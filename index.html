@@ -1,131 +1,302 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Marcação de Ponto</title>
 
   <!-- Supabase -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
-  <!-- QR Code Reader -->
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <!-- html5-qrcode (versão estável) -->
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
 
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 18px;
-    }
-    button {
-      padding: 12px 18px;
-      font-size: 16px;
-      margin-top: 10px;
-      width: 100%;
-    }
-    #qr-reader {
-      width: 100%;
-      margin-top: 20px;
-    }
+    body { font-family: Arial, sans-serif; padding: 14px; max-width:720px; margin:auto; }
+    h2 { margin-bottom:6px; }
+    label { display:block; margin-top:10px; }
+    select, button { padding:10px; font-size:16px; width:100%; box-sizing:border-box; }
+    #qr-reader { width:100%; margin-top:12px; }
+    .log { margin-top:12px; background:#f6f6f6; padding:8px; border-radius:6px; white-space:pre-wrap; font-size:13px; max-height:180px; overflow:auto; }
   </style>
 </head>
 <body>
+  <h2>📍 Marcação de Ponto</h2>
 
-<h2>📍 Marcação de Ponto</h2>
+  <label>Funcionário:</label>
+  <select id="funcionario"></select>
 
-<label>Funcionário:</label>
-<select id="funcionario"></select>
+  <button id="btnStart">📷 Ler QR Code</button>
+  <div id="qr-reader" style="display:none;"></div>
 
-<button onclick="startScanner()">📷 Ler QR Code</button>
-
-<div id="qr-reader" style="display:none;"></div>
+  <div class="log" id="log">Logs:</div>
 
 <script>
-/* ---------------------------------------------------
-   CONFIGURAÇÃO DO SUPABASE
------------------------------------------------------- */
-const supabase = supabase.createClient(
-  https://npyosbigynxmxdakcymg.supabase.co,
-  sb_publishable_67e1zdXpV7_PXZ-0_ZmmSw__9ddgDKF
-);
+/* ============================
+   CONFIGURAÇÃO - substituir
+   ============================ */
+const SUPABASE_URL = https://npyosbigynxmxdakcymg.supabase.co;      // ex: https://xyz.supabase.co
+const SUPABASE_ANON_KEY = sb_publishable_67e1zdXpV7_PXZ-0_ZmmSw__9ddgDKF;    // anon public key (RLS aplicado)
 
-/* ---------------------------------------------------
-   CARREGAR LISTA DE FUNCIONÁRIOS
------------------------------------------------------- */
-async function carregarFuncionarios() {
-  const { data, error } = await supabase
-    .from("funcionarios")
-    .select("*")
-    .order("nome");
+/* ============================
+   Inicializar Supabase
+   ============================ */
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  if (error) {
-    alert("Erro ao carregar funcionários.");
+/* ============================
+   Utilitários
+   ============================ */
+const logEl = document.getElementById('log');
+function log(msg){
+  const ts = new Date().toLocaleTimeString();
+  logEl.textContent = ts + " — " + msg + "\n" + logEl.textContent;
+  console.log(msg);
+}
+
+function hojeIsoDate(){ // retorna YYYY-MM-DD
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+/* ============================
+   Carregar funcionários
+   ============================ */
+async function carregarFuncionarios(){
+  try {
+    const { data, error } = await supabaseClient
+      .from('funcionarios')
+      .select('id,nome,codigo')
+      .eq('ativo', true)
+      .order('nome');
+
+    if (error) {
+      log("Erro ao carregar funcionários: " + error.message);
+      alert("Erro ao carregar funcionários. Ver console.");
+      return;
+    }
+
+    const sel = document.getElementById('funcionario');
+    sel.innerHTML = '';
+    if (!data || data.length === 0){
+      sel.innerHTML = '<option value="">(nenhum funcionário)</option>';
+      return;
+    }
+    data.forEach(f=>{
+      const opt = document.createElement('option');
+      opt.value = f.id;
+      opt.textContent = f.nome + (f.codigo ? " ("+f.codigo+")" : "");
+      sel.appendChild(opt);
+    });
+    log("Funcionários carregados: " + data.length);
+  } catch (err) {
+    console.error(err);
+    alert("Erro ao carregar funcionários. Ver consola.");
+  }
+}
+
+/* ============================
+   Scanner QR
+   ============================ */
+let qrScanner = null;
+const readerId = "qr-reader";
+
+async function startScanner(){
+  // verificar se biblioteca está presente
+  if (typeof Html5Qrcode === 'undefined') {
+    alert("Erro: html5-qrcode não está carregado. Verifica o script CDN.");
+    log("html5-qrcode indefinido.");
     return;
   }
 
-  const sel = document.getElementById("funcionario");
-  sel.innerHTML = data.map(f => 
-    `<option value="${f.id}">${f.nome}</option>`
-  ).join("");
+  const sel = document.getElementById('funcionario');
+  if (!sel.value) {
+    alert("Por favor selecione um funcionário antes de ler o QR.");
+    return;
+  }
+
+  document.getElementById('qr-reader').style.display = "block";
+  document.getElementById('btnStart').disabled = true;
+
+  qrScanner = new Html5Qrcode(readerId);
+
+  try {
+    await qrScanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 250 },
+      qrMessage => {
+        // Ao detectar QR
+        log("QR detectado: " + qrMessage);
+        // parar scanner e processar
+        qrScanner.stop().then(()=> {
+          document.getElementById('qr-reader').style.display = "none";
+          document.getElementById('btnStart').disabled = false;
+          tratarQr(qrMessage);
+        }).catch(errStop=>{
+          console.warn("Erro ao parar scanner:", errStop);
+          document.getElementById('qr-reader').style.display = "none";
+          document.getElementById('btnStart').disabled = false;
+          tratarQr(qrMessage);
+        });
+      },
+      errorMessage => {
+        // leitura falhou intermitente (ignorar)
+        //console.debug("QR leitura intermitente:", errorMessage);
+      }
+    );
+    log("Scanner iniciado.");
+  } catch (err) {
+    console.error("Erro ao iniciar scanner:", err);
+    alert("Não foi possível iniciar a câmara. Ver console.");
+    document.getElementById('qr-reader').style.display = "none";
+    document.getElementById('btnStart').disabled = false;
+  }
 }
 
-carregarFuncionarios();
+document.getElementById('btnStart').addEventListener('click', startScanner);
 
-/* ---------------------------------------------------
-   INICIAR LEITOR DE QR CODE
------------------------------------------------------- */
-function startScanner() {
-  document.getElementById("qr-reader").style.display = "block";
+/* ============================
+   Função principal: tratar QR
+   ============================ */
+/*
+ Espera QR que contenha o identificador da obra, por exemplo:
+ OBRA:U003-74076
+ ou apenas o código/ID (ex: U003-74076)
+*/
+async function tratarQr(texto){
+  // normalizar
+  const txt = String(texto).trim();
+  // aceitar formatos "OBRA:XYZ" ou só "XYZ"
+  let obraCodigo = txt;
+  if (txt.toUpperCase().startsWith("OBRA:")){
+    obraCodigo = txt.split(':').slice(1).join(':').trim();
+  }
 
-  const qr = new Html5Qrcode("qr-reader");
+  if (!obraCodigo){
+    alert("QR inválido: não foi identificado código da obra.");
+    return;
+  }
 
-  qr.start(
-    { facingMode: "environment" },
-    { fps: 10, qrbox: 250 },
-    qrText => {
-      qr.stop();
-      document.getElementById("qr-reader").style.display = "none";
-      marcarPonto(qrText);
-    },
-    err => {}
-  );
+  log("Obra detectada: " + obraCodigo);
+
+  // procurar obra na base
+  try {
+    const { data: obras, error: obraErr } = await supabaseClient
+      .from('obras')
+      .select('id,codigo,nome')
+      .eq('codigo', obraCodigo)
+      .limit(1);
+
+    if (obraErr) { log("Erro ao procurar obra: " + obraErr.message); alert("Erro ao procurar obra."); return; }
+    if (!obras || obras.length === 0) { alert("Obra não encontrada: " + obraCodigo); return; }
+
+    const obra = obras[0];
+    const funcionarioId = document.getElementById('funcionario').value;
+
+    // marcar ponto (lógica: procurar registo do dia para este funcionário+obra)
+    await marcarPontoLogica(funcionarioId, obra.id);
+
+  } catch (err) {
+    console.error("Erro ao tratar QR:", err);
+    alert("Erro interno. Ver console.");
+  }
 }
 
-/* ---------------------------------------------------
-   MARCAR PONTO
------------------------------------------------------- */
-async function marcarPonto(qrData) {
-  const funcionario_id = document.getElementById("funcionario").value;
-  const obra_id = qrData; // o QR contém apenas o ID da obra
+/* ============================
+   Função marcarPontoLogica
+   - procura registo do dia
+   - se não existir cria com 'entrada'
+   - se existir sem 'saida' atualiza com 'saida'
+   - se existir com 'entrada' e 'saida' cria novo turno (nova linha com entrada)
+   ============================ */
+async function marcarPontoLogica(funcionarioId, obraId){
+  const today = hojeIsoDate();
 
-  // Obter localização GPS
-  navigator.geolocation.getCurrentPosition(async pos => {
-    const latitude = pos.coords.latitude;
-    const longitude = pos.coords.longitude;
+  try {
+    // obter registos do dia (ordenados por created_at desc para pegar último)
+    const { data: existentes, error: selErr } = await supabaseClient
+      .from('ponto')
+      .select('*')
+      .eq('funcionario_id', funcionarioId)
+      .eq('obra_id', obraId)
+      .eq('data', today)
+      .order('created_at', { ascending: false });
 
-    // Enviar para o Supabase
-    const { error } = await supabase
-      .from("ponto")
-      .insert({
-        funcionario_id,
-        obra_id,
-        datahora: new Date().toISOString(),
-        latitude,
-        longitude
+    if (selErr) { log("Erro ao consultar ponto: " + selErr.message); alert("Erro ao consultar ponto."); return; }
+
+    // função para obter geolocation (opcional)
+    async function obterPosicao(){
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) return resolve(null);
+        navigator.geolocation.getCurrentPosition(pos => {
+          resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+        }, err => {
+          // Não bloquear por falta de GPS
+          console.warn("GPS erro:", err);
+          resolve(null);
+        }, { enableHighAccuracy: true, timeout: 8000 });
       });
-
-    if (error) {
-      alert("❌ Erro ao registrar ponto!");
-      console.log(error);
-    } else {
-      alert("✅ Ponto registado com sucesso!");
     }
 
-  }, () => {
-    alert("❌ Não foi possível obter a localização GPS.");
-  });
+    const pos = await obterPosicao();
+
+    if (!existentes || existentes.length === 0){
+      // inserir novo registo com 'entrada'
+      const payload = {
+        funcionario_id: funcionarioId,
+        obra_id: obraId,
+        data: today,
+        entrada: new Date().toISOString()
+      };
+      if (pos){ payload.latitude = pos.latitude; payload.longitude = pos.longitude; }
+
+      const { data: ins, error: insErr } = await supabaseClient.from('ponto').insert(payload);
+      if (insErr){ log("Erro ao inserir entrada: " + insErr.message); alert("Erro ao registar entrada."); return; }
+      log("Entrada registada: " + (pos ? `gps(${pos.latitude},${pos.longitude}) ` : "") + new Date().toLocaleString());
+      alert("Entrada registada com sucesso!");
+      return;
+    }
+
+    // já existe registo do dia — analisar último
+    const ultimo = existentes[0];
+
+    if (!ultimo.saida){
+      // atualizar com saida
+      const payload = { saida: new Date().toISOString() };
+      if (pos){ payload.latitude_saida = pos.latitude; payload.longitude_saida = pos.longitude; } // opcional colunas
+      const { data: upd, error: updErr } = await supabaseClient.from('ponto').update(payload).eq('id', ultimo.id);
+      if (updErr){ log("Erro ao registar saída: " + updErr.message); alert("Erro ao registar saída."); return; }
+      log("Saída registada: " + new Date().toLocaleString());
+      alert("Saída registada com sucesso!");
+      return;
+    } else {
+      // já tem entrada e saída: criar novo turno (nova entrada)
+      const payload = {
+        funcionario_id: funcionarioId,
+        obra_id: obraId,
+        data: today,
+        entrada: new Date().toISOString()
+      };
+      if (pos){ payload.latitude = pos.latitude; payload.longitude = pos.longitude; }
+      const { data: ins2, error: ins2Err } = await supabaseClient.from('ponto').insert(payload);
+      if (ins2Err){ log("Erro ao inserir novo turno: " + ins2Err.message); alert("Erro ao registar novo turno."); return; }
+      log("Novo turno - entrada registada: " + new Date().toLocaleString());
+      alert("Entrada registada (novo turno)!");
+      return;
+    }
+
+  } catch (err) {
+    console.error("Erro marcarPontoLogica:", err);
+    alert("Erro interno ao marcar ponto. Ver console.");
+  }
 }
 
+/* ============================
+   Inicialização
+   ============================ */
+carregarFuncionarios();
 </script>
-
 </body>
 </html>
