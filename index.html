@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Marcação de Ponto</title>
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- QR Code Reader -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 18px;
+    }
+    button {
+      padding: 12px 18px;
+      font-size: 16px;
+      margin-top: 10px;
+      width: 100%;
+    }
+    #qr-reader {
+      width: 100%;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<h2>📍 Marcação de Ponto</h2>
+
+<label>Funcionário:</label>
+<select id="funcionario"></select>
+
+<button onclick="startScanner()">📷 Ler QR Code</button>
+
+<div id="qr-reader" style="display:none;"></div>
+
+<script>
+/* ---------------------------------------------------
+   CONFIGURAÇÃO DO SUPABASE
+------------------------------------------------------ */
+const supabase = supabase.createClient(
+  https://npyosbigynxmxdakcymg.supabase.co,
+  sb_publishable_67e1zdXpV7_PXZ-0_ZmmSw__9ddgDKF
+);
+
+/* ---------------------------------------------------
+   CARREGAR LISTA DE FUNCIONÁRIOS
+------------------------------------------------------ */
+async function carregarFuncionarios() {
+  const { data, error } = await supabase
+    .from("funcionarios")
+    .select("*")
+    .order("nome");
+
+  if (error) {
+    alert("Erro ao carregar funcionários.");
+    return;
+  }
+
+  const sel = document.getElementById("funcionario");
+  sel.innerHTML = data.map(f => 
+    `<option value="${f.id}">${f.nome}</option>`
+  ).join("");
+}
+
+carregarFuncionarios();
+
+/* ---------------------------------------------------
+   INICIAR LEITOR DE QR CODE
+------------------------------------------------------ */
+function startScanner() {
+  document.getElementById("qr-reader").style.display = "block";
+
+  const qr = new Html5Qrcode("qr-reader");
+
+  qr.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 250 },
+    qrText => {
+      qr.stop();
+      document.getElementById("qr-reader").style.display = "none";
+      marcarPonto(qrText);
+    },
+    err => {}
+  );
+}
+
+/* ---------------------------------------------------
+   MARCAR PONTO
+------------------------------------------------------ */
+async function marcarPonto(qrData) {
+  const funcionario_id = document.getElementById("funcionario").value;
+  const obra_id = qrData; // o QR contém apenas o ID da obra
+
+  // Obter localização GPS
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const latitude = pos.coords.latitude;
+    const longitude = pos.coords.longitude;
+
+    // Enviar para o Supabase
+    const { error } = await supabase
+      .from("ponto")
+      .insert({
+        funcionario_id,
+        obra_id,
+        datahora: new Date().toISOString(),
+        latitude,
+        longitude
+      });
+
+    if (error) {
+      alert("❌ Erro ao registrar ponto!");
+      console.log(error);
+    } else {
+      alert("✅ Ponto registado com sucesso!");
+    }
+
+  }, () => {
+    alert("❌ Não foi possível obter a localização GPS.");
+  });
+}
+
+</script>
+
+</body>
+</html>
