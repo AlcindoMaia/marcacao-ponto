@@ -33,6 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
     e.preventDefault();
     e.stopPropagation();
     console.log("SUBMIT INTERCEPTADO");
+};
 
 
     const nome = document.getElementById("nome").value.trim();
