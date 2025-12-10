@@ -1,15 +1,9 @@
-// cadastro.js - Registo de dispositivo + funcionário (versão corrigida + debug)
+// cadastro.js - FIX FINAL
 
-// =====================================================
-//  CONFIG SUPABASE
-// =====================================================
 const SUPABASE_URL = "https://npyosbigynxmxdakcymg.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_67e1zdXpV7_PXZ-0_ZmmSw__9ddgDKF";
 const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// =====================================================
-//  GERAR OU OBTER DEVICE ID
-// =====================================================
 function getDeviceId() {
   let id = localStorage.getItem("deviceId");
   if (!id) {
@@ -19,11 +13,8 @@ function getDeviceId() {
   return id;
 }
 
-// =====================================================
-//  MAIN
-// =====================================================
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("cadastro.js carregado"); // confirmação que JS está a funcionar
+  console.log("cadastro.js carregado");
   const deviceId = getDeviceId();
 
   document.getElementById("deviceInfo").textContent =
@@ -33,8 +24,6 @@ document.addEventListener("DOMContentLoaded", () => {
     e.preventDefault();
     e.stopPropagation();
     console.log("SUBMIT INTERCEPTADO");
-};
-
 
     const nome = document.getElementById("nome").value.trim();
     const codigo = document.getElementById("codigo").value.trim();
@@ -44,9 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // =====================================================
-    //  VERIFICAR SE JÁ EXISTE UM FUNCIONÁRIO COM ESTE DEVICE ID
-    // =====================================================
+    // VERIFICAR SE EXISTE
     const { data: existente, error: erroSelect } = await supabase
       .from("funcionarios")
       .select("*")
@@ -54,14 +41,11 @@ document.addEventListener("DOMContentLoaded", () => {
       .maybeSingle();
 
     if (erroSelect) {
-      console.error("ERRO SELECT:", erroSelect);
       alert("ERRO SELECT: " + JSON.stringify(erroSelect));
       return;
     }
 
-    // =====================================================
-    //  SE EXISTIR → ATUALIZAR
-    // =====================================================
+    // ATUALIZAR REGISTO EXISTENTE
     if (existente) {
       const { error: errUpdate } = await supabase
         .from("funcionarios")
@@ -69,35 +53,32 @@ document.addEventListener("DOMContentLoaded", () => {
         .eq("device_id", deviceId);
 
       if (errUpdate) {
-        console.error("ERRO UPDATE:", errUpdate);
         alert("ERRO UPDATE: " + JSON.stringify(errUpdate));
         return;
       }
 
       document.getElementById("msg").textContent =
         "Registo atualizado com sucesso!";
+      console.log("UPDATE OK");
       return;
     }
 
-    // =====================================================
-    //  SE NÃO EXISTIR → INSERIR
-    // =====================================================
-    const { error: errInsert } = await supabase.from("funcionarios").insert({
-      nome,
-      codigo,
-      device_id: deviceId,
-    });
+    // INSERIR NOVO
+    const { error: errInsert } = await supabase
+      .from("funcionarios")
+      .insert({
+        nome,
+        codigo,
+        device_id: deviceId
+      });
 
     if (errInsert) {
-      console.error("ERRO INSERT:", errInsert);
-      alert("ERRO INSERT: " + JSON.stringify(errInsert)); // agora mostra sempre
+      alert("ERRO INSERT: " + JSON.stringify(errInsert));
       return;
     }
 
-    // =====================================================
-    //  SUCESSO
-    // =====================================================
+    console.log("INSERT OK");
     document.getElementById("msg").textContent =
-      "Registado com sucesso! Pode fechar esta página.";
-  });
+      "Registado com sucesso! Pode fechar a página.";
+  };
 });
