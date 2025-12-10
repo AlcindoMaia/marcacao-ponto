@@ -1,1 +1,106 @@
-<html><body>cadastro placeholder</body></html>
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cadastro — Marcação de Ponto</title>
+<link rel="stylesheet" href="style.css" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div class="wrap smallpage">
+  <main class="card">
+    <h2>Cadastro de Dispositivo</h2>
+
+    <p id="deviceInfo"></p>
+
+    <form id="frmCadastro">
+      <label>Nome do Funcionário</label>
+      <input id="nome" required />
+
+      <label>Nº Colaborador (opcional)</label>
+      <input id="codigo" />
+
+      <div class="actions">
+        <button type="submit" class="btn primary">Registar</button>
+      </div>
+    </form>
+
+    <div id="msg" class="msg"></div>
+
+    <p class="small">
+      Este formulário regista permanentemente o dispositivo no sistema.  
+      Apenas o administrador deve fornecer o QR de registo.
+    </p>
+  </main>
+</div>
+
+<script>
+const SUPABASE_URL = "https://npyosbigynxmxdakcymg.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_67e1zdXpV7_PXZ-0_ZmmSw__9ddgDKF";
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function getDeviceId() {
+  let id = localStorage.getItem("deviceId");
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem("deviceId", id);
+  }
+  return id;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const deviceId = getDeviceId();
+  document.getElementById("deviceInfo").textContent = "Identificador do dispositivo: " + deviceId;
+
+  document.getElementById("frmCadastro").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const nome = document.getElementById("nome").value.trim();
+    const codigo = document.getElementById("codigo").value.trim();
+
+    if (!nome) {
+      alert("Introduza o nome do funcionário.");
+      return;
+    }
+
+    // Será que já existe?
+    const { data: existente } = await supabase
+      .from("funcionarios")
+      .select("*")
+      .eq("device_id", deviceId)
+      .maybeSingle();
+
+    if (existente) {
+      const { error } = await supabase
+        .from("funcionarios")
+        .update({ nome, codigo })
+        .eq("device_id", deviceId);
+
+      if (error) {
+        document.getElementById("msg").textContent = "Erro ao atualizar registo.";
+      } else {
+        document.getElementById("msg").textContent = "Registo atualizado com sucesso!";
+      }
+
+      return;
+    }
+
+    // Inserir novo funcionário
+    const { error } = await supabase.from("funcionarios").insert({
+      nome,
+      codigo,
+      device_id: deviceId,
+    });
+
+    if (error) {
+      document.getElementById("msg").textContent = "Erro ao registar funcionário.";
+    } else {
+      document.getElementById("msg").textContent = "Registado com sucesso! Pode fechar esta página.";
+    }
+  });
+});
+</script>
+
+</body>
+</html>
