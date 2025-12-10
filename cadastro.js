@@ -29,8 +29,11 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("deviceInfo").textContent =
     "Identificador do dispositivo: " + deviceId;
 
-  document.getElementById("frmCadastro").addEventListener("submit", async (e) => {
+  document.getElementById("frmCadastro").onsubmit = async function(e){
     e.preventDefault();
+    e.stopPropagation();
+    console.log("SUBMIT INTERCEPTADO");
+
 
     const nome = document.getElementById("nome").value.trim();
     const codigo = document.getElementById("codigo").value.trim();
