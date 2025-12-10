@@ -1,3 +1,5 @@
+alert("JS carregado");
+
 // cadastro.js - Registo de dispositivo + funcionário
 
 const SUPABASE_URL = "https://npyosbigynxmxdakcymg.supabase.co";
