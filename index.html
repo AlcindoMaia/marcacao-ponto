@@ -1,1 +1,52 @@
-<html><body>index placeholder</body></html>
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Marcação de Ponto — Maia Solutions</title>
+
+<link rel="stylesheet" href="style.css" />
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+
+<body>
+<div class="wrap">
+  <header class="header">
+    <div class="brand">Maia Solutions</div>
+    <div class="subtitle">Marcação de Ponto</div>
+  </header>
+
+  <main class="card">
+
+    <div id="userCard" class="userCard hidden">
+      <div class="userName" id="nomeFuncionario">—</div>
+      <div class="userMeta">Dispositivo registado</div>
+      <button id="btnEditRegistration" class="btn small">Editar registo</button>
+    </div>
+
+    <div id="notRegistered" class="notice hidden">
+      Este dispositivo não está registado.  
+      <br>
+      Peça ao administrador o QR de registo ou  
+      <a href="cadastro.html">clique aqui para registar.</a>
+    </div>
+
+    <button id="btnScanner" class="btn primary">📷 Ler QR da Obra</button>
+
+    <div id="qr-reader" class="qrReader hidden"></div>
+
+    <h3 class="sectionTitle">Registos semanais</h3>
+    <div id="historico" class="history"></div>
+
+  </main>
+
+  <footer class="footer">
+    <small>© Maia Solutions</small>
+  </footer>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
