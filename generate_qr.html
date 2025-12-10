@@ -1,1 +1,54 @@
-<html><body>generate qr placeholder</body></html>
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Gerador de QR — Admin</title>
+
+<link rel="stylesheet" href="style.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+
+<body>
+<div class="wrap smallpage">
+  <main class="card">
+    <h2>Gerador de QR (Admin)</h2>
+
+    <label>URL</label>
+    <input id="url" value="https://alcindomaia.github.io/marcacao-ponto/cadastro.html" />
+
+    <label>ID da Obra (opcional)</label>
+    <input id="obra" placeholder="obra_001" />
+
+    <div id="qrcode"></div>
+
+    <div class="actions">
+      <button id="btnGen" class="btn primary">Gerar QR</button>
+    </div>
+
+    <p class="small">Imprima este QR para uso na obra ou para cadastro.</p>
+  </main>
+</div>
+
+<script>
+document.getElementById("btnGen").addEventListener("click", () => {
+  const url = document.getElementById("url").value.trim();
+  const obra = document.getElementById("obra").value.trim();
+
+  let finalURL = url;
+
+  if (obra) {
+    finalURL += (finalURL.includes("?") ? "&" : "?") + "obra=" + encodeURIComponent(obra);
+  }
+
+  document.getElementById("qrcode").innerHTML = "";
+  new QRCode(document.getElementById("qrcode"), {
+    text: finalURL,
+    width: 240,
+    height: 240,
+  });
+});
+</script>
+
+</body>
+</html>
