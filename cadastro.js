@@ -44,6 +44,9 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("ERRO SELECT: " + JSON.stringify(erroSelect));
       return;
     }
+    
+console.log("SELECT retorno:", existente, erroSelect);
+alert("SELECT retorno: " + JSON.stringify({ existente, erroSelect }));
 
     // ATUALIZAR REGISTO EXISTENTE
     if (existente) {
@@ -76,6 +79,8 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("ERRO INSERT: " + JSON.stringify(errInsert));
       return;
     }
+console.log("INSERT retorno:", errInsert);
+alert("INSERT retorno: " + JSON.stringify(errInsert));
 
     console.log("INSERT OK");
     document.getElementById("msg").textContent =
