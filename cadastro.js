@@ -1,3 +1,5 @@
+alert("TESTE: cadastro.js carregado do servidor real");
+
 // cadastro.js - FIX FINAL
 
 const SUPABASE_URL = "https://npyosbigynxmxdakcymg.supabase.co";
