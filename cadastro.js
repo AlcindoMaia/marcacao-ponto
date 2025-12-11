@@ -1,11 +1,18 @@
-alert("TESTE: cadastro.js carregado do servidor real");
-
-// cadastro.js - FIX FINAL
-
+// ================================
+// CONFIGURAÇÃO DO SUPABASE
+// ================================
 const SUPABASE_URL = "https://npyosbigynxmxdakcymg.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weW9zYmlneW54bXhkYWtjeW1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4MzYyMjYsImV4cCI6MjA4MDQxMjIyNn0.CErd5a_-9HS4qPB99SFyO-airsNnS3b8dvWWrSPE4_M";
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_ANON_KEY =
+"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weW9zYmlneW54bXhkYWtjeW1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4MzYyMjYsImV4cCI6MjA4MDQxMjIyNn0.CErd5a_-9HS4qPB99SFyO-airsNnS3b8dvWWrSPE4_M";
 
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+console.log("Supabase inicializado");
+
+
+// ================================
+// DEVICE ID PERMANENTE
+// ================================
 function getDeviceId() {
   let id = localStorage.getItem("deviceId");
   if (!id) {
@@ -15,16 +22,25 @@ function getDeviceId() {
   return id;
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  console.log("cadastro.js carregado");
-  const deviceId = getDeviceId();
 
+// ================================
+// MAIN
+// ================================
+document.addEventListener("DOMContentLoaded", () => {
+
+  console.log("cadastro.js carregado");
+
+  const deviceId = getDeviceId();
   document.getElementById("deviceInfo").textContent =
     "Identificador do dispositivo: " + deviceId;
 
-  document.getElementById("frmCadastro").onsubmit = async function(e){
+  const form = document.getElementById("frmCadastro");
+
+  // INTERCEPTAR SUBMIT
+  form.onsubmit = async function (e) {
     e.preventDefault();
     e.stopPropagation();
+
     console.log("SUBMIT INTERCEPTADO");
 
     const nome = document.getElementById("nome").value.trim();
@@ -35,30 +51,34 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // VERIFICAR SE EXISTE
-    const { data: existente, error: erroSelect } = await supabase
+    // ================================
+    // VERIFICAR SE JÁ EXISTE (SELECT)
+    // ================================
+    const { data: existente, error: erroSelect } = await supabaseClient
       .from("funcionarios")
       .select("*")
       .eq("device_id", deviceId)
       .maybeSingle();
 
     if (erroSelect) {
-      alert("ERRO SELECT: " + JSON.stringify(erroSelect));
+      alert("ERRO AO LER DA BASE DE DADOS:\n" + JSON.stringify(erroSelect));
+      console.error(erroSelect);
       return;
     }
-    
-console.log("SELECT retorno:", existente, erroSelect);
-alert("SELECT retorno: " + JSON.stringify({ existente, erroSelect }));
 
-    // ATUALIZAR REGISTO EXISTENTE
+    // ================================
+    // UPDATE SE EXISTE
+    // ================================
     if (existente) {
-      const { error: errUpdate } = await supabase
+
+      const { error: errUpdate } = await supabaseClient
         .from("funcionarios")
         .update({ nome, codigo })
         .eq("device_id", deviceId);
 
       if (errUpdate) {
-        alert("ERRO UPDATE: " + JSON.stringify(errUpdate));
+        alert("ERRO AO ATUALIZAR:\n" + JSON.stringify(errUpdate));
+        console.error(errUpdate);
         return;
       }
 
@@ -68,8 +88,10 @@ alert("SELECT retorno: " + JSON.stringify({ existente, erroSelect }));
       return;
     }
 
-    // INSERIR NOVO
-    const { error: errInsert } = await supabase
+    // ================================
+    // INSERT SE NÃO EXISTE
+    // ================================
+    const { error: errInsert } = await supabaseClient
       .from("funcionarios")
       .insert({
         nome,
@@ -78,11 +100,10 @@ alert("SELECT retorno: " + JSON.stringify({ existente, erroSelect }));
       });
 
     if (errInsert) {
-      alert("ERRO INSERT: " + JSON.stringify(errInsert));
+      alert("ERRO AO INSERIR:\n" + JSON.stringify(errInsert));
+      console.error(errInsert);
       return;
     }
-console.log("INSERT retorno:", errInsert);
-alert("INSERT retorno: " + JSON.stringify(errInsert));
 
     console.log("INSERT OK");
     document.getElementById("msg").textContent =
