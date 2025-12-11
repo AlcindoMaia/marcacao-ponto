@@ -4,10 +4,13 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Cadastro — Marcação de Ponto</title>
-<link rel="stylesheet" href="style.css" />
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
 
+<link rel="stylesheet" href="style.css" />
+
+<!-- CARREGAR SUPABASE PRIMEIRO -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+</head>
 <body>
 
 <div class="wrap smallpage">
@@ -36,6 +39,8 @@
   </main>
 </div>
 
+<!-- CARREGAR O JS DEPOIS DO SUPABASE -->
 <script src="cadastro.js"></script>
+
 </body>
 </html>
