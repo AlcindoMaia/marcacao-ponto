@@ -52,9 +52,9 @@ document.getElementById("formObra").onsubmit = async (e) => {
         .maybeSingle();
 
     if (error || !data) {
-        alert("Erro ao criar obra.");
-        console.error(error);
-        return;
+    alert("ERRO DETALHADO: " + JSON.stringify(error));
+    console.error(error);
+    return;
     }
 
     const obraID = data.id;
@@ -89,3 +89,4 @@ document.getElementById("formObra").onsubmit = async (e) => {
 
     alert("Obra criada e QR gerado com sucesso!");
 };
+
