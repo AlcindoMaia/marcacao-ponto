@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gerador de QR — Obras</title>
+<title>Criar Obra + Gerar QR — Maia Solutions</title>
 
 <link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -11,26 +11,46 @@
 
 <style>
 .container { padding: 20px; }
-.qr-box { text-align: center; margin-top: 20px; }
-.qr-img { margin-top: 20px; border: 1px solid #ddd; padding: 10px; }
+.qr-preview { margin-top: 25px; text-align:center; }
+canvas { border:1px solid #ddd; padding:10px; background:#fff; }
+label { font-weight: bold; margin-top:10px; display:block; }
+input { width: 100%; padding:8px; margin:5px 0 15px 0; }
 </style>
-
 </head>
+
 <body>
 
 <div class="container card">
-    <h2>Gerador de QR Code para Obra</h2>
 
-    <label>Selecionar Obra</label>
-    <select id="listaObras"></select>
+<h2>Criar Nova Obra + Gerar QR Code</h2>
 
-    <button class="btn primary" id="gerar">Gerar QR</button>
+<form id="formObra">
 
-    <div class="qr-box">
-        <canvas id="qrCanvas"></canvas>
-    </div>
+    <label>Nome da Obra</label>
+    <input id="nomeObra" required />
 
-    <a id="downloadBtn" class="btn secondary" download="qr_obra.png">Descarregar QR</a>
+    <label>Morada (opcional)</label>
+    <input id="morada" />
+
+    <label>Raio de validação (metros)</label>
+    <input id="raio" type="number" value="120" />
+
+    <label>Coordenadas GPS</label>
+    <input id="latitude" placeholder="Latitude" readonly />
+    <input id="longitude" placeholder="Longitude" readonly />
+
+    <button type="button" class="btn secondary" id="btnGPS">Obter Localização Atual</button>
+
+    <button type="submit" class="btn primary">Criar Obra + Gerar QR</button>
+</form>
+
+<div class="qr-preview hidden" id="qrBox">
+    <h3>QR Code da Obra</h3>
+    <canvas id="qrCanvas"></canvas>
+    <br>
+    <a id="downloadBtn" class="btn secondary" download="QR_Obra.png">Descarregar QR</a>
+</div>
+
 </div>
 
 <script src="qr.js"></script>
