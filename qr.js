@@ -7,57 +7,85 @@ const SUPABASE_ANON_KEY =
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ===================================================================
-// CARREGAR LISTA DE OBRAS
-// ===================================================================
-async function carregarObras() {
-    const { data, error } = await supabaseClient
-        .from("obras")
-        .select("id, nome")
-        .order("nome");
 
-    const lista = document.getElementById("listaObras");
+// ===================================================================
+// OBTER LOCALIZAÇÃO ATUAL
+// ===================================================================
+document.getElementById("btnGPS").onclick = () => {
+    navigator.geolocation.getCurrentPosition(pos => {
+        document.getElementById("latitude").value = pos.coords.latitude;
+        document.getElementById("longitude").value = pos.coords.longitude;
+    }, err => {
+        alert("Erro ao obter localização. Ative o GPS.");
+    }, { enableHighAccuracy: true, timeout:15000 });
+};
 
-    if (error) {
-        alert("Erro ao carregar obras.");
+
+// ===================================================================
+// CRIAR OBRA + GERAR QR
+// ===================================================================
+document.getElementById("formObra").onsubmit = async (e) => {
+    e.preventDefault();
+
+    const nome = document.getElementById("nomeObra").value.trim();
+    const morada = document.getElementById("morada").value.trim();
+    const raio = parseInt(document.getElementById("raio").value);
+    const lat = parseFloat(document.getElementById("latitude").value);
+    const lon = parseFloat(document.getElementById("longitude").value);
+
+    if (!nome || !lat || !lon) {
+        alert("Preencha nome e localização.");
         return;
     }
 
-    lista.innerHTML = data.map(o =>
-        `<option value="${o.id}">${o.nome}</option>`
-    ).join("");
-}
+    // Criar obra no Supabase
+    const { data, error } = await supabaseClient
+        .from("obras")
+        .insert({
+            nome,
+            morada,
+            latitude: lat,
+            longitude: lon,
+            raio: raio
+        })
+        .select()
+        .maybeSingle();
 
-carregarObras();
+    if (error || !data) {
+        alert("Erro ao criar obra.");
+        console.error(error);
+        return;
+    }
 
-// ===================================================================
-// GERAR QR
-// ===================================================================
-document.getElementById("gerar").onclick = () => {
-    const obraId = document.getElementById("listaObras").value;
-    const qrUrl = `https://alcindomaia.github.io/marcacao-ponto/?obra=${obraId}`;
+    const obraID = data.id;
+    const urlObra = `https://alcindomaia.github.io/marcacao-ponto/?obra=${obraID}`;
 
+    // Gerar QR
     const qr = new QRious({
         element: document.getElementById("qrCanvas"),
         size: 300,
         level: 'H',
-        value: qrUrl
+        value: urlObra
     });
 
-    // Criar imagem final com o logo no centro
+    // Inserir logótipo no centro
     const canvas = document.getElementById("qrCanvas");
     const ctx = canvas.getContext("2d");
 
     const logo = new Image();
-    logo.src = "Logo.png"; // coloca aqui o nome da imagem do teu logótipo na raiz do projeto
+    logo.src = "Logo.png";  // Tens de colocar este ficheiro no repo
     logo.onload = () => {
-        const size = 60;
-        const x = (canvas.width - size) / 2;
-        const y = (canvas.height - size) / 2;
-        ctx.drawImage(logo, x, y, size, size);
+        const s = 60;
+        const x = (canvas.width - s) / 2;
+        const y = (canvas.height - s) / 2;
+        ctx.drawImage(logo, x, y, s, s);
 
-        // Botão de download
-        const download = document.getElementById("downloadBtn");
-        download.href = canvas.toDataURL("image/png");
+        // Botão para download
+        document.getElementById("downloadBtn").href =
+            canvas.toDataURL("image/png");
     };
+
+    document.getElementById("qrBox").classList.remove("hidden");
+
+    alert("Obra criada e QR gerado com sucesso!");
 };
