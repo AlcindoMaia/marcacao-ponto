@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gerador de QR — Obras</title>
+
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+
+<style>
+.container { padding: 20px; }
+.qr-box { text-align: center; margin-top: 20px; }
+.qr-img { margin-top: 20px; border: 1px solid #ddd; padding: 10px; }
+</style>
+
+</head>
+<body>
+
+<div class="container card">
+    <h2>Gerador de QR Code para Obra</h2>
+
+    <label>Selecionar Obra</label>
+    <select id="listaObras"></select>
+
+    <button class="btn primary" id="gerar">Gerar QR</button>
+
+    <div class="qr-box">
+        <canvas id="qrCanvas"></canvas>
+    </div>
+
+    <a id="downloadBtn" class="btn secondary" download="qr_obra.png">Descarregar QR</a>
+</div>
+
+<script src="qr.js"></script>
+
+</body>
+</html>
