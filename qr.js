@@ -17,7 +17,11 @@ document.getElementById("btnGPS").onclick = () => {
         document.getElementById("longitude").value = pos.coords.longitude;
     }, err => {
         alert("Erro ao obter localização. Ative o GPS.");
-    }, { enableHighAccuracy: true, timeout:15000 });
+        console.error(err);
+    }, {
+        enableHighAccuracy: true,
+        timeout: 15000
+    });
 };
 
 
@@ -30,11 +34,15 @@ document.getElementById("formObra").onsubmit = async (e) => {
     const nome = document.getElementById("nomeObra").value.trim();
     const morada = document.getElementById("morada").value.trim();
     const raio = parseInt(document.getElementById("raio").value);
-    const lat = parseFloat(document.getElementById("latitude").value);
-    const lon = parseFloat(document.getElementById("longitude").value);
+    const latitude = parseFloat(document.getElementById("latitude").value);
+    const longitude = parseFloat(document.getElementById("longitude").value);
 
-    if (!nome || !lat || !lon) {
-        alert("Preencha nome e localização.");
+    if (!nome) {
+        alert("O nome da obra é obrigatório.");
+        return;
+    }
+    if (isNaN(latitude) || isNaN(longitude)) {
+        alert("As coordenadas GPS são obrigatórias.");
         return;
     }
 
@@ -44,49 +52,53 @@ document.getElementById("formObra").onsubmit = async (e) => {
         .insert({
             nome,
             morada,
-            latitude: lat,
-            longitude: lon,
-            raio: raio
+            latitude,
+            longitude,
+            raio
         })
         .select()
         .maybeSingle();
 
     if (error || !data) {
-    alert("ERRO DETALHADO: " + JSON.stringify(error));
-    console.error(error);
-    return;
+        alert("ERRO AO CRIAR OBRA:\n" + JSON.stringify(error));
+        console.error(error);
+        return;
     }
 
     const obraID = data.id;
-    const urlObra = `https://alcindomaia.github.io/marcacao-ponto/?obra=${obraID}`;
+
+    // URL final da obra
+    const qrURL = `https://alcindomaia.github.io/marcacao-ponto/?obra=${obraID}`;
 
     // Gerar QR
+    const canvas = document.getElementById("qrCanvas");
     const qr = new QRious({
-        element: document.getElementById("qrCanvas"),
+        element: canvas,
         size: 300,
-        level: 'H',
-        value: urlObra
+        level: "H",
+        value: qrURL
     });
 
-    // Inserir logótipo no centro
-    const canvas = document.getElementById("qrCanvas");
+    // Inserir LOGO no centro do QR
     const ctx = canvas.getContext("2d");
-
     const logo = new Image();
-    logo.src = "Logo.png";  // Tens de colocar este ficheiro no repo
-    logo.onload = () => {
-        const s = 60;
-        const x = (canvas.width - s) / 2;
-        const y = (canvas.height - s) / 2;
-        ctx.drawImage(logo, x, y, s, s);
+    logo.src = "Logo.png";  // O teu logótipo deve estar na raiz do repo
 
-        // Botão para download
-        document.getElementById("downloadBtn").href =
-            canvas.toDataURL("image/png");
+    logo.onload = () => {
+        const size = 60;
+        const x = (canvas.width - size) / 2;
+        const y = (canvas.height - size) / 2;
+        ctx.drawImage(logo, x, y, size, size);
+
+        // Nome do ficheiro de download
+        const nomeArquivo = "QR_" + nome.replace(/\s+/g, "_") + ".png";
+
+        const download = document.getElementById("downloadBtn");
+        download.href = canvas.toDataURL("image/png");
+        download.download = nomeArquivo;
     };
 
     document.getElementById("qrBox").classList.remove("hidden");
 
-    alert("Obra criada e QR gerado com sucesso!");
+    alert("Obra criada com sucesso! QR gerado.");
 };
-
