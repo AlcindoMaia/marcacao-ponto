@@ -176,9 +176,10 @@ async function confirmarMarcacao() {
       .from("ponto")
       .insert(payload);
 
-    if (errIns) {
-      alert("Erro ao registar ponto.");
-      return;
+   if (errIns) {
+    alert("ERRO DETALHADO AO REGISTAR PONTO:\n" + JSON.stringify(errIns));
+    console.error(errIns);
+    return;
     }
 
     alert(`Registo ${tipo.toUpperCase()} efetuado com sucesso!`);
