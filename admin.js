@@ -3,10 +3,10 @@
 // ===========================================
 const SUPABASE_URL = "https://npyosbigynxmxdakcymg.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_67e1zdXpV7_PXZ-0_ZmmSw__9ddgDKF";
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SB = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ===========================================
-//  OBTÉM OU CRIA DEVICE ID
+//  DEVICE ID
 // ===========================================
 function getDeviceId() {
     let id = localStorage.getItem("deviceId");
@@ -21,10 +21,10 @@ const deviceId = getDeviceId();
 
 
 // ===========================================
-//  AUTENTICAÇÃO AUTOMÁTICA VIA DEVICE_ID
+//  CHECK ADMIN
 // ===========================================
 async function verificarAdmin() {
-    const { data, error } = await supabase
+    const { data, error } = await SB
         .from("admins")
         .select("*")
         .eq("device_id", deviceId)
@@ -35,7 +35,6 @@ async function verificarAdmin() {
         return;
     }
 
-    // Senão for admin → mostrar login por PIN
     document.getElementById("loginBox").style.display = "block";
 }
 
@@ -43,7 +42,7 @@ document.addEventListener("DOMContentLoaded", verificarAdmin);
 
 
 // ===========================================
-//  LOGIN POR PIN (1810) — REGISTA ADMIN
+//  LOGIN VIA PIN
 // ===========================================
 async function validarPIN() {
     const pin = document.getElementById("pinInput").value.trim();
@@ -53,8 +52,7 @@ async function validarPIN() {
         return;
     }
 
-    // Registar este dispositivo como admin
-    await supabase.from("admins").insert({
+    await SB.from("admins").insert({
         device_id: deviceId,
         nome: "Administrador"
     });
@@ -72,74 +70,66 @@ function abrirAdmin() {
 
 
 // ===========================================
-//  CARREGAR FILTROS (Funcionários e Obras)
+//  FILTROS
 // ===========================================
 async function carregarFiltros() {
     const fSel = document.getElementById("filtroFunc");
     const oSel = document.getElementById("filtroObra");
 
-    // Funcionários
-    const fData = await supabase.from("funcionarios").select("id, nome").order("nome");
+    const fData = await SB.from("funcionarios").select("id, nome").order("nome");
     fSel.innerHTML = `<option value="">(Todos)</option>` +
         fData.data.map(f => `<option value="${f.id}">${f.nome}</option>`).join("");
 
-    // Obras
-    const oData = await supabase.from("obras").select("id, nome").order("nome");
+    const oData = await SB.from("obras").select("id, nome").order("nome");
     oSel.innerHTML = `<option value="">(Todas)</option>` +
         oData.data.map(o => `<option value="${o.id}">${o.nome}</option>`).join("");
 }
 
 
 // ===========================================
-//  CARREGAR TABELA PRINCIPAL
+//  TABELA
 // ===========================================
 let tabela;
 
 async function carregarTabela() {
-    const { data, error } = await supabase
+    const { data } = await SB
         .from("vw_horas_detalhadas")
         .select("*");
 
-    if (error) {
-        console.error("Erro ao carregar tabela:", error);
-        return;
-    }
-
-    const linhasProcessadas = processarEntradasSaidas(data);
-
-    montarDataTable(linhasProcessadas);
+    const processado = processarEntradasSaidas(data);
+    montarDataTable(processado);
 }
 
 
 // ===========================================
-//  PROCESSAR ENTRADAS E SAÍDAS (A + C)
+//  PROCESSAMENTO DAS HORAS
 // ===========================================
 function processarEntradasSaidas(registos) {
 
-    const agrupado = {};
+    const grupos = {};
 
     for (const r of registos) {
         const key = `${r.funcionario}_${r.obra}_${r.marcacao.split("T")[0]}`;
 
-        if (!agrupado[key]) agrupado[key] = [];
-        agrupado[key].push(r);
+        if (!grupos[key]) grupos[key] = [];
+        grupos[key].push(r);
     }
 
     const linhas = [];
 
-    for (const key in agrupado) {
-        const grupo = agrupado[key].sort((a, b) =>
+    for (const key in grupos) {
+        const grupo = grupos[key].sort((a, b) =>
             new Date(a.marcacao) - new Date(b.marcacao)
         );
 
         for (let i = 0; i < grupo.length; i++) {
+
             const entrada = grupo[i];
             if (entrada.tipo !== "entrada") continue;
 
             const saida = grupo[i + 1];
 
             if (!saida || saida.tipo !== "saida") {
-                // Registo INCOMPLETO
                 linhas.push({
                     funcionario: entrada.funcionario,
                     obra: entrada.obra,
@@ -147,15 +137,17 @@ function processarEntradasSaidas(registos) {
                     entrada: entrada.marcacao,
                     saída: "-",
                     horas: "-",
-                    distancia: entrada.distancia ?? "",
                     estado: "Incompleto"
                 });
                 continue;
             }
 
-            const hEntrada = new Date(entrada.marcacao);
-            const hSaida = new Date(saida.marcacao);
-            const dif = (hSaida - hEntrada) / 1000 / 3600;
+            const h1 = new Date(entrada.marcacao);
+            const h2 = new Date(saida.marcacao);
+            const difSeg = Math.floor((h2 - h1) / 1000);
+
+            const horas = Math.floor(difSeg / 3600).toString().padStart(2, "0");
+            const min = Math.floor((difSeg % 3600) / 60).toString().padStart(2, "0");
 
             linhas.push({
                 funcionario: entrada.funcionario,
@@ -163,9 +155,8 @@ function processarEntradasSaidas(registos) {
                 data: entrada.marcacao.split("T")[0],
                 entrada: entrada.marcacao,
                 saída: saida.marcacao,
-                horas: dif.toFixed(2),
-                distancia: entrada.distancia ?? "",
-                estado: entrada.distancia > entrada.raio ? "Fora do raio" : "OK"
+                horas: `${horas}:${min}`,
+                estado: "OK"
             });
         }
     }
@@ -175,69 +166,40 @@ function processarEntradasSaidas(registos) {
 
 
 // ===========================================
-//  MONTAR DATATABLE PREMIUM
+//  DATATABLE
 // ===========================================
 function montarDataTable(linhas) {
-    if (tabela) {
-        tabela.destroy();
-    }
+    if (tabela) tabela.destroy();
 
     tabela = $('#tabelaRegistos').DataTable({
         data: linhas,
         columns: [
-            { data: 'funcionario' },
-            { data: 'obra' },
-            { data: 'data' },
-            { data: 'entrada' },
-            { data: 'saída' },
-            { data: 'horas' },
-            { data: 'distancia', render: d => d ? d + " m" : "-" },
-            { data: 'estado', render: e =>
-                e === "OK"
-                    ? `<span class="badge-ok">OK</span>`
-                    : `<span class="badge-erro">${e}</span>`
-            }
+            { data: "funcionario" },
+            { data: "obra" },
+            { data: "data" },
+            { data: "entrada" },
+            { data: "saída" },
+            { data: "horas" },
+            { data: "estado" }
         ],
-        pageLength: 20,
-        order: [[2, "desc"]]
+        order: [[2, "desc"]],
+        pageLength: 20
     });
 }
 
 
 // ===========================================
-//  APLICAR E LIMPAR FILTROS
-// ===========================================
-function aplicarFiltros() {
-    const func = document.getElementById("filtroFunc").value;
-    const obra = document.getElementById("filtroObra").value;
-
-    tabela.column(0).search(func ? func : "", true, false);
-    tabela.column(1).search(obra ? obra : "", true, false);
-
-    tabela.draw();
-}
-
-function limparFiltros() {
-    document.getElementById("filtroFunc").value = "";
-    document.getElementById("filtroObra").value = "";
-    document.getElementById("fDataIni").value = "";
-    document.getElementById("fDataFim").value = "";
-
-    tabela.search("").columns().search("").draw();
-}
-
-
-// ===========================================
-//  CARREGAR MÉTRICAS SUPERIORES
+//  MÉTRICAS
 // ===========================================
 async function carregarMetricas() {
+
     const hoje = new Date().toISOString().split("T")[0];
 
-    const { data: hojeData } = await supabase.rpc("horas_totais_dia", { p_data: hoje });
-    const { data: semanaData } = await supabase.rpc("horas_totais_semana");
-    const { data: mesData } = await supabase.rpc("horas_totais_mes");
+    const d = await SB.rpc("horas_totais_dia", { p_data: hoje });
+    const s = await SB.rpc("horas_totais_semana");
+    const m = await SB.rpc("horas_totais_mes");
 
-    document.getElementById("mHorasHoje").textContent = (hojeData || 0) + " h";
-    document.getElementById("mHorasSemana").textContent = (semanaData || 0) + " h";
-    document.getElementById("mHorasMes").textContent = (mesData || 0) + " h";
+    document.getElementById("mHorasHoje").textContent = d.data ?? "00:00";
+    document.getElementById("mHorasSemana").textContent = s.data ?? "00:00";
+    document.getElementById("mHorasMes").textContent = m.data ?? "00:00";
 }
