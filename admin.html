@@ -16,22 +16,25 @@
 
 <!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 </head>
 
 <body>
 
+<!-- HEADER -->
 <header class="header">
     <img src="logo.png" alt="Maia Solutions" class="logo">
-    <h1>Painel Administrativo</h1>
+    <h1>Maia Solutions — Painel Administrativo</h1>
+
+    <!-- DARK MODE BUTTON -->
+    <button class="dark-toggle" onclick="toggleDark()">Modo Escuro</button>
 </header>
 
 <!-- LOGIN -->
-<div id="loginBox" class="login-card">
+<div id="loginBox" class="login-card hidden">
     <h2>Área Restrita</h2>
     <p>Introduza o PIN administrativo</p>
 
-    <input type="password" id="pinInput">
+    <input type="password" id="pinInput" placeholder="PIN de acesso">
     <div id="pinMsg" class="msg-error"></div>
 
     <button class="btn-primary" onclick="validarPIN()">Entrar</button>
@@ -40,21 +43,21 @@
 <!-- PAINEL -->
 <div id="adminArea" class="container hidden">
 
-    <!-- CARDS METRICAS -->
+    <!-- METRIC CARDS -->
     <div class="grid-cards">
         <div class="card metric">
             <h3>Horas Hoje</h3>
-            <div id="mHorasHoje" class="value"></div>
+            <div id="mHorasHoje" class="value">00:00</div>
         </div>
 
         <div class="card metric">
             <h3>Horas Semana</h3>
-            <div id="mHorasSemana" class="value"></div>
+            <div id="mHorasSemana" class="value">00:00</div>
         </div>
 
         <div class="card metric">
             <h3>Horas Mês</h3>
-            <div id="mHorasMes" class="value"></div>
+            <div id="mHorasMes" class="value">00:00</div>
         </div>
     </div>
 
@@ -92,10 +95,17 @@
             </thead>
         </table>
     </div>
-
 </div>
 
+<!-- SCRIPT PRINCIPAL -->
 <script src="admin.js"></script>
+
+<!-- DARK MODE SCRIPT -->
+<script>
+function toggleDark() {
+    document.body.classList.toggle("dark");
+}
+</script>
 
 </body>
 </html>
