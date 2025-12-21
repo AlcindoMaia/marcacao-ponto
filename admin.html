@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel Administrativo — Maia Solutions</title>
+
+<link rel="stylesheet" href="style.css">
+
+<!-- Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- DataTable Premium -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+<style>
+/* LAYOUT PREMIUM APPLE DASHBOARD */
+body {
+  background: #f5f6f7;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial;
+}
+
+.dashboard-container {
+  max-width: 1250px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.card-metric {
+  background: white;
+  padding: 20px;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  flex: 1;
+  margin: 10px;
+  text-align: left;
+}
+
+.metric-title {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 5px;
+}
+
+.metric-value {
+  font-size: 28px;
+  font-weight: 600;
+  color: #222;
+}
+
+.metrics-row {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+/* FILTROS */
+.filters-box {
+  background: white;
+  padding: 20px;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  margin-top: 20px;
+}
+
+.filters-box label {
+  display: block;
+  margin-top: 10px;
+  font-weight: 600;
+}
+
+.filters-box input,
+.filters-box select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin-top: 4px;
+}
+
+/* LOGIN POR PIN */
+#loginBox {
+  max-width: 420px;
+  margin: 70px auto;
+  background: white;
+  padding: 25px;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  text-align: center;
+}
+
+#loginBox input {
+  font-size: 20px;
+  padding: 10px;
+  letter-spacing: 8px;
+  text-align: center;
+}
+
+/* TABELA */
+#tabelaRegistos_wrapper {
+  margin-top: 30px;
+}
+
+.badge-ok {
+  color: #0a0;
+  font-weight: 600;
+}
+
+.badge-erro {
+  color: #b00;
+  font-weight: 600;
+}
+</style>
+
+</head>
+
+<body>
+
+<!-- LOGIN POR PIN OU DEVICE_ID -->
+<div id="loginBox" style="display:none">
+  <h2>Acesso Administrativo</h2>
+  <p>Introduza o PIN:</p>
+  <input id="pinInput" type="password" maxlength="4" /><br><br>
+  <button onclick="validarPIN()" class="btn primary">Entrar</button>
+  <p id="pinMsg" style="color:red; margin-top:10px;"></p>
+</div>
+
+<div id="adminArea" style="display:none">
+
+<div class="dashboard-container">
+
+<h1>Painel Administrativo</h1>
+
+<!-- MÉTRICAS SUPERIORES -->
+<div class="metrics-row">
+  <div class="card-metric">
+    <div class="metric-title">Horas Hoje</div>
+    <div class="metric-value" id="mHorasHoje">0 h</div>
+  </div>
+
+  <div class="card-metric">
+    <div class="metric-title">Horas Semana</div>
+    <div class="metric-value" id="mHorasSemana">0 h</div>
+  </div>
+
+  <div class="card-metric">
+    <div class="metric-title">Horas Mês</div>
+    <div class="metric-value" id="mHorasMes">0 h</div>
+  </div>
+
+  <div class="card-metric">
+    <div class="metric-title">Funcionários Ativos Hoje</div>
+    <div class="metric-value" id="mFuncAtivos">0</div>
+  </div>
+
+  <div class="card-metric">
+    <div class="metric-title">Obras Ativas Hoje</div>
+    <div class="metric-value" id="mObrasAtivas">0</div>
+  </div>
+</div>
+
+<!-- FILTROS -->
+<div class="filters-box">
+  <h3>Filtros</h3>
+
+  <label>Funcionário</label>
+  <select id="filtroFunc"></select>
+
+  <label>Obra</label>
+  <select id="filtroObra"></select>
+
+  <label>Data Inicial</label>
+  <input type="date" id="fDataIni" />
+
+  <label>Data Final</label>
+  <input type="date" id="fDataFim" />
+
+  <br><br>
+  <button onclick="aplicarFiltros()" class="btn primary">Aplicar Filtros</button>
+  <button onclick="limparFiltros()" class="btn secondary">Limpar</button>
+</div>
+
+<!-- TABELA -->
+<table id="tabelaRegistos" class="display" style="width:100%">
+  <thead>
+    <tr>
+      <th>Funcionário</th>
+      <th>Obra</th>
+      <th>Data</th>
+      <th>Entrada</th>
+      <th>Saída</th>
+      <th>Total Horas</th>
+      <th>Distância</th>
+      <th>Estado</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+</div>
+</div>
+
+<script src="admin.js"></script>
+
+</body>
+</html>
