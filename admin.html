@@ -17,169 +17,85 @@
 <!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<style>
-body {
-    background: #f3f5f7;
-    font-family: Arial, sans-serif;
-}
-
-/* Container geral */
-.container {
-    max-width: 1200px;
-    margin: 40px auto;
-    padding: 15px;
-}
-
-/* Login Card */
-#loginBox {
-    display: none;
-    background: white;
-    padding: 40px;
-    text-align: center;
-    border-radius: 15px;
-    max-width: 400px;
-    margin: 100px auto;
-    box-shadow: 0 0 20px rgba(0,0,0,0.1);
-}
-
-#loginBox input {
-    margin-top: 20px;
-    padding: 10px;
-    width: 80%;
-    font-size: 18px;
-    text-align: center;
-}
-
-/* Painel Admin */
-#adminArea {
-    display: none;
-}
-
-/* Cards das métricas */
-.cards {
-    display: flex;
-    gap: 20px;
-    margin-bottom: 25px;
-}
-
-.card {
-    background: white;
-    padding: 20px;
-    border-radius: 12px;
-    flex: 1;
-    text-align: center;
-    box-shadow: 0 0 10px rgba(0,0,0,0.06);
-}
-
-.card h3 {
-    font-size: 16px;
-    font-weight: 600;
-    color: #666;
-}
-
-.card .valor {
-    margin-top: 10px;
-    font-size: 26px;
-    font-weight: bold;
-    color: #2080ff;
-}
-
-/* Filtros */
-.filtros {
-    background: white;
-    padding: 20px;
-    border-radius: 12px;
-    margin-bottom: 25px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.06);
-}
-
-.filtros label {
-    display: block;
-    font-weight: bold;
-    margin-top: 10px;
-}
-
-button {
-    margin-top: 15px;
-    padding: 10px 15px;
-    background: #2080ff;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-}
-
-button.secondary {
-    background: #999;
-}
-
-table.dataTable {
-    background: white;
-    border-radius: 12px;
-    overflow: hidden;
-}
-</style>
 </head>
 
 <body>
 
+<header class="header">
+    <img src="logo.png" alt="Maia Solutions" class="logo">
+    <h1>Painel Administrativo</h1>
+</header>
+
 <!-- LOGIN -->
-<div id="loginBox">
-    <h2>Administração</h2>
-    <p>Introduza o PIN</p>
-    <input type="password" id="pinInput" placeholder="PIN">
-    <p id="pinMsg" style="color:red; margin-top:10px;"></p>
-    <button onclick="validarPIN()">Entrar</button>
+<div id="loginBox" class="login-card">
+    <h2>Área Restrita</h2>
+    <p>Introduza o PIN administrativo</p>
+
+    <input type="password" id="pinInput">
+    <div id="pinMsg" class="msg-error"></div>
+
+    <button class="btn-primary" onclick="validarPIN()">Entrar</button>
 </div>
 
-<!-- ÁREA DO PAINEL -->
-<div id="adminArea" class="container">
+<!-- PAINEL -->
+<div id="adminArea" class="container hidden">
 
-    <!-- CARDS -->
-    <div class="cards">
-        <div class="card">
+    <!-- CARDS METRICAS -->
+    <div class="grid-cards">
+        <div class="card metric">
             <h3>Horas Hoje</h3>
-            <div id="mHorasHoje" class="valor">00:00</div>
+            <div id="mHorasHoje" class="value"></div>
         </div>
-        <div class="card">
+
+        <div class="card metric">
             <h3>Horas Semana</h3>
-            <div id="mHorasSemana" class="valor">00:00</div>
+            <div id="mHorasSemana" class="value"></div>
         </div>
-        <div class="card">
+
+        <div class="card metric">
             <h3>Horas Mês</h3>
-            <div id="mHorasMes" class="valor">00:00</div>
+            <div id="mHorasMes" class="value"></div>
         </div>
     </div>
 
     <!-- FILTROS -->
-    <div class="filtros">
+    <div class="card filtros">
+        <h2>Filtros</h2>
+
         <label>Funcionário</label>
         <select id="filtroFunc"></select>
 
         <label>Obra</label>
         <select id="filtroObra"></select>
 
-        <button onclick="aplicarFiltros()">Aplicar Filtros</button>
-        <button onclick="limparFiltros()" class="secondary">Limpar</button>
+        <div class="actions">
+            <button class="btn-primary" onclick="aplicarFiltros()">Aplicar</button>
+            <button class="btn-secondary" onclick="limparFiltros()">Limpar</button>
+        </div>
     </div>
 
     <!-- TABELA -->
-    <table id="tabelaRegistos" class="display" style="width:100%">
-        <thead>
-            <tr>
-                <th>Funcionário</th>
-                <th>Obra</th>
-                <th>Data</th>
-                <th>Entrada</th>
-                <th>Saída</th>
-                <th>Horas</th>
-                <th>Estado</th>
-            </tr>
-        </thead>
-    </table>
+    <div class="card">
+        <h2>Registos de Ponto</h2>
+
+        <table id="tabelaRegistos" class="display" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Funcionário</th>
+                    <th>Obra</th>
+                    <th>Data</th>
+                    <th>Entrada</th>
+                    <th>Saída</th>
+                    <th>Horas</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+        </table>
+    </div>
 
 </div>
 
 <script src="admin.js"></script>
+
 </body>
 </html>
