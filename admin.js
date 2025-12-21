@@ -203,3 +203,7 @@ async function carregarMetricas() {
     document.getElementById("mHorasSemana").textContent = s.data ?? "00:00";
     document.getElementById("mHorasMes").textContent = m.data ?? "00:00";
 }
+
+function toggleDark() {
+    document.body.classList.toggle("dark");
+}
