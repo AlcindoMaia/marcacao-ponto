@@ -3,27 +3,25 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>Criar Obra + Gerar QR — Maia Solutions</title>
 
 <link rel="stylesheet" href="style.css">
-
-<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<!-- QR library -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
-
-<!-- jsPDF para gerar PDF A4 -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
 .container { padding: 20px; }
 .qr-preview { margin-top: 25px; text-align:center; }
-canvas { border:1px solid #ddd; padding:10px; background:#fff; }
-label { font-weight: bold; margin-top:10px; display:block; }
-input { width: 100%; padding:8px; margin:5px 0 15px 0; }
+canvas { 
+    border:1px solid #ddd; 
+    padding:10px; 
+    background:white;
+    border-radius: 8px;
+}
+label { font-weight:bold; display:block; margin-top:15px; }
+input { width:100%; padding:8px; margin-top:5px; }
 </style>
-
 </head>
 
 <body>
@@ -47,26 +45,17 @@ input { width: 100%; padding:8px; margin:5px 0 15px 0; }
     <input id="latitude" placeholder="Latitude" readonly />
     <input id="longitude" placeholder="Longitude" readonly />
 
-    <button type="button" class="btn secondary" id="btnGPS">
-        Obter Localização Atual
-    </button>
+    <button type="button" class="btn secondary" id="btnGPS">Obter Localização</button>
 
-    <button type="submit" class="btn primary">
-        Criar Obra + Gerar QR
-    </button>
+    <button type="submit" class="btn primary">Criar Obra + Gerar QR</button>
 </form>
 
 <div class="qr-preview hidden" id="qrBox">
     <h3>QR Code da Obra</h3>
     <canvas id="qrCanvas"></canvas>
-    <br>
-    <a id="downloadBtn" class="btn secondary" download="QR_Obra.png">
-        Descarregar QR (PNG)
-    </a>
+
     <br><br>
-    <button id="btnPDF" class="btn secondary">
-        Descarregar PDF A4
-    </button>
+    <a id="downloadBtn" class="btn primary" download="">Descarregar QR</a>
 </div>
 
 </div>
