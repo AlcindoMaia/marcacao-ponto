@@ -80,7 +80,7 @@ async function carregarTabela() {
 
     if (tabela) tabela.destroy();
 
-    const { data } = await SB.from("vw_horas_detalhadas").select("*");
+    const { data } = await SB.from("vw_registos_ponto").select("*");
 
     console.log("ADMIN.JS: registos carregados:", data?.length); // DEBUG 8
 
