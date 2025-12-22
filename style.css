@@ -43,7 +43,7 @@ body {
     transition: background var(--transition), color var(--transition);
 }
 
-h1, h2, h3 { margin: 0; font-weight: 600; }
+h1, h2, h3 { margin: 0; font-weight: 400; }
 
 .hidden { display: none !important; }
 
