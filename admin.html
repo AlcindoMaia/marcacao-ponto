@@ -16,21 +16,21 @@
 
 <!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 </head>
 
-<body>
+<body class="dark">
 
-<!-- HEADER -->
 <header class="header">
-    <img src="Logo.png" alt="Maia Solutions" class="logo">
-    <h1>Maia Solutions — Painel Administrativo</h1>
+    <img src="logo.png" class="logo">
+    <h1>Painel Administrativo</h1>
 
-    <!-- DARK MODE BUTTON -->
-    <button class="dark-toggle" onclick="toggleDark()">Modo Escuro</button>
+    <button class="dark-toggle" onclick="toggleDark()">
+        <img id="iconDark" src="icons/moon.png">
+    </button>
 </header>
 
-<!-- LOGIN -->
-<div id="loginBox" class="login-card hidden">
+<div id="loginBox" class="login-card">
     <h2>Área Restrita</h2>
     <p>Introduza o PIN administrativo</p>
 
@@ -40,10 +40,8 @@
     <button class="btn-primary" onclick="validarPIN()">Entrar</button>
 </div>
 
-<!-- PAINEL -->
 <div id="adminArea" class="container hidden">
 
-    <!-- METRIC CARDS -->
     <div class="grid-cards">
         <div class="card metric">
             <h3>Horas Hoje</h3>
@@ -61,15 +59,20 @@
         </div>
     </div>
 
-    <!-- FILTROS -->
     <div class="card filtros">
         <h2>Filtros</h2>
 
-        <label>Funcionário</label>
-        <select id="filtroFunc"></select>
+        <div class="filtros-linha">
+            <div class="col">
+                <label>Funcionário</label>
+                <select id="filtroFunc"></select>
+            </div>
 
-        <label>Obra</label>
-        <select id="filtroObra"></select>
+            <div class="col">
+                <label>Obra</label>
+                <select id="filtroObra"></select>
+            </div>
+        </div>
 
         <div class="actions">
             <button class="btn-primary" onclick="aplicarFiltros()">Aplicar</button>
@@ -77,7 +80,6 @@
         </div>
     </div>
 
-    <!-- TABELA -->
     <div class="card">
         <h2>Registos de Ponto</h2>
 
@@ -86,7 +88,7 @@
                 <tr>
                     <th>Funcionário</th>
                     <th>Obra</th>
-                    <th>Data</th>
+                    <th>Dia</th>
                     <th>Entrada</th>
                     <th>Saída</th>
                     <th>Horas</th>
@@ -95,15 +97,19 @@
             </thead>
         </table>
     </div>
+
 </div>
 
-<!-- SCRIPT PRINCIPAL -->
 <script src="admin.js"></script>
 
-<!-- DARK MODE SCRIPT -->
 <script>
 function toggleDark() {
     document.body.classList.toggle("dark");
+
+    const icon = document.getElementById("iconDark");
+    icon.src = document.body.classList.contains("dark")
+        ? "icons/moon.png"
+        : "icons/sun.png";
 }
 </script>
 
