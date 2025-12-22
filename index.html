@@ -1,28 +1,47 @@
 <!doctype html>
 <html lang="pt">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Marcação de Ponto</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Marcação de Ponto — Maia Solutions</title>
+<link rel="stylesheet" href="style.css" />
 
-<link rel="stylesheet" href="style.css">
+<!-- Supabase + QR library (carregar antes do script da app) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
+<body>
+<div class="wrap">
+  <header class="header">
+    <div class="brand">Maia Solutions</div>
+    <div class="subtitle">Marcação de Ponto</div>
+  </header>
 
-<body class="dark">
-
-<header class="header">
-    <img src="logo.png" class="logo">
-    <h1>Marcação de Ponto</h1>
-</header>
-
-<div class="container">
-    <div class="card">
-        <h2>Registar Ponto</h2>
-        <button class="btn-primary" onclick="abrirCamera()">Abrir Câmara</button>
-        <div id="qrReader"></div>
+  <main class="card" id="mainCard">
+    <div id="userBlock" class="userCard hidden">
+      <div class="userName" id="nomeFuncionario">—</div>
+      <div class="userMeta" id="metaInfo">Aguardando leitura do QR</div>
     </div>
+
+    <div id="notRegistered" class="notice hidden">
+      Este dispositivo não está registado. Abra o QR de cadastro ou contacte o administrador.
+    </div>
+
+    <button id="btnScanner" class="btn primary">📷 Ler QR da Obra</button>
+    <div id="qr-reader" class="qrReader hidden"></div>
+
+    <div id="lastAction" style="margin-top:12px;"></div>
+
+    <h3 class="sectionTitle">Histórico semanal (horas por dia)</h3>
+    <div id="histResumo" class="history"></div>
+
+    <h3 class="sectionTitle">Registos detalhados (esta semana)</h3>
+    <div id="historico" class="history"></div>
+  </main>
+
+  <footer class="footer">
+    <small>© Maia Solutions</small>
+  </footer>
 </div>
 
 <script src="app.js"></script>
