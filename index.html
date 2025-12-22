@@ -1,55 +1,28 @@
 <!doctype html>
 <html lang="pt">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Marcação de Ponto — Maia Solutions</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marcação de Ponto</title>
 
-<link rel="stylesheet" href="style.css" />
-
-<!-- Supabase -->
+<link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 
-<body>
-<div class="wrap">
+<body class="dark">
 
-  <header class="header">
-    <div class="brand">Maia Solutions</div>
-    <div class="subtitle">Marcação de Ponto</div>
-  </header>
+<header class="header">
+    <img src="logo.png" class="logo">
+    <h1>Marcação de Ponto</h1>
+</header>
 
-  <main class="card" id="painelPonto">
-
-    <!-- BLOQUEIO SE O DISPOSITIVO NÃO ESTIVER REGISTADO -->
-    <div id="bloqueado" class="hidden">
-      <h3>Dispositivo não reconhecido</h3>
-      <p>Este dispositivo não está registado.</p>
-      <p>Se encontrou este QR perdido, destrua-o por favor.</p>
+<div class="container">
+    <div class="card">
+        <h2>Registar Ponto</h2>
+        <button class="btn-primary" onclick="abrirCamera()">Abrir Câmara</button>
+        <div id="qrReader"></div>
     </div>
-
-    <!-- BLOCO PRINCIPAL DE ACESSO -->
-    <div id="conteudo" class="hidden">
-      <h3 id="msgOla"></h3>
-      <p id="msgObra"></p>
-
-      <button id="btnConfirmar" class="btn primary">Confirmar Registo</button>
-
-      <div id="resultado" class="msg"></div>
-
-      <h3 class="sectionTitle">Última Ação</h3>
-      <div id="ultimaAcao"></div>
-
-      <h3 class="sectionTitle">Histórico Semanal</h3>
-      <div id="histSemanal"></div>
-    </div>
-
-  </main>
-
-  <footer class="footer">
-    <small>© Maia Solutions</small>
-  </footer>
-
 </div>
 
 <script src="app.js"></script>
