@@ -110,9 +110,10 @@ async function carregarMetricas() {
 
     if (!data) return;
 
-    document.getElementById("mHorasHoje").textContent = data.horas_hoje;
-    document.getElementById("mHorasSemana").textContent = data.horas_semana;
-    document.getElementById("mHorasMes").textContent = data.horas_mes;
+document.getElementById("mHorasHoje").textContent = data.horas_hoje || "00:00";
+document.getElementById("mHorasSemana").textContent = data.horas_semana || "00:00";
+document.getElementById("mHorasMes").textContent = data.horas_mes || "00:00";
+
 }
 
 
