@@ -3,87 +3,52 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
 <title>Painel Administrativo — Maia Solutions</title>
 
 <link rel="stylesheet" href="style.css">
-
-<!-- DataTables -->
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-
-<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 </head>
 
 <body class="dark">
 
 <header class="header">
-    <img src="Logo.png" class="logo">
-    <h1>Painel Administrativo - Maia Solutions</h1>
-
-    <button class="dark-toggle" onclick="toggleDark()">
-        <img id="iconDark" src="icons/moon.png">
-    </button>
+    <img src="logo.png" class="logo">
+    <h1>Painel Administrativo</h1>
+    <button class="dark-toggle" id="darkBtn" onclick="toggleDark()">🌙</button>
 </header>
 
-<div id="loginBox" class="login-card">
+<div id="loginBox" class="card" style="max-width:400px;margin:60px auto">
     <h2>Área Restrita</h2>
-    <p>Introduza o PIN administrativo</p>
-
-    <input type="password" id="pinInput" placeholder="PIN de acesso">
-    <div id="pinMsg" class="msg-error"></div>
-
+    <input id="pinInput" placeholder="PIN">
+    <p id="pinMsg"></p>
     <button class="btn-primary" onclick="validarPIN()">Entrar</button>
 </div>
 
 <div id="adminArea" class="container hidden">
 
     <div class="grid-cards">
-        <div class="card metric">
-            <h3>Horas Hoje</h3>
-            <div id="mHorasHoje" class="value">00:00</div>
-        </div>
-
-        <div class="card metric">
-            <h3>Horas Semana</h3>
-            <div id="mHorasSemana" class="value">00:00</div>
-        </div>
-
-        <div class="card metric">
-            <h3>Horas Mês</h3>
-            <div id="mHorasMes" class="value">00:00</div>
-        </div>
-    </div>
-
-    <div class="card filtros">
-        <h2>Filtros</h2>
-
-        <div class="filtros-linha">
-            <div class="col">
-                <label>Funcionário</label>
-                <select id="filtroFunc"></select>
-            </div>
-
-            <div class="col">
-                <label>Obra</label>
-                <select id="filtroObra"></select>
-            </div>
-        </div>
-
-        <div class="actions">
-            <button class="btn-primary" onclick="aplicarFiltros()">Aplicar</button>
-            <button class="btn-secondary" onclick="limparFiltros()">Limpar</button>
-        </div>
+        <div class="card metric"><h3>Horas Hoje</h3><div id="mHorasHoje" class="value">00:00</div></div>
+        <div class="card metric"><h3>Horas Semana</h3><div id="mHorasSemana" class="value">00:00</div></div>
+        <div class="card metric"><h3>Horas Mês</h3><div id="mHorasMes" class="value">00:00</div></div>
     </div>
 
     <div class="card">
-        <h2>Registos de Ponto</h2>
+        <h2>Filtros</h2>
+        <div class="filtros-linha">
+            <div class="col"><label>Funcionário</label><select id="filtroFunc"></select></div>
+            <div class="col"><label>Obra</label><select id="filtroObra"></select></div>
+        </div>
+        <button class="btn-primary" onclick="aplicarFiltros()">Aplicar</button>
+        <button class="btn-secondary" onclick="limparFiltros()">Limpar</button>
+    </div>
 
-        <table id="tabelaRegistos" class="display" style="width:100%">
+    <div class="card">
+        <h2>Registos</h2>
+        <table id="tabelaRegistos" class="display">
             <thead>
                 <tr>
                     <th>Funcionário</th>
@@ -101,17 +66,12 @@
 </div>
 
 <script src="admin.js"></script>
-
 <script>
 function toggleDark() {
     document.body.classList.toggle("dark");
-
-    const icon = document.getElementById("iconDark");
-    icon.src = document.body.classList.contains("dark")
-        ? "icons/moon.png"
-        : "icons/sun.png";
+    document.getElementById("darkBtn").textContent =
+        document.body.classList.contains("dark") ? "🌙" : "☀️";
 }
 </script>
-
 </body>
 </html>
