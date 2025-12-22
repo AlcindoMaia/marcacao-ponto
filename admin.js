@@ -86,15 +86,15 @@ async function carregarTabela() {
 
     tabela = $("#tabelaRegistos").DataTable({
         data: data || [],
-        columns: [
-            { data: "funcionario" },
-            { data: "obra" },
-            { data: "data" },
-            { data: "entrada" },
-            { data: "saida" },
-            { data: "horas" },
-            { data: "estado" }
-        ]
+columns: [
+    { data: "funcionario" },
+    { data: "obra" },
+    { data: "dia" },
+    { data: "entrada" },
+    { data: "saida" },
+    { data: "horas" },
+    { data: "estado" }
+]
     });
 }
 
