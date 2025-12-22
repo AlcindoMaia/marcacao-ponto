@@ -38,7 +38,7 @@ body.dark {
 body {
     background: var(--bg-light);
     margin: 0;
-    font-family: "Inter", Arial, sans-serif;
+    font-family: "Inter", Candara, sans-serif;
     color: var(--text-dark);
     transition: background var(--transition), color var(--transition);
 }
