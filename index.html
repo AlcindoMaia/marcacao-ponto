@@ -1,71 +1,28 @@
 <!doctype html>
 <html lang="pt">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Marcação de Ponto — Maia Solutions</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marcação de Ponto</title>
 
-<link rel="stylesheet" href="style.css" />
-
-<!-- Supabase -->
+<link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 
 <body class="dark">
 
-<div class="wrap">
+<header class="header">
+    <img src="logo.png" class="logo">
+    <h1>Marcação de Ponto</h1>
+</header>
 
-  <!-- HEADER -->
-  <header class="header ponto-header">
-    <div class="brand">
-      <strong>Maia Solutions</strong>
-      <span class="subtitle">Marcação de Ponto</span>
+<div class="container">
+    <div class="card">
+        <h2>Registar Ponto</h2>
+        <button class="btn-primary" onclick="abrirCamera()">Abrir Câmara</button>
+        <div id="qrReader"></div>
     </div>
-  </header>
-
-  <!-- CONTEÚDO -->
-  <main class="card ponto-card" id="painelPonto">
-
-    <!-- BLOQUEIO -->
-    <div id="bloqueado" class="hidden">
-      <h3 class="error-title">Dispositivo não reconhecido</h3>
-      <p>Este dispositivo não está registado no sistema.</p>
-      <p class="muted">
-        Se encontrou este QR code perdido, destrua-o por favor.
-      </p>
-    </div>
-
-    <!-- CONTEÚDO PRINCIPAL -->
-    <div id="conteudo" class="hidden">
-
-      <h3 id="msgOla" class="welcome"></h3>
-      <p id="msgObra" class="obra"></p>
-
-      <button id="btnConfirmar" class="btn-primary btn-large">
-        Confirmar Registo
-      </button>
-
-      <div id="resultado" class="msg"></div>
-
-      <div class="section">
-        <h4 class="sectionTitle">Última Ação</h4>
-        <div id="ultimaAcao" class="box"></div>
-      </div>
-
-      <div class="section">
-        <h4 class="sectionTitle">Histórico Semanal</h4>
-        <div id="histSemanal" class="box"></div>
-      </div>
-
-    </div>
-
-  </main>
-
-  <!-- FOOTER -->
-  <footer class="footer">
-    <small>© Maia Solutions</small>
-  </footer>
-
 </div>
 
 <script src="app.js"></script>
