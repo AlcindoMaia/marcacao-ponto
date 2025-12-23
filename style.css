@@ -16,6 +16,9 @@
     --shadow: 0 6px 22px rgba(0,0,0,0.12);
     --radius: 14px;
     --transition: 0.25s ease;
+
+    --space-lg: 32px;
+    --space-md: 24px;
 }
 
 /* DARK MODE */
@@ -45,14 +48,18 @@ h3 { font-size: 14px; letter-spacing: .3px; }
 /* HEADER */
 .header {
     background: var(--bg-panel);
-    padding: 18px 28px;
+    padding: 18px 32px;
     display: flex;
     align-items: center;
-    gap: 18px;
+    gap: 20px;
     box-shadow: var(--shadow);
+    margin-bottom: var(--space-lg);
 }
 
-.logo { height: 40px; }
+/* LOGO MAIOR */
+.logo {
+    height: 54px;
+}
 
 /* DARK TOGGLE */
 .dark-toggle {
@@ -61,13 +68,14 @@ h3 { font-size: 14px; letter-spacing: .3px; }
     background: transparent;
     font-size: 22px;
     cursor: pointer;
+    line-height: 1;
 }
 
 /* CONTAINER */
 .container {
     max-width: 1200px;
     margin: auto;
-    padding: 24px;
+    padding: 0 32px 32px;
 }
 
 /* CARDS */
@@ -76,13 +84,12 @@ h3 { font-size: 14px; letter-spacing: .3px; }
     padding: 24px;
     border-radius: var(--radius);
     box-shadow: var(--shadow);
-    margin-bottom: 32px;
 }
 
 .grid-cards {
     display: flex;
     gap: 24px;
-    margin-bottom: 32px;
+    margin-bottom: var(--space-lg);
 }
 
 .card.metric {
@@ -102,6 +109,10 @@ h3 { font-size: 14px; letter-spacing: .3px; }
 }
 
 /* FILTROS */
+.card.filtros {
+    margin-bottom: var(--space-lg);
+}
+
 .filtros-linha {
     display: flex;
     gap: 24px;
