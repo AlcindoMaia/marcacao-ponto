@@ -11,41 +11,57 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
-<body>
+<body class="dark">
+
 <div class="wrap">
 
-  <header class="header">
-    <div class="brand">Maia Solutions</div>
-    <div class="subtitle">Marcação de Ponto</div>
+  <!-- HEADER -->
+  <header class="header ponto-header">
+    <div class="brand">
+      <strong>Maia Solutions</strong>
+      <span class="subtitle">Marcação de Ponto</span>
+    </div>
   </header>
 
-  <main class="card" id="painelPonto">
+  <!-- CONTEÚDO -->
+  <main class="card ponto-card" id="painelPonto">
 
-    <!-- BLOQUEIO SE O DISPOSITIVO NÃO ESTIVER REGISTADO -->
+    <!-- BLOQUEIO -->
     <div id="bloqueado" class="hidden">
-      <h3>Dispositivo não reconhecido</h3>
-      <p>Este dispositivo não está registado.</p>
-      <p>Se encontrou este QR perdido, destrua-o por favor.</p>
+      <h3 class="error-title">Dispositivo não reconhecido</h3>
+      <p>Este dispositivo não está registado no sistema.</p>
+      <p class="muted">
+        Se encontrou este QR code perdido, destrua-o por favor.
+      </p>
     </div>
 
-    <!-- BLOCO PRINCIPAL DE ACESSO -->
+    <!-- CONTEÚDO PRINCIPAL -->
     <div id="conteudo" class="hidden">
-      <h3 id="msgOla"></h3>
-      <p id="msgObra"></p>
 
-      <button id="btnConfirmar" class="btn primary">Confirmar Registo</button>
+      <h3 id="msgOla" class="welcome"></h3>
+      <p id="msgObra" class="obra"></p>
+
+      <button id="btnConfirmar" class="btn-primary btn-large">
+        Confirmar Registo
+      </button>
 
       <div id="resultado" class="msg"></div>
 
-      <h3 class="sectionTitle">Última Ação</h3>
-      <div id="ultimaAcao"></div>
+      <div class="section">
+        <h4 class="sectionTitle">Última Ação</h4>
+        <div id="ultimaAcao" class="box"></div>
+      </div>
 
-      <h3 class="sectionTitle">Histórico Semanal</h3>
-      <div id="histSemanal"></div>
+      <div class="section">
+        <h4 class="sectionTitle">Histórico Semanal</h4>
+        <div id="histSemanal" class="box"></div>
+      </div>
+
     </div>
 
   </main>
 
+  <!-- FOOTER -->
   <footer class="footer">
     <small>© Maia Solutions</small>
   </footer>
