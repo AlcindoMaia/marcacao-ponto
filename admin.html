@@ -16,12 +16,14 @@
 <body class="dark">
 
 <header class="header">
-    <img src="Logo.png" class="logo">
+    <img src="logo.png" class="logo">
     <h1>Painel Administrativo</h1>
-    <button class="dark-toggle" id="darkBtn" onclick="toggleDark()">🌙</button>
+
+    <!-- ÍCONE SIMPLES -->
+    <button class="dark-toggle" id="darkBtn" onclick="toggleDark()">☀️</button>
 </header>
 
-<div id="loginBox" class="card" style="max-width:400px;margin:60px auto">
+<div id="loginBox" class="card" style="max-width:400px;margin:0 auto var(--space-lg)">
     <h2>Área Restrita</h2>
     <input id="pinInput" placeholder="PIN">
     <p id="pinMsg"></p>
@@ -30,22 +32,40 @@
 
 <div id="adminArea" class="container hidden">
 
+    <!-- MÉTRICAS -->
     <div class="grid-cards">
-        <div class="card metric"><h3>Horas Hoje</h3><div id="mHorasHoje" class="value">00:00</div></div>
-        <div class="card metric"><h3>Horas Semana</h3><div id="mHorasSemana" class="value">00:00</div></div>
-        <div class="card metric"><h3>Horas Mês</h3><div id="mHorasMes" class="value">00:00</div></div>
+        <div class="card metric">
+            <h3>Horas Hoje</h3>
+            <div id="mHorasHoje" class="value">00:00</div>
+        </div>
+        <div class="card metric">
+            <h3>Horas Semana</h3>
+            <div id="mHorasSemana" class="value">00:00</div>
+        </div>
+        <div class="card metric">
+            <h3>Horas Mês</h3>
+            <div id="mHorasMes" class="value">00:00</div>
+        </div>
     </div>
 
-    <div class="card">
+    <!-- FILTROS -->
+    <div class="card filtros">
         <h2>Filtros</h2>
         <div class="filtros-linha">
-            <div class="col"><label>Funcionário</label><select id="filtroFunc"></select></div>
-            <div class="col"><label>Obra</label><select id="filtroObra"></select></div>
+            <div class="col">
+                <label>Funcionário</label>
+                <select id="filtroFunc"></select>
+            </div>
+            <div class="col">
+                <label>Obra</label>
+                <select id="filtroObra"></select>
+            </div>
         </div>
         <button class="btn-primary" onclick="aplicarFiltros()">Aplicar</button>
         <button class="btn-secondary" onclick="limparFiltros()">Limpar</button>
     </div>
 
+    <!-- TABELA -->
     <div class="card">
         <h2>Registos</h2>
         <table id="tabelaRegistos" class="display">
@@ -66,12 +86,14 @@
 </div>
 
 <script src="admin.js"></script>
+
 <script>
 function toggleDark() {
     document.body.classList.toggle("dark");
     document.getElementById("darkBtn").textContent =
-        document.body.classList.contains("dark") ? "🌙" : "☀️";
+        document.body.classList.contains("dark") ? "☀️" : "🌙";
 }
 </script>
+
 </body>
 </html>
