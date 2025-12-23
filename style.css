@@ -168,3 +168,90 @@ table.dataTable tbody tr:hover {
 body.dark table.dataTable tbody td {
     color: white !important;
 }
+/* =========================================================
+   MARCAÇÃO DE PONTO (INDEX.HTML)
+   ========================================================= */
+
+.wrap {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.ponto-header {
+    justify-content: center;
+    text-align: center;
+}
+
+.ponto-header .brand {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ponto-header .subtitle {
+    font-size: 13px;
+    opacity: 0.7;
+}
+
+.ponto-card {
+    max-width: 420px;
+    margin: 40px auto;
+    text-align: center;
+}
+
+.welcome {
+    font-size: 18px;
+    margin-bottom: 6px;
+}
+
+.obra {
+    font-size: 14px;
+    opacity: 0.85;
+    margin-bottom: 24px;
+}
+
+.btn-large {
+    width: 100%;
+    font-size: 16px;
+    padding: 14px;
+    margin-bottom: 18px;
+}
+
+.section {
+    margin-top: 26px;
+    text-align: left;
+}
+
+.sectionTitle {
+    font-size: 13px;
+    margin-bottom: 6px;
+    opacity: 0.7;
+}
+
+.box {
+    background: rgba(0,0,0,0.05);
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 14px;
+}
+
+body.dark .box {
+    background: rgba(255,255,255,0.06);
+}
+
+.error-title {
+    color: #ff6b6b;
+}
+
+.muted {
+    font-size: 13px;
+    opacity: 0.6;
+}
+
+.footer {
+    text-align: center;
+    padding: 16px 0;
+    font-size: 12px;
+    opacity: 0.6;
+}
