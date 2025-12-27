@@ -6,109 +6,70 @@ const SUPABASE_URL = "https://npyosbigynxmxdakcymg.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weW9zYmlneW54bXhkYWtjeW1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4MzYyMjYsImV4cCI6MjA4MDQxMjIyNn0.CErd5a_-9HS4qPB99SFyO-airsNnS3b8dvWWrSPE4_M";
 const SB = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let tabela = null;
-
-// -------------------------------------------------------
 // LOGIN
-// -------------------------------------------------------
-async function validarPIN() {
-    const pin = document.getElementById("pinInput").value.trim();
-    const msg = document.getElementById("pinMsg");
+document.getElementById("btnLogin").onclick = () => {
+  document.getElementById("loginBox").classList.add("hidden");
+  document.getElementById("painelAdmin").classList.remove("hidden");
+  carregarFinanceiro();
+};
 
-    if (pin !== "1810") {
-        msg.textContent = "PIN incorreto";
-        return;
-    }
+// TABS
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
 
-    msg.textContent = "";
+    tab.classList.add("active");
+    document.getElementById("tab-" + tab.dataset.tab).classList.add("active");
 
-    document.getElementById("loginBox").classList.add("hidden");
-    document.getElementById("adminArea").classList.remove("hidden");
+    if (tab.dataset.tab === "financeiro") carregarFinanceiro();
+  };
+});
 
-    await carregarFiltros();
-    await carregarMetricas();
-    await carregarTabela();
+// FINANCEIRO
+async function carregarFinanceiro() {
+
+  // KPIs
+  const { data: kpi } = await supabase
+    .from("vw_kpis_financeiros_mes")
+    .select("*")
+    .single();
+
+  if (kpi) {
+    kpiFuncionarios.textContent = kpi.total_funcionarios;
+    kpiHoras.textContent = kpi.total_horas_mes;
+    kpiDias.textContent = kpi.total_dias_trabalhados;
+    kpiDiasIncompletos.textContent = kpi.total_dias_nao_completos;
+    kpiTotal.textContent = kpi.total_a_pagar.toFixed(2);
+  }
+
+  // TABELA
+  const { data } = await supabase
+    .from("vw_dashboard_mes_atual")
+    .select("*")
+    .order("valor_a_receber", { ascending: false });
+
+  const tbody = document.querySelector("#tabelaFinanceira tbody");
+  tbody.innerHTML = "";
+
+  data.forEach(r => {
+    const tr = document.createElement("tr");
+    if (r.dias_nao_completos > 0) tr.style.background = "#402";
+
+    tr.innerHTML = `
+      <td>${r.funcionario}</td>
+      <td>${r.horas_trabalhadas}</td>
+      <td>${r.dias_trabalhados}</td>
+      <td>${r.dias_nao_completos}</td>
+      <td>${r.valor_a_receber.toFixed(2)} €</td>
+    `;
+    tbody.appendChild(tr);
+  });
 }
 
-// -------------------------------------------------------
-// FILTROS
-// -------------------------------------------------------
-async function carregarFiltros() {
-    const selFunc = document.getElementById("filtroFunc");
-    const selObra = document.getElementById("filtroObra");
+// BOTÕES
+btnRefreshFinanceiro.onclick = carregarFinanceiro;
 
-    selFunc.innerHTML = "<option value=''>Todos</option>";
-    selObra.innerHTML = "<option value=''>Todas</option>";
-
-    const { data: funcs } = await SB.from("funcionarios").select("*").order("nome");
-    const { data: obras } = await SB.from("obras").select("*").order("nome");
-
-    funcs?.forEach(f => {
-        selFunc.innerHTML += `<option value="${f.id}">${f.nome}</option>`;
-    });
-
-    obras?.forEach(o => {
-        selObra.innerHTML += `<option value="${o.id}">${o.nome}</option>`;
-    });
-}
-
-// -------------------------------------------------------
-// TABELA
-// -------------------------------------------------------
-async function carregarTabela() {
-
-    if (tabela) {
-        tabela.destroy();
-        tabela = null;
-    }
-
-    const { data } = await SB.from("vw_registos_ponto").select("*");
-
-    tabela = $("#tabelaRegistos").DataTable({
-        data: data || [],
-        columns: [
-            { data: "funcionario" },
-            { data: "obra" },
-            { data: "dia" },
-            { data: "entrada" },
-            { data: "saida" },
-            { data: "horas" },
-            { data: "estado" }
-        ],
-        order: [[2, "desc"]],
-        pageLength: 10
-    });
-}
-
-// -------------------------------------------------------
-// MÉTRICAS (CORRIGIDO)
-// -------------------------------------------------------
-async function carregarMetricas() {
-    const { data, error } = await SB.rpc("get_metrica_admin");
-
-    if (error || !data || data.length === 0) {
-        document.getElementById("mHorasHoje").textContent = "00:00";
-        document.getElementById("mHorasSemana").textContent = "00:00";
-        document.getElementById("mHorasMes").textContent = "00:00";
-        return;
-    }
-
-    const m = data[0]; // ← RPC devolve array
-
-    document.getElementById("mHorasHoje").textContent = m.horas_hoje || "00:00";
-    document.getElementById("mHorasSemana").textContent = m.horas_semana || "00:00";
-    document.getElementById("mHorasMes").textContent = m.horas_mes || "00:00";
-}
-
-// -------------------------------------------------------
-// AÇÕES
-// -------------------------------------------------------
-function aplicarFiltros() {
-    carregarTabela();
-}
-
-function limparFiltros() {
-    document.getElementById("filtroFunc").value = "";
-    document.getElementById("filtroObra").value = "";
-    carregarTabela();
-}
+btnExportExcel.onclick = () => {
+  alert("Exportação Excel será adicionada na próxima fase.");
+};
