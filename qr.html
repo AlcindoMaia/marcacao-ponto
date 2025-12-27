@@ -4,59 +4,127 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<title>Criar Obra + Gerar QR — Maia Solutions</title>
+<title>Gerar QR — Maia Solutions</title>
 
 <link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
 
 <style>
-.container { padding: 20px; }
-.qr-preview { margin-top: 25px; text-align:center; }
-canvas { 
-    border:1px solid #ddd; 
-    padding:10px; 
-    background:white;
-    border-radius: 8px;
+/* ====================================
+   QR PAGE — DESIGN ESG (moderno)
+   ==================================== */
+body.dark .qr-container {
+    background: var(--bg-panel);
+    color: var(--text-light);
 }
-label { font-weight:bold; display:block; margin-top:15px; }
-input { width:100%; padding:8px; margin-top:5px; }
+.qr-page {
+    max-width: 480px;
+    margin: 32px auto;
+    padding: 0 24px 48px;
+}
+.qr-header {
+    text-align: center;
+    margin-bottom: 28px;
+}
+.qr-header h2 {
+    font-size: 20px;
+    font-weight: 700;
+}
+.qr-form {
+    background: var(--bg-panel);
+    box-shadow: var(--shadow);
+    border-radius: var(--radius);
+    padding: 22px;
+}
+.qr-form label {
+    font-size: 14px;
+    margin-top: 14px;
+    display: block;
+    opacity: 0.85;
+}
+.qr-form input {
+    width: 100%;
+    margin-top: 8px;
+    padding: 10px 12px;
+    font-size: 15px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+}
+.qr-buttons {
+    margin-top: 18px;
+    display: flex;
+    gap: 12px;
+}
+.qr-buttons button {
+    flex: 1;
+    font-size: 16px;
+    padding: 10px;
+}
+.qr-preview {
+    text-align: center;
+    margin-top: 32px;
+    display: none;
+}
+.qr-preview canvas {
+    border: 2px solid var(--primary);
+    border-radius: 8px;
+    padding: 12px;
+    background: white;
+}
+.qr-download {
+    margin-top: 12px;
+    display: block;
+    font-size: 15px;
+    text-align: center;
+    padding: 10px 0;
+    border-radius: var(--radius);
+    background: var(--primary);
+    color: black;
+    text-decoration: none;
+    font-weight: bold;
+}
 </style>
 </head>
 
-<body>
+<body class="dark">
 
-<div class="container card">
+<div class="qr-page">
 
-<h2>Criar Nova Obra + Gerar QR Code</h2>
+  <!-- HEADER -->
+  <div class="qr-header">
+    <h2>Criar Nova Obra + QR Code</h2>
+  </div>
 
-<form id="formObra">
+  <!-- FORMULÁRIO -->
+  <div class="qr-form">
+      <label>Nome da Obra</label>
+      <input id="nomeObra" placeholder="Ex.: Obra Centro">
 
-    <label>Nome da Obra</label>
-    <input id="nomeObra" required />
+      <label>Morada (opcional)</label>
+      <input id="morada">
 
-    <label>Morada (opcional)</label>
-    <input id="morada" />
+      <label>Raio de Validação (metros)</label>
+      <input id="raio" type="number" value="120">
 
-    <label>Raio de validação (metros)</label>
-    <input id="raio" type="number" value="120" />
+      <label>Latitude</label>
+      <input id="latitude" placeholder="Latitude" readonly>
 
-    <label>Coordenadas GPS</label>
-    <input id="latitude" placeholder="Latitude" readonly />
-    <input id="longitude" placeholder="Longitude" readonly />
+      <label>Longitude</label>
+      <input id="longitude" placeholder="Longitude" readonly>
 
-    <button type="button" class="btn secondary" id="btnGPS">Obter Localização</button>
+      <div class="qr-buttons">
+          <button id="btnGPS" class="btn-secondary">Obter Localização</button>
+          <button id="btnGerar" class="btn-primary">Criar Obra + QR</button>
+      </div>
+  </div>
 
-    <button type="submit" class="btn primary">Criar Obra + Gerar QR</button>
-</form>
-
-<div class="qr-preview hidden" id="qrBox">
-    <h3>QR Code da Obra</h3>
-    <canvas id="qrCanvas"></canvas>
-
-    <br><br>
-    <a id="downloadBtn" class="btn primary" download="">Descarregar QR</a>
-</div>
+  <!-- QR PREVIEW -->
+  <div class="qr-preview" id="qrBox">
+      <h3>QR Code da Obra</h3>
+      <canvas id="qrCanvas"></canvas>
+      <a id="downloadBtn" class="qr-download" download="">Descarregar QR</a>
+  </div>
 
 </div>
 
@@ -64,3 +132,5 @@ input { width:100%; padding:8px; margin-top:5px; }
 
 </body>
 </html>
+
+
