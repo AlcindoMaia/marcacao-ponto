@@ -168,6 +168,7 @@ table.dataTable tbody tr:hover {
 body.dark table.dataTable tbody td {
     color: white !important;
 }
+
 /* =========================================================
    MARCAÇÃO DE PONTO (INDEX.HTML)
    ========================================================= */
@@ -255,65 +256,57 @@ body.dark .box {
     font-size: 12px;
     opacity: 0.6;
 }
-/* === TABS === */
+
+/* =========================================================
+   NOVO — TABS (ADMIN)
+   ========================================================= */
+
 .tabs {
-  display: flex;
-  gap: 8px;
-  margin: 20px 0;
+    display: flex;
+    gap: 12px;
+    margin-bottom: var(--space-lg);
 }
+
 .tab {
-  padding: 8px 16px;
-  border-radius: 20px;
-  background: #333;
-  color: #ccc;
-  cursor: pointer;
+    padding: 10px 20px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.06);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
 }
+
 .tab.active {
-  background: var(--primary);
-  color: black;
+    background: var(--primary);
+    color: #000;
 }
 
-/* === TAB CONTENT === */
+body.dark .tab {
+    background: rgba(255,255,255,0.08);
+}
+
+/* CONTEÚDO DAS TABS */
 .tab-content {
-  display: none;
-  animation: fade .25s ease-in-out;
+    display: none;
 }
+
 .tab-content.active {
-  display: block;
-}
-@keyframes fade {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+    display: block;
 }
 
-/* === KPIs === */
-.kpis {
-  display: grid;
-  grid-template-columns: repeat(auto-fit,minmax(150px,1fr));
-  gap: 16px;
-  margin-bottom: 20px;
+/* GARANTIA: cards e tabelas não colapsam */
+.tab-content .card {
+    margin-bottom: var(--space-lg);
 }
-.kpi {
-  background: var(--bg-panel);
-  padding: 16px;
-  border-radius: var(--radius);
-  text-align: center;
-}
-.kpi span {
-  font-size: 22px;
-  font-weight: bold;
-}
-.kpi small {
-  display: block;
-  margin-top: 4px;
-  opacity: .7;
-}
-.kpi.primary { background: var(--primary); color: black; }
-.kpi.warning { background: #a86; }
 
-/* === ACTIONS === */
-.actions {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 12px;
+/* =========================================================
+   AJUSTES FINANCEIRO
+   ========================================================= */
+
+.card.metric.primary .value {
+    color: #000;
+}
+
+.card.metric.warning .value {
+    color: #ffb3b3;
 }
