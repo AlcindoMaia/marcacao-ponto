@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>Painel Administrativo — Maia Solutions</title>
 
 <link rel="stylesheet" href="style.css">
@@ -23,6 +24,7 @@
     <button class="dark-toggle" id="darkBtn" onclick="toggleDark()">☀️</button>
 </header>
 
+<!-- LOGIN -->
 <div id="loginBox" class="card" style="max-width:400px;margin:0 auto var(--space-lg)">
     <h2>Área Restrita</h2>
     <input id="pinInput" type="password" placeholder="PIN">
@@ -30,57 +32,121 @@
     <button class="btn-primary" onclick="validarPIN()">Entrar</button>
 </div>
 
+<!-- ÁREA ADMIN -->
 <div id="adminArea" class="container hidden">
 
-    <!-- MÉTRICAS -->
-    <div class="grid-cards">
-        <div class="card metric">
-            <h3>Horas Hoje</h3>
-            <div id="mHorasHoje" class="value">00:00</div>
-        </div>
-        <div class="card metric">
-            <h3>Horas Semana</h3>
-            <div id="mHorasSemana" class="value">00:00</div>
-        </div>
-        <div class="card metric">
-            <h3>Horas Mês</h3>
-            <div id="mHorasMes" class="value">00:00</div>
-        </div>
+    <!-- TABS -->
+    <div class="tabs">
+        <button class="tab active" data-tab="financeiro">Financeiro</button>
+        <button class="tab" data-tab="registos">Registos</button>
     </div>
 
-    <!-- FILTROS -->
-    <div class="card filtros">
-        <h2>Filtros</h2>
-        <div class="filtros-linha">
-            <div class="col">
-                <label>Funcionário</label>
-                <select id="filtroFunc"></select>
+    <!-- ================= TAB FINANCEIRO ================= -->
+    <div class="tab-content active" id="tab-financeiro">
+
+        <!-- KPIs FINANCEIROS -->
+        <div class="grid-cards">
+            <div class="card metric">
+                <h3>Funcionários</h3>
+                <div id="kpiFuncionarios" class="value">–</div>
             </div>
-            <div class="col">
-                <label>Obra</label>
-                <select id="filtroObra"></select>
+            <div class="card metric">
+                <h3>Horas do mês</h3>
+                <div id="kpiHoras" class="value">–</div>
+            </div>
+            <div class="card metric">
+                <h3>Dias trabalhados</h3>
+                <div id="kpiDias" class="value">–</div>
+            </div>
+            <div class="card metric warning">
+                <h3>Dias &lt; 8h</h3>
+                <div id="kpiDiasIncompletos" class="value">–</div>
+            </div>
+            <div class="card metric primary">
+                <h3>Total a pagar</h3>
+                <div id="kpiTotal" class="value">–</div>
             </div>
         </div>
-        <button class="btn-primary" onclick="aplicarFiltros()">Aplicar</button>
-        <button class="btn-secondary" onclick="limparFiltros()">Limpar</button>
+
+        <!-- AÇÕES -->
+        <div class="card filtros">
+            <button class="btn-primary" id="btnRefreshFinanceiro">Atualizar</button>
+            <button class="btn-secondary" id="btnExportExcel">Exportar Excel</button>
+        </div>
+
+        <!-- TABELA FINANCEIRA -->
+        <div class="card">
+            <h2>Resumo Financeiro — Mês Atual</h2>
+            <table id="tabelaFinanceira" class="display">
+                <thead>
+                    <tr>
+                        <th>Funcionário</th>
+                        <th>Horas</th>
+                        <th>Dias</th>
+                        <th>Dias &lt; 8h</th>
+                        <th>Valor (€)</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
     </div>
 
-    <!-- TABELA -->
-    <div class="card">
-        <h2>Registos</h2>
-        <table id="tabelaRegistos" class="display">
-            <thead>
-                <tr>
-                    <th>Funcionário</th>
-                    <th>Obra</th>
-                    <th>Dia</th>
-                    <th>Entrada</th>
-                    <th>Saída</th>
-                    <th>Horas</th>
-                    <th>Estado</th>
-                </tr>
-            </thead>
-        </table>
+    <!-- ================= TAB REGISTOS ================= -->
+    <div class="tab-content" id="tab-registos">
+
+        <!-- MÉTRICAS EXISTENTES -->
+        <div class="grid-cards">
+            <div class="card metric">
+                <h3>Horas Hoje</h3>
+                <div id="mHorasHoje" class="value">00:00</div>
+            </div>
+            <div class="card metric">
+                <h3>Horas Semana</h3>
+                <div id="mHorasSemana" class="value">00:00</div>
+            </div>
+            <div class="card metric">
+                <h3>Horas Mês</h3>
+                <div id="mHorasMes" class="value">00:00</div>
+            </div>
+        </div>
+
+        <!-- FILTROS EXISTENTES -->
+        <div class="card filtros">
+            <h2>Filtros</h2>
+            <div class="filtros-linha">
+                <div class="col">
+                    <label>Funcionário</label>
+                    <select id="filtroFunc"></select>
+                </div>
+                <div class="col">
+                    <label>Obra</label>
+                    <select id="filtroObra"></select>
+                </div>
+            </div>
+            <button class="btn-primary" onclick="aplicarFiltros()">Aplicar</button>
+            <button class="btn-secondary" onclick="limparFiltros()">Limpar</button>
+        </div>
+
+        <!-- TABELA EXISTENTE -->
+        <div class="card">
+            <h2>Registos</h2>
+            <table id="tabelaRegistos" class="display">
+                <thead>
+                    <tr>
+                        <th>Funcionário</th>
+                        <th>Obra</th>
+                        <th>Dia</th>
+                        <th>Entrada</th>
+                        <th>Saída</th>
+                        <th>Horas</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+
     </div>
 
 </div>
@@ -97,3 +163,4 @@ function toggleDark() {
 
 </body>
 </html>
+
