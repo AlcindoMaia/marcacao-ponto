@@ -110,9 +110,14 @@ function mostrarTab(nome) {
     tabDiv.style.visibility = "visible";
     tabDiv.style.left = "0";
 
-    if (nome === "registos" && tabela) {
-        tabela.columns.adjust().draw(false);
+if (nome === "registos") {
+    if (tabela) {
+        tabela.destroy();
+        tabela = null;
     }
+    carregarTabela();
+}
+
 
     if (nome === "financeiro") {
         carregarKPIsFinanceiros();
@@ -131,7 +136,6 @@ document.querySelectorAll(".tab").forEach(tab => {
 async function carregarTudo() {
     await carregarFiltros();
     await carregarMetricas();
-    await carregarTabela();
     await carregarKPIsFinanceiros();
     await carregarTabelaFinanceira();
 }
