@@ -157,14 +157,30 @@ async function carregarTabelaFinanceira() {
 // TABS (VISUAL)
 // -------------------------------------------------------
 function ativarTab(nome) {
-    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
 
+    // desativar tudo
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(c => c.style.display = "none");
+
+    // ativar tab escolhida
     const btn = document.querySelector(`.tab[data-tab="${nome}"]`);
     const div = document.getElementById("tab-" + nome);
 
-    if (btn && div) {
-        btn.classList.add("active");
-        div.classList.add("active");
+    if (!btn || !div) {
+        console.warn("Tab não encontrada:", nome);
+        return;
+    }
+
+    btn.classList.add("active");
+    div.style.display = "block";
+
+    // ações específicas por tab
+    if (nome === "financeiro") {
+        carregarKPIsFinanceiros();
+        carregarTabelaFinanceira();
+    }
+
+    if (nome === "registos") {
+        carregarTabela(); // garante DataTable visível
     }
 }
