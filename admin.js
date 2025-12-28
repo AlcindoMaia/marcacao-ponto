@@ -1,4 +1,4 @@
-// =======================================================
+*// =======================================================
 // SUPABASE
 // =======================================================
 const SUPABASE_URL = "https://npyosbigynxmxdakcymg.supabase.co";
@@ -7,7 +7,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkXVCJ9.eyJpc3MiOiJzdXBhY
 const SB = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const PIN_ADMIN = "1810";
-const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutos
+const SESSION_TIMEOUT = 30 * 60 * 1000;
 
 let tabela = null;
 let inactivityTimer = null;
@@ -35,7 +35,6 @@ function validarPIN() {
     msg.textContent = "";
     localStorage.setItem("admin_auth", "1");
     localStorage.setItem("admin_last", Date.now());
-
     entrarAdmin();
 }
 
@@ -48,8 +47,7 @@ function entrarAdmin() {
 }
 
 function sairAdmin() {
-    localStorage.removeItem("admin_auth");
-    localStorage.removeItem("admin_last");
+    localStorage.clear();
     location.reload();
 }
 
@@ -70,7 +68,7 @@ document.addEventListener("keydown", e => {
 });
 
 // =======================================================
-// INATIVIDADE (30 MIN)
+// INATIVIDADE
 // =======================================================
 function resetInactivity() {
     clearTimeout(inactivityTimer);
@@ -89,7 +87,7 @@ function prepararEventosGlobais() {
 }
 
 // =======================================================
-// TABS (ROBUSTO — SEM display:none)
+// TABS
 // =======================================================
 function mostrarTab(nome) {
     document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
@@ -105,23 +103,19 @@ function mostrarTab(nome) {
     if (!tabBtn || !tabDiv) return;
 
     tabBtn.classList.add("active");
-
     tabDiv.style.position = "relative";
     tabDiv.style.visibility = "visible";
     tabDiv.style.left = "0";
 
-if (nome === "registos") {
-    if (tabela) {
-        tabela.destroy();
-        tabela = null;
-    }
-    carregarTabela();
-}
-
-
     if (nome === "financeiro") {
         carregarKPIsFinanceiros();
         carregarTabelaFinanceira();
+    }
+
+    if (nome === "registos") {
+        setTimeout(() => {
+            carregarTabela();
+        }, 50);
     }
 }
 
@@ -158,11 +152,11 @@ async function carregarFiltros() {
 }
 
 // =======================================================
-// TABELA REGISTOS
+// TABELA REGISTOS (CORRIGIDA)
 // =======================================================
 async function carregarTabela() {
     if (tabela) {
-        tabela.destroy();
+        tabela.destroy(true);
         tabela = null;
     }
 
@@ -170,6 +164,9 @@ async function carregarTabela() {
 
     tabela = $("#tabelaRegistos").DataTable({
         data: data || [],
+        destroy: true,
+        deferRender: true,
+        autoWidth: false,
         columns: [
             { data: "funcionario" },
             { data: "obra" },
@@ -182,10 +179,14 @@ async function carregarTabela() {
         order: [[2, "desc"]],
         pageLength: 10
     });
+
+    setTimeout(() => {
+        tabela.columns.adjust().draw(false);
+    }, 100);
 }
 
 // =======================================================
-// MÉTRICAS OPERACIONAIS
+// MÉTRICAS
 // =======================================================
 async function carregarMetricas() {
     const { data } = await SB.rpc("get_metrica_admin");
