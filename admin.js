@@ -23,6 +23,30 @@ async function validarPIN() {
 
     msg.textContent = "";
 
+    // Guardar sessão
+    localStorage.setItem("admin_autenticado", "1");
+
+    entrarAdmin();
+}
+
+// Login automático se já autenticado
+document.addEventListener("DOMContentLoaded", () => {
+    if (localStorage.getItem("admin_autenticado") === "1") {
+        entrarAdmin();
+    }
+});
+
+// ENTER no input PIN
+document.addEventListener("DOMContentLoaded", () => {
+    const pinInput = document.getElementById("pinInput");
+    if (pinInput) {
+        pinInput.addEventListener("keydown", e => {
+            if (e.key === "Enter") validarPIN();
+        });
+    }
+});
+
+async function entrarAdmin() {
     document.getElementById("loginBox").classList.add("hidden");
     document.getElementById("adminArea").classList.remove("hidden");
 
@@ -30,7 +54,7 @@ async function validarPIN() {
     await carregarMetricas();
     await carregarTabela();
 
-    // NOVO: abrir financeiro por defeito
+    // GARANTIA de carga financeira
     ativarTab("financeiro");
 }
 
@@ -57,7 +81,7 @@ async function carregarFiltros() {
 }
 
 // -------------------------------------------------------
-// TABELA REGISTOS (EXISTENTE)
+// TABELA REGISTOS
 // -------------------------------------------------------
 async function carregarTabela() {
 
@@ -85,7 +109,7 @@ async function carregarTabela() {
 }
 
 // -------------------------------------------------------
-// MÉTRICAS OPERACIONAIS (EXISTENTE)
+// MÉTRICAS OPERACIONAIS
 // -------------------------------------------------------
 async function carregarMetricas() {
     const { data, error } = await SB.rpc("get_metrica_admin");
@@ -105,7 +129,7 @@ async function carregarMetricas() {
 }
 
 // -------------------------------------------------------
-// AÇÕES EXISTENTES
+// AÇÕES
 // -------------------------------------------------------
 function aplicarFiltros() {
     carregarTabela();
@@ -118,12 +142,9 @@ function limparFiltros() {
 }
 
 // =======================================================
-// ===============  NOVO — FINANCEIRO  ===================
+// FINANCEIRO
 // =======================================================
 
-// -------------------------------------------------------
-// KPIs FINANCEIROS
-// -------------------------------------------------------
 async function carregarKPIsFinanceiros() {
     const { data, error } = await SB
         .from("vw_kpis_financeiros_mes")
@@ -143,9 +164,6 @@ async function carregarKPIsFinanceiros() {
         Number(data.total_a_pagar || 0).toFixed(2) + " €";
 }
 
-// -------------------------------------------------------
-// TABELA FINANCEIRA
-// -------------------------------------------------------
 async function carregarTabelaFinanceira() {
 
     const tbody = document.querySelector("#tabelaFinanceira tbody");
@@ -181,10 +199,9 @@ async function carregarTabelaFinanceira() {
 }
 
 // -------------------------------------------------------
-// SISTEMA DE TABS
+// TABS
 // -------------------------------------------------------
 function ativarTab(nome) {
-
     document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
     document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
 
@@ -202,9 +219,6 @@ function ativarTab(nome) {
     }
 }
 
-// -------------------------------------------------------
-// EVENTOS DAS TABS
-// -------------------------------------------------------
 document.querySelectorAll(".tab").forEach(tab => {
     tab.addEventListener("click", () => {
         ativarTab(tab.dataset.tab);
