@@ -310,3 +310,31 @@ body.dark .tab {
 .card.metric.warning .value {
     color: #ffb3b3;
 }
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.tabs {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.tab {
+    padding: 8px 18px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    cursor: pointer;
+    border: none;
+}
+
+.tab.active {
+    background: var(--primary);
+    color: #000;
+}
+
