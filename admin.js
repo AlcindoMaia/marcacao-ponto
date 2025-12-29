@@ -1,4 +1,4 @@
-*// =======================================================
+// =======================================================
 // SUPABASE
 // =======================================================
 const SUPABASE_URL = "https://npyosbigynxmxdakcymg.supabase.co";
@@ -35,12 +35,18 @@ function validarPIN() {
     msg.textContent = "";
     localStorage.setItem("admin_auth", "1");
     localStorage.setItem("admin_last", Date.now());
+
     entrarAdmin();
 }
 
 function entrarAdmin() {
     document.getElementById("loginBox").classList.add("hidden");
     document.getElementById("adminArea").classList.remove("hidden");
+
+    // 🔥 AGORA as tabs EXISTEM — ligar eventos aqui
+    document.querySelectorAll(".tab").forEach(tab => {
+        tab.onclick = () => mostrarTab(tab.dataset.tab);
+    });
 
     carregarTudo();
     mostrarTab("financeiro");
@@ -113,16 +119,9 @@ function mostrarTab(nome) {
     }
 
     if (nome === "registos") {
-        setTimeout(() => {
-            carregarTabela();
-        }, 50);
+        setTimeout(() => carregarTabela(), 50);
     }
 }
-
-// Eventos tabs
-document.querySelectorAll(".tab").forEach(tab => {
-    tab.addEventListener("click", () => mostrarTab(tab.dataset.tab));
-});
 
 // =======================================================
 // CARREGAMENTO GLOBAL
@@ -152,7 +151,7 @@ async function carregarFiltros() {
 }
 
 // =======================================================
-// TABELA REGISTOS (CORRIGIDA)
+// TABELA REGISTOS
 // =======================================================
 async function carregarTabela() {
     if (tabela) {
@@ -180,9 +179,7 @@ async function carregarTabela() {
         pageLength: 10
     });
 
-    setTimeout(() => {
-        tabela.columns.adjust().draw(false);
-    }, 100);
+    setTimeout(() => tabela.columns.adjust().draw(false), 100);
 }
 
 // =======================================================
