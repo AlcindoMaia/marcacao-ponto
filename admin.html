@@ -35,48 +35,24 @@
 <!-- ÁREA ADMIN -->
 <div id="adminArea" class="container hidden">
 
-    <!-- TABS -->
     <div class="tabs">
         <button class="tab active" data-tab="financeiro">Financeiro</button>
         <button class="tab" data-tab="registos">Registos</button>
     </div>
 
-    <!-- ================= TAB FINANCEIRO ================= -->
+    <!-- FINANCEIRO -->
     <div class="tab-content active" id="tab-financeiro">
 
-        <!-- KPIs FINANCEIROS -->
         <div class="grid-cards">
-            <div class="card metric">
-                <h3>Funcionários</h3>
-                <div id="kpiFuncionarios" class="value">–</div>
-            </div>
-            <div class="card metric">
-                <h3>Horas do mês</h3>
-                <div id="kpiHoras" class="value">–</div>
-            </div>
-            <div class="card metric">
-                <h3>Dias trabalhados</h3>
-                <div id="kpiDias" class="value">–</div>
-            </div>
-            <div class="card metric warning">
-                <h3>Dias &lt; 8h</h3>
-                <div id="kpiDiasIncompletos" class="value">–</div>
-            </div>
-            <div class="card metric primary">
-                <h3>Total a pagar</h3>
-                <div id="kpiTotal" class="value">–</div>
-            </div>
+            <div class="card metric"><h3>Funcionários</h3><div id="kpiFuncionarios" class="value">–</div></div>
+            <div class="card metric"><h3>Horas do mês</h3><div id="kpiHoras" class="value">–</div></div>
+            <div class="card metric"><h3>Dias trabalhados</h3><div id="kpiDias" class="value">–</div></div>
+            <div class="card metric warning"><h3>Dias &lt; 8h</h3><div id="kpiDiasIncompletos" class="value">–</div></div>
+            <div class="card metric primary"><h3>Total a pagar</h3><div id="kpiTotal" class="value">–</div></div>
         </div>
 
-        <!-- AÇÕES -->
-        <div class="card filtros">
-            <button class="btn-primary" id="btnRefreshFinanceiro">Atualizar</button>
-            <button class="btn-secondary" id="btnExportExcel">Exportar Excel</button>
-        </div>
-
-        <!-- TABELA FINANCEIRA -->
         <div class="card">
-            <h2>Resumo Financeiro — Mês Atual</h2>
+            <h2>Resumo Financeiro</h2>
             <table id="tabelaFinanceira" class="display">
                 <thead>
                     <tr>
@@ -93,43 +69,15 @@
 
     </div>
 
-    <!-- ================= TAB REGISTOS ================= -->
+    <!-- REGISTOS -->
     <div class="tab-content" id="tab-registos">
 
-        <!-- MÉTRICAS EXISTENTES -->
         <div class="grid-cards">
-            <div class="card metric">
-                <h3>Horas Hoje</h3>
-                <div id="mHorasHoje" class="value">00:00</div>
-            </div>
-            <div class="card metric">
-                <h3>Horas Semana</h3>
-                <div id="mHorasSemana" class="value">00:00</div>
-            </div>
-            <div class="card metric">
-                <h3>Horas Mês</h3>
-                <div id="mHorasMes" class="value">00:00</div>
-            </div>
+            <div class="card metric"><h3>Horas Hoje</h3><div id="mHorasHoje" class="value">00:00</div></div>
+            <div class="card metric"><h3>Horas Semana</h3><div id="mHorasSemana" class="value">00:00</div></div>
+            <div class="card metric"><h3>Horas Mês</h3><div id="mHorasMes" class="value">00:00</div></div>
         </div>
 
-        <!-- FILTROS EXISTENTES -->
-        <div class="card filtros">
-            <h2>Filtros</h2>
-            <div class="filtros-linha">
-                <div class="col">
-                    <label>Funcionário</label>
-                    <select id="filtroFunc"></select>
-                </div>
-                <div class="col">
-                    <label>Obra</label>
-                    <select id="filtroObra"></select>
-                </div>
-            </div>
-            <button class="btn-primary" onclick="aplicarFiltros()">Aplicar</button>
-            <button class="btn-secondary" onclick="limparFiltros()">Limpar</button>
-        </div>
-
-        <!-- TABELA EXISTENTE -->
         <div class="card">
             <h2>Registos</h2>
             <table id="tabelaRegistos" class="display">
@@ -150,6 +98,7 @@
     </div>
 
 </div>
+
 
 <script src="admin.js?v=2026-01"></script>
 
