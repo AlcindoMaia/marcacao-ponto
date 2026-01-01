@@ -63,6 +63,26 @@ async function carregarFinanceiro() {
 }
 
 // REGISTOS
+
+async function carregarTabela() {
+
+    const { data, error } = await SB.from("vw_registos_ponto").select("*");
+
+    console.log("DADOS REGISTOS:", data);
+    console.table(data);
+
+    if (error) {
+        console.error("ERRO SUPABASE:", error);
+        return;
+    }
+
+    if (!data || data.length === 0) {
+        alert("A view não devolveu dados no browser");
+        return;
+    }
+
+    // deixa o resto como está por agora
+
 async function carregarRegistos() {
     if (tabelaRegistos) return;
 
