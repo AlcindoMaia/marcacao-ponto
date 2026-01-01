@@ -1,41 +1,74 @@
+// =======================================================
 // SUPABASE
+// =======================================================
 const SB = supabase.createClient(
   "https://npyosbigynxmxdakcymg.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weW9zYmlneW54bXhkYWtjeW1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4MzYyMjYsImV4cCI6MjA4MDQxMjIyNn0.CErd5a_-9HS4qPB99SFyO-airsNnS3b8dvWWrSPE4_M"
 );
 
-const PIN = "1810";
+const PIN_ADMIN = "1810";
 let tabelaRegistos = null;
+let tabelaFinanceira = null;
 
-// LOGIN
+// =======================================================
+// LOGIN (ÚNICO CÓDIGO ATIVO NO LOAD)
+// =======================================================
+window.onload = () => {
+    document.getElementById("pinInput").focus();
+};
+
+// ENTER no PIN
+document.addEventListener("keydown", e => {
+    if (e.key === "Enter") validarPIN();
+});
+
 function validarPIN() {
-    if (pinInput.value !== PIN) {
-        pinMsg.textContent = "PIN incorreto";
+    const pin = document.getElementById("pinInput").value.trim();
+    const msg = document.getElementById("pinMsg");
+
+    if (pin !== PIN_ADMIN) {
+        msg.textContent = "PIN incorreto";
         return;
     }
-    loginBox.classList.add("hidden");
-    adminArea.classList.remove("hidden");
-    initTabs();
-    carregarFinanceiro();
+
+    msg.textContent = "";
+    document.getElementById("loginBox").classList.add("hidden");
+    document.getElementById("adminArea").classList.remove("hidden");
+
+    inicializarPainel();
 }
 
-// TABS
-function initTabs() {
+// =======================================================
+// INICIALIZAÇÃO DO PAINEL (APÓS LOGIN)
+// =======================================================
+function inicializarPainel() {
+    inicializarTabs();
+    abrirTab("financeiro");
+}
+
+// =======================================================
+// TABS (SIMPLES, SEM HACKS)
+// =======================================================
+function inicializarTabs() {
     document.querySelectorAll(".tab").forEach(btn => {
-        btn.onclick = () => {
-            document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-            document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
-
-            btn.classList.add("active");
-            document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
-
-            if (btn.dataset.tab === "registos") carregarRegistos();
-            if (btn.dataset.tab === "financeiro") carregarFinanceiro();
-        };
+        btn.onclick = () => abrirTab(btn.dataset.tab);
     });
 }
 
+function abrirTab(nome) {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+
+    document.querySelector(`.tab[data-tab="${nome}"]`).classList.add("active");
+    document.getElementById("tab-" + nome).classList.add("active");
+
+    if (nome === "financeiro") carregarFinanceiro();
+    if (nome === "registos") carregarRegistos();
+}
+
+// =======================================================
 // FINANCEIRO
+// =======================================================
 async function carregarFinanceiro() {
     const { data } = await SB.from("vw_kpis_financeiros_mes").select("*").single();
     if (!data) return;
@@ -62,43 +95,37 @@ async function carregarFinanceiro() {
     });
 }
 
-// REGISTOS
-
-async function carregarTabela() {
+// =======================================================
+// REGISTOS (SEM DATATABLES PARA DEBUG FINAL)
+// =======================================================
+async function carregarRegistos() {
+    if (tabelaRegistos) return;
 
     const { data, error } = await SB.from("vw_registos_ponto").select("*");
 
     console.log("DADOS REGISTOS:", data);
-    console.table(data);
 
-    if (error) {
-        console.error("ERRO SUPABASE:", error);
+    if (error || !data) {
+        alert("Erro ao carregar registos");
         return;
     }
 
-    if (!data || data.length === 0) {
-        alert("A view não devolveu dados no browser");
-        return;
-    }
+    const tbody = document.querySelector("#tabelaRegistos tbody");
+    tbody.innerHTML = "";
 
-    // deixa o resto como está por agora
-
-async function carregarRegistos() {
-    if (tabelaRegistos) return;
-
-    const { data } = await SB.from("vw_registos_ponto").select("*");
-
-    tabelaRegistos = $("#tabelaRegistos").DataTable({
-        data: data || [],
-        columns: [
-            { data: "funcionario" },
-            { data: "obra" },
-            { data: "dia" },
-            { data: "entrada" },
-            { data: "saida" },
-            { data: "horas" },
-            { data: "estado" }
-        ],
-        order: [[2, "desc"]]
+    data.forEach(r => {
+        tbody.innerHTML += `
+            <tr>
+                <td>${r.funcionario}</td>
+                <td>${r.obra}</td>
+                <td>${r.dia}</td>
+                <td>${r.entrada}</td>
+                <td>${r.saida}</td>
+                <td>${r.horas}</td>
+                <td>${r.estado}</td>
+            </tr>
+        `;
     });
+
+    tabelaRegistos = true;
 }
