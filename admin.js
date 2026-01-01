@@ -1,25 +1,18 @@
 // =======================================================
-// SUPABASE
+// SUPABASE (CHAVE CORRETA)
 // =======================================================
 const SB = supabase.createClient(
   "https://npyosbigynxmxdakcymg.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weW9zYmlneW54bXhkYWtjeW1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4MzYyMjYsImV4cCI6MjA4MDQxMjIyNn0.CErd5a_-9HS4qPB99SFyO-airsNnS3b8dvWWrSPE4_M"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weW9zYmlneW54bXhkYWtjeW1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4MzYyMjYsImV4cCI6MjA4MDQxMjIyNn0.CErd5a_-9HS4qPB99SFyO-airsNnS3b8dvWWrSPE4_M"
 );
 
 const PIN_ADMIN = "1810";
-let tabelaRegistos = null;
-let tabelaFinanceira = null;
 
 // =======================================================
-// LOGIN (ÚNICO CÓDIGO ATIVO NO LOAD)
+// LOGIN
 // =======================================================
-window.onload = () => {
+window.addEventListener("DOMContentLoaded", () => {
     document.getElementById("pinInput").focus();
-};
-
-// ENTER no PIN
-document.addEventListener("keydown", e => {
-    if (e.key === "Enter") validarPIN();
 });
 
 function validarPIN() {
@@ -38,18 +31,23 @@ function validarPIN() {
     inicializarPainel();
 }
 
+// ENTER no PIN
+document.addEventListener("keydown", e => {
+    if (e.key === "Enter") validarPIN();
+});
+
 // =======================================================
-// INICIALIZAÇÃO DO PAINEL (APÓS LOGIN)
+// PAINEL
 // =======================================================
 function inicializarPainel() {
-    inicializarTabs();
+    ativarTabs();
     abrirTab("financeiro");
 }
 
 // =======================================================
-// TABS (SIMPLES, SEM HACKS)
+// TABS
 // =======================================================
-function inicializarTabs() {
+function ativarTabs() {
     document.querySelectorAll(".tab").forEach(btn => {
         btn.onclick = () => abrirTab(btn.dataset.tab);
     });
@@ -91,19 +89,18 @@ async function carregarFinanceiro() {
                 <td>${r.dias_trabalhados}</td>
                 <td>${r.dias_nao_completos}</td>
                 <td>${Number(r.valor_a_receber).toFixed(2)} €</td>
-            </tr>`;
+            </tr>
+        `;
     });
 }
 
 // =======================================================
-// REGISTOS (SEM DATATABLES PARA DEBUG FINAL)
+// REGISTOS (RENDER DIRETO)
 // =======================================================
 async function carregarRegistos() {
-    if (tabelaRegistos) return;
-
     const { data, error } = await SB.from("vw_registos_ponto").select("*");
 
-    console.log("DADOS REGISTOS:", data);
+    console.log("REGISTOS:", data);
 
     if (error || !data) {
         alert("Erro ao carregar registos");
@@ -126,6 +123,4 @@ async function carregarRegistos() {
             </tr>
         `;
     });
-
-    tabelaRegistos = true;
 }
