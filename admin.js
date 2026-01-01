@@ -100,14 +100,8 @@ async function carregarFinanceiro() {
 async function carregarRegistos() {
     try {
         const table = document.getElementById("tabelaRegistos");
-
-        if (!table) {
-            alert("Tabela não encontrada no DOM");
-            return;
-        }
-
-        // GARANTIR TBODY
         let tbody = table.querySelector("tbody");
+
         if (!tbody) {
             tbody = document.createElement("tbody");
             table.appendChild(tbody);
@@ -115,11 +109,17 @@ async function carregarRegistos() {
 
         tbody.innerHTML = "";
 
-        const { data, error } = await SB.from("vw_registos_ponto").select("*");
+        const { data, error } = await SB
+            .from("vw_registos_ponto")
+            .select("*");
 
         if (error) {
-            console.error(error);
-            alert("Erro Supabase");
+            console.error("ERRO SUPABASE REAL:", error);
+            alert(
+              "Erro Supabase:\n" +
+              error.message +
+              (error.details ? "\n" + error.details : "")
+            );
             return;
         }
 
@@ -143,7 +143,7 @@ async function carregarRegistos() {
         });
 
     } catch (e) {
-        console.error("ERRO REAL:", e);
-        alert("Erro ao carregar tabela");
+        console.error("ERRO JS:", e);
+        alert("Erro JavaScript ao carregar tabela");
     }
 }
