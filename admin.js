@@ -98,21 +98,39 @@ async function carregarFinanceiro() {
 // REGISTOS (RENDER DIRETO)
 // =======================================================
 async function carregarRegistos() {
-    const { data, error } = await SB.from("vw_registos_ponto").select("*");
+    try {
+        const table = document.getElementById("tabelaRegistos");
 
-    console.log("REGISTOS:", data);
+        if (!table) {
+            alert("Tabela não encontrada no DOM");
+            return;
+        }
 
-    if (error || !data) {
-        alert("Erro ao carregar registos");
-        return;
-    }
+        // GARANTIR TBODY
+        let tbody = table.querySelector("tbody");
+        if (!tbody) {
+            tbody = document.createElement("tbody");
+            table.appendChild(tbody);
+        }
 
-    const tbody = document.querySelector("#tabelaRegistos tbody");
-    tbody.innerHTML = "";
+        tbody.innerHTML = "";
 
-    data.forEach(r => {
-        tbody.innerHTML += `
-            <tr>
+        const { data, error } = await SB.from("vw_registos_ponto").select("*");
+
+        if (error) {
+            console.error(error);
+            alert("Erro Supabase");
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7">Sem registos</td></tr>`;
+            return;
+        }
+
+        data.forEach(r => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
                 <td>${r.funcionario}</td>
                 <td>${r.obra}</td>
                 <td>${r.dia}</td>
@@ -120,7 +138,12 @@ async function carregarRegistos() {
                 <td>${r.saida}</td>
                 <td>${r.horas}</td>
                 <td>${r.estado}</td>
-            </tr>
-        `;
-    });
+            `;
+            tbody.appendChild(tr);
+        });
+
+    } catch (e) {
+        console.error("ERRO REAL:", e);
+        alert("Erro ao carregar tabela");
+    }
 }
