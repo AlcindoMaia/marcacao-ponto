@@ -147,3 +147,103 @@ async function carregarRegistos() {
         alert("Erro JavaScript ao carregar tabela");
     }
 }
+
+// =======================================================
+// INVENTÁRIO
+// =======================================================
+
+// Inicializar anos automaticamente
+
+function preencherAnosInventario() {
+    const select = document.getElementById("anoInventario");
+    if (!select) return;
+
+    const anoAtual = new Date().getFullYear();
+
+    select.innerHTML = "";
+    for (let i = 0; i < 6; i++) {
+        const ano = anoAtual - i;
+        select.innerHTML += `<option value="${ano}">${ano}</option>`;
+    }
+}
+
+// KPI
+
+async function carregarKPIsInventario() {
+
+    const { data } = await SB
+        .from("artigos")
+        .select("id", { count: "exact" });
+
+    document.getElementById("kpiTotalArtigos").textContent =
+        data?.length || 0;
+
+    const ano = new Date().getFullYear();
+    const dataFinal = `${ano}-12-31`;
+
+    const { data: inv } = await SB.rpc("get_inventario_data", {
+        p_data: dataFinal
+    });
+
+    let total = 0;
+    inv?.forEach(r => total += Number(r.total));
+
+    document.getElementById("kpiValorStock").textContent =
+        total.toFixed(2) + " €";
+}
+
+// Gerar inventário
+
+async function gerarInventario() {
+
+    const ano = document.getElementById("anoInventario").value;
+    const dataFinal = `${ano}-12-31`;
+
+    const { data, error } = await SB.rpc("get_inventario_data", {
+        p_data: dataFinal
+    });
+
+    if (error) {
+        alert("Erro ao gerar inventário");
+        return;
+    }
+
+    const tbody = document.querySelector("#tabelaInventario tbody");
+    tbody.innerHTML = "";
+
+    data?.forEach(r => {
+        const tr = document.createElement("tr");
+
+        tr.innerHTML = `
+            <td>${r.descricao}</td>
+            <td>${r.quantidade}</td>
+            <td>${r.medida}</td>
+            <td>${Number(r.preco_unitario).toFixed(2)} €</td>
+            <td>${Number(r.total).toFixed(2)} €</td>
+        `;
+
+        tbody.appendChild(tr);
+    });
+}
+
+// Integrar na função mostrarTab
+
+if (nome === "inventario") {
+    preencherAnosInventario();
+    carregarKPIsInventario();
+}
+
+// Eventos
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    const btn = document.getElementById("btnGerarInventario");
+    if (btn) {
+        btn.addEventListener("click", gerarInventario);
+    }
+
+});
+
+
+
+
