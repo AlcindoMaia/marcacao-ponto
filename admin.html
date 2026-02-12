@@ -162,5 +162,52 @@ function toggleDark() {
 }
 </script>
 
+<button class="tab" data-tab="inventario">Inventário</button>
+
+    <!-- ================= TAB INVENTÁRIO ================= -->
+<div class="tab-content" id="tab-inventario">
+
+    <div class="grid-cards">
+        <div class="card metric">
+            <h3>Total Artigos</h3>
+            <div id="kpiTotalArtigos" class="value">–</div>
+        </div>
+
+        <div class="card metric">
+            <h3>Valor Stock Atual</h3>
+            <div id="kpiValorStock" class="value">–</div>
+        </div>
+    </div>
+
+    <div class="card filtros">
+        <h2>Inventário Contabilístico</h2>
+
+        <label>Ano</label>
+        <select id="anoInventario"></select>
+
+        <button class="btn-primary" id="btnGerarInventario">
+            Gerar Inventário
+        </button>
+    </div>
+
+    <div class="card">
+        <h2>Inventário a 31/12</h2>
+        <table id="tabelaInventario" class="display">
+            <thead>
+                <tr>
+                    <th>Descrição</th>
+                    <th>Quantidade</th>
+                    <th>Medida</th>
+                    <th>Preço Unitário</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+</div>
+
+    
 </body>
 </html>
