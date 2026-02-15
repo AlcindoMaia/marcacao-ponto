@@ -154,42 +154,111 @@ async function carregarRegistos() {
 
 // Inicializar anos automaticamente
 
-function preencherAnosInventario() {
-    const select = document.getElementById("anoInventario");
-    if (!select) return;
-
-    const anoAtual = new Date().getFullYear();
-
-    select.innerHTML = "";
-    for (let i = 0; i < 6; i++) {
-        const ano = anoAtual - i;
-        select.innerHTML += `<option value="${ano}">${ano}</option>`;
-    }
+async function initInventario() {
+    await carregarKPIsInventario();
+    await carregarArtigos();
+    preencherAnos();
 }
 
 // KPI
 
 async function carregarKPIsInventario() {
 
-    const { data } = await SB
-        .from("artigos")
-        .select("id", { count: "exact" });
-
+    const { data: artigos } = await SB.from("artigos").select("*");
     document.getElementById("kpiTotalArtigos").textContent =
-        data?.length || 0;
+        artigos?.length || 0;
 
-    const ano = new Date().getFullYear();
-    const dataFinal = `${ano}-12-31`;
-
-    const { data: inv } = await SB.rpc("get_inventario_data", {
-        p_data: dataFinal
-    });
+    const { data: stock } = await SB.from("vw_stock_atual").select("*");
 
     let total = 0;
-    inv?.forEach(r => total += Number(r.total));
+    stock?.forEach(s => {
+        total += Number(s.quantidade || 0);
+    });
 
     document.getElementById("kpiValorStock").textContent =
-        total.toFixed(2) + " €";
+        total.toFixed(2);
+}
+
+// Guardar Artigo
+async function guardarArtigo() {
+
+    const codigo = artCodigo.value.trim();
+    const descricao = artDescricao.value.trim();
+    const preco = artPreco.value;
+
+    if (!codigo || !descricao || !preco) {
+        alert("Campos obrigatórios em falta");
+        return;
+    }
+
+    const { data: artigo, error } = await SB
+        .from("artigos")
+        .insert({
+            codigo,
+            descricao
+        })
+        .select()
+        .single();
+
+    if (error) {
+        alert("Erro ao criar artigo");
+        return;
+    }
+
+    await SB.from("movimentos_stock").insert({
+        artigo_id: artigo.id,
+        tipo_movimento: "INVENTARIO_INICIAL",
+        quantidade: 0
+    });
+
+    await SB.from("artigo_precos").insert({
+        artigo_id: artigo.id,
+        preco_unitario: preco,
+        data_inicio: new Date().toISOString().split("T")[0]
+    });
+
+    alert("Artigo criado");
+    carregarArtigos();
+}
+
+// Lista Artigos
+async function carregarArtigos() {
+
+    const { data } = await SB
+        .from("vw_stock_atual")
+        .select("*")
+        .order("descricao");
+
+    const tbody = document.querySelector("#tabelaArtigos tbody");
+    tbody.innerHTML = "";
+
+    data?.forEach(a => {
+
+        const tr = document.createElement("tr");
+
+        tr.innerHTML = `
+            <td>${a.codigo}</td>
+            <td>${a.descricao}</td>
+            <td>${a.quantidade}</td>
+        `;
+
+        tbody.appendChild(tr);
+    });
+}
+
+// Anos
+
+function preencherAnos() {
+
+    const select = document.getElementById("anoInventario");
+    const anoAtual = new Date().getFullYear();
+
+    select.innerHTML = "";
+
+    for (let i = 0; i < 5; i++) {
+        const ano = anoAtual - i;
+        select.innerHTML += `<option value="${ano}">${ano}</option>`;
+    }
 }
 
 // Gerar inventário
@@ -212,37 +281,40 @@ async function gerarInventario() {
     tbody.innerHTML = "";
 
     data?.forEach(r => {
+
         const tr = document.createElement("tr");
 
         tr.innerHTML = `
             <td>${r.descricao}</td>
             <td>${r.quantidade}</td>
-            <td>${r.medida}</td>
-            <td>${Number(r.preco_unitario).toFixed(2)} €</td>
-            <td>${Number(r.total).toFixed(2)} €</td>
+            <td>${Number(r.preco_unitario || 0).toFixed(2)}</td>
+            <td>${Number(r.total || 0).toFixed(2)}</td>
         `;
 
         tbody.appendChild(tr);
     });
 }
 
-// Integrar na função mostrarTab
-
-if (nome === "inventario") {
-    preencherAnosInventario();
-    carregarKPIsInventario();
-}
-
 // Eventos
 
 document.addEventListener("DOMContentLoaded", () => {
 
-    const btn = document.getElementById("btnGerarInventario");
-    if (btn) {
-        btn.addEventListener("click", gerarInventario);
-    }
+    const btn = document.getElementById("btnGuardarArtigo");
+    if (btn) btn.addEventListener("click", guardarArtigo);
+
+    const btnInv = document.getElementById("btnGerarInventario");
+    if (btnInv) btnInv.addEventListener("click", gerarInventario);
 
 });
+
+
+// Integrar na função mostrarTab
+
+if (nome === "inventario") {
+    initInventario();
+}
+
+
 
 
 
