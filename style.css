@@ -338,3 +338,41 @@ body.dark .tab {
     color: #000;
 }
 
+/* inventário */
+
+.inventario-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.btn-round {
+    width: 40px;
+    height: 40px;
+    font-size: 22px;
+    border-radius: 50%;
+}
+
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background: var(--bg-panel);
+    padding: 25px;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+
+
+
