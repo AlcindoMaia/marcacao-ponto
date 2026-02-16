@@ -152,82 +152,20 @@ async function carregarRegistos() {
 // INVENTÁRIO
 // =======================================================
 
-// Inicializar anos automaticamente
-
 async function initInventario() {
-    await carregarKPIsInventario();
+    await carregarUnidades();
     await carregarArtigos();
-    preencherAnos();
 }
 
-// KPI
-
-async function carregarKPIsInventario() {
-
-    const { data: artigos } = await SB.from("artigos").select("*");
-    document.getElementById("kpiTotalArtigos").textContent =
-        artigos?.length || 0;
-
-    const { data: stock } = await SB.from("vw_stock_atual").select("*");
-
-    let total = 0;
-    stock?.forEach(s => {
-        total += Number(s.quantidade || 0);
+async function carregarUnidades() {
+    const { data } = await SB.from("unidades_medida").select("*");
+    const sel = document.getElementById("artUnidade");
+    sel.innerHTML = "";
+    data?.forEach(u => {
+        sel.innerHTML += `<option value="${u.id}">${u.codigo}</option>`;
     });
-
-    document.getElementById("kpiValorStock").textContent =
-        total.toFixed(2);
 }
 
-// Guardar Artigo
-async function guardarArtigo() {
-
-    const codigo = artCodigo.value.trim();
-    const descricao = artDescricao.value.trim();
-    const preco = artPreco.value;
-
-    if (!codigo || !descricao || !preco) {
-        alert("Campos obrigatórios em falta");
-        return;
-    }
-
-    const { data: artigo, error } = await SB
-        .from("artigos")
-        .insert({
-            codigo,
-            descricao
-        })
-        .select()
-        .single();
-    
-    if (error) {
-    console.error("ERRO ARTIGO:", error);
-    alert("Erro ao criar artigo: " + error.message);
-    return;
-}
-
-//    if (error) {
-//        alert("Erro ao criar artigo");
-//        return;
-//    }
-
-    await SB.from("movimentos_stock").insert({
-        artigo_id: artigo.id,
-        tipo_movimento: "INVENTARIO_INICIAL",
-        quantidade: 0
-    });
-
-    await SB.from("artigo_precos").insert({
-        artigo_id: artigo.id,
-        preco_unitario: preco,
-        data_inicio: new Date().toISOString().split("T")[0]
-    });
-
-    alert("Artigo criado");
-    carregarArtigos();
-}
-
-// Lista Artigos
 async function carregarArtigos() {
 
     const { data } = await SB
@@ -239,77 +177,87 @@ async function carregarArtigos() {
     tbody.innerHTML = "";
 
     data?.forEach(a => {
-
         const tr = document.createElement("tr");
 
         tr.innerHTML = `
             <td>${a.codigo}</td>
             <td>${a.descricao}</td>
+            <td>${a.tipo_artigo || ""}</td>
+            <td>${Number(a.preco_atual || 0).toFixed(2)} €</td>
             <td>${a.quantidade}</td>
+            <td>${a.local_armazenamento || ""}</td>
         `;
 
         tbody.appendChild(tr);
     });
 }
 
-// Anos
+async function guardarArtigo() {
 
-function preencherAnos() {
+    const codigo = artCodigo.value.trim();
+    const descricao = artDescricao.value.trim();
+    const preco = Number(artPreco.value);
+    const iva = Number(artIva.value);
+    const unidade = artUnidade.value;
+    const tipo = artTipo.value;
+    const qtdInicial = Number(artQtdInicial.value || 0);
+    const local = artLocal.value.trim();
 
-    const select = document.getElementById("anoInventario");
-    const anoAtual = new Date().getFullYear();
-
-    select.innerHTML = "";
-
-    for (let i = 0; i < 5; i++) {
-        const ano = anoAtual - i;
-        select.innerHTML += `<option value="${ano}">${ano}</option>`;
-    }
-}
-
-// Gerar inventário
-
-async function gerarInventario() {
-
-    const ano = document.getElementById("anoInventario").value;
-    const dataFinal = `${ano}-12-31`;
-
-    const { data, error } = await SB.rpc("get_inventario_data", {
-        p_data: dataFinal
-    });
-
-    if (error) {
-        alert("Erro ao gerar inventário");
+    if (!codigo || !descricao || !preco || !unidade) {
+        alert("Campos obrigatórios em falta");
         return;
     }
 
-    const tbody = document.querySelector("#tabelaInventario tbody");
-    tbody.innerHTML = "";
+    const { data: artigo, error } = await SB
+        .from("artigos")
+        .insert({
+            codigo,
+            descricao,
+            unidade_id: unidade,
+            tipo_artigo: tipo,
+            taxa_iva: iva,
+            preco_atual: preco,
+            stock_inicial: qtdInicial,
+            local_armazenamento: local
+        })
+        .select()
+        .single();
 
-    data?.forEach(r => {
+    if (error) {
+        alert(error.message);
+        return;
+    }
 
-        const tr = document.createElement("tr");
+    if (qtdInicial > 0) {
+        await SB.from("movimentos_stock").insert({
+            artigo_id: artigo.id,
+            tipo_movimento: "INVENTARIO_INICIAL",
+            quantidade: qtdInicial
+        });
+    }
 
-        tr.innerHTML = `
-            <td>${r.descricao}</td>
-            <td>${r.quantidade}</td>
-            <td>${Number(r.preco_unitario || 0).toFixed(2)}</td>
-            <td>${Number(r.total || 0).toFixed(2)}</td>
-        `;
-
-        tbody.appendChild(tr);
-    });
+    document.getElementById("modalArtigo").classList.add("hidden");
+    carregarArtigos();
 }
 
 // Eventos
 
 document.addEventListener("DOMContentLoaded", () => {
 
-    const btn = document.getElementById("btnGuardarArtigo");
-    if (btn) btn.addEventListener("click", guardarArtigo);
+    document.getElementById("btnNovoArtigo")
+        ?.addEventListener("click", () => {
+            document.getElementById("modalArtigo")
+                .classList.remove("hidden");
+        });
 
-    const btnInv = document.getElementById("btnGerarInventario");
-    if (btnInv) btnInv.addEventListener("click", gerarInventario);
+    document.getElementById("fecharModalBtn")
+        ?.addEventListener("click", () => {
+            document.getElementById("modalArtigo")
+                .classList.add("hidden");
+        });
+
+    document.getElementById("guardarArtigoBtn")
+        ?.addEventListener("click", guardarArtigo);
 
 });
 
