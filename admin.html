@@ -9,10 +9,16 @@
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
+<!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+
+<!-- DataTables -->
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
+
 
 <body class="dark">
 
@@ -176,3 +182,17 @@
     </div>
 
 </div>
+
+<script src="admin.js"></script>
+
+<script>
+function toggleDark() {
+    document.body.classList.toggle("dark");
+    document.getElementById("darkBtn").textContent =
+        document.body.classList.contains("dark") ? "☀️" : "🌙";
+}
+</script>
+
+</body>
+</html>
+
