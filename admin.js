@@ -199,11 +199,17 @@ async function guardarArtigo() {
         })
         .select()
         .single();
-
+    
     if (error) {
-        alert("Erro ao criar artigo");
-        return;
-    }
+    console.error("ERRO ARTIGO:", error);
+    alert("Erro ao criar artigo: " + error.message);
+    return;
+}
+
+//    if (error) {
+//        alert("Erro ao criar artigo");
+//        return;
+//    }
 
     await SB.from("movimentos_stock").insert({
         artigo_id: artigo.id,
