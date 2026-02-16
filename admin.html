@@ -104,86 +104,77 @@
 <!-- ================= TAB INVENTÁRIO ================= -->
 <div class="tab-content" id="tab-inventario">
 
-    <!-- KPI -->
-    <div class="grid-cards">
-        <div class="card metric">
-            <h3>Total Artigos</h3>
-            <div id="kpiTotalArtigos" class="value">–</div>
-        </div>
+    <!-- Barra superior -->
+    <div class="inventario-header">
 
-        <div class="card metric">
-            <h3>Valor Stock Atual</h3>
-            <div id="kpiValorStock" class="value">–</div>
-        </div>
+        <input type="text" id="pesquisaInventario"
+               placeholder="Pesquisar por código, descrição ou tipo">
+
+        <button id="btnNovoArtigo" class="btn-primary btn-round">+</button>
+
     </div>
 
-    <!-- FORM ARTIGO -->
+    <!-- Tabela -->
     <div class="card">
-        <h2>Novo Artigo</h2>
-
-        <div class="filtros-linha">
-            <div class="col">
-                <label>Código</label>
-                <input id="artCodigo">
-            </div>
-
-            <div class="col">
-                <label>Descrição</label>
-                <input id="artDescricao">
-            </div>
-
-            <div class="col">
-                <label>Preço Inicial</label>
-                <input id="artPreco" type="number" step="0.0001">
-            </div>
-        </div>
-
-        <div style="margin-top:15px;">
-            <button class="btn-primary" id="btnGuardarArtigo">
-                Guardar Artigo
-            </button>
-        </div>
-    </div>
-
-    <!-- LISTA ARTIGOS -->
-    <div class="card">
-        <h2>Artigos</h2>
-
         <table id="tabelaArtigos" class="display">
             <thead>
                 <tr>
                     <th>Código</th>
                     <th>Descrição</th>
+                    <th>Tipo</th>
+                    <th>Preço</th>
                     <th>Stock</th>
+                    <th>Local</th>
                 </tr>
             </thead>
             <tbody></tbody>
         </table>
     </div>
 
-    <!-- INVENTÁRIO 31/12 -->
-    <div class="card">
-        <h2>Inventário 31/12</h2>
+    <!-- Modal Novo Artigo -->
+    <div id="modalArtigo" class="modal hidden">
 
-        <select id="anoInventario"></select>
-        <button class="btn-primary" id="btnGerarInventario">
-            Gerar
-        </button>
+        <div class="modal-content">
 
-        <table id="tabelaInventario" class="display">
-            <thead>
-                <tr>
-                    <th>Descrição</th>
-                    <th>Quantidade</th>
-                    <th>Preço Unitário</th>
-                    <th>Total</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+            <h2>Novo Artigo</h2>
+
+            <input id="artCodigo" placeholder="Código (barcode)">
+            <input id="artDescricao" placeholder="Descrição">
+
+            <input id="artPreco" type="number" step="0.0001"
+                   placeholder="Preço s/IVA">
+
+            <input id="artIva" type="number" value="23"
+                   placeholder="IVA %">
+
+            <select id="artUnidade"></select>
+
+            <select id="artTipo">
+                <option value="ferramenta">Ferramenta</option>
+                <option value="consumivel">Consumível</option>
+                <option value="mercadoria">Mercadoria</option>
+            </select>
+
+            <input id="artQtdInicial" type="number"
+                   placeholder="Quantidade inicial">
+
+            <input id="artLocal"
+                   placeholder="Local (ARMAZEM ou nome obra)">
+
+            <div class="modal-actions">
+                <button class="btn-primary" id="guardarArtigoBtn">
+                    Guardar
+                </button>
+                <button class="btn-secondary" id="fecharModalBtn">
+                    Cancelar
+                </button>
+            </div>
+
+        </div>
     </div>
 
 </div>
+
 </div> <!-- FECHA adminArea -->
     
 <script src="admin.js"></script>
