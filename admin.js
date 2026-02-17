@@ -62,6 +62,9 @@ function abrirTab(nome) {
 
     if (nome === "financeiro") carregarFinanceiro();
     if (nome === "registos") carregarRegistos();
+    if (nome === "inventario") {
+    initInventario();
+}
 }
 
 // =======================================================
@@ -262,11 +265,9 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 
-// Integrar na função mostrarTab
 
-if (nome === "inventario") {
-    initInventario();
-}
+
+
 
 
 
