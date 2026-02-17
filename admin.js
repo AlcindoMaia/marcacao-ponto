@@ -54,18 +54,34 @@ function ativarTabs() {
 }
 
 function abrirTab(nome) {
+
     document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(c => {
+        c.style.display = "none";
+    });
 
-    document.querySelector(`.tab[data-tab="${nome}"]`).classList.add("active");
-    document.getElementById("tab-" + nome).classList.add("active");
+    const tabBtn = document.querySelector(`.tab[data-tab="${nome}"]`);
+    const tabDiv = document.getElementById("tab-" + nome);
 
-    if (nome === "financeiro") carregarFinanceiro();
-    if (nome === "registos") carregarRegistos();
+    if (!tabBtn || !tabDiv) return;
+
+    tabBtn.classList.add("active");
+    tabDiv.style.display = "block";
+
     if (nome === "inventario") {
-    initInventario();
+        initInventario();   // ← AGORA É SEMPRE CHAMADO
+    }
+
+    if (nome === "registos") {
+        carregarTabela();
+    }
+
+    if (nome === "financeiro") {
+        carregarKPIsFinanceiros();
+        carregarTabelaFinanceira();
+    }
 }
-}
+
 
 // =======================================================
 // FINANCEIRO
