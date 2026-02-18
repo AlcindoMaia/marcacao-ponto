@@ -87,17 +87,23 @@ body.dark .cadastro-form {
   </div>
 
   <!-- FORMULÁRIO -->
-  <div class="cadastro-form">
-      <label>Nome do Funcionário</label>
-      <input id="nome" placeholder="Ex.: João Silva" />
+<form id="frmCadastro" class="cadastro-form">
 
-      <label>Nº de Colaborador</label>
-      <input id="codigo" placeholder="Opcional" />
+    <label>Nome do Funcionário</label>
+    <input id="nome" placeholder="Ex.: João Silva" />
 
-      <button class="btn-primary" type="submit" id="btnRegistar">Registar</button>
+    <label>Nº de Colaborador</label>
+    <input id="codigo" placeholder="Opcional" />
 
-      <div id="msg"></div>
-  </div>
+    <div id="deviceInfo" style="margin-top:12px;font-size:12px;opacity:.6"></div>
+
+    <button class="btn-primary" type="submit">
+        Registar
+    </button>
+
+    <div id="msg"></div>
+
+</form>
 
 </div>
 
