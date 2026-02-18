@@ -80,6 +80,7 @@ function abrirTab(nome) {
         carregarKPIsFinanceiros();
         carregarTabelaFinanceira();
     }
+    
 }
 
 
@@ -277,6 +278,117 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.getElementById("guardarArtigoBtn")
         ?.addEventListener("click", guardarArtigo);
+
+// =======================================================
+// FLUXO DE CAIXA
+// =======================================================
+    await carregarCategoriasFinanceiras();
+    await carregarObrasFluxo();
+
+    async function carregarCategoriasFinanceiras() {
+    const sel = document.getElementById("movCategoria");
+    sel.innerHTML = "";
+
+    const { data } = await SB
+        .from("categorias_financeiras")
+        .select("*")
+        .order("nome");
+
+    data?.forEach(c => {
+        sel.innerHTML += `<option value="${c.id}">${c.nome}</option>`;
+    });
+}
+    
+async function carregarObrasFluxo() {
+    const sel = document.getElementById("movObra");
+    sel.innerHTML = "";
+
+    const { data } = await SB
+        .from("obras")
+        .select("*")
+        .order("nome");
+
+    data?.forEach(o => {
+        sel.innerHTML += `<option value="${o.id}">${o.nome}</option>`;
+    });
+}
+
+document.getElementById("btnGuardarMov")?.addEventListener("click", guardarMovimento);
+
+async function guardarMovimento() {
+
+    const referencia = movReferencia.value.trim();
+    const dataDoc = movData.value;
+    const tipo = movTipo.value;
+    const nif = movNif.value.trim();
+    const nomeFornecedor = movFornecedor.value.trim();
+    const categoria_id = movCategoria.value;
+    const obra_id = movObra.value;
+    const valor_base = Number(movBase.value);
+    const iva = Number(movIva.value);
+    const valor_total = Number(movTotal.value);
+    const estado = movEstado.value;
+    const obs = movObs.value;
+
+    if (!referencia || !dataDoc || !valor_total) {
+        movMsg.textContent = "Preencha os campos obrigatórios.";
+        return;
+    }
+
+    // Criar ou obter fornecedor
+    let fornecedor_id = null;
+
+    if (nif) {
+        const { data: existente } = await SB
+            .from("fornecedores")
+            .select("*")
+            .eq("nif", nif)
+            .maybeSingle();
+
+        if (existente) {
+            fornecedor_id = existente.id;
+        } else {
+            const { data: novo, error } = await SB
+                .from("fornecedores")
+                .insert({ nif, nome: nomeFornecedor })
+                .select()
+                .single();
+
+            if (error) {
+                movMsg.textContent = "Erro ao criar fornecedor.";
+                return;
+            }
+
+            fornecedor_id = novo.id;
+        }
+    }
+
+    const { error } = await SB
+        .from("movimentos_financeiros")
+        .insert({
+            referencia,
+            data_documento: dataDoc,
+            tipo,
+            fornecedor_id,
+            categoria_id,
+            obra_id,
+            valor_base,
+            iva,
+            valor_total,
+            estado_pagamento: estado,
+            observacoes: obs
+        });
+
+    if (error) {
+        movMsg.textContent = "Erro: " + error.message;
+        return;
+    }
+
+    movMsg.textContent = "Movimento registado com sucesso.";
+
+    // limpar
+    document.querySelectorAll("#tab-fluxo input").forEach(i => i.value = "");
+}
 
 });
 
