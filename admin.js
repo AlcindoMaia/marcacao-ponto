@@ -1,18 +1,17 @@
 // =======================================================
-// SUPABASE (CHAVE CORRETA)
+// SUPABASE
 // =======================================================
 const SUPABASE_URL = "https://npyosbigynxmxdakcymg.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weW9zYmlneW54bXhkYWtjeW1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4MzYyMjYsImV4cCI6MjA4MDQxMjIyNn0.CErd5a_-9HS4qPB99SFyO-airsNnS3b8dvWWrSPE4_M";
 
 const SB = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
 const PIN_ADMIN = "1810";
 
 // =======================================================
 // LOGIN
 // =======================================================
 window.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("pinInput").focus();
+    document.getElementById("pinInput")?.focus();
 });
 
 function validarPIN() {
@@ -31,9 +30,11 @@ function validarPIN() {
     inicializarPainel();
 }
 
-// ENTER no PIN
 document.addEventListener("keydown", e => {
-    if (e.key === "Enter") validarPIN();
+    if (e.key === "Enter" &&
+        !document.getElementById("loginBox").classList.contains("hidden")) {
+        validarPIN();
+    }
 });
 
 // =======================================================
@@ -68,36 +69,35 @@ function abrirTab(nome) {
     tabBtn.classList.add("active");
     tabDiv.style.display = "block";
 
-    if (nome === "inventario") {
-        initInventario();   // ← AGORA É SEMPRE CHAMADO
-    }
-
-    if (nome === "registos") {
-        carregarTabela();
-    }
-
-    if (nome === "financeiro") {
-        carregarKPIsFinanceiros();
-        carregarTabelaFinanceira();
-    }
-    
+    if (nome === "inventario") initInventario();
+    if (nome === "registos") carregarRegistos();
+    if (nome === "financeiro") carregarFinanceiro();
+    if (nome === "fluxo") initFluxo();
 }
-
 
 // =======================================================
 // FINANCEIRO
 // =======================================================
 async function carregarFinanceiro() {
-    const { data } = await SB.from("vw_kpis_financeiros_mes").select("*").single();
-    if (!data) return;
 
-    kpiFuncionarios.textContent = data.total_funcionarios;
-    kpiHoras.textContent = data.total_horas_mes;
-    kpiDias.textContent = data.total_dias_trabalhados;
-    kpiDiasIncompletos.textContent = data.total_dias_nao_completos;
-    kpiTotal.textContent = Number(data.total_a_pagar).toFixed(2) + " €";
+    const { data } = await SB
+        .from("vw_kpis_financeiros_mes")
+        .select("*")
+        .single();
 
-    const { data: linhas } = await SB.from("vw_dashboard_mes_atual").select("*");
+    if (data) {
+        kpiFuncionarios.textContent = data.total_funcionarios;
+        kpiHoras.textContent = data.total_horas_mes;
+        kpiDias.textContent = data.total_dias_trabalhados;
+        kpiDiasIncompletos.textContent = data.total_dias_nao_completos;
+        kpiTotal.textContent =
+            Number(data.total_a_pagar).toFixed(2) + " €";
+    }
+
+    const { data: linhas } = await SB
+        .from("vw_dashboard_mes_atual")
+        .select("*");
+
     const tbody = document.querySelector("#tabelaFinanceira tbody");
     tbody.innerHTML = "";
 
@@ -115,42 +115,37 @@ async function carregarFinanceiro() {
 }
 
 // =======================================================
-// REGISTOS (RENDER DIRETO)
+// REGISTOS
 // =======================================================
 async function carregarRegistos() {
-    try {
-        const table = document.getElementById("tabelaRegistos");
-        let tbody = table.querySelector("tbody");
 
-        if (!tbody) {
-            tbody = document.createElement("tbody");
-            table.appendChild(tbody);
-        }
+    const table = document.getElementById("tabelaRegistos");
+    let tbody = table.querySelector("tbody");
 
-        tbody.innerHTML = "";
+    if (!tbody) {
+        tbody = document.createElement("tbody");
+        table.appendChild(tbody);
+    }
 
-        const { data, error } = await SB
-            .from("vw_registos_ponto")
-            .select("*");
+    tbody.innerHTML = "";
 
-        if (error) {
-            console.error("ERRO SUPABASE REAL:", error);
-            alert(
-              "Erro Supabase:\n" +
-              error.message +
-              (error.details ? "\n" + error.details : "")
-            );
-            return;
-        }
+    const { data, error } = await SB
+        .from("vw_registos_ponto")
+        .select("*");
 
-        if (!data || data.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7">Sem registos</td></tr>`;
-            return;
-        }
+    if (error) {
+        alert("Erro Supabase: " + error.message);
+        return;
+    }
 
-        data.forEach(r => {
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
+    if (!data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7">Sem registos</td></tr>`;
+        return;
+    }
+
+    data.forEach(r => {
+        tbody.innerHTML += `
+            <tr>
                 <td>${r.funcionario}</td>
                 <td>${r.obra}</td>
                 <td>${r.dia}</td>
@@ -158,31 +153,33 @@ async function carregarRegistos() {
                 <td>${r.saida}</td>
                 <td>${r.horas}</td>
                 <td>${r.estado}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-
-    } catch (e) {
-        console.error("ERRO JS:", e);
-        alert("Erro JavaScript ao carregar tabela");
-    }
+            </tr>
+        `;
+    });
 }
 
 // =======================================================
 // INVENTÁRIO
 // =======================================================
-
 async function initInventario() {
     await carregarUnidades();
     await carregarArtigos();
 }
 
 async function carregarUnidades() {
-    const { data } = await SB.from("unidades_medida").select("*");
+
+    const { data } = await SB
+        .from("unidades_medida")
+        .select("*")
+        .order("codigo");
+
     const sel = document.getElementById("artUnidade");
+    if (!sel) return;
+
     sel.innerHTML = "";
     data?.forEach(u => {
-        sel.innerHTML += `<option value="${u.id}">${u.codigo}</option>`;
+        sel.innerHTML +=
+            `<option value="${u.id}">${u.codigo}</option>`;
     });
 }
 
@@ -194,21 +191,21 @@ async function carregarArtigos() {
         .order("descricao");
 
     const tbody = document.querySelector("#tabelaArtigos tbody");
+    if (!tbody) return;
+
     tbody.innerHTML = "";
 
     data?.forEach(a => {
-        const tr = document.createElement("tr");
-
-        tr.innerHTML = `
-            <td>${a.codigo}</td>
-            <td>${a.descricao}</td>
-            <td>${a.tipo_artigo || ""}</td>
-            <td>${Number(a.preco_atual || 0).toFixed(2)} €</td>
-            <td>${a.quantidade}</td>
-            <td>${a.local_armazenamento || ""}</td>
+        tbody.innerHTML += `
+            <tr>
+                <td>${a.codigo}</td>
+                <td>${a.descricao}</td>
+                <td>${a.tipo_artigo || ""}</td>
+                <td>${Number(a.preco_atual || 0).toFixed(2)} €</td>
+                <td>${a.quantidade}</td>
+                <td>${a.local_armazenamento || ""}</td>
+            </tr>
         `;
-
-        tbody.appendChild(tr);
     });
 }
 
@@ -223,7 +220,7 @@ async function guardarArtigo() {
     const qtdInicial = Number(artQtdInicial.value || 0);
     const local = artLocal.value.trim();
 
-    if (!codigo || !descricao || !preco || !unidade) {
+    if (!codigo || !descricao || isNaN(preco) || !unidade) {
         alert("Campos obrigatórios em falta");
         return;
     }
@@ -260,33 +257,18 @@ async function guardarArtigo() {
     carregarArtigos();
 }
 
-// Eventos
-
-document.addEventListener("DOMContentLoaded", () => {
-
-    document.getElementById("btnNovoArtigo")
-        ?.addEventListener("click", () => {
-            document.getElementById("modalArtigo")
-                .classList.remove("hidden");
-        });
-
-    document.getElementById("fecharModalBtn")
-        ?.addEventListener("click", () => {
-            document.getElementById("modalArtigo")
-                .classList.add("hidden");
-        });
-
-    document.getElementById("guardarArtigoBtn")
-        ?.addEventListener("click", guardarArtigo);
-
 // =======================================================
 // FLUXO DE CAIXA
 // =======================================================
+async function initFluxo() {
     await carregarCategoriasFinanceiras();
     await carregarObrasFluxo();
+}
 
-    async function carregarCategoriasFinanceiras() {
+async function carregarCategoriasFinanceiras() {
     const sel = document.getElementById("movCategoria");
+    if (!sel) return;
+
     sel.innerHTML = "";
 
     const { data } = await SB
@@ -295,12 +277,15 @@ document.addEventListener("DOMContentLoaded", () => {
         .order("nome");
 
     data?.forEach(c => {
-        sel.innerHTML += `<option value="${c.id}">${c.nome}</option>`;
+        sel.innerHTML +=
+            `<option value="${c.id}">${c.nome}</option>`;
     });
 }
-    
+
 async function carregarObrasFluxo() {
     const sel = document.getElementById("movObra");
+    if (!sel) return;
+
     sel.innerHTML = "";
 
     const { data } = await SB
@@ -309,11 +294,10 @@ async function carregarObrasFluxo() {
         .order("nome");
 
     data?.forEach(o => {
-        sel.innerHTML += `<option value="${o.id}">${o.nome}</option>`;
+        sel.innerHTML +=
+            `<option value="${o.id}">${o.nome}</option>`;
     });
 }
-
-document.getElementById("btnGuardarMov")?.addEventListener("click", guardarMovimento);
 
 async function guardarMovimento() {
 
@@ -330,12 +314,11 @@ async function guardarMovimento() {
     const estado = movEstado.value;
     const obs = movObs.value;
 
-    if (!referencia || !dataDoc || !valor_total) {
+    if (!referencia || !dataDoc || isNaN(valor_total)) {
         movMsg.textContent = "Preencha os campos obrigatórios.";
         return;
     }
 
-    // Criar ou obter fornecedor
     let fornecedor_id = null;
 
     if (nif) {
@@ -348,16 +331,11 @@ async function guardarMovimento() {
         if (existente) {
             fornecedor_id = existente.id;
         } else {
-            const { data: novo, error } = await SB
+            const { data: novo } = await SB
                 .from("fornecedores")
                 .insert({ nif, nome: nomeFornecedor })
                 .select()
                 .single();
-
-            if (error) {
-                movMsg.textContent = "Erro ao criar fornecedor.";
-                return;
-            }
 
             fornecedor_id = novo.id;
         }
@@ -380,25 +358,9 @@ async function guardarMovimento() {
         });
 
     if (error) {
-        movMsg.textContent = "Erro: " + error.message;
+        movMsg.textContent = error.message;
         return;
     }
 
     movMsg.textContent = "Movimento registado com sucesso.";
-
-    // limpar
-    document.querySelectorAll("#tab-fluxo input").forEach(i => i.value = "");
 }
-
-});
-
-
-
-
-
-
-
-
-
-
-
