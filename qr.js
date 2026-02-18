@@ -194,8 +194,6 @@ document.getElementById("formObra").onsubmit = async (e) => {
         document.getElementById("qrBox").classList.remove("hidden");
     };
 
-    // 6 — PDF AUTOMÁTICO
-    document.getElementById("btnPDF").onclick = () => gerarPDF(nome, morada);
-
     alert("Obra criada com sucesso! QR gerado.");
 };
+
