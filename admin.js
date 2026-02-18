@@ -59,7 +59,7 @@ function abrirTab(nome) {
 
     document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
     document.querySelectorAll(".tab-content").forEach(c => c.classicList.remove("active"));
-    });
+    }
 
     const tabBtn = document.querySelector(`.tab[data-tab="${nome}"]`);
     const tabDiv = document.getElementById("tab-" + nome);
