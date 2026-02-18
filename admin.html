@@ -217,6 +217,102 @@
 
 </div>
 
+    <!-- ================= TAB FLUXO DE CAIXA ================= -->
+
+    <button class="tab" data-tab="fluxo">Fluxo de Caixa</button>
+
+<div class="tab-content" id="tab-fluxo">
+
+    <div class="card">
+
+        <h2>Novo Movimento</h2>
+
+        <div class="filtros-linha">
+            <div class="col">
+                <label>Referência</label>
+                <input id="movReferencia">
+            </div>
+
+            <div class="col">
+                <label>Data</label>
+                <input id="movData" type="date">
+            </div>
+
+            <div class="col">
+                <label>Tipo</label>
+                <select id="movTipo">
+                    <option value="saida">Saída</option>
+                    <option value="entrada">Entrada</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="filtros-linha">
+            <div class="col">
+                <label>NIF Fornecedor</label>
+                <input id="movNif">
+            </div>
+
+            <div class="col">
+                <label>Nome Fornecedor</label>
+                <input id="movFornecedor">
+            </div>
+
+            <div class="col">
+                <label>Categoria</label>
+                <select id="movCategoria"></select>
+            </div>
+        </div>
+
+        <div class="filtros-linha">
+            <div class="col">
+                <label>Obra</label>
+                <select id="movObra"></select>
+            </div>
+
+            <div class="col">
+                <label>Valor Base</label>
+                <input id="movBase" type="number" step="0.01">
+            </div>
+
+            <div class="col">
+                <label>IVA</label>
+                <input id="movIva" type="number" step="0.01">
+            </div>
+
+            <div class="col">
+                <label>Total</label>
+                <input id="movTotal" type="number" step="0.01">
+            </div>
+        </div>
+
+        <div class="filtros-linha">
+            <div class="col">
+                <label>Estado</label>
+                <select id="movEstado">
+                    <option value="por_pagar">Por Pagar</option>
+                    <option value="pago">Pago</option>
+                </select>
+            </div>
+
+            <div class="col">
+                <label>Observações</label>
+                <input id="movObs">
+            </div>
+        </div>
+
+        <button class="btn-primary" id="btnGuardarMov">
+            Guardar Movimento
+        </button>
+
+        <div id="movMsg"></div>
+
+    </div>
+
+</div>
+
+
+    
 </div> <!-- FECHA adminArea -->
     
 <script src="admin.js"></script>
