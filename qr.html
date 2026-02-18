@@ -7,124 +7,153 @@
 <title>Gerar QR — Maia Solutions</title>
 
 <link rel="stylesheet" href="style.css">
+
+<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- QR Generator -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
 
+<!-- jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <style>
-/* ====================================
-   QR PAGE — DESIGN ESG (moderno)
-   ==================================== */
-body.dark .qr-container {
-    background: var(--bg-panel);
-    color: var(--text-light);
-}
 .qr-page {
-    max-width: 480px;
-    margin: 32px auto;
+    max-width: 520px;
+    margin: 40px auto;
     padding: 0 24px 48px;
 }
+
 .qr-header {
     text-align: center;
     margin-bottom: 28px;
 }
+
 .qr-header h2 {
     font-size: 20px;
     font-weight: 700;
 }
+
 .qr-form {
     background: var(--bg-panel);
     box-shadow: var(--shadow);
     border-radius: var(--radius);
-    padding: 22px;
+    padding: 24px;
 }
+
 .qr-form label {
+    display: block;
     font-size: 14px;
     margin-top: 14px;
-    display: block;
-    opacity: 0.85;
+    opacity: .85;
 }
+
 .qr-form input {
     width: 100%;
-    margin-top: 8px;
+    margin-top: 6px;
     padding: 10px 12px;
-    font-size: 15px;
     border-radius: 8px;
     border: 1px solid #ccc;
+    font-size: 14px;
 }
+
 .qr-buttons {
-    margin-top: 18px;
+    margin-top: 20px;
     display: flex;
     gap: 12px;
 }
+
 .qr-buttons button {
     flex: 1;
-    font-size: 16px;
-    padding: 10px;
 }
+
 .qr-preview {
-    text-align: center;
     margin-top: 32px;
+    text-align: center;
     display: none;
 }
+
 .qr-preview canvas {
     border: 2px solid var(--primary);
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 12px;
     background: white;
 }
-.qr-download {
-    margin-top: 12px;
-    display: block;
-    font-size: 15px;
-    text-align: center;
-    padding: 10px 0;
+
+.qr-actions {
+    margin-top: 14px;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.qr-actions a,
+.qr-actions button {
+    padding: 10px 16px;
     border-radius: var(--radius);
-    background: var(--primary);
-    color: black;
+    font-weight: 600;
     text-decoration: none;
-    font-weight: bold;
 }
 </style>
+
 </head>
 
 <body class="dark">
 
 <div class="qr-page">
 
-  <!-- HEADER -->
-  <div class="qr-header">
-    <h2>Criar Nova Obra + QR Code</h2>
-  </div>
+    <div class="qr-header">
+        <h2>Criar Nova Obra + QR Code</h2>
+    </div>
 
-  <!-- FORMULÁRIO -->
-  <div class="qr-form">
-      <label>Nome da Obra</label>
-      <input id="nomeObra" placeholder="Ex.: Obra Centro">
+    <!-- FORM CORRETO -->
+    <form id="formObra" class="qr-form">
 
-      <label>Morada (opcional)</label>
-      <input id="morada">
+        <label>Nome da Obra</label>
+        <input id="nomeObra" required>
 
-      <label>Raio de Validação (metros)</label>
-      <input id="raio" type="number" value="120">
+        <label>Morada (opcional)</label>
+        <input id="morada">
 
-      <label>Latitude</label>
-      <input id="latitude" placeholder="Latitude" readonly>
+        <label>Raio de Validação (metros)</label>
+        <input id="raio" type="number" value="120" required>
 
-      <label>Longitude</label>
-      <input id="longitude" placeholder="Longitude" readonly>
+        <label>Latitude</label>
+        <input id="latitude" readonly required>
 
-      <div class="qr-buttons">
-          <button id="btnGPS" class="btn-secondary">Obter Localização</button>
-          <button id="btnGerar" class="btn-primary">Criar Obra + QR</button>
-      </div>
-  </div>
+        <label>Longitude</label>
+        <input id="longitude" readonly required>
 
-  <!-- QR PREVIEW -->
-  <div class="qr-preview" id="qrBox">
-      <h3>QR Code da Obra</h3>
-      <canvas id="qrCanvas"></canvas>
-      <a id="downloadBtn" class="qr-download" download="">Descarregar QR</a>
-  </div>
+        <div class="qr-buttons">
+            <button type="button" id="btnGPS" class="btn-secondary">
+                Obter Localização
+            </button>
+
+            <button type="submit" class="btn-primary">
+                Criar Obra + QR
+            </button>
+        </div>
+
+    </form>
+
+    <!-- PREVIEW -->
+    <div class="qr-preview" id="qrBox">
+
+        <h3>QR Code da Obra</h3>
+
+        <canvas id="qrCanvas" width="300" height="300"></canvas>
+
+        <div class="qr-actions">
+            <a id="downloadBtn" class="btn-primary" download="">
+                Descarregar PNG
+            </a>
+
+            <button id="btnPDF" class="btn-secondary">
+                Descarregar PDF
+            </button>
+        </div>
+
+    </div>
 
 </div>
 
@@ -132,5 +161,3 @@ body.dark .qr-container {
 
 </body>
 </html>
-
-
