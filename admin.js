@@ -12,6 +12,7 @@ const PIN_ADMIN = "1810";
 // =======================================================
 window.addEventListener("DOMContentLoaded", () => {
     document.getElementById("pinInput")?.focus();
+    ligarEventosGlobais();
 });
 
 function validarPIN() {
@@ -38,7 +39,7 @@ document.addEventListener("keydown", e => {
 });
 
 // =======================================================
-// PAINEL
+// INICIALIZAÇÃO
 // =======================================================
 function inicializarPainel() {
     ativarTabs();
@@ -253,8 +254,18 @@ async function guardarArtigo() {
         });
     }
 
+    limparFormularioArtigo();
     document.getElementById("modalArtigo").classList.add("hidden");
     carregarArtigos();
+}
+
+function limparFormularioArtigo() {
+    artCodigo.value = "";
+    artDescricao.value = "";
+    artPreco.value = "";
+    artIva.value = "23";
+    artQtdInicial.value = "";
+    artLocal.value = "";
 }
 
 // =======================================================
@@ -363,4 +374,58 @@ async function guardarMovimento() {
     }
 
     movMsg.textContent = "Movimento registado com sucesso.";
+    limparFormularioFluxo();
+}
+
+function limparFormularioFluxo() {
+    movReferencia.value = "";
+    movData.value = "";
+    movNif.value = "";
+    movFornecedor.value = "";
+    movBase.value = "";
+    movTotal.value = "";
+    movObs.value = "";
+    movIva.value = "23";
+}
+
+// =======================================================
+// EVENTOS GLOBAIS
+// =======================================================
+function ligarEventosGlobais() {
+
+    document.getElementById("btnNovoArtigo")
+        ?.addEventListener("click", () => {
+            document.getElementById("modalArtigo")
+                .classList.remove("hidden");
+        });
+
+    document.getElementById("fecharModalBtn")
+        ?.addEventListener("click", () => {
+            document.getElementById("modalArtigo")
+                .classList.add("hidden");
+        });
+
+    document.getElementById("guardarArtigoBtn")
+        ?.addEventListener("click", guardarArtigo);
+
+    document.getElementById("btnGuardarMov")
+        ?.addEventListener("click", guardarMovimento);
+
+    // Cálculo automático valor base
+    const totalInput = document.getElementById("movTotal");
+    const ivaInput = document.getElementById("movIva");
+    const baseInput = document.getElementById("movBase");
+
+    function calcularBase() {
+        const total = Number(totalInput?.value);
+        const iva = Number(ivaInput?.value);
+
+        if (!isNaN(total) && !isNaN(iva)) {
+            const base = total / (1 + iva / 100);
+            if (baseInput) baseInput.value = base.toFixed(2);
+        }
+    }
+
+    totalInput?.addEventListener("input", calcularBase);
+    ivaInput?.addEventListener("input", calcularBase);
 }
