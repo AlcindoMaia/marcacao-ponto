@@ -9,7 +9,7 @@ const SB = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 
 // =======================================================
-// HAVERSINE — cálculo distância GPS
+// HAVERSINE (DISTÂNCIA GPS)
 // =======================================================
 function haversine(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
@@ -30,9 +30,9 @@ function haversine(lat1, lon1, lat2, lon2) {
 
 
 // =======================================================
-// GPS
+// OBTER LOCALIZAÇÃO
 // =======================================================
-document.getElementById("btnGPS")?.addEventListener("click", () => {
+document.getElementById("btnGPS").onclick = () => {
 
     navigator.geolocation.getCurrentPosition(pos => {
 
@@ -40,14 +40,15 @@ document.getElementById("btnGPS")?.addEventListener("click", () => {
         document.getElementById("longitude").value = pos.coords.longitude;
 
     }, err => {
+
         alert("Erro ao obter localização. Ative o GPS.");
         console.error(err);
+
     }, {
         enableHighAccuracy: true,
         timeout: 15000
     });
-
-});
+};
 
 
 // =======================================================
@@ -55,33 +56,34 @@ document.getElementById("btnGPS")?.addEventListener("click", () => {
 // =======================================================
 async function obraDuplicada(nome, morada, lat, lon, raioNovo) {
 
-    const { data: obras, error } = await SB
+    const { data, error } = await SB
         .from("obras")
         .select("*");
 
-    if (error || !obras) return false;
+    if (error) {
+        console.error(error);
+        return false;
+    }
 
-    for (const ob of obras) {
+    for (const ob of data) {
 
+        // Mesmo nome
         if (ob.nome.toLowerCase() === nome.toLowerCase()) {
             return "Já existe uma obra com este nome.";
         }
 
+        // Mesma morada
         if (morada && ob.morada &&
             ob.morada.toLowerCase() === morada.toLowerCase()) {
             return "Já existe uma obra com esta morada.";
         }
 
+        // Proximidade GPS
         if (ob.latitude && ob.longitude) {
+            const dist = haversine(lat, lon, ob.latitude, ob.longitude);
 
-            const dist = haversine(
-                lat, lon,
-                ob.latitude,
-                ob.longitude
-            );
-
-            if (dist <= ob.raio || dist <= raioNovo) {
-                return `Localização demasiado próxima da obra "${ob.nome}" (${Math.round(dist)}m).`;
+            if (dist <= (ob.raio || 0) || dist <= raioNovo) {
+                return `Obra demasiado próxima de "${ob.nome}" (${Math.round(dist)}m).`;
             }
         }
     }
@@ -93,63 +95,58 @@ async function obraDuplicada(nome, morada, lat, lon, raioNovo) {
 // =======================================================
 // GERAR PDF
 // =======================================================
-async function gerarPDF(nomeObra, morada) {
-
-    if (!window.jspdf) return;
+function gerarPDF(nomeObra, morada) {
 
     const canvas = document.getElementById("qrCanvas");
     const imgData = canvas.toDataURL("image/png");
 
     const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF("portrait", "mm", "a4");
 
-    const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4"
-    });
-
-    pdf.setFontSize(22);
+    pdf.setFontSize(20);
     pdf.text("QR Code da Obra", 105, 20, { align: "center" });
 
-    pdf.setFontSize(16);
+    pdf.setFontSize(14);
     pdf.text(nomeObra, 105, 30, { align: "center" });
 
     if (morada) {
-        pdf.setFontSize(12);
+        pdf.setFontSize(11);
         pdf.text(morada, 105, 36, { align: "center" });
     }
 
     pdf.addImage(imgData, "PNG", 45, 50, 120, 120);
 
-    pdf.setFontSize(10);
-    pdf.text("Gerado automaticamente por Maia Solutions", 105, 285, { align: "center" });
-
     pdf.save(`QR_${nomeObra.replace(/\s+/g, "_")}.pdf`);
 }
-
-
-let ultimaObraCriada = null;
 
 
 // =======================================================
 // CRIAR OBRA + GERAR QR
 // =======================================================
-document.getElementById("btnGerar")?.addEventListener("click", async () => {
+document.getElementById("btnGerar").onclick = async () => {
 
     const nome = document.getElementById("nomeObra").value.trim();
     const morada = document.getElementById("morada").value.trim();
-    const raio = parseInt(document.getElementById("raio").value);
-    const latitude = parseFloat(document.getElementById("latitude").value);
-    const longitude = parseFloat(document.getElementById("longitude").value);
+
+    const raioInput = document.getElementById("raio").value.trim();
+    const latInput = document.getElementById("latitude").value.trim();
+    const lonInput = document.getElementById("longitude").value.trim();
+
+    const raio = raioInput ? parseInt(raioInput) : 120;
+    const latitude = latInput ? parseFloat(latInput) : null;
+    const longitude = lonInput ? parseFloat(lonInput) : null;
 
     if (!nome) return alert("Nome obrigatório.");
-    if (isNaN(latitude) || isNaN(longitude))
+    if (latitude === null || longitude === null)
         return alert("Coordenadas obrigatórias.");
-    if (isNaN(raio))
-        return alert("Raio inválido.");
 
+    // Verificar duplicação
     const duplicado = await obraDuplicada(
-        nome, morada, latitude, longitude, raio
+        nome,
+        morada,
+        latitude,
+        longitude,
+        raio
     );
 
     if (duplicado) {
@@ -157,6 +154,7 @@ document.getElementById("btnGerar")?.addEventListener("click", async () => {
         return;
     }
 
+    // Inserir obra
     const { data, error } = await SB
         .from("obras")
         .insert({
@@ -169,16 +167,19 @@ document.getElementById("btnGerar")?.addEventListener("click", async () => {
         .select()
         .single();
 
-    if (error) {
+    if (error || !data) {
         alert("Erro ao criar obra:\n" + error.message);
+        console.error(error);
         return;
     }
 
-    ultimaObraCriada = data;
+    const obraID = data.id;
 
+    // Criar URL
     const qrURL =
-        `https://alcindomaia.github.io/marcacao-ponto/?obra=${data.id}`;
+        `https://alcindomaia.github.io/marcacao-ponto/?obra=${obraID}`;
 
+    // Gerar QR
     const canvas = document.getElementById("qrCanvas");
 
     new QRious({
@@ -188,28 +189,28 @@ document.getElementById("btnGerar")?.addEventListener("click", async () => {
         value: qrURL
     });
 
-    const download = document.getElementById("downloadBtn");
-    download.href = canvas.toDataURL("image/png");
-    download.download = "QR_" + nome + ".png";
+    // Inserir logotipo
+    const ctx = canvas.getContext("2d");
+    const logo = new Image();
+    logo.src = "Logo.png";
 
-    document.getElementById("qrBox").style.display = "block";
+    logo.onload = () => {
+        const size = 60;
+        ctx.drawImage(
+            logo,
+            (canvas.width - size) / 2,
+            (canvas.height - size) / 2,
+            size,
+            size
+        );
 
-    alert("Obra criada com sucesso.");
-});
+        const download = document.getElementById("downloadBtn");
+        download.href = canvas.toDataURL("image/png");
+        download.download =
+            "QR_" + nome.replace(/\s+/g, "_") + ".png";
 
+        document.getElementById("qrBox").style.display = "block";
+    };
 
-// =======================================================
-// GERAR PDF (APENAS SE JÁ EXISTIR OBRA)
-// =======================================================
-document.getElementById("btnPDF")?.addEventListener("click", () => {
-
-    if (!ultimaObraCriada) {
-        alert("Primeiro crie a obra.");
-        return;
-    }
-
-    gerarPDF(
-        ultimaObraCriada.nome,
-        ultimaObraCriada.morada
-    );
-});
+    alert("Obra criada com sucesso!");
+};
