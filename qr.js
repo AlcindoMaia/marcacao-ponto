@@ -128,52 +128,28 @@ async function gerarPDF(nomeObra, morada) {
 }
 
 
+let ultimaObraCriada = null;
+
+
 // =======================================================
 // CRIAR OBRA + GERAR QR
 // =======================================================
 document.getElementById("btnGerar")?.addEventListener("click", async () => {
 
-    // =============================
-    // LEITURA SEGURA DOS CAMPOS
-    // =============================
     const nome = document.getElementById("nomeObra").value.trim();
     const morada = document.getElementById("morada").value.trim();
+    const raio = parseInt(document.getElementById("raio").value);
+    const latitude = parseFloat(document.getElementById("latitude").value);
+    const longitude = parseFloat(document.getElementById("longitude").value);
 
-    const raioRaw = document.getElementById("raio").value;
-    const latRaw = document.getElementById("latitude").value;
-    const lonRaw = document.getElementById("longitude").value;
+    if (!nome) return alert("Nome obrigatório.");
+    if (isNaN(latitude) || isNaN(longitude))
+        return alert("Coordenadas obrigatórias.");
+    if (isNaN(raio))
+        return alert("Raio inválido.");
 
-    const raio = raioRaw ? parseInt(raioRaw) : null;
-    const latitude = latRaw ? parseFloat(latRaw) : null;
-    const longitude = lonRaw ? parseFloat(lonRaw) : null;
-
-    // =============================
-    // VALIDAÇÕES
-    // =============================
-    if (!nome) {
-        alert("Nome da obra é obrigatório.");
-        return;
-    }
-
-    if (latitude === null || longitude === null) {
-        alert("Coordenadas GPS obrigatórias.");
-        return;
-    }
-
-    if (raio === null || isNaN(raio)) {
-        alert("Raio inválido.");
-        return;
-    }
-
-    // =============================
-    // VERIFICAR DUPLICAÇÃO
-    // =============================
     const duplicado = await obraDuplicada(
-        nome,
-        morada,
-        latitude,
-        longitude,
-        raio
+        nome, morada, latitude, longitude, raio
     );
 
     if (duplicado) {
@@ -181,9 +157,6 @@ document.getElementById("btnGerar")?.addEventListener("click", async () => {
         return;
     }
 
-    // =============================
-    // INSERT NA BASE
-    // =============================
     const { data, error } = await SB
         .from("obras")
         .insert({
@@ -197,18 +170,14 @@ document.getElementById("btnGerar")?.addEventListener("click", async () => {
         .single();
 
     if (error) {
-        alert("ERRO AO CRIAR OBRA:\n" + error.message);
-        console.error(error);
+        alert("Erro ao criar obra:\n" + error.message);
         return;
     }
 
-    const obraID = data.id;
+    ultimaObraCriada = data;
 
-    // =============================
-    // GERAR QR
-    // =============================
     const qrURL =
-        `https://alcindomaia.github.io/marcacao-ponto/?obra=${obraID}`;
+        `https://alcindomaia.github.io/marcacao-ponto/?obra=${data.id}`;
 
     const canvas = document.getElementById("qrCanvas");
 
@@ -219,35 +188,28 @@ document.getElementById("btnGerar")?.addEventListener("click", async () => {
         value: qrURL
     });
 
-    // =============================
-    // INSERIR LOGÓTIPO
-    // =============================
-    const ctx = canvas.getContext("2d");
-    const logo = new Image();
-    logo.src = "Logo.png";
+    const download = document.getElementById("downloadBtn");
+    download.href = canvas.toDataURL("image/png");
+    download.download = "QR_" + nome + ".png";
 
-    logo.onload = () => {
+    document.getElementById("qrBox").style.display = "block";
 
-        const size = 60;
+    alert("Obra criada com sucesso.");
+});
 
-        ctx.drawImage(
-            logo,
-            (canvas.width - size)/2,
-            (canvas.height - size)/2,
-            size,
-            size
-        );
 
-        // PNG Download
-        const download = document.getElementById("downloadBtn");
-        download.href = canvas.toDataURL("image/png");
-        download.download =
-            "QR_" + nome.replace(/\s+/g, "_") + ".png";
+// =======================================================
+// GERAR PDF (APENAS SE JÁ EXISTIR OBRA)
+// =======================================================
+document.getElementById("btnPDF")?.addEventListener("click", () => {
 
-        document.getElementById("qrBox")
-            .classList.remove("hidden");
-    };
+    if (!ultimaObraCriada) {
+        alert("Primeiro crie a obra.");
+        return;
+    }
 
-    alert("Obra criada com sucesso. QR gerado.");
-
+    gerarPDF(
+        ultimaObraCriada.nome,
+        ultimaObraCriada.morada
+    );
 });
