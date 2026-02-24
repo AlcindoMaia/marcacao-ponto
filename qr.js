@@ -104,8 +104,33 @@ document.getElementById("btnGerar").addEventListener("click", async () => {
     downloadBtn.download =
         "QR_" + nome.replace(/\s+/g, "_") + ".png";
 
-    document.getElementById("qrBox")
-        .classList.remove("hidden");
+    document.getElementById("qrBox").style.display = "block";
 
     alert("Obra criada com sucesso!");
+
+// =======================================================
+// GERAR PDF
+// =======================================================
+document.getElementById("btnPDF").addEventListener("click", () => {
+
+    const canvas = document.getElementById("qrCanvas");
+
+    if (!canvas.toDataURL) {
+        alert("Gere primeiro o QR.");
+        return;
+    }
+
+    const imgData = canvas.toDataURL("image/png");
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF();
+
+    pdf.setFontSize(18);
+    pdf.text("QR Code da Obra", 105, 20, { align: "center" });
+
+    pdf.addImage(imgData, "PNG", 55, 40, 100, 100);
+
+    pdf.save("QR_Obra.pdf");
 });
+});
+
