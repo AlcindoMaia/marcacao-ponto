@@ -376,4 +376,78 @@ function ligarEventosGlobais() {
 
     totalInput?.addEventListener("input", calcularBase);
     ivaInput?.addEventListener("input", calcularBase);
+
+// =======================================================
+// GUARDAR MOVIMENTO (FLUXO DE CAIXA)
+// =======================================================
+
+async function guardarMovimento() {
+
+    const referencia = movReferencia?.value?.trim();
+    const dataDoc = movData?.value;
+    const tipo = movTipo?.value;
+    const nif = movNif?.value?.trim();
+    const nomeFornecedor = movFornecedor?.value?.trim();
+    const categoria_id = movCategoria?.value;
+    const obra_id = movObra?.value;
+    const valor_base = Number(movBase?.value);
+    const iva = Number(movIva?.value);
+    const valor_total = Number(movTotal?.value);
+    const estado = movEstado?.value;
+    const obs = movObs?.value;
+
+    if (!referencia || !dataDoc || isNaN(valor_total)) {
+        movMsg.textContent = "Preencha os campos obrigatórios.";
+        return;
+    }
+
+    let fornecedor_id = null;
+
+    if (nif) {
+
+        const { data: existente } = await SB
+            .from("fornecedores")
+            .select("*")
+            .eq("nif", nif)
+            .maybeSingle();
+
+        if (existente) {
+
+            fornecedor_id = existente.id;
+
+        } else {
+
+            const { data: novo } = await SB
+                .from("fornecedores")
+                .insert({ nif, nome: nomeFornecedor })
+                .select()
+                .single();
+
+            fornecedor_id = novo.id;
+        }
+    }
+
+    const { error } = await SB
+        .from("movimentos_financeiros")
+        .insert({
+            referencia,
+            data_documento: dataDoc,
+            tipo,
+            fornecedor_id,
+            categoria_id,
+            obra_id,
+            valor_base,
+            iva,
+            valor_total,
+            estado_pagamento: estado,
+            observacoes: obs
+        });
+
+    if (error) {
+        movMsg.textContent = error.message;
+        return;
+    }
+
+    movMsg.textContent = "Movimento registado com sucesso.";
+}  
 }
