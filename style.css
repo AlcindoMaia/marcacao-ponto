@@ -313,3 +313,100 @@ body.dark table.dataTable tbody td {
     }
 
 }
+
+/* ================= CALENDÁRIO ================= */
+
+.calendar-container {
+    margin-bottom: 24px;
+    background: var(--bg-panel);
+    padding: 20px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.calendar-header button {
+    background: var(--primary);
+    border: none;
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+}
+
+.calendar-day {
+    padding: 10px;
+    text-align: center;
+    border-radius: 8px;
+    cursor: pointer;
+    background: rgba(255,255,255,0.05);
+}
+
+.calendar-day:hover {
+    background: var(--primary);
+    color: black;
+}
+
+.calendar-day.active {
+    background: var(--primary);
+    color: black;
+    font-weight: 600;
+}
+
+/* ================= TABELA REGISTOS ================= */
+
+#tabelaRegistos {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+#tabelaRegistos th {
+    background: var(--primary);
+    color: black;
+    padding: 12px;
+    text-align: left;
+}
+
+#tabelaRegistos td {
+    padding: 10px 14px;
+}
+
+#tabelaRegistos tbody tr:nth-child(even) {
+    background: rgba(255,255,255,0.03);
+}
+
+#tabelaRegistos tbody tr:hover {
+    background: rgba(244,185,66,.18);
+}
+
+/* Estado */
+.estado-ok {
+    color: #5ad65a;
+    font-weight: 600;
+}
+
+.estado-incompleto {
+    color: #ff7a7a;
+    font-weight: 600;
+}
+
+/* Linha editada */
+.linha-editada td.editado {
+    color: #ffcc00;
+    font-weight: 600;
+}
+
+
+
