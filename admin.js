@@ -3,10 +3,17 @@
 // =======================================================
 const SUPABASE_URL = "https://npyosbigynxmxdakcymg.supabase.co";
 const SUPABASE_ANON_KEY =
-"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weW9zYmlneW54bXhkYWtjeW1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4MzYyMjYsImV4cCI6MjA4MDQxMjIyNn0.CErd5a_-9HS4qPB99SFyO-airsNnS3b8dvWWrSPE4_M";
+"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
 
 const SB = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const PIN_ADMIN = "1810";
+
+// =======================================================
+// CALENDÁRIO REGISTOS
+// =======================================================
+
+let currentDate = new Date();
+let filtroDia = null;
 
 // =======================================================
 // LOGIN
@@ -54,7 +61,7 @@ function inicializarPainel() {
 }
 
 // =======================================================
-// TABS (CORRIGIDO)
+// TABS
 // =======================================================
 function ativarTabs() {
     document.querySelectorAll(".tab").forEach(btn => {
@@ -76,12 +83,15 @@ function abrirTab(nome) {
     tabDiv.classList.add("active");
 
     if (nome === "inventario") initInventario();
-    if (nome === "registos") carregarRegistos();
+
+    if (nome === "registos") {
+        gerarCalendario();
+        carregarRegistos();
+    }
+
     if (nome === "financeiro") carregarFinanceiro();
     if (nome === "fluxo") initFluxo();
-    if (nome === "gerarqr") return;
 }
-
 
 // =======================================================
 // FINANCEIRO
@@ -123,6 +133,77 @@ async function carregarFinanceiro() {
 }
 
 // =======================================================
+// CALENDÁRIO
+// =======================================================
+function gerarCalendario() {
+
+    const grid = document.getElementById("calendarGrid");
+    const title = document.getElementById("calendarTitle");
+
+    if (!grid || !title) return;
+
+    const ano = currentDate.getFullYear();
+    const mes = currentDate.getMonth();
+
+    title.textContent = currentDate.toLocaleString("pt-PT", {
+        month: "long",
+        year: "numeric"
+    });
+
+    grid.innerHTML = "";
+
+    const primeiroDia = new Date(ano, mes, 1).getDay();
+    const diasNoMes = new Date(ano, mes + 1, 0).getDate();
+
+    for (let i = 0; i < primeiroDia; i++) {
+        grid.innerHTML += `<div></div>`;
+    }
+
+    for (let dia = 1; dia <= diasNoMes; dia++) {
+
+        const div = document.createElement("div");
+        div.classList.add("calendar-day");
+        div.textContent = dia;
+
+        div.onclick = () => {
+
+            filtroDia = new Date(ano, mes, dia);
+
+            document.querySelectorAll(".calendar-day")
+                .forEach(d => d.classList.remove("active"));
+
+            div.classList.add("active");
+
+            carregarRegistos();
+        };
+
+        grid.appendChild(div);
+    }
+
+    title.onclick = () => {
+
+        filtroDia = null;
+
+        document.querySelectorAll(".calendar-day")
+            .forEach(d => d.classList.remove("active"));
+
+        carregarRegistos();
+    };
+
+    document.getElementById("prevMonth")?.onclick = () => {
+        currentDate.setMonth(currentDate.getMonth() - 1);
+        gerarCalendario();
+        carregarRegistos();
+    };
+
+    document.getElementById("nextMonth")?.onclick = () => {
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        gerarCalendario();
+        carregarRegistos();
+    };
+}
+
+// =======================================================
 // REGISTOS
 // =======================================================
 async function carregarRegistos() {
@@ -137,9 +218,21 @@ async function carregarRegistos() {
 
     tbody.innerHTML = "";
 
-    const { data, error } = await SB
-        .from("vw_registos_ponto")
-        .select("*");
+    let query = SB.from("vw_registos_ponto").select("*");
+
+    const ano = currentDate.getFullYear();
+    const mes = currentDate.getMonth() + 1;
+
+    query = query
+        .gte("dia", `${ano}-${String(mes).padStart(2,"0")}-01`)
+        .lt("dia", `${ano}-${String(mes).padStart(2,"0")}-32`);
+
+    if (filtroDia) {
+        const d = filtroDia.toISOString().split("T")[0];
+        query = query.eq("dia", d);
+    }
+
+    const { data, error } = await query.order("dia", { ascending: false });
 
     if (error) {
         alert("Erro Supabase: " + error.message);
@@ -151,18 +244,45 @@ async function carregarRegistos() {
         return;
     }
 
+    const formatHora = (valor) => {
+        if (!valor) return "";
+        return valor.substring(11,16);
+    };
+
     data.forEach(r => {
-        tbody.innerHTML += `
-            <tr>
-                <td>${r.funcionario}</td>
-                <td>${r.obra}</td>
-                <td>${r.dia}</td>
-                <td>${r.entrada}</td>
-                <td>${r.saida}</td>
-                <td>${r.horas}</td>
-                <td>${r.estado}</td>
-            </tr>
+
+        const tr = document.createElement("tr");
+
+        tr.innerHTML = `
+            <td>${r.funcionario}</td>
+            <td>${r.obra}</td>
+            <td>${r.dia}</td>
+            <td contenteditable="true" class="editavel">${formatHora(r.entrada)}</td>
+            <td contenteditable="true" class="editavel">${formatHora(r.saida)}</td>
+            <td>${r.horas || ""}</td>
+            <td contenteditable="true" class="editavel">${r.estado}</td>
         `;
+
+        tr.querySelectorAll(".editavel").forEach(td => {
+
+            td.addEventListener("blur", async () => {
+
+                td.classList.add("editado");
+                tr.classList.add("linha-editada");
+
+                await SB
+                    .from("registos_ponto")
+                    .update({
+                        entrada: r.entrada,
+                        saida: r.saida,
+                        estado: r.estado
+                    })
+                    .eq("id", r.id);
+            });
+
+        });
+
+        tbody.appendChild(tr);
     });
 }
 
@@ -185,6 +305,7 @@ async function carregarUnidades() {
     if (!sel) return;
 
     sel.innerHTML = "";
+
     data?.forEach(u => {
         sel.innerHTML +=
             `<option value="${u.id}">${u.codigo}</option>`;
@@ -217,182 +338,12 @@ async function carregarArtigos() {
     });
 }
 
-async function guardarArtigo() {
-
-    const codigo = artCodigo.value.trim();
-    const descricao = artDescricao.value.trim();
-    const preco = Number(artPreco.value);
-    const iva = Number(artIva.value);
-    const unidade = artUnidade.value;
-    const tipo = artTipo.value;
-    const qtdInicial = Number(artQtdInicial.value || 0);
-    const local = artLocal.value.trim();
-
-    if (!codigo || !descricao || isNaN(preco) || !unidade) {
-        alert("Campos obrigatórios em falta");
-        return;
-    }
-
-    const { data: artigo, error } = await SB
-        .from("artigos")
-        .insert({
-            codigo,
-            descricao,
-            unidade_id: unidade,
-            tipo_artigo: tipo,
-            taxa_iva: iva,
-            preco_atual: preco,
-            stock_inicial: qtdInicial,
-            local_armazenamento: local
-        })
-        .select()
-        .single();
-
-    if (error) {
-        alert(error.message);
-        return;
-    }
-
-    if (qtdInicial > 0) {
-        await SB.from("movimentos_stock").insert({
-            artigo_id: artigo.id,
-            tipo_movimento: "INVENTARIO_INICIAL",
-            quantidade: qtdInicial
-        });
-    }
-
-    limparFormularioArtigo();
-    document.getElementById("modalArtigo").classList.add("hidden");
-    carregarArtigos();
-}
-
-function limparFormularioArtigo() {
-    artCodigo.value = "";
-    artDescricao.value = "";
-    artPreco.value = "";
-    artIva.value = "23";
-    artQtdInicial.value = "";
-    artLocal.value = "";
-}
-
 // =======================================================
 // FLUXO DE CAIXA
 // =======================================================
 async function initFluxo() {
     await carregarCategoriasFinanceiras();
     await carregarObrasFluxo();
-}
-
-async function carregarCategoriasFinanceiras() {
-    const sel = document.getElementById("movCategoria");
-    if (!sel) return;
-
-    sel.innerHTML = "";
-
-    const { data } = await SB
-        .from("categorias_financeiras")
-        .select("*")
-        .order("nome");
-
-    data?.forEach(c => {
-        sel.innerHTML +=
-            `<option value="${c.id}">${c.nome}</option>`;
-    });
-}
-
-async function carregarObrasFluxo() {
-    const sel = document.getElementById("movObra");
-    if (!sel) return;
-
-    sel.innerHTML = "";
-
-    const { data } = await SB
-        .from("obras")
-        .select("*")
-        .order("nome");
-
-    data?.forEach(o => {
-        sel.innerHTML +=
-            `<option value="${o.id}">${o.nome}</option>`;
-    });
-}
-
-async function guardarMovimento() {
-
-    const referencia = movReferencia.value.trim();
-    const dataDoc = movData.value;
-    const tipo = movTipo.value;
-    const nif = movNif.value.trim();
-    const nomeFornecedor = movFornecedor.value.trim();
-    const categoria_id = movCategoria.value;
-    const obra_id = movObra.value;
-    const valor_base = Number(movBase.value);
-    const iva = Number(movIva.value);
-    const valor_total = Number(movTotal.value);
-    const estado = movEstado.value;
-    const obs = movObs.value;
-
-    if (!referencia || !dataDoc || isNaN(valor_total)) {
-        movMsg.textContent = "Preencha os campos obrigatórios.";
-        return;
-    }
-
-    let fornecedor_id = null;
-
-    if (nif) {
-        const { data: existente } = await SB
-            .from("fornecedores")
-            .select("*")
-            .eq("nif", nif)
-            .maybeSingle();
-
-        if (existente) {
-            fornecedor_id = existente.id;
-        } else {
-            const { data: novo } = await SB
-                .from("fornecedores")
-                .insert({ nif, nome: nomeFornecedor })
-                .select()
-                .single();
-
-            fornecedor_id = novo.id;
-        }
-    }
-
-    const { error } = await SB
-        .from("movimentos_financeiros")
-        .insert({
-            referencia,
-            data_documento: dataDoc,
-            tipo,
-            fornecedor_id,
-            categoria_id,
-            obra_id,
-            valor_base,
-            iva,
-            valor_total,
-            estado_pagamento: estado,
-            observacoes: obs
-        });
-
-    if (error) {
-        movMsg.textContent = error.message;
-        return;
-    }
-
-    movMsg.textContent = "Movimento registado com sucesso.";
-    limparFormularioFluxo();
-}
-
-function limparFormularioFluxo() {
-    movReferencia.value = "";
-    movData.value = "";
-    movNif.value = "";
-    movFornecedor.value = "";
-    movBase.value = "";
-    movTotal.value = "";
-    movObs.value = "";
-    movIva.value = "23";
 }
 
 // =======================================================
@@ -406,19 +357,9 @@ function ligarEventosGlobais() {
                 .classList.remove("hidden");
         });
 
-    document.getElementById("fecharModalBtn")
-        ?.addEventListener("click", () => {
-            document.getElementById("modalArtigo")
-                .classList.add("hidden");
-        });
-
-    document.getElementById("guardarArtigoBtn")
-        ?.addEventListener("click", guardarArtigo);
-
     document.getElementById("btnGuardarMov")
         ?.addEventListener("click", guardarMovimento);
 
-    // Cálculo automático valor base
     const totalInput = document.getElementById("movTotal");
     const ivaInput = document.getElementById("movIva");
     const baseInput = document.getElementById("movBase");
