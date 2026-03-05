@@ -93,6 +93,49 @@ function abrirTab(nome) {
 }
 
 // =======================================================
+// CATEGORIAS FINANCEIRAS
+// =======================================================
+
+async function carregarCategoriasFinanceiras() {
+
+    const sel = document.getElementById("movCategoria");
+    if (!sel) return;
+
+    sel.innerHTML = "";
+
+    const { data } = await SB
+        .from("categorias_financeiras")
+        .select("*")
+        .order("nome");
+
+    data?.forEach(c => {
+        sel.innerHTML += `<option value="${c.id}">${c.nome}</option>`;
+    });
+}
+
+
+// =======================================================
+// OBRAS (FLUXO DE CAIXA)
+// =======================================================
+
+async function carregarObrasFluxo() {
+
+    const sel = document.getElementById("movObra");
+    if (!sel) return;
+
+    sel.innerHTML = "";
+
+    const { data } = await SB
+        .from("obras")
+        .select("*")
+        .order("nome");
+
+    data?.forEach(o => {
+        sel.innerHTML += `<option value="${o.id}">${o.nome}</option>`;
+    });
+}
+
+// =======================================================
 // FINANCEIRO
 // =======================================================
 async function carregarFinanceiro() {
