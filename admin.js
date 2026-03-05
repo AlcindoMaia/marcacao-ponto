@@ -376,7 +376,7 @@ function ligarEventosGlobais() {
 
     totalInput?.addEventListener("input", calcularBase);
     ivaInput?.addEventListener("input", calcularBase);
-
+}
 // =======================================================
 // GUARDAR MOVIMENTO (FLUXO DE CAIXA)
 // =======================================================
@@ -448,6 +448,5 @@ async function guardarMovimento() {
         return;
     }
 
-    movMsg.textContent = "Movimento registado com sucesso.";
-}  
+    movMsg.textContent = "Movimento registado com sucesso.";  
 }
