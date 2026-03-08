@@ -269,13 +269,15 @@ async function carregarRegistos() {
 
     let query = SB.from("vw_registos_ponto").select("*");
 
-    const ano = currentDate.getFullYear();
-    const mes = currentDate.getMonth() + 1;
+const ano = currentDate.getFullYear();
+const mes = currentDate.getMonth() + 1;
 
-    query = query
-        .gte("dia", `${ano}-${String(mes).padStart(2,"0")}-01`)
-        .lt("dia", `${ano}-${String(mes).padStart(2,"0")}-32`);
+const ultimoDia = new Date(ano, mes, 0).getDate();
 
+query = query
+    .gte("dia", `${ano}-${String(mes).padStart(2,"0")}-01`)
+    .lte("dia", `${ano}-${String(mes).padStart(2,"0")}-${ultimoDia}`);
+    
     if (filtroDia) {
         const d = filtroDia.toISOString().split("T")[0];
         query = query.eq("dia", d);
