@@ -412,6 +412,19 @@ async function initFluxo() {
 // =======================================================
 function ligarEventosGlobais() {
 
+    document.getElementById("pesquisaInventario")?.addEventListener("input", function(){
+
+const filtro = this.value.toLowerCase();
+
+document.querySelectorAll("#tabelaArtigos tbody tr").forEach(tr => {
+
+const texto = tr.innerText.toLowerCase();
+
+tr.style.display = texto.includes(filtro) ? "" : "none";
+
+});
+
+});
     document.getElementById("btnNovoArtigo")
         ?.addEventListener("click", () => {
             document.getElementById("modalArtigo")
