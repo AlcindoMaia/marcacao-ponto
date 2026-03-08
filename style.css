@@ -407,6 +407,30 @@ body.dark table.dataTable tbody td {
     color: #ffcc00;
     font-weight: 600;
 }
+/* ================= INVENTÁRIO TABELA ================= */
 
+#tabelaArtigos {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+#tabelaArtigos th {
+    background: var(--primary);
+    color: black;
+    padding: 12px;
+    text-align: left;
+}
+
+#tabelaArtigos td {
+    padding: 10px 14px;
+}
+
+#tabelaArtigos tbody tr:nth-child(even) {
+    background: rgba(255,255,255,0.03);
+}
+
+#tabelaArtigos tbody tr:hover {
+    background: rgba(244,185,66,.18);
+}
 
 
