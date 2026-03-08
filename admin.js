@@ -18,6 +18,7 @@ let filtroDia = null;
 // LOGIN
 // =======================================================
 window.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("btnLogin")?.addEventListener("click", validarPIN);
     document.getElementById("pinInput")?.focus();
     ligarEventosGlobais();
 });
@@ -318,14 +319,24 @@ async function carregarRegistos() {
                 td.classList.add("editado");
                 tr.classList.add("linha-editada");
 
-                await SB
-                    .from("registos_ponto")
-                    .update({
-                        entrada: r.entrada,
-                        saida: r.saida,
-                        estado: r.estado
-                    })
-                    .eq("id", r.id);
+              td.addEventListener("blur", async () => {
+
+    const novaEntrada = tr.children[3].textContent;
+    const novaSaida = tr.children[4].textContent;
+    const novoEstado = tr.children[6].textContent;
+
+    td.classList.add("editado");
+    tr.classList.add("linha-editada");
+
+    await SB
+        .from("registos_ponto")
+        .update({
+            entrada: novaEntrada,
+            saida: novaSaida,
+            estado: novoEstado
+        })
+        .eq("id", r.id);
+});
             });
 
         });
