@@ -232,17 +232,23 @@ function gerarCalendario() {
         carregarRegistos();
     };
 
-    document.getElementById("prevMonth")?.onclick = () => {
+const prevBtn = document.getElementById("prevMonth");
+if (prevBtn) {
+    prevBtn.onclick = () => {
         currentDate.setMonth(currentDate.getMonth() - 1);
         gerarCalendario();
         carregarRegistos();
     };
+}
 
-    document.getElementById("nextMonth")?.onclick = () => {
+const nextBtn = document.getElementById("nextMonth");
+if (nextBtn) {
+    nextBtn.onclick = () => {
         currentDate.setMonth(currentDate.getMonth() + 1);
         gerarCalendario();
         carregarRegistos();
     };
+}
 }
 
 // =======================================================
