@@ -234,10 +234,12 @@ async function carregarArtigos() {
             <td>${a.local_armazenamento || ""}</td>
             <td class="acoes-td">
                 <button class="btn-acao" title="Editar">✏️</button>
+                <button class="btn-acao" title="Histórico">📋</button>
                 <button class="btn-acao btn-apagar-art" title="Apagar">🗑️</button>
             </td>`;
-        tr.querySelector("[title='Editar']").onclick   = () => abrirModalArtigo(a);
-        tr.querySelector("[title='Apagar']").onclick   = () => apagarArtigo(a.id, a.descricao);
+        tr.querySelector("[title='Editar']").onclick    = () => abrirModalArtigo(a);
+        tr.querySelector("[title='Histórico']").onclick = () => abrirHistoricoStock(a.id, a.descricao);
+        tr.querySelector("[title='Apagar']").onclick    = () => apagarArtigo(a.id, a.descricao);
         tbody.appendChild(tr);
     });
 }
@@ -278,6 +280,59 @@ async function abrirModalArtigo(artigo = null) {
 
     document.getElementById("modalArtigoMsg").textContent = "";
     document.getElementById("modalArtigo").classList.remove("hidden");
+}
+
+// =======================================================
+// HISTÓRICO DE STOCK
+// =======================================================
+async function abrirHistoricoStock(artigoId, descricao) {
+    document.getElementById("histNomeArtigo").textContent = descricao;
+    document.getElementById("histCorpo").innerHTML =
+        `<tr><td colspan="5" style="text-align:center;padding:16px;opacity:.6">A carregar...</td></tr>`;
+    document.getElementById("modalHistorico").classList.remove("hidden");
+
+    const { data, error } = await SB
+        .from("movimentos_stock")
+        .select("tipo_movimento, quantidade, preco_unitario, data_movimento, observacoes")
+        .eq("artigo_id", artigoId)
+        .order("data_movimento", { ascending: false });
+
+    const tbody = document.getElementById("histCorpo");
+
+    if (error || !data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:16px;opacity:.6">Sem movimentos registados.</td></tr>`;
+        return;
+    }
+
+    // Calcular stock acumulado (do mais antigo para o mais recente)
+    let acumulado = 0;
+    const comSaldo = [...data].reverse().map(m => {
+        const delta = m.tipo_movimento === "saida" ? -m.quantidade : Number(m.quantidade);
+        acumulado += delta;
+        return { ...m, saldo: acumulado };
+    });
+    comSaldo.reverse();
+
+    const labels = { entrada: "Entrada", saida: "Saída", ajuste: "Ajuste", inicial: "Inicial" };
+    const cores  = { entrada: "#5ad65a", saida: "#ff7a7a", ajuste: "#f4b942", inicial: "#85B7EB" };
+
+    tbody.innerHTML = comSaldo.map(m => {
+        const cor   = cores[m.tipo_movimento] || "#888";
+        const label = labels[m.tipo_movimento] || m.tipo_movimento;
+        const delta = m.tipo_movimento === "saida" ? -m.quantidade : +m.quantidade;
+        const sinal = delta >= 0 ? "+" : "";
+        return `<tr>
+            <td>${m.data_movimento || "—"}</td>
+            <td><span style="color:${cor};font-weight:600">${label}</span></td>
+            <td style="text-align:right;color:${cor}">${sinal}${delta}</td>
+            <td style="text-align:right;font-weight:500">${m.saldo}</td>
+            <td style="opacity:.7;font-size:12px">${m.observacoes || "—"}</td>
+        </tr>`;
+    }).join("");
+}
+
+function fecharModalHistorico() {
+    document.getElementById("modalHistorico").classList.add("hidden");
 }
 
 function fecharModalArtigo() {
@@ -560,6 +615,10 @@ function ligarEventosGlobais() {
     document.getElementById("fecharModalBtn")?.addEventListener("click", fecharModalArtigo);
     document.getElementById("modalArtigo")?.addEventListener("click", e => {
         if (e.target.id === "modalArtigo") fecharModalArtigo();
+    });
+
+    document.getElementById("modalHistorico")?.addEventListener("click", e => {
+        if (e.target.id === "modalHistorico") fecharModalHistorico();
     });
 
     // Fluxo — modal

@@ -172,6 +172,34 @@
 
 </div>
 
+<!-- ================= MODAL HISTÓRICO DE STOCK ================= -->
+<div id="modalHistorico" class="modal hidden">
+    <div class="modal-content" style="max-width:680px">
+
+        <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <div>
+                <h2 style="margin:0">Histórico de Stock</h2>
+                <div id="histNomeArtigo" style="font-size:13px;opacity:.6;margin-top:2px"></div>
+            </div>
+            <button onclick="fecharModalHistorico()" class="modal-close" style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.6">×</button>
+        </div>
+
+        <table style="border-collapse:collapse;width:100%">
+            <thead>
+                <tr>
+                    <th style="background:var(--primary);color:#000;padding:10px 12px;text-align:left;font-size:13px">Data</th>
+                    <th style="background:var(--primary);color:#000;padding:10px 12px;text-align:left;font-size:13px">Tipo</th>
+                    <th style="background:var(--primary);color:#000;padding:10px 12px;text-align:right;font-size:13px">Movimento</th>
+                    <th style="background:var(--primary);color:#000;padding:10px 12px;text-align:right;font-size:13px">Saldo</th>
+                    <th style="background:var(--primary);color:#000;padding:10px 12px;text-align:left;font-size:13px">Observações</th>
+                </tr>
+            </thead>
+            <tbody id="histCorpo"></tbody>
+        </table>
+
+    </div>
+</div>
+
 <!-- ================= MODAL ARTIGO (fora das tabs para funcionar sempre) ================= -->
 <div id="modalArtigo" class="modal hidden">
 
