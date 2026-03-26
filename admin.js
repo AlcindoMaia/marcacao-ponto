@@ -11,6 +11,9 @@ let artigoEditId  = null;
 let movEditId     = null;
 let movimentos    = [];
 let funcEditId    = null;
+let chartLinhas   = null;
+let chartObras    = null;
+let chartFuncs    = null;
 
 // =======================================================
 // AUTH — Login com Supabase Auth (email + password)
@@ -99,6 +102,7 @@ function abrirTab(nome) {
     tabBtn.classList.add("active");
     tabDiv.classList.add("active");
     if (nome === "financeiro")   carregarFinanceiro();
+    if (nome === "dashboard")    initDashboard();
     if (nome === "registos")     { gerarCalendario(); carregarRegistos(); }
     if (nome === "funcionarios") initFuncionarios();
     if (nome === "inventario")   initInventario();
@@ -227,6 +231,228 @@ async function guardarEdicaoRegisto(tr, id) {
     if (error) { console.error(error.message); return; }
     tr.querySelectorAll(".editavel").forEach(td => td.classList.add("editado"));
     tr.classList.add("linha-editada");
+}
+
+// =======================================================
+// DASHBOARD
+// =======================================================
+function initDashboard() {
+    // Popular seletor de anos (ano atual + 2 anteriores)
+    const sel = document.getElementById("dashAno");
+    if (sel && !sel.options.length) {
+        const anoAtual = new Date().getFullYear();
+        for (let a = anoAtual; a >= anoAtual - 2; a--) {
+            sel.innerHTML += `<option value="${a}">${a}</option>`;
+        }
+    }
+    carregarDashboard();
+}
+
+async function carregarDashboard() {
+    const ano = parseInt(document.getElementById("dashAno")?.value) || new Date().getFullYear();
+    const dataInicio = `${ano}-01-01`;
+    const dataFim    = `${ano}-12-31`;
+
+    // Carregar movimentos do ano
+    const { data: movs } = await SB
+        .from("movimentos_financeiros")
+        .select("tipo, valor_total, data_documento, obra_id, obras(nome)")
+        .gte("data_documento", dataInicio)
+        .lte("data_documento", dataFim)
+        .eq("ativo", true);
+
+    // Carregar registos de ponto do ano (para horas por funcionário)
+    const { data: registos } = await SB
+        .from("vw_registos_ponto")
+        .select("funcionario, horas, dia")
+        .gte("dia", dataInicio)
+        .lte("dia", dataFim);
+
+    // Carregar obras ativas
+    const { data: obras } = await SB.from("obras").select("id, nome");
+
+    renderKpisDash(movs || []);
+    renderChartLinhas(movs || [], ano);
+    renderChartObras(movs || []);
+    renderChartFuncionarios(registos || []);
+
+    document.getElementById("dashObras").textContent = obras?.length || 0;
+}
+
+function renderKpisDash(movs) {
+    const receita = movs.filter(m => m.tipo === "entrada").reduce((s, m) => s + Number(m.valor_total), 0);
+    const despesa = movs.filter(m => m.tipo === "saida").reduce((s, m) => s + Number(m.valor_total), 0);
+    const saldo   = receita - despesa;
+
+    document.getElementById("dashReceita").textContent = receita.toFixed(2) + " €";
+    document.getElementById("dashDespesa").textContent = despesa.toFixed(2) + " €";
+    const saldoEl = document.getElementById("dashSaldo");
+    saldoEl.textContent = saldo.toFixed(2) + " €";
+    saldoEl.style.color = saldo >= 0 ? "#5ad65a" : "#ff7a7a";
+}
+
+function renderChartLinhas(movs, ano) {
+    const meses     = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+    const entradas  = Array(12).fill(0);
+    const saidas    = Array(12).fill(0);
+
+    movs.forEach(m => {
+        const mes = new Date(m.data_documento).getMonth();
+        if (m.tipo === "entrada") entradas[mes] += Number(m.valor_total);
+        else saidas[mes] += Number(m.valor_total);
+    });
+
+    const ctx = document.getElementById("chartLinhas");
+    if (!ctx) return;
+    if (chartLinhas) chartLinhas.destroy();
+
+    chartLinhas = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: meses,
+            datasets: [
+                {
+                    label: "Entradas",
+                    data: entradas,
+                    borderColor: "#5ad65a",
+                    backgroundColor: "rgba(90,214,90,.08)",
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 3
+                },
+                {
+                    label: "Saídas",
+                    data: saidas,
+                    borderColor: "#ff7a7a",
+                    backgroundColor: "rgba(255,122,122,.08)",
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { labels: { color: "#aaa", font: { size: 12 } } },
+                tooltip: { callbacks: { label: ctx => ctx.dataset.label + ": " + Number(ctx.raw).toFixed(2) + " €" } }
+            },
+            scales: {
+                x: { ticks: { color: "#888", font: { size: 11 } }, grid: { color: "rgba(255,255,255,.05)" } },
+                y: { ticks: { color: "#888", font: { size: 11 }, callback: v => v + " €" }, grid: { color: "rgba(255,255,255,.05)" } }
+            }
+        }
+    });
+}
+
+function renderChartObras(movs) {
+    // Agrupar saídas por obra
+    const porObra = {};
+    movs.filter(m => m.tipo === "saida" && m.obra_id).forEach(m => {
+        const nome = m.obras?.nome || m.obra_id.substring(0, 8);
+        porObra[nome] = (porObra[nome] || 0) + Number(m.valor_total);
+    });
+
+    const labels = Object.keys(porObra);
+    const valores = Object.values(porObra);
+
+    const cores = [
+        "#f4b942","#5ad65a","#7b9cff","#ff7a7a","#c084fc",
+        "#34d399","#fb923c","#60a5fa","#f472b6","#a3e635"
+    ];
+
+    const ctx = document.getElementById("chartObras");
+    if (!ctx) return;
+    if (chartObras) chartObras.destroy();
+
+    if (labels.length === 0) {
+        chartObras = new Chart(ctx, {
+            type: "doughnut",
+            data: { labels: ["Sem dados"], datasets: [{ data: [1], backgroundColor: ["rgba(255,255,255,.1)"] }] },
+            options: { plugins: { legend: { display: false } } }
+        });
+        return;
+    }
+
+    chartObras = new Chart(ctx, {
+        type: "doughnut",
+        data: {
+            labels,
+            datasets: [{
+                data: valores,
+                backgroundColor: cores.slice(0, labels.length),
+                borderWidth: 0,
+                hoverOffset: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: "right", labels: { color: "#aaa", font: { size: 11 }, padding: 12, boxWidth: 12 } },
+                tooltip: { callbacks: { label: ctx => ctx.label + ": " + Number(ctx.raw).toFixed(2) + " €" } }
+            }
+        }
+    });
+}
+
+function renderChartFuncionarios(registos) {
+    // Agregar horas por funcionário
+    const porFunc = {};
+    registos.forEach(r => {
+        if (!r.funcionario || !r.horas) return;
+        // horas pode vir como "HH:MM" — converter para decimal
+        let h = 0;
+        if (typeof r.horas === "string" && r.horas.includes(":")) {
+            const [hh, mm] = r.horas.split(":").map(Number);
+            h = hh + mm / 60;
+        } else {
+            h = Number(r.horas) || 0;
+        }
+        porFunc[r.funcionario] = (porFunc[r.funcionario] || 0) + h;
+    });
+
+    // Ordenar por horas desc, top 8
+    const sorted = Object.entries(porFunc)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8);
+
+    const labels = sorted.map(e => e[0]);
+    const valores = sorted.map(e => parseFloat(e[1].toFixed(1)));
+
+    const ctx = document.getElementById("chartFuncionarios");
+    if (!ctx) return;
+    if (chartFuncs) chartFuncs.destroy();
+
+    if (labels.length === 0) {
+        ctx.parentElement.innerHTML += `<p style="text-align:center;opacity:.5;font-size:13px">Sem dados de registos de ponto para este ano.</p>`;
+        return;
+    }
+
+    chartFuncs = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels,
+            datasets: [{
+                label: "Horas",
+                data: valores,
+                backgroundColor: "#f4b942",
+                borderRadius: 6,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            indexAxis: "y",
+            responsive: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: ctx => ctx.raw + "h" } }
+            },
+            scales: {
+                x: { ticks: { color: "#888", font: { size: 11 }, callback: v => v + "h" }, grid: { color: "rgba(255,255,255,.05)" } },
+                y: { ticks: { color: "#ccc", font: { size: 12 } }, grid: { display: false } }
+            }
+        }
+    });
 }
 
 // =======================================================
