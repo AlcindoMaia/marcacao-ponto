@@ -254,25 +254,98 @@
 </div>
 
     <!-- ================= TAB FLUXO DE CAIXA ================= -->
-
 <div class="tab-content" id="tab-fluxo">
 
-    <div class="card">
+    <!-- Totais -->
+    <div class="grid-cards" style="margin-bottom:24px">
+        <div class="card metric">
+            <h3>Entradas</h3>
+            <div id="totalEntradas" class="value" style="color:#5ad65a">–</div>
+        </div>
+        <div class="card metric">
+            <h3>Saídas</h3>
+            <div id="totalSaidas" class="value" style="color:#ff7a7a">–</div>
+        </div>
+        <div class="card metric">
+            <h3>Saldo</h3>
+            <div id="saldoFluxo" class="value">–</div>
+        </div>
+    </div>
 
-        <h2>Novo Movimento</h2>
-
+    <!-- Filtros -->
+    <div class="card" style="margin-bottom:20px">
         <div class="filtros-linha">
             <div class="col">
-                <label>Referência</label>
-                <input id="movReferencia">
+                <label>Obra</label>
+                <select id="filtroObra"></select>
             </div>
-
             <div class="col">
+                <label>Categoria</label>
+                <select id="filtroCategoria"></select>
+            </div>
+            <div class="col">
+                <label>Tipo</label>
+                <select id="filtroTipo">
+                    <option value="">— Todos —</option>
+                    <option value="entrada">Entrada</option>
+                    <option value="saida">Saída</option>
+                </select>
+            </div>
+            <div class="col">
+                <label>De</label>
+                <input id="filtroDataInicio" type="date">
+            </div>
+            <div class="col">
+                <label>Até</label>
+                <input id="filtroDataFim" type="date">
+            </div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:10px">
+            <button class="btn-primary" id="btnNovoMovimento">+ Novo Movimento</button>
+            <button class="btn-secondary" id="btnLimparFiltros">Limpar Filtros</button>
+        </div>
+    </div>
+
+    <!-- Tabela movimentos -->
+    <div class="card">
+        <table id="tabelaMovimentos" style="border-collapse:collapse;width:100%">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Referência</th>
+                    <th>Tipo</th>
+                    <th>Fornecedor</th>
+                    <th>Categoria</th>
+                    <th>Obra</th>
+                    <th style="text-align:right">Total</th>
+                    <th>Estado</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+</div>
+
+<!-- MODAL MOVIMENTO -->
+<div id="modalMovimento" class="modal hidden">
+    <div class="modal-content">
+        <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center">
+            <h2 id="modalMovTitulo">Novo Movimento</h2>
+            <button id="fecharModalMovBtn" class="modal-close" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--color-text-secondary)">×</button>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Referência</label>
+                <input id="movReferencia" placeholder="Ex: FT 2024/001">
+            </div>
+            <div class="form-group input-sm">
                 <label>Data</label>
                 <input id="movData" type="date">
             </div>
-
-            <div class="col">
+            <div class="form-group input-sm">
                 <label>Tipo</label>
                 <select id="movTipo">
                     <option value="saida">Saída</option>
@@ -281,90 +354,62 @@
             </div>
         </div>
 
-        <div class="filtros-linha">
-            <div class="col">
+        <div class="form-row">
+            <div class="form-group input-sm">
                 <label>NIF Fornecedor</label>
-                <input id="movNif">
+                <input id="movNif" placeholder="Opcional">
             </div>
-
-            <div class="col">
+            <div class="form-group">
                 <label>Nome Fornecedor</label>
                 <input id="movFornecedor">
             </div>
+        </div>
 
-            <div class="col">
+        <div class="form-row">
+            <div class="form-group">
                 <label>Categoria</label>
                 <select id="movCategoria"></select>
             </div>
-        </div>
-
-        <div class="filtros-linha">
-            <div class="col">
+            <div class="form-group">
                 <label>Obra</label>
                 <select id="movObra"></select>
             </div>
-
-            <div class="col">
-                <label>Valor Base</label>
-                <input id="movBase" type="number" step="0.01">
-            </div>
-
-            <div class="col">
-                <label>IVA</label>
-                <input id="movIva" type="number" step="0.01">
-            </div>
-
-            <div class="col">
-                <label>Total</label>
-                <input id="movTotal" type="number" step="0.01">
-            </div>
         </div>
 
-        <div class="filtros-linha">
-            <div class="col">
+        <div class="form-row">
+            <div class="form-group input-sm">
+                <label>Total c/ IVA</label>
+                <input id="movTotal" type="number" step="0.01" placeholder="0.00">
+            </div>
+            <div class="form-group input-sm">
+                <label>IVA %</label>
+                <input id="movIva" type="number" placeholder="23">
+            </div>
+            <div class="form-group input-sm">
+                <label>Base (auto)</label>
+                <input id="movBase" type="number" step="0.01" readonly style="opacity:.6">
+            </div>
+            <div class="form-group input-sm">
                 <label>Estado</label>
                 <select id="movEstado">
                     <option value="por_pagar">Por Pagar</option>
                     <option value="pago">Pago</option>
                 </select>
             </div>
-
-            <div class="col">
-                <label>Observações</label>
-                <input id="movObs">
-            </div>
         </div>
 
-        <button class="btn-primary" id="btnGuardarMov">
-            Guardar Movimento
-        </button>
+        <div class="form-group">
+            <label>Observações</label>
+            <input id="movObs" placeholder="Opcional">
+        </div>
 
-        <div id="movMsg"></div>
-
+        <div class="modal-actions">
+            <button class="btn-secondary" id="fecharModalMovBtnAlt" onclick="fecharModalMovimento()">Cancelar</button>
+            <button class="btn-primary" id="btnGuardarMov">Guardar</button>
+        </div>
+        <div id="movMsg" style="margin-top:8px;font-size:13px;color:#ff7a7a"></div>
     </div>
-
 </div>
-
-    <!-- ================= TAB Gerar QR ================= -->
-
-    <div class="tab-content" id="tab-gerarqr">
-
-    <div class="card" style="text-align:center">
-
-        <h2>Gerar QR de Obra</h2>
-
-        <p style="margin-bottom:20px">
-            Criar nova obra e gerar QR Code
-        </p>
-
-        <a href="generate_qr.html" class="btn-primary" target="_blank">
-            Abrir Gerador de QR
-        </a>
-
-    </div>
-
-</div>
-
 
     <!-- ================= TAB Gerar QR ================= -->
     <div class="tab-content" id="tab-gerarqr">
