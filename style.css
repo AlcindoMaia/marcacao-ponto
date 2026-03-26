@@ -314,44 +314,16 @@ body.dark table.dataTable tbody td {
 
 }
 
-/* ================= CALENDÁRIO ================= */
-
-.calendar-container {
-    margin-bottom: 24px;
-    background: var(--bg-panel);
-    padding: 20px;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-}
-
-.calendar-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-weight: 600;
-    margin-bottom: 12px;
-}
-
-.calendar-header button {
-    background: var(--primary);
-    border: none;
-    padding: 6px 12px;
-    border-radius: 8px;
-    cursor: pointer;
-}
-
-.calendar-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 6px;
-}
+/* ================= CALENDÁRIO COMPACTO ================= */
 
 .calendar-day {
-    padding: 10px;
+    padding: 5px 2px;
     text-align: center;
-    border-radius: 8px;
+    border-radius: 6px;
     cursor: pointer;
+    font-size: 12px;
     background: rgba(255,255,255,0.05);
+    transition: background .15s;
 }
 
 .calendar-day:hover {

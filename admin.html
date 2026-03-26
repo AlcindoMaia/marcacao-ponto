@@ -51,21 +51,23 @@
 <!-- ================= TAB REGISTOS ================= -->
 <div class="tab-content" id="tab-registos">
 
-    <div class="card">
-        <h2>Registos de Ponto</h2>
+    <!-- Calendário compacto centrado -->
+    <div style="display:flex;justify-content:center;margin-bottom:20px">
+        <div class="card" style="width:320px;padding:14px">
 
-        <div class="calendar-container">
-
-            <div class="calendar-header">
-                <button id="prevMonth">‹</button>
-                <div id="calendarTitle"></div>
-                <button id="nextMonth">›</button>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                <button id="prevMonth" style="background:var(--primary);border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700">‹</button>
+                <div id="calendarTitle" style="font-weight:600;font-size:14px;cursor:pointer;text-transform:capitalize"></div>
+                <button id="nextMonth" style="background:var(--primary);border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700">›</button>
             </div>
 
-            <div class="calendar-grid" id="calendarGrid"></div>
+            <div id="calendarGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px"></div>
 
         </div>
+    </div>
 
+    <!-- Tabela registos -->
+    <div class="card">
         <table id="tabelaRegistos">
             <thead>
                 <tr>
@@ -80,7 +82,6 @@
             </thead>
             <tbody></tbody>
         </table>
-
     </div>
 
 </div>
@@ -309,8 +310,8 @@
     <!-- ================= TAB FLUXO DE CAIXA ================= -->
 <div class="tab-content" id="tab-fluxo">
 
-    <!-- Totais -->
-    <div class="grid-cards" style="margin-bottom:24px">
+    <!-- KPIs -->
+    <div class="grid-cards">
         <div class="card metric">
             <h3>Entradas</h3>
             <div id="totalEntradas" class="value" style="color:#5ad65a">–</div>
@@ -325,9 +326,9 @@
         </div>
     </div>
 
-    <!-- Filtros -->
+    <!-- Filtros + ações numa linha -->
     <div class="card" style="margin-bottom:20px">
-        <div class="filtros-linha">
+        <div class="filtros-linha" style="align-items:flex-end">
             <div class="col">
                 <label>Obra</label>
                 <select id="filtroObra"></select>
@@ -352,10 +353,10 @@
                 <label>Até</label>
                 <input id="filtroDataFim" type="date">
             </div>
-        </div>
-        <div style="margin-top:12px;display:flex;gap:10px">
-            <button class="btn-primary" id="btnNovoMovimento">+ Novo Movimento</button>
-            <button class="btn-secondary" id="btnLimparFiltros">Limpar Filtros</button>
+            <div style="display:flex;gap:8px;flex-shrink:0">
+                <button class="btn-primary" id="btnNovoMovimento">+ Novo</button>
+                <button class="btn-secondary" id="btnLimparFiltros">Limpar</button>
+            </div>
         </div>
     </div>
 

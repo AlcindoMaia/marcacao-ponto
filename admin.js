@@ -358,24 +358,29 @@ async function guardarArtigo() {
     };
 
     if (artigoEditId) {
-        // EDITAR artigo
+        // EDITAR — actualizar dados do artigo
         const { error } = await SB.from("artigos").update(payload).eq("id", artigoEditId);
         if (error) { msg.textContent = "Erro: " + error.message; return; }
 
-        // Movimento de ajuste de stock (se preenchido)
+        // Movimento de ajuste de stock (só se quantidade preenchida)
         const qtdAjuste  = parseFloat(document.getElementById("artAjusteQtd").value);
         const tipoAjuste = document.getElementById("artAjusteTipo").value;
         const motivo     = document.getElementById("artAjusteMotivo").value.trim();
 
-        if (!isNaN(qtdAjuste) && qtdAjuste !== 0) {
+        if (!isNaN(qtdAjuste) && qtdAjuste > 0) {
             const { error: errMov } = await SB.from("movimentos_stock").insert({
                 artigo_id:      artigoEditId,
                 tipo_movimento: tipoAjuste,
-                quantidade:     Math.abs(qtdAjuste),
+                quantidade:     qtdAjuste,
                 data_movimento: new Date().toISOString().split("T")[0],
                 observacoes:    motivo || null
             });
-            if (errMov) { msg.textContent = "Artigo guardado, mas erro no ajuste: " + errMov.message; return; }
+            if (errMov) {
+                msg.textContent = "Artigo guardado, mas erro no ajuste de stock: " + errMov.message;
+                // Recarregar mesmo assim para reflectir a edição dos dados
+                await carregarArtigos();
+                return;
+            }
         }
 
     } else {
@@ -388,7 +393,7 @@ async function guardarArtigo() {
         if (error) { msg.textContent = "Erro: " + error.message; return; }
 
         // Movimento inicial se stock > 0
-        if (qtd > 0) {
+        if (qtd > 0 && data?.id) {
             await SB.from("movimentos_stock").insert({
                 artigo_id:      data.id,
                 tipo_movimento: "entrada",
@@ -400,6 +405,8 @@ async function guardarArtigo() {
     }
 
     fecharModalArtigo();
+    // Pequeno delay para garantir que a view do Supabase reflecte o novo movimento
+    await new Promise(r => setTimeout(r, 300));
     await carregarArtigos();
 }
 
