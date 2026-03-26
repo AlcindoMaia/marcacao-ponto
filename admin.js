@@ -242,30 +242,39 @@ async function carregarArtigos() {
     });
 }
 
-function abrirModalArtigo(artigo = null) {
+async function abrirModalArtigo(artigo = null) {
+    // Em modo edição, vai buscar os dados COMPLETOS à tabela artigos.
+    // A vw_stock_atual só tem campos de stock — não tem taxa_iva, unidade_id, etc.
+    let d = null;
+    if (artigo?.id) {
+        const { data } = await SB.from("artigos").select("*").eq("id", artigo.id).single();
+        d = data;
+    }
+
     artigoEditId = artigo?.id || null;
-    document.getElementById("modalTitulo").textContent  = artigo ? "Editar Artigo" : "Novo Artigo";
-    document.getElementById("artCodigo").value          = artigo?.codigo || "";
-    document.getElementById("artDescricao").value       = artigo?.descricao || "";
-    document.getElementById("artPreco").value           = artigo?.preco_atual || "";
-    document.getElementById("artIva").value             = artigo?.taxa_iva ?? 23;
-    document.getElementById("artTipo").value            = artigo?.tipo_artigo || "consumivel";
-    document.getElementById("artLocal").value           = artigo?.local_armazenamento || "";
-    document.getElementById("artQtdInicial").value      = artigo ? "" : "";
-    if (artigo?.unidade_id) document.getElementById("artUnidade").value = artigo.unidade_id;
-    // Modo edição: esconder qty inicial, mostrar secção de ajuste de stock
+
+    document.getElementById("modalTitulo").textContent = artigo ? "Editar Artigo" : "Novo Artigo";
+    document.getElementById("artCodigo").value         = d?.codigo || "";
+    document.getElementById("artDescricao").value      = d?.descricao || "";
+    document.getElementById("artPreco").value          = d?.preco_atual ?? "";
+    document.getElementById("artIva").value            = d?.taxa_iva ?? 23;
+    document.getElementById("artTipo").value           = d?.tipo_artigo || "consumivel";
+    document.getElementById("artLocal").value          = d?.local_armazenamento || "";
+    document.getElementById("artQtdInicial").value     = "";
+
+    const selUnidade = document.getElementById("artUnidade");
+    if (selUnidade && d?.unidade_id) selUnidade.value = d.unidade_id;
+
+    // Modo edição: esconder qty inicial, mostrar ajuste de stock
     const qtdGrp = document.getElementById("artQtdInicial")?.closest(".form-group");
     if (qtdGrp) qtdGrp.style.display = artigo ? "none" : "";
 
     const secaoAjuste = document.getElementById("secaoAjusteStock");
     if (secaoAjuste) secaoAjuste.style.display = artigo ? "block" : "none";
 
-    // Limpar campos de ajuste ao abrir
-    if (artigo) {
-        document.getElementById("artAjusteQtd").value    = "";
-        document.getElementById("artAjusteMotivo").value = "";
-        document.getElementById("artAjusteTipo").value   = "entrada";
-    }
+    document.getElementById("artAjusteQtd").value    = "";
+    document.getElementById("artAjusteMotivo").value = "";
+    document.getElementById("artAjusteTipo").value   = "entrada";
 
     document.getElementById("modalArtigoMsg").textContent = "";
     document.getElementById("modalArtigo").classList.remove("hidden");
