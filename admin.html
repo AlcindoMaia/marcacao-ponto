@@ -48,6 +48,7 @@
     <div class="tabs">
         <button class="tab active" data-tab="financeiro">Financeiro</button>
         <button class="tab" data-tab="registos">Registos</button>
+        <button class="tab" data-tab="funcionarios">Funcionários</button>
         <button class="tab" data-tab="inventario">Inventário</button>
         <button class="tab" data-tab="fluxo">Fluxo de Caixa</button>
         <button class="tab" data-tab="gerarqr">Gerar QR</button>
@@ -481,7 +482,108 @@
     </div>
 </div>
 
+<!-- ================= TAB FUNCIONÁRIOS ================= -->
+<div class="tab-content" id="tab-funcionarios">
+
+    <!-- Barra superior -->
+    <div class="inventario-header">
+        <input type="text" id="pesquisaFuncionarios" class="input-lg"
+               placeholder="Pesquisar por nome ou código">
+        <button id="btnNovoFuncionario" class="btn-primary"
+                style="width:42px;height:42px;font-size:22px;border-radius:50%;padding:0;flex-shrink:0">+</button>
+    </div>
+
+    <!-- KPIs rápidos -->
+    <div class="grid-cards" style="margin-bottom:20px">
+        <div class="card metric">
+            <h3>Total</h3>
+            <div id="funcKpiTotal" class="value">–</div>
+        </div>
+        <div class="card metric">
+            <h3>Ativos</h3>
+            <div id="funcKpiAtivos" class="value" style="color:#5ad65a">–</div>
+        </div>
+        <div class="card metric">
+            <h3>Inativos</h3>
+            <div id="funcKpiInativos" class="value" style="color:#ff7a7a">–</div>
+        </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="card">
+        <table id="tabelaFuncionarios" style="border-collapse:collapse;width:100%">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Código</th>
+                    <th>Valor/dia</th>
+                    <th>Registado em</th>
+                    <th>Estado</th>
+                    <th>Dispositivo</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+</div>
+
 </div> <!-- FECHA adminArea -->
+
+<!-- ================= MODAL FUNCIONÁRIO ================= -->
+<div id="modalFuncionario" class="modal hidden">
+    <div class="modal-content">
+
+        <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h2 id="modalFuncTitulo">Novo Funcionário</h2>
+            <button onclick="fecharModalFuncionario()" class="modal-close"
+                    style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.6">×</button>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Nome completo</label>
+                <input id="funcNome" placeholder="Ex: João Silva">
+            </div>
+            <div class="form-group input-sm">
+                <label>Código</label>
+                <input id="funcCodigo" placeholder="Ex: 001">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group input-sm">
+                <label>Valor por dia (€)</label>
+                <input id="funcValorDia" type="number" step="0.01" placeholder="0.00">
+            </div>
+            <div class="form-group input-sm">
+                <label>Estado</label>
+                <select id="funcAtivo">
+                    <option value="true">Ativo</option>
+                    <option value="false">Inativo</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Info dispositivo — só visível em modo edição -->
+        <div id="funcDeviceInfo" style="display:none;margin-top:12px;padding:12px;border-radius:8px;background:rgba(255,255,255,.05);font-size:13px">
+            <div style="opacity:.6;font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Dispositivo registado</div>
+            <div id="funcDeviceId" style="font-family:monospace;font-size:12px;opacity:.7;word-break:break-all"></div>
+            <button id="btnRevogarDispositivo" class="btn-secondary"
+                    style="margin-top:10px;font-size:12px;padding:5px 12px">
+                Revogar dispositivo
+            </button>
+        </div>
+
+        <div class="modal-actions" style="margin-top:20px">
+            <button class="btn-secondary" onclick="fecharModalFuncionario()">Cancelar</button>
+            <button class="btn-primary" id="guardarFuncionarioBtn">Guardar</button>
+        </div>
+        <div id="modalFuncMsg" style="margin-top:8px;font-size:13px;color:#ff7a7a"></div>
+
+    </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>

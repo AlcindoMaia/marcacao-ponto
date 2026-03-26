@@ -10,6 +10,7 @@ let filtroDia     = null;
 let artigoEditId  = null;
 let movEditId     = null;
 let movimentos    = [];
+let funcEditId    = null;
 
 // =======================================================
 // AUTH — Login com Supabase Auth (email + password)
@@ -97,10 +98,11 @@ function abrirTab(nome) {
     if (!tabBtn || !tabDiv) return;
     tabBtn.classList.add("active");
     tabDiv.classList.add("active");
-    if (nome === "financeiro") carregarFinanceiro();
-    if (nome === "registos")   { gerarCalendario(); carregarRegistos(); }
-    if (nome === "inventario") initInventario();
-    if (nome === "fluxo")      initFluxo();
+    if (nome === "financeiro")   carregarFinanceiro();
+    if (nome === "registos")     { gerarCalendario(); carregarRegistos(); }
+    if (nome === "funcionarios") initFuncionarios();
+    if (nome === "inventario")   initInventario();
+    if (nome === "fluxo")        initFluxo();
 }
 
 // =======================================================
@@ -225,6 +227,152 @@ async function guardarEdicaoRegisto(tr, id) {
     if (error) { console.error(error.message); return; }
     tr.querySelectorAll(".editavel").forEach(td => td.classList.add("editado"));
     tr.classList.add("linha-editada");
+}
+
+// =======================================================
+// FUNCIONÁRIOS — CRUD COMPLETO
+// =======================================================
+async function initFuncionarios() {
+    await carregarFuncionarios();
+}
+
+async function carregarFuncionarios() {
+    const { data, error } = await SB
+        .from("funcionarios")
+        .select("*")
+        .order("nome");
+
+    const tbody = document.querySelector("#tabelaFuncionarios tbody");
+    if (!tbody) return;
+
+    if (error) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#ff7a7a">Erro: ${error.message}</td></tr>`;
+        return;
+    }
+
+    // KPIs
+    const total    = data?.length || 0;
+    const ativos   = data?.filter(f => f.ativo !== false).length || 0;
+    const inativos = total - ativos;
+    document.getElementById("funcKpiTotal").textContent   = total;
+    document.getElementById("funcKpiAtivos").textContent  = ativos;
+    document.getElementById("funcKpiInativos").textContent = inativos;
+
+    tbody.innerHTML = "";
+    if (!data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;opacity:.6">Sem funcionários registados.</td></tr>`;
+        return;
+    }
+
+    data.forEach(f => {
+        const ativo  = f.ativo !== false;
+        const data_reg = f.created_at ? new Date(f.created_at).toLocaleDateString("pt-PT") : "—";
+        const temDevice = !!f.device_id;
+
+        const tr = document.createElement("tr");
+        tr.style.opacity = ativo ? "1" : ".5";
+        tr.innerHTML = `
+            <td style="font-weight:500">${f.nome || "—"}</td>
+            <td>${f.codigo || "—"}</td>
+            <td>${f.valor_dia ? Number(f.valor_dia).toFixed(2) + " €" : "—"}</td>
+            <td style="font-size:12px;opacity:.7">${data_reg}</td>
+            <td><span class="badge-estado ${ativo ? "pago" : "por_pagar"}">${ativo ? "Ativo" : "Inativo"}</span></td>
+            <td style="font-size:11px;opacity:.5;font-family:monospace">${temDevice ? f.device_id.substring(0,8) + "…" : "Sem dispositivo"}</td>
+            <td class="acoes-td">
+                <button class="btn-acao" title="Editar">✏️</button>
+                <button class="btn-acao" title="${ativo ? "Desativar" : "Ativar"}">${ativo ? "🔴" : "🟢"}</button>
+            </td>`;
+
+        tr.querySelectorAll(".btn-acao")[0].onclick = () => abrirModalFuncionario(f);
+        tr.querySelectorAll(".btn-acao")[1].onclick = () => toggleAtivoFuncionario(f.id, f.nome, ativo);
+        tbody.appendChild(tr);
+    });
+}
+
+function abrirModalFuncionario(func = null) {
+    funcEditId = func?.id || null;
+
+    document.getElementById("modalFuncTitulo").textContent = func ? "Editar Funcionário" : "Novo Funcionário";
+    document.getElementById("funcNome").value      = func?.nome || "";
+    document.getElementById("funcCodigo").value    = func?.codigo || "";
+    document.getElementById("funcValorDia").value  = func?.valor_dia || "";
+    document.getElementById("funcAtivo").value     = func?.ativo === false ? "false" : "true";
+
+    // Info dispositivo — só em edição
+    const deviceInfo = document.getElementById("funcDeviceInfo");
+    const deviceIdEl = document.getElementById("funcDeviceId");
+    if (func?.device_id) {
+        deviceInfo.style.display = "block";
+        deviceIdEl.textContent   = func.device_id;
+    } else {
+        deviceInfo.style.display = "none";
+    }
+
+    document.getElementById("modalFuncMsg").textContent = "";
+    document.getElementById("modalFuncionario").classList.remove("hidden");
+}
+
+function fecharModalFuncionario() {
+    document.getElementById("modalFuncionario").classList.add("hidden");
+    funcEditId = null;
+}
+
+async function guardarFuncionario() {
+    const nome     = document.getElementById("funcNome").value.trim();
+    const msg      = document.getElementById("modalFuncMsg");
+
+    if (!nome) { msg.textContent = "O nome é obrigatório."; return; }
+
+    const payload = {
+        nome,
+        codigo:    document.getElementById("funcCodigo").value.trim() || null,
+        valor_dia: parseFloat(document.getElementById("funcValorDia").value) || null,
+        ativo:     document.getElementById("funcAtivo").value === "true"
+    };
+
+    if (funcEditId) {
+        const { error } = await SB.from("funcionarios").update(payload).eq("id", funcEditId);
+        if (error) { msg.textContent = "Erro: " + error.message; return; }
+    } else {
+        // Novo funcionário — device_id será atribuído quando o funcionário
+        // fizer o cadastro no seu dispositivo via QR
+        const { error } = await SB.from("funcionarios").insert({
+            ...payload,
+            device_id: crypto.randomUUID()  // placeholder — será substituído no cadastro
+        });
+        if (error) { msg.textContent = "Erro: " + error.message; return; }
+    }
+
+    fecharModalFuncionario();
+    await carregarFuncionarios();
+}
+
+async function toggleAtivoFuncionario(id, nome, ativoAtual) {
+    const acao = ativoAtual ? "desativar" : "ativar";
+    if (!confirm(`${acao.charAt(0).toUpperCase() + acao.slice(1)} "${nome}"?`)) return;
+
+    const { error } = await SB.from("funcionarios")
+        .update({ ativo: !ativoAtual })
+        .eq("id", id);
+
+    if (error) { alert("Erro: " + error.message); return; }
+    await carregarFuncionarios();
+}
+
+async function revogarDispositivoFuncionario() {
+    if (!funcEditId) return;
+    if (!confirm("Revogar o dispositivo deste funcionário?\nEle terá de fazer novo cadastro.")) return;
+
+    const { error } = await SB.from("funcionarios")
+        .update({ device_id: null })
+        .eq("id", funcEditId);
+
+    if (error) { alert("Erro: " + error.message); return; }
+
+    document.getElementById("funcDeviceInfo").style.display = "none";
+    document.getElementById("modalFuncMsg").textContent = "Dispositivo revogado. O funcionário terá de se registar novamente.";
+    document.getElementById("modalFuncMsg").style.color = "#5ad65a";
+    await carregarFuncionarios();
 }
 
 // =======================================================
@@ -646,6 +794,21 @@ function ligarEventosGlobais() {
     document.getElementById("pesquisaInventario")?.addEventListener("input", function () {
         const f = this.value.toLowerCase();
         document.querySelectorAll("#tabelaArtigos tbody tr")
+            .forEach(tr => { tr.style.display = tr.innerText.toLowerCase().includes(f) ? "" : "none"; });
+    });
+
+    // Funcionários — modal
+    document.getElementById("btnNovoFuncionario")?.addEventListener("click", () => abrirModalFuncionario());
+    document.getElementById("guardarFuncionarioBtn")?.addEventListener("click", guardarFuncionario);
+    document.getElementById("btnRevogarDispositivo")?.addEventListener("click", revogarDispositivoFuncionario);
+    document.getElementById("modalFuncionario")?.addEventListener("click", e => {
+        if (e.target.id === "modalFuncionario") fecharModalFuncionario();
+    });
+
+    // Pesquisa funcionários
+    document.getElementById("pesquisaFuncionarios")?.addEventListener("input", function () {
+        const f = this.value.toLowerCase();
+        document.querySelectorAll("#tabelaFuncionarios tbody tr")
             .forEach(tr => { tr.style.display = tr.innerText.toLowerCase().includes(f) ? "" : "none"; });
     });
 

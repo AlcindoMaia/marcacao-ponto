@@ -602,3 +602,29 @@ body:not(.dark) .form-group select {
 }
 
 .modal-close:hover { opacity: 1; }
+
+/* =======================================================
+   TABELA FUNCIONÁRIOS
+======================================================= */
+#tabelaFuncionarios {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+#tabelaFuncionarios th {
+    background: var(--primary);
+    color: black;
+    padding: 12px;
+    text-align: left;
+    font-size: 13px;
+}
+
+#tabelaFuncionarios td {
+    padding: 10px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+}
+
+#tabelaFuncionarios tbody tr:hover {
+    background: rgba(244,185,66,.08);
+}
