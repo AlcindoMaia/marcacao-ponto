@@ -185,52 +185,152 @@ async function carregarRegistos() {
     let tbody = table.querySelector("tbody");
     if (!tbody) { tbody = document.createElement("tbody"); table.appendChild(tbody); }
     tbody.innerHTML = "";
-    const ano    = currentDate.getFullYear();
-    const mes    = currentDate.getMonth() + 1;
-    const mesStr = String(mes).padStart(2, "0");
+
+    const ano       = currentDate.getFullYear();
+    const mes       = currentDate.getMonth() + 1;
+    const mesStr    = String(mes).padStart(2, "0");
     const ultimoDia = new Date(ano, mes, 0).getDate();
+
     let query = SB.from("vw_registos_ponto").select("*")
         .gte("dia", `${ano}-${mesStr}-01`)
         .lte("dia", `${ano}-${mesStr}-${ultimoDia}`);
     if (filtroDia) query = query.eq("dia", filtroDia.toISOString().split("T")[0]);
+
     const { data, error } = await query.order("dia", { ascending: false });
     if (error) { alert("Erro: " + error.message); return; }
+
     if (!data || data.length === 0) {
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;opacity:.6">Sem registos neste período</td></tr>`;
         return;
     }
+
     const fmt = v => v ? v.substring(11, 16) : "";
+
     data.forEach(r => {
         const tr = document.createElement("tr");
-        tr.dataset.id = r.id;
+        const incompleto = r.estado === "Incompleto";
+
+        // Highlight visual para registos incompletos
+        if (incompleto) tr.style.borderLeft = "3px solid #ff7a7a";
+
         tr.innerHTML = `
             <td>${r.funcionario}</td>
             <td>${r.obra}</td>
             <td>${r.dia}</td>
-            <td contenteditable="true" class="editavel">${fmt(r.entrada)}</td>
-            <td contenteditable="true" class="editavel">${fmt(r.saida)}</td>
-            <td>${r.horas || ""}</td>
-            <td contenteditable="true" class="editavel">${r.estado || ""}</td>`;
+            <td contenteditable="true" class="editavel" data-id="${r.entrada_id || ""}" data-tipo="entrada">${fmt(r.entrada)}</td>
+            <td contenteditable="true" class="editavel" data-id="${r.saida_id || ""}" data-tipo="saida">${fmt(r.saida)}</td>
+            <td class="col-horas">${r.horas || "–"}</td>
+            <td>${incompleto
+                ? `<span class="estado-incompleto">Incompleto</span>`
+                : `<span class="estado-ok">OK</span>`
+            }</td>`;
+
+        // Edição inline — atualiza tabela ponto pelo ID correto
         tr.querySelectorAll(".editavel").forEach(td => {
-            td.addEventListener("blur", () => guardarEdicaoRegisto(tr, r.id));
+            td.addEventListener("blur", () => guardarEdicaoRegisto(tr, td));
         });
+
         tbody.appendChild(tr);
     });
 }
 
-async function guardarEdicaoRegisto(tr, id) {
-    const dia    = tr.children[2].textContent.trim();
-    const ent    = tr.children[3].textContent.trim();
-    const sai    = tr.children[4].textContent.trim();
-    const estado = tr.children[6].textContent.trim();
-    const { error } = await SB.from("registos_ponto").update({
-        entrada: ent ? `${dia}T${ent}:00` : null,
-        saida:   sai ? `${dia}T${sai}:00` : null,
-        estado
-    }).eq("id", id);
-    if (error) { console.error(error.message); return; }
-    tr.querySelectorAll(".editavel").forEach(td => td.classList.add("editado"));
+async function guardarEdicaoRegisto(tr, tdEditado) {
+    const dia      = tr.children[2].textContent.trim();
+    const tdEnt    = tr.children[3];
+    const tdSai    = tr.children[4];
+    const tdHoras  = tr.children[5];
+
+    const entHora  = tdEnt.textContent.trim();
+    const saiHora  = tdSai.textContent.trim();
+    const entId    = tdEnt.dataset.id;
+    const saiId    = tdSai.dataset.id;
+    const tipo     = tdEditado.dataset.tipo;
+
+    // Validar formato HH:MM
+    const reHora = /^([01]\d|2[0-3]):([0-5]\d)$/;
+    const novaHora = tdEditado.textContent.trim();
+    if (novaHora && !reHora.test(novaHora)) {
+        tdEditado.style.color = "#ff7a7a";
+        tdEditado.title = "Formato inválido — use HH:MM";
+        return;
+    }
+
+    // Atualizar o registo correto na tabela ponto
+    let erros = [];
+
+    if (tipo === "entrada" && entId) {
+        const novoTS = entHora ? `${dia}T${entHora}:00` : null;
+        const { error } = await SB.from("ponto")
+            .update({ created_at: novoTS })
+            .eq("id", entId);
+        if (error) erros.push("entrada: " + error.message);
+    }
+
+    if (tipo === "saida") {
+        if (saiId) {
+            // Actualizar saída existente
+            const novoTS = saiHora ? `${dia}T${saiHora}:00` : null;
+            const { error } = await SB.from("ponto")
+                .update({ created_at: novoTS })
+                .eq("id", saiId);
+            if (error) erros.push("saída: " + error.message);
+        } else if (saiHora && entId) {
+            // Criar registo de saída que não existia (registo incompleto)
+            // Primeiro buscar funcionario_id e obra_id da entrada
+            const { data: entData } = await SB.from("ponto")
+                .select("funcionario_id, obra_id")
+                .eq("id", entId)
+                .single();
+
+            if (entData) {
+                const { data: novo, error } = await SB.from("ponto")
+                    .insert({
+                        funcionario_id: entData.funcionario_id,
+                        obra_id:        entData.obra_id,
+                        tipo:           "saida",
+                        created_at:     `${dia}T${saiHora}:00`,
+                        datahora:       `${dia}T${saiHora}:00`,
+                        latitude:       0,
+                        longitude:      0
+                    })
+                    .select("id")
+                    .single();
+                if (error) erros.push("criar saída: " + error.message);
+                else tdSai.dataset.id = novo.id;
+            }
+        }
+    }
+
+    if (erros.length > 0) {
+        console.error(erros);
+        tdEditado.style.color = "#ff7a7a";
+        return;
+    }
+
+    // Recalcular horas no frontend
+    if (entHora && saiHora && reHora.test(entHora) && reHora.test(saiHora)) {
+        const [eh, em] = entHora.split(":").map(Number);
+        const [sh, sm] = saiHora.split(":").map(Number);
+        const totalMin = (sh * 60 + sm) - (eh * 60 + em);
+        if (totalMin >= 0) {
+            const hh = String(Math.floor(totalMin / 60)).padStart(2, "0");
+            const mm = String(totalMin % 60).padStart(2, "0");
+            tdHoras.textContent = `${hh}:${mm}`;
+            // Actualizar estado visual
+            const tdEstado = tr.children[6];
+            const completo = totalMin > 0;
+            tdEstado.innerHTML = completo
+                ? `<span class="estado-ok">OK</span>`
+                : `<span class="estado-incompleto">Incompleto</span>`;
+            if (completo) tr.style.borderLeft = "";
+        }
+    }
+
+    // Destacar células editadas com cor diferente
+    tdEditado.classList.add("editado");
     tr.classList.add("linha-editada");
+    tdEditado.style.color = "";
+    tdEditado.title = "";
 }
 
 // =======================================================

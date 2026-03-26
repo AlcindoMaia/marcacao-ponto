@@ -628,3 +628,28 @@ body:not(.dark) .form-group select {
 #tabelaFuncionarios tbody tr:hover {
     background: rgba(244,185,66,.08);
 }
+
+/* ================= EDIÇÃO DE REGISTOS ================= */
+
+/* Célula editada — destaque âmbar */
+td.editado {
+    color: #f4b942 !important;
+    font-weight: 600;
+}
+
+/* Linha com qualquer célula editada */
+tr.linha-editada {
+    background: rgba(244, 185, 66, 0.06) !important;
+}
+
+/* Célula em foco durante edição */
+td.editavel:focus {
+    outline: 2px solid var(--primary);
+    border-radius: 4px;
+    background: rgba(244, 185, 66, 0.08);
+}
+
+/* Célula com erro de formato */
+td.editavel[title] {
+    text-decoration: underline wavy #ff7a7a;
+}
