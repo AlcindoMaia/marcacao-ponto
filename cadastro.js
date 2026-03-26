@@ -1,11 +1,6 @@
-// ================================
-// CONFIGURAÇÃO SUPABASE
-// ================================
-const SUPABASE_URL = "https://npyosbigynxmxdakcymg.supabase.co";
-const SUPABASE_ANON_KEY =
-"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weW9zYmlneW54bXhkYWtjeW1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4MzYyMjYsImV4cCI6MjA4MDQxMjIyNn0.CErd5a_-9HS4qPB99SFyO-airsNnS3b8dvWWrSPE4_M";
-
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// =======================================================
+// SUPABASE — vem de config.js (SB já está disponível)
+// =======================================================
 
 // ================================
 // DEVICE ID PERMANENTE
@@ -56,7 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
         msg.textContent = "A registar...";
 
         // Verificar se já existe
-        const { data: existente, error: erroSelect } = await supabaseClient
+        const { data: existente, error: erroSelect } = await SB
             .from("funcionarios")
             .select("*")
             .eq("device_id", deviceId)
@@ -71,7 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // UPDATE
         if (existente) {
 
-            const { error: errUpdate } = await supabaseClient
+            const { error: errUpdate } = await SB
                 .from("funcionarios")
                 .update({ nome, codigo })
                 .eq("device_id", deviceId);
@@ -87,7 +82,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // INSERT
-        const { error: errInsert } = await supabaseClient
+        const { error: errInsert } = await SB
             .from("funcionarios")
             .insert({
                 nome,

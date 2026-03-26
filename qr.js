@@ -1,74 +1,54 @@
 // =======================================================
-// CONFIG SUPABASE
+// SUPABASE — vem de config.js (SB já está disponível)
 // =======================================================
-const SUPABASE_URL = "https://npyosbigynxmxdakcymg.supabase.co";
-const SUPABASE_ANON_KEY =
-"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weW9zYmlneW54bXhkYWtjeW1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4MzYyMjYsImV4cCI6MjA4MDQxMjIyNn0.CErd5a_-9HS4qPB99SFyO-airsNnS3b8dvWWrSPE4_M";
-
-const SB = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
 
 // =======================================================
-// GPS
+// GPS — obter coordenadas actuais
 // =======================================================
 document.getElementById("btnGPS").addEventListener("click", () => {
-
     navigator.geolocation.getCurrentPosition(
         pos => {
-            document.getElementById("latitude").value =
-                pos.coords.latitude.toFixed(8);
-
-            document.getElementById("longitude").value =
-                pos.coords.longitude.toFixed(8);
+            document.getElementById("latitude").value  = pos.coords.latitude.toFixed(8);
+            document.getElementById("longitude").value = pos.coords.longitude.toFixed(8);
         },
         err => {
-            alert("Erro ao obter localização.");
+            alert("Erro ao obter localização. Verifique se o GPS está ativo.");
             console.error(err);
         },
         { enableHighAccuracy: true }
     );
 });
 
-
 // =======================================================
-// CRIAR OBRA + QR
+// CRIAR OBRA + GERAR QR
 // =======================================================
 document.getElementById("btnGerar").addEventListener("click", async () => {
-
-    const nome = document.getElementById("nomeObra").value.trim();
-    const morada = document.getElementById("morada").value.trim();
-
+    const nome     = document.getElementById("nomeObra").value.trim();
+    const morada   = document.getElementById("morada").value.trim();
     const latitude = parseFloat(document.getElementById("latitude").value);
     const longitude = parseFloat(document.getElementById("longitude").value);
-
     const raioInput = document.getElementById("raio").value;
 
     if (!nome) {
-        alert("Nome obrigatório.");
+        alert("O nome da obra é obrigatório.");
         return;
     }
 
     if (isNaN(latitude) || isNaN(longitude)) {
-        alert("Latitude e Longitude obrigatórias.");
+        alert("Latitude e Longitude são obrigatórias. Use o botão 'Obter Localização'.");
         return;
     }
 
-    // ===================================================
-    // CONSTRUÇÃO SEGURA DO OBJECTO
-    // ===================================================
     const dados = {
-        nome: nome,
+        nome,
         morada: morada || null,
-        latitude: latitude,
-        longitude: longitude
+        latitude,
+        longitude
     };
 
-    // 👇 Só adiciona raio se existir valor válido
     if (raioInput !== "" && !isNaN(parseInt(raioInput))) {
         dados.raio = parseInt(raioInput);
     }
-
-    console.log("OBJETO ENVIADO:", dados);
 
     const { data, error } = await SB
         .from("obras")
@@ -84,53 +64,61 @@ document.getElementById("btnGerar").addEventListener("click", async () => {
 
     const obraID = data.id;
 
-    // ===================================================
-    // GERAR QR
-    // ===================================================
-    const qrURL =
-        "https://alcindomaia.github.io/marcacao-ponto/?obra=" + obraID;
-
+    // Gerar QR code
+    const qrURL = "https://alcindomaia.github.io/marcacao-ponto/?obra=" + obraID;
     const canvas = document.getElementById("qrCanvas");
 
     new QRious({
         element: canvas,
-        size: 300,
-        value: qrURL,
-        level: "H"
+        size:    300,
+        value:   qrURL,
+        level:   "H"
     });
 
+    // Configurar botão de download PNG
     const downloadBtn = document.getElementById("downloadBtn");
-    downloadBtn.href = canvas.toDataURL("image/png");
-    downloadBtn.download =
-        "QR_" + nome.replace(/\s+/g, "_") + ".png";
+    downloadBtn.href     = canvas.toDataURL("image/png");
+    downloadBtn.download = "QR_" + nome.replace(/\s+/g, "_") + ".png";
 
+    // Guardar nome da obra para o PDF
     document.getElementById("qrBox").style.display = "block";
+    document.getElementById("qrBox").dataset.nomeObra = nome;
 
-    alert("Obra criada com sucesso!");
+    alert(`Obra "${nome}" criada com sucesso!`);
+});
 
 // =======================================================
 // GERAR PDF
+// FIX: listener definido UMA VEZ fora do callback de criar obra.
+// Antes estava dentro — acumulava um listener por cada obra criada.
 // =======================================================
 document.getElementById("btnPDF").addEventListener("click", () => {
-
     const canvas = document.getElementById("qrCanvas");
 
-    if (!canvas.toDataURL) {
-        alert("Gere primeiro o QR.");
+    // Verificar se o QR foi gerado (canvas com conteúdo)
+    const ctx = canvas.getContext("2d");
+    const pixels = ctx.getImageData(0, 0, 1, 1).data;
+    const vazio  = pixels[0] === 0 && pixels[1] === 0 && pixels[2] === 0 && pixels[3] === 0;
+
+    if (vazio) {
+        alert("Crie primeiro uma obra para gerar o QR.");
         return;
     }
 
-    const imgData = canvas.toDataURL("image/png");
+    const nomeObra = document.getElementById("qrBox").dataset.nomeObra || "Obra";
+    const imgData  = canvas.toDataURL("image/png");
 
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF();
 
     pdf.setFontSize(18);
-    pdf.text("QR Code da Obra", 105, 20, { align: "center" });
+    pdf.text("QR Code — " + nomeObra, 105, 20, { align: "center" });
 
-    pdf.addImage(imgData, "PNG", 55, 40, 100, 100);
+    pdf.setFontSize(11);
+    pdf.setTextColor(100);
+    pdf.text("Marcação de Ponto · Maia Solutions", 105, 30, { align: "center" });
 
-    pdf.save("QR_Obra.pdf");
+    pdf.addImage(imgData, "PNG", 55, 45, 100, 100);
+
+    pdf.save("QR_" + nomeObra.replace(/\s+/g, "_") + ".pdf");
 });
-});
-

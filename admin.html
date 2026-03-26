@@ -15,8 +15,6 @@
 <!-- DataTables -->
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 
-<!-- Supabase -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 
@@ -49,7 +47,6 @@
         <button class="tab" data-tab="fluxo">Fluxo de Caixa</button>
         <button class="tab" data-tab="gerarqr">Gerar QR</button>
     </div>
- </div>
 
 <!-- ================= TAB REGISTOS ================= -->
 <div class="tab-content" id="tab-registos">
@@ -369,9 +366,21 @@
 </div>
 
 
-    
+    <!-- ================= TAB Gerar QR ================= -->
+    <div class="tab-content" id="tab-gerarqr">
+    <div class="card" style="text-align:center">
+        <h2>Gerar QR de Obra</h2>
+        <p style="margin-bottom:20px">Criar nova obra e gerar QR Code</p>
+        <a href="qr.html" class="btn-primary" target="_blank">
+            Abrir Gerador de QR
+        </a>
+    </div>
+</div>
+
 </div> <!-- FECHA adminArea -->
-    
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
 <script src="admin.js"></script>
 
 <script>
