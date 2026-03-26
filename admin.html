@@ -148,7 +148,7 @@
                class="input-lg"
                placeholder="Pesquisar por código, descrição ou tipo">
 
-        <button id="btnNovoArtigo" class="tab btn-add">+</button>
+        <button id="btnNovoArtigo" class="btn-primary" style="width:42px;height:42px;font-size:22px;border-radius:50%;padding:0;flex-shrink:0">+</button>
 
     </div>
 
@@ -170,8 +170,10 @@
         </table>
     </div>
 
-    <!-- ================= MODAL NOVO / EDITAR ARTIGO ================= -->
-    <div id="modalArtigo" class="modal hidden">
+</div>
+
+<!-- ================= MODAL ARTIGO (fora das tabs para funcionar sempre) ================= -->
+<div id="modalArtigo" class="modal hidden">
 
         <div class="modal-content">
 
@@ -243,10 +245,10 @@
 
             <!-- Ações -->
             <div class="modal-actions">
-                <button class="btn-primary" id="guardarArtigoBtn">
-                    Guardar
-                </button>
+                <button class="btn-secondary" onclick="fecharModalArtigo()">Cancelar</button>
+                <button class="btn-primary" id="guardarArtigoBtn">Guardar</button>
             </div>
+            <div id="modalArtigoMsg" style="margin-top:8px;font-size:13px;color:#ff7a7a"></div>
 
         </div>
     </div>
