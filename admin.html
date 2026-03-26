@@ -243,8 +243,31 @@
 
             </div>
 
+            <!-- Ajuste de stock — só visível em modo edição -->
+            <div id="secaoAjusteStock" style="display:none;border-top:1px solid rgba(255,255,255,.1);margin-top:16px;padding-top:16px">
+                <div style="font-size:12px;opacity:.6;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">Ajuste de Stock</div>
+                <div class="form-row">
+                    <div class="form-group input-sm">
+                        <label>Tipo</label>
+                        <select id="artAjusteTipo">
+                            <option value="entrada">Entrada</option>
+                            <option value="saida">Saída</option>
+                            <option value="ajuste">Ajuste / Correção</option>
+                        </select>
+                    </div>
+                    <div class="form-group input-sm">
+                        <label>Quantidade</label>
+                        <input id="artAjusteQtd" type="number" step="0.01" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Motivo</label>
+                        <input id="artAjusteMotivo" placeholder="Ex: Inventário, Devolução...">
+                    </div>
+                </div>
+            </div>
+
             <!-- Ações -->
-            <div class="modal-actions">
+            <div class="modal-actions" style="margin-top:16px">
                 <button class="btn-secondary" onclick="fecharModalArtigo()">Cancelar</button>
                 <button class="btn-primary" id="guardarArtigoBtn">Guardar</button>
             </div>

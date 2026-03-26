@@ -253,9 +253,20 @@ function abrirModalArtigo(artigo = null) {
     document.getElementById("artLocal").value           = artigo?.local_armazenamento || "";
     document.getElementById("artQtdInicial").value      = artigo ? "" : "";
     if (artigo?.unidade_id) document.getElementById("artUnidade").value = artigo.unidade_id;
-    // Esconder qty inicial em modo edição (stock_inicial é coluna direta)
+    // Modo edição: esconder qty inicial, mostrar secção de ajuste de stock
     const qtdGrp = document.getElementById("artQtdInicial")?.closest(".form-group");
     if (qtdGrp) qtdGrp.style.display = artigo ? "none" : "";
+
+    const secaoAjuste = document.getElementById("secaoAjusteStock");
+    if (secaoAjuste) secaoAjuste.style.display = artigo ? "block" : "none";
+
+    // Limpar campos de ajuste ao abrir
+    if (artigo) {
+        document.getElementById("artAjusteQtd").value    = "";
+        document.getElementById("artAjusteMotivo").value = "";
+        document.getElementById("artAjusteTipo").value   = "entrada";
+    }
+
     document.getElementById("modalArtigoMsg").textContent = "";
     document.getElementById("modalArtigo").classList.remove("hidden");
 }
@@ -272,7 +283,6 @@ async function guardarArtigo() {
 
     const unidadeVal = document.getElementById("artUnidade").value;
 
-    // Payload com os nomes REAIS das colunas da tabela artigos
     const payload = {
         codigo:              document.getElementById("artCodigo").value.trim() || null,
         descricao,
@@ -284,17 +294,45 @@ async function guardarArtigo() {
     };
 
     if (artigoEditId) {
-        // EDITAR — não toca em stock_inicial
+        // EDITAR artigo
         const { error } = await SB.from("artigos").update(payload).eq("id", artigoEditId);
         if (error) { msg.textContent = "Erro: " + error.message; return; }
+
+        // Movimento de ajuste de stock (se preenchido)
+        const qtdAjuste  = parseFloat(document.getElementById("artAjusteQtd").value);
+        const tipoAjuste = document.getElementById("artAjusteTipo").value;
+        const motivo     = document.getElementById("artAjusteMotivo").value.trim();
+
+        if (!isNaN(qtdAjuste) && qtdAjuste !== 0) {
+            const { error: errMov } = await SB.from("movimentos_stock").insert({
+                artigo_id:      artigoEditId,
+                tipo_movimento: tipoAjuste,
+                quantidade:     Math.abs(qtdAjuste),
+                data_movimento: new Date().toISOString().split("T")[0],
+                observacoes:    motivo || null
+            });
+            if (errMov) { msg.textContent = "Artigo guardado, mas erro no ajuste: " + errMov.message; return; }
+        }
+
     } else {
-        // CRIAR — inclui stock_inicial como coluna direta
+        // CRIAR novo artigo
         const qtd = parseInt(document.getElementById("artQtdInicial").value) || 0;
         payload.stock_inicial = qtd;
         payload.ativo = true;
 
-        const { error } = await SB.from("artigos").insert(payload);
+        const { data, error } = await SB.from("artigos").insert(payload).select("id").single();
         if (error) { msg.textContent = "Erro: " + error.message; return; }
+
+        // Movimento inicial se stock > 0
+        if (qtd > 0) {
+            await SB.from("movimentos_stock").insert({
+                artigo_id:      data.id,
+                tipo_movimento: "entrada",
+                quantidade:     qtd,
+                data_movimento: new Date().toISOString().split("T")[0],
+                observacoes:    "Stock inicial"
+            });
+        }
     }
 
     fecharModalArtigo();
