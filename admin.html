@@ -26,14 +26,19 @@
 
     <!-- BOTÃO DARK MODE -->
     <button class="dark-toggle" id="darkBtn" onclick="toggleDark()">☀️</button>
+    <!-- LOGOUT -->
+    <button class="btn-secondary" onclick="fazerLogout()" style="font-size:13px;padding:6px 14px;margin-left:8px">Sair</button>
 </header>
 
 <!-- LOGIN -->
-<div id="loginBox" class="card" style="max-width:400px;margin:0 auto var(--space-lg)">
+<div id="loginBox" class="card hidden" style="max-width:400px;margin:0 auto var(--space-lg)">
     <h2>Área Restrita</h2>
-    <input id="pinInput" type="password" placeholder="PIN">
-    <p id="pinMsg"></p>
-    <button class="btn-primary" id="btnLogin">Entrar</button>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px">
+        <input id="emailInput" type="email" placeholder="Email" style="padding:10px 12px;border-radius:8px;border:1px solid #ccc;font-size:14px;background:var(--bg-dark-panel);color:var(--text-light)">
+        <input id="passwordInput" type="password" placeholder="Password" style="padding:10px 12px;border-radius:8px;border:1px solid #ccc;font-size:14px;background:var(--bg-dark-panel);color:var(--text-light)">
+    </div>
+    <p id="pinMsg" style="margin-top:8px;font-size:13px;min-height:18px"></p>
+    <button class="btn-primary" id="btnLogin" style="width:100%;margin-top:4px">Entrar</button>
 </div>
 
 <!-- ÁREA ADMIN -->

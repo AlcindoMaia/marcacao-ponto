@@ -1,7 +1,6 @@
 // =======================================================
 // SUPABASE — vem de config.js (SB já está disponível)
 // =======================================================
-const PIN_ADMIN = "1810";
 
 // =======================================================
 // ESTADO GLOBAL
@@ -13,34 +12,68 @@ let movEditId     = null;
 let movimentos    = [];
 
 // =======================================================
-// LOGIN
+// AUTH — Login com Supabase Auth (email + password)
 // =======================================================
-window.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("btnLogin")?.addEventListener("click", validarPIN);
-    document.getElementById("pinInput")?.focus();
+window.addEventListener("DOMContentLoaded", async () => {
     ligarEventosGlobais();
-});
 
-function validarPIN() {
-    const pinInput = document.getElementById("pinInput");
-    const msg      = document.getElementById("pinMsg");
-    if (!pinInput) return;
-    if (pinInput.value.trim() !== PIN_ADMIN) {
-        msg.textContent = "PIN incorreto";
+    // Verificar se já há sessão activa
+    const { data: { session } } = await SB.auth.getSession();
+    if (session) {
+        mostrarPainel();
         return;
     }
-    msg.textContent = "";
+
+    // Mostrar form de login
+    document.getElementById("loginBox").classList.remove("hidden");
+    document.getElementById("emailInput")?.focus();
+
+    document.getElementById("btnLogin")?.addEventListener("click", fazerLogin);
+    document.addEventListener("keydown", e => {
+        if (e.key === "Enter" && !document.getElementById("loginBox").classList.contains("hidden")) {
+            fazerLogin();
+        }
+    });
+});
+
+async function fazerLogin() {
+    const email    = document.getElementById("emailInput")?.value?.trim();
+    const password = document.getElementById("passwordInput")?.value;
+    const msg      = document.getElementById("pinMsg");
+
+    if (!email || !password) {
+        msg.textContent = "Preencha email e password.";
+        return;
+    }
+
+    msg.textContent = "A autenticar...";
+    msg.style.color = "";
+
+    const { error } = await SB.auth.signInWithPassword({ email, password });
+
+    if (error) {
+        msg.textContent = "Credenciais inválidas.";
+        msg.style.color = "#ff7a7a";
+        return;
+    }
+
+    mostrarPainel();
+}
+
+async function fazerLogout() {
+    await SB.auth.signOut();
+    document.getElementById("adminArea").classList.add("hidden");
+    document.getElementById("loginBox").classList.remove("hidden");
+    document.getElementById("emailInput").value    = "";
+    document.getElementById("passwordInput").value = "";
+    document.getElementById("pinMsg").textContent  = "";
+}
+
+function mostrarPainel() {
     document.getElementById("loginBox").classList.add("hidden");
     document.getElementById("adminArea").classList.remove("hidden");
     inicializarPainel();
 }
-
-document.addEventListener("keydown", e => {
-    if (e.key === "Enter" &&
-        !document.getElementById("loginBox").classList.contains("hidden")) {
-        validarPIN();
-    }
-});
 
 // =======================================================
 // INICIALIZAÇÃO / TABS
