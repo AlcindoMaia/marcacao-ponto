@@ -248,12 +248,12 @@ function abrirModalArtigo(artigo = null) {
     document.getElementById("artCodigo").value          = artigo?.codigo || "";
     document.getElementById("artDescricao").value       = artigo?.descricao || "";
     document.getElementById("artPreco").value           = artigo?.preco_atual || "";
-    document.getElementById("artIva").value             = artigo?.iva ?? 23;
+    document.getElementById("artIva").value             = artigo?.taxa_iva ?? 23;
     document.getElementById("artTipo").value            = artigo?.tipo_artigo || "consumivel";
     document.getElementById("artLocal").value           = artigo?.local_armazenamento || "";
-    document.getElementById("artQtdInicial").value      = "";
-    if (artigo?.unidade_medida_id) document.getElementById("artUnidade").value = artigo.unidade_medida_id;
-    // Esconder qty inicial em modo edição
+    document.getElementById("artQtdInicial").value      = artigo ? "" : "";
+    if (artigo?.unidade_id) document.getElementById("artUnidade").value = artigo.unidade_id;
+    // Esconder qty inicial em modo edição (stock_inicial é coluna direta)
     const qtdGrp = document.getElementById("artQtdInicial")?.closest(".form-group");
     if (qtdGrp) qtdGrp.style.display = artigo ? "none" : "";
     document.getElementById("modalArtigoMsg").textContent = "";
@@ -266,32 +266,35 @@ function fecharModalArtigo() {
 }
 
 async function guardarArtigo() {
-    const descricao   = document.getElementById("artDescricao").value.trim();
-    const msg         = document.getElementById("modalArtigoMsg");
+    const descricao = document.getElementById("artDescricao").value.trim();
+    const msg       = document.getElementById("modalArtigoMsg");
     if (!descricao) { msg.textContent = "A descrição é obrigatória."; return; }
 
+    const unidadeVal = document.getElementById("artUnidade").value;
+
+    // Payload com os nomes REAIS das colunas da tabela artigos
     const payload = {
         codigo:              document.getElementById("artCodigo").value.trim() || null,
         descricao,
-        preco:               parseFloat(document.getElementById("artPreco").value) || 0,
-        iva:                 parseInt(document.getElementById("artIva").value) || 23,
+        preco_atual:         parseFloat(document.getElementById("artPreco").value) || 0,
+        taxa_iva:            parseInt(document.getElementById("artIva").value) || 23,
         tipo_artigo:         document.getElementById("artTipo").value,
         local_armazenamento: document.getElementById("artLocal").value.trim() || null,
-        unidade_medida_id:   document.getElementById("artUnidade").value || null
+        unidade_id:          unidadeVal ? parseInt(unidadeVal) : null
     };
 
     if (artigoEditId) {
+        // EDITAR — não toca em stock_inicial
         const { error } = await SB.from("artigos").update(payload).eq("id", artigoEditId);
         if (error) { msg.textContent = "Erro: " + error.message; return; }
     } else {
-        const { data, error } = await SB.from("artigos").insert(payload).select("id").single();
-        if (error) { msg.textContent = "Erro: " + error.message; return; }
+        // CRIAR — inclui stock_inicial como coluna direta
         const qtd = parseInt(document.getElementById("artQtdInicial").value) || 0;
-        if (qtd > 0) {
-            await SB.from("movimentos_stock").insert({
-                artigo_id: data.id, tipo_movimento: "inicial", quantidade: qtd
-            });
-        }
+        payload.stock_inicial = qtd;
+        payload.ativo = true;
+
+        const { error } = await SB.from("artigos").insert(payload);
+        if (error) { msg.textContent = "Erro: " + error.message; return; }
     }
 
     fecharModalArtigo();
