@@ -79,15 +79,15 @@ h3 { font-size: 14px; letter-spacing: .3px; }
 .container {
     max-width: 1200px;
     margin: auto;
-    padding: 0 32px 32px;
+    padding: 0 28px 32px;
 }
 
 .card {
     background: var(--bg-panel);
-    padding: 24px;
+    padding: 22px 24px;
     border-radius: var(--radius);
     box-shadow: var(--shadow);
-    margin-bottom: var(--space-lg);
+    margin-bottom: 20px;
 }
 
 /* =======================================================
@@ -682,10 +682,7 @@ td.editavel[title] {
    CONSISTÊNCIA ENTRE TABS — espaçamentos uniformes
 ======================================================= */
 
-/* Todas as tab-content arrancam com o mesmo padding */
-.tab-content.active {
-    padding-top: 0;
-}
+
 
 /* Barra superior com pesquisa + botão — uniforme em todas as tabs */
 .inventario-header {
@@ -822,4 +819,216 @@ body:not(.dark) .filtros-linha select {
     padding: 0 16px;
     white-space: nowrap;
     font-size: 13px;
+}
+
+/* =======================================================
+   LAYOUT UNIFORME DE TODAS AS TABS
+   Garante que o conteúdo de cada tab tem as mesmas
+   margens laterais e espaçamentos independentemente
+   de estar dentro ou fora do .container
+======================================================= */
+
+/* Tab activa — sem padding lateral (já vem do .container pai) */
+.tab-content.active {
+    display: block;
+    padding-bottom: 20px;
+}
+
+/* KPI cards — altura mínima e padding uniformes */
+.card.metric {
+    flex: 1;
+    min-width: 160px;
+    padding: 20px 22px;
+}
+
+.card.metric h3 {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    opacity: .65;
+    margin: 0 0 10px;
+}
+
+.card.metric .value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--primary);
+    line-height: 1;
+}
+
+/* grid-cards — gap e margin-bottom uniformes */
+.grid-cards {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+/* Barra de pesquisa + botão (inventário, funcionários, obras) */
+.inventario-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+.inventario-header input {
+    flex: 1;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.15);
+    background: var(--bg-dark-panel);
+    color: var(--text-light);
+    font-size: 14px;
+    height: 42px;
+}
+
+body:not(.dark) .inventario-header input {
+    background: var(--bg-panel);
+    color: var(--text-dark);
+    border-color: #ccc;
+}
+
+/* Cabeçalho de tabela — uniforme */
+table.display thead th,
+#tabelaFuncionarios thead th,
+#tabelaMovimentos thead th,
+#tabelaObras thead th,
+#tabelaArtigos thead th,
+#tabelaRegistos thead th,
+#tabelaFinanceira thead th {
+    background: var(--primary) !important;
+    color: #000 !important;
+    padding: 11px 14px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: .04em !important;
+    border: none !important;
+}
+
+/* Células de todas as tabelas — padding uniforme */
+#tabelaFuncionarios td,
+#tabelaMovimentos td,
+#tabelaObras td,
+#tabelaArtigos td,
+#tabelaRegistos td,
+#tabelaFinanceira td {
+    padding: 10px 14px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+    vertical-align: middle;
+}
+
+body:not(.dark) #tabelaFuncionarios td,
+body:not(.dark) #tabelaMovimentos td,
+body:not(.dark) #tabelaObras td,
+body:not(.dark) #tabelaArtigos td,
+body:not(.dark) #tabelaRegistos td,
+body:not(.dark) #tabelaFinanceira td {
+    border-bottom-color: rgba(0,0,0,.05);
+}
+
+/* Hover uniforme em todas as tabelas */
+#tabelaFuncionarios tbody tr:hover,
+#tabelaMovimentos tbody tr:hover,
+#tabelaObras tbody tr:hover,
+#tabelaArtigos tbody tr:hover,
+#tabelaRegistos tbody tr:hover,
+#tabelaFinanceira tbody tr:hover {
+    background: rgba(244,185,66,.1) !important;
+}
+
+/* card dentro das tabs — margin-bottom consistente */
+.tab-content .card {
+    margin-bottom: 20px;
+}
+
+/* Filtros do fluxo de caixa */
+.filtros-linha {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+    align-items: flex-end;
+}
+
+.filtros-linha .col {
+    flex: 1;
+    min-width: 130px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.filtros-linha label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    opacity: .6;
+}
+
+.filtros-linha input,
+.filtros-linha select {
+    height: 38px;
+    padding: 0 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,.15);
+    background: var(--bg-dark-panel);
+    color: var(--text-light);
+    font-size: 13px;
+}
+
+body:not(.dark) .filtros-linha input,
+body:not(.dark) .filtros-linha select {
+    background: var(--bg-panel);
+    color: var(--text-dark);
+    border-color: #ccc;
+}
+
+/* Tabs button bar */
+.tabs {
+    margin-bottom: var(--space-lg);
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .tab-content.active {
+        padding-bottom: 20px;
+    }
+    .container {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+}
+
+/* Dentro de grid-cards, cards não têm margin-bottom — o gap trata */
+.grid-cards .card {
+    margin-bottom: 0;
+}
+
+/* Botão + circular — tamanho fixo igual em todas as tabs */
+#btnNovoArtigo,
+#btnNovoFuncionario,
+#btnNovaObra {
+    width: 42px !important;
+    height: 42px !important;
+    font-size: 22px !important;
+    border-radius: 50% !important;
+    padding: 0 !important;
+    flex-shrink: 0 !important;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Tabelas sem classe dedicada — border-collapse e width */
+#tabelaMovimentos,
+#tabelaFuncionarios,
+#tabelaObras {
+    border-collapse: collapse;
+    width: 100%;
 }
