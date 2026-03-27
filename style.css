@@ -677,3 +677,149 @@ td.editavel[title] {
 #tabelaObras tbody tr:hover {
     background: rgba(244,185,66,.08);
 }
+
+/* =======================================================
+   CONSISTÊNCIA ENTRE TABS — espaçamentos uniformes
+======================================================= */
+
+/* Todas as tab-content arrancam com o mesmo padding */
+.tab-content.active {
+    padding-top: 0;
+}
+
+/* Barra superior com pesquisa + botão — uniforme em todas as tabs */
+.inventario-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+/* Input de pesquisa — uniforme */
+#pesquisaInventario,
+#pesquisaFuncionarios,
+#pesquisaObras {
+    flex: 1;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.15);
+    background: var(--bg-dark-panel);
+    color: var(--text-light);
+    font-size: 14px;
+}
+
+body:not(.dark) #pesquisaInventario,
+body:not(.dark) #pesquisaFuncionarios,
+body:not(.dark) #pesquisaObras {
+    background: var(--bg-panel);
+    color: var(--text-dark);
+    border-color: #ccc;
+}
+
+/* KPI cards — dimensões uniformes em todas as tabs */
+.card.metric {
+    min-width: 140px;
+    padding: 18px 20px;
+}
+
+.card.metric h3 {
+    font-size: 12px;
+    font-weight: 500;
+    opacity: .7;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-bottom: 8px;
+}
+
+.card.metric .value {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--primary);
+    line-height: 1.1;
+}
+
+/* Tabelas internas — cabeçalho uniforme */
+#tabelaFuncionarios th,
+#tabelaMovimentos th,
+#tabelaObras th,
+#tabelaArtigos th,
+#tabelaRegistos th {
+    background: var(--primary);
+    color: #000;
+    padding: 11px 14px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+}
+
+/* Células — padding uniforme */
+#tabelaFuncionarios td,
+#tabelaMovimentos td,
+#tabelaObras td {
+    padding: 10px 14px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+    vertical-align: middle;
+}
+
+body:not(.dark) #tabelaFuncionarios td,
+body:not(.dark) #tabelaMovimentos td,
+body:not(.dark) #tabelaObras td {
+    border-bottom-color: rgba(0,0,0,.05);
+}
+
+/* Hover nas linhas — uniforme */
+#tabelaFuncionarios tbody tr:hover,
+#tabelaMovimentos tbody tr:hover,
+#tabelaObras tbody tr:hover {
+    background: rgba(244,185,66,.1);
+}
+
+/* Coluna de ações — centrada e compacta */
+.acoes-td {
+    white-space: nowrap;
+    text-align: right;
+    padding-right: 10px !important;
+}
+
+/* Filtros do fluxo de caixa — inputs com mesma altura dos selects */
+.filtros-linha input,
+.filtros-linha select {
+    height: 38px;
+    padding: 0 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,.15);
+    background: var(--bg-dark-panel);
+    color: var(--text-light);
+    font-size: 13px;
+    width: 100%;
+}
+
+body:not(.dark) .filtros-linha input,
+body:not(.dark) .filtros-linha select {
+    background: var(--bg-panel);
+    color: var(--text-dark);
+    border-color: #ccc;
+}
+
+.filtros-linha label {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    opacity: .6;
+    margin-bottom: 5px;
+    display: block;
+}
+
+/* Botões dentro dos filtros — mesma altura */
+.filtros-linha .btn-primary,
+.filtros-linha .btn-secondary {
+    height: 38px;
+    padding: 0 16px;
+    white-space: nowrap;
+    font-size: 13px;
+}
