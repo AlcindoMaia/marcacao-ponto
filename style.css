@@ -1032,3 +1032,57 @@ body:not(.dark) .filtros-linha select {
     border-collapse: collapse;
     width: 100%;
 }
+
+/* =======================================================
+   BOTÃO CIRCULAR — uniforme em todas as tabs
+======================================================= */
+.btn-circular {
+    width: 42px !important;
+    height: 42px !important;
+    border-radius: 50% !important;
+    padding: 0 !important;
+    font-size: 24px !important;
+    line-height: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+}
+
+/* Input dentro do card da barra de pesquisa */
+.inventario-header input {
+    flex: 1;
+    padding: 9px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.07);
+    color: var(--text-light);
+    font-size: 14px;
+    height: 38px;
+    outline: none;
+}
+
+body:not(.dark) .inventario-header input {
+    background: rgba(0,0,0,.04);
+    color: var(--text-dark);
+    border-color: #ddd;
+}
+
+.inventario-header input:focus {
+    border-color: var(--primary);
+}
+
+/* Tabs — reduzir espaço abaixo */
+.tabs {
+    margin-bottom: 16px !important;
+}
+
+/* Tab-content — padding top reduzido */
+.tab-content.active {
+    padding-top: 4px;
+}
+
+/* grid-cards dentro de tab — sempre com margin-bottom 16px */
+.tab-content .grid-cards {
+    margin-bottom: 16px;
+}

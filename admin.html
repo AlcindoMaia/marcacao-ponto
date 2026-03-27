@@ -542,15 +542,16 @@
 <!-- ================= TAB FUNCIONÁRIOS ================= -->
 <div class="tab-content" id="tab-funcionarios">
 
-    <!-- Barra superior -->
-    <div class="inventario-header">
-        <input type="text" id="pesquisaFuncionarios" class="input-lg"
-               placeholder="Pesquisar por nome ou código">
-        <button id="btnNovoFuncionario" class="btn-primary"
-                style="width:42px;height:42px;font-size:22px;border-radius:50%;padding:0;flex-shrink:0">+</button>
+    <!-- Barra superior com card -->
+    <div class="card" style="padding:14px 20px;margin-bottom:16px">
+        <div class="inventario-header" style="margin-bottom:0">
+            <input type="text" id="pesquisaFuncionarios"
+                   placeholder="Pesquisar por nome ou código">
+            <button id="btnNovoFuncionario" class="btn-primary btn-circular">+</button>
+        </div>
     </div>
 
-    <!-- KPIs -->
+    <!-- KPIs em cards -->
     <div class="grid-cards">
         <div class="card metric">
             <h3>Total</h3>
@@ -589,11 +590,12 @@
 <!-- ================= TAB OBRAS ================= -->
 <div class="tab-content" id="tab-obras">
 
-    <div class="inventario-header">
-        <input type="text" id="pesquisaObras" class="input-lg"
-               placeholder="Pesquisar por nome ou código">
-        <button id="btnNovaObra" class="btn-primary"
-                style="width:42px;height:42px;font-size:22px;border-radius:50%;padding:0;flex-shrink:0">+</button>
+    <div class="card" style="padding:14px 20px;margin-bottom:16px">
+        <div class="inventario-header" style="margin-bottom:0">
+            <input type="text" id="pesquisaObras"
+                   placeholder="Pesquisar por nome ou código">
+            <button id="btnNovaObra" class="btn-primary btn-circular">+</button>
+        </div>
     </div>
 
     <div class="grid-cards">
