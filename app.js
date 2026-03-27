@@ -58,20 +58,15 @@ function endOfWeek() {
 }
 
 // =======================================================
-// MOSTRAR BLOQUEIO COM MENSAGEM E BOTÃO DE CADASTRO
+// MOSTRAR BLOQUEIO — sem link de cadastro
+// O cadastro é controlado pelo administrador
 // =======================================================
-function mostrarBloqueio(titulo, mensagem, mostrarLinkCadastro = false) {
+function mostrarBloqueio(titulo, mensagem) {
     const el = document.getElementById("bloqueado");
     el.classList.remove("hidden");
     el.innerHTML = `
         <h3 class="error-title">${titulo}</h3>
         <p>${mensagem}</p>
-        ${mostrarLinkCadastro ? `
-        <p style="margin-top:16px">
-            <a href="cadastro.html" class="btn-primary" style="display:inline-block;padding:10px 20px;text-decoration:none">
-                Registar este dispositivo
-            </a>
-        </p>` : ""}
     `;
 }
 
@@ -98,8 +93,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!funcionario) {
         mostrarBloqueio(
             "Dispositivo não reconhecido",
-            "Este dispositivo não está registado no sistema.",
-            true  // mostra link para cadastro.html
+            "Este dispositivo não está autorizado. Contacte o administrador."
         );
         return;
     }
