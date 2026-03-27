@@ -653,3 +653,27 @@ td.editavel:focus {
 td.editavel[title] {
     text-decoration: underline wavy #ff7a7a;
 }
+
+/* ================= TABELA OBRAS ================= */
+#tabelaObras {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+#tabelaObras th {
+    background: var(--primary);
+    color: black;
+    padding: 12px;
+    text-align: left;
+    font-size: 13px;
+}
+
+#tabelaObras td {
+    padding: 10px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+}
+
+#tabelaObras tbody tr:hover {
+    background: rgba(244,185,66,.08);
+}

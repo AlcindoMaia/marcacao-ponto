@@ -106,6 +106,7 @@ function abrirTab(nome) {
     if (nome === "registos")     { gerarCalendario(); carregarRegistos(); }
     if (nome === "funcionarios") initFuncionarios();
     if (nome === "inventario")   initInventario();
+    if (nome === "obras")        initObras();
     if (nome === "fluxo")        initFluxo();
 }
 
@@ -586,24 +587,31 @@ async function carregarFuncionarios() {
 
     tbody.innerHTML = "";
     if (!data || data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;opacity:.6">Sem funcionários registados.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;opacity:.6">Sem funcionários. Clique + para adicionar.</td></tr>`;
         return;
     }
 
     data.forEach(f => {
-        const ativo  = f.ativo !== false;
+        const ativo    = f.ativo !== false;
         const data_reg = f.created_at ? new Date(f.created_at).toLocaleDateString("pt-PT") : "—";
         const temDevice = !!f.device_id;
 
         const tr = document.createElement("tr");
-        tr.style.opacity = ativo ? "1" : ".5";
+        tr.style.opacity = ativo ? "1" : ".45";
+        if (!temDevice) tr.style.borderLeft = "3px solid #f4b942";
+
         tr.innerHTML = `
             <td style="font-weight:500">${f.nome || "—"}</td>
             <td>${f.codigo || "—"}</td>
             <td>${f.valor_dia ? Number(f.valor_dia).toFixed(2) + " €" : "—"}</td>
-            <td style="font-size:12px;opacity:.7">${data_reg}</td>
-            <td><span class="badge-estado ${ativo ? "pago" : "por_pagar"}">${ativo ? "Ativo" : "Inativo"}</span></td>
-            <td style="font-size:11px;opacity:.5;font-family:monospace">${temDevice ? f.device_id.substring(0,8) + "…" : "Sem dispositivo"}</td>
+            <td>
+                <span class="badge-estado ${ativo ? "pago" : "por_pagar"}">${ativo ? "Ativo" : "Inativo"}</span>
+            </td>
+            <td>
+                ${temDevice
+                    ? `<span style="font-size:11px;opacity:.5;font-family:monospace">${f.device_id.substring(0,8)}…</span>`
+                    : `<span style="font-size:11px;color:#f4b942">Sem dispositivo</span>`}
+            </td>
             <td class="acoes-td">
                 <button class="btn-acao" title="Editar">✏️</button>
                 <button class="btn-acao" title="${ativo ? "Desativar" : "Ativar"}">${ativo ? "🔴" : "🟢"}</button>
@@ -699,6 +707,99 @@ async function revogarDispositivoFuncionario() {
     document.getElementById("modalFuncMsg").textContent = "Dispositivo revogado. O funcionário terá de se registar novamente.";
     document.getElementById("modalFuncMsg").style.color = "#5ad65a";
     await carregarFuncionarios();
+}
+
+// =======================================================
+// OBRAS — listagem, QR codes
+// =======================================================
+async function initObras() {
+    await carregarObras();
+}
+
+async function carregarObras() {
+    const { data, error } = await SB.from("obras").select("*").order("created_at", { ascending: false });
+    const tbody = document.querySelector("#tabelaObras tbody");
+    if (!tbody) return;
+
+    if (error) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#ff7a7a">Erro: ${error.message}</td></tr>`;
+        return;
+    }
+
+    // KPIs
+    const total     = data?.length || 0;
+    const ativas    = data?.filter(o => !o.estado || o.estado === "ativa").length || 0;
+    const concluidas = data?.filter(o => o.estado === "concluida").length || 0;
+    document.getElementById("obrasKpiTotal").textContent     = total;
+    document.getElementById("obrasKpiAtivas").textContent    = ativas;
+    document.getElementById("obrasKpiConcluidas").textContent = concluidas;
+
+    tbody.innerHTML = "";
+    if (!data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;opacity:.6">Sem obras. Use "Gerar QR" para criar uma obra.</td></tr>`;
+        return;
+    }
+
+    data.forEach(o => {
+        const tr = document.createElement("tr");
+        const estado = o.estado || "ativa";
+
+        tr.innerHTML = `
+            <td style="font-family:monospace;font-size:12px">${o.codigo || "—"}</td>
+            <td style="font-weight:500">${o.nome || "—"}</td>
+            <td style="font-size:12px;opacity:.7">${o.morada || "—"}</td>
+            <td style="text-align:center">${o.raio || 120}</td>
+            <td>
+                <span class="badge-estado ${estado === "ativa" ? "pago" : estado === "concluida" ? "por_pagar" : "por_pagar"}">
+                    ${estado.charAt(0).toUpperCase() + estado.slice(1)}
+                </span>
+            </td>
+            <td class="acoes-td">
+                <button class="btn-acao" title="Ver QR">🔲</button>
+            </td>
+            <td class="acoes-td">
+                <button class="btn-acao" title="${estado === "ativa" ? "Concluir" : "Reativar"}">${estado === "ativa" ? "✅" : "🔄"}</button>
+            </td>`;
+
+        tr.querySelector("[title='Ver QR']").onclick = () => abrirModalQR(o);
+        tr.querySelector("[title='Concluir'], [title='Reativar']").onclick = () => toggleEstadoObra(o.id, o.nome, estado);
+        tbody.appendChild(tr);
+    });
+}
+
+function abrirModalQR(obra) {
+    const url = `https://alcindomaia.github.io/marcacao-ponto/?obra=${obra.id}`;
+    document.getElementById("modalQRTitulo").textContent = obra.nome;
+    document.getElementById("qrUrlAdmin").textContent    = url;
+
+    const canvas = document.getElementById("qrCanvasAdmin");
+
+    new QRious({
+        element: canvas,
+        size:    220,
+        value:   url,
+        level:   "H"
+    });
+
+    const dl = document.getElementById("qrDownloadAdmin");
+    dl.href     = canvas.toDataURL("image/png");
+    dl.download = "QR_" + obra.nome.replace(/\s+/g, "_") + ".png";
+
+    document.getElementById("modalQR").classList.remove("hidden");
+}
+
+function fecharModalQR() {
+    document.getElementById("modalQR").classList.add("hidden");
+}
+
+async function toggleEstadoObra(id, nome, estadoAtual) {
+    const novoEstado = estadoAtual === "ativa" ? "concluida" : "ativa";
+    const acao = novoEstado === "concluida" ? "concluir" : "reativar";
+    if (!confirm(`${acao.charAt(0).toUpperCase() + acao.slice(1)} a obra "${nome}"?`)) return;
+
+    const { error } = await SB.from("obras").update({ estado: novoEstado }).eq("id", id);
+    if (error) { alert("Erro: " + error.message); return; }
+    await carregarObras();
 }
 
 // =======================================================
@@ -1136,6 +1237,17 @@ function ligarEventosGlobais() {
         const f = this.value.toLowerCase();
         document.querySelectorAll("#tabelaFuncionarios tbody tr")
             .forEach(tr => { tr.style.display = tr.innerText.toLowerCase().includes(f) ? "" : "none"; });
+    });
+
+    // Obras — filtro e eventos
+    document.getElementById("pesquisaObras")?.addEventListener("input", function () {
+        const f = this.value.toLowerCase();
+        document.querySelectorAll("#tabelaObras tbody tr")
+            .forEach(tr => { tr.style.display = tr.innerText.toLowerCase().includes(f) ? "" : "none"; });
+    });
+    document.getElementById("btnNovaObra")?.addEventListener("click", () => abrirTab("gerarqr"));
+    document.getElementById("modalQR")?.addEventListener("click", e => {
+        if (e.target.id === "modalQR") fecharModalQR();
     });
 
     // Inventário — modal

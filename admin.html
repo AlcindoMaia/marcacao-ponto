@@ -26,6 +26,8 @@
 
     <!-- BOTÃO DARK MODE -->
     <button class="dark-toggle" id="darkBtn" onclick="toggleDark()">☀️</button>
+    <!-- DASHBOARD -->
+    <a href="dashboard.html" class="btn-secondary" style="font-size:13px;padding:6px 14px;margin-left:8px;text-decoration:none">⬅ Dashboard</a>
     <!-- LOGOUT -->
     <button class="btn-secondary" onclick="fazerLogout()" style="font-size:13px;padding:6px 14px;margin-left:8px">Sair</button>
 </header>
@@ -52,6 +54,7 @@
         <button class="tab" data-tab="funcionarios">Funcionários</button>
         <button class="tab" data-tab="inventario">Inventário</button>
         <button class="tab" data-tab="fluxo">Fluxo de Caixa</button>
+        <button class="tab" data-tab="obras">Obras</button>
         <button class="tab" data-tab="gerarqr">Gerar QR</button>
     </div>
 
@@ -583,6 +586,69 @@
 
 </div>
 
+
+<!-- ================= TAB OBRAS ================= -->
+<div class="tab-content" id="tab-obras">
+
+    <div class="inventario-header">
+        <input type="text" id="pesquisaObras" class="input-lg"
+               placeholder="Pesquisar por nome ou código">
+        <button id="btnNovaObra" class="btn-primary"
+                style="width:42px;height:42px;font-size:22px;border-radius:50%;padding:0;flex-shrink:0">+</button>
+    </div>
+
+    <div class="grid-cards" style="margin-bottom:20px">
+        <div class="card metric">
+            <h3>Total</h3>
+            <div id="obrasKpiTotal" class="value">–</div>
+        </div>
+        <div class="card metric">
+            <h3>Ativas</h3>
+            <div id="obrasKpiAtivas" class="value" style="color:#5ad65a">–</div>
+        </div>
+        <div class="card metric">
+            <h3>Concluídas</h3>
+            <div id="obrasKpiConcluidas" class="value" style="color:#f4b942">–</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <table id="tabelaObras" style="border-collapse:collapse;width:100%">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Nome</th>
+                    <th>Morada</th>
+                    <th>Raio (m)</th>
+                    <th>Estado</th>
+                    <th>QR Code</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+</div>
+
+<!-- MODAL QR OBRA -->
+<div id="modalQR" class="modal hidden">
+    <div class="modal-content" style="max-width:400px;text-align:center">
+        <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h2 id="modalQRTitulo">QR Code</h2>
+            <button onclick="fecharModalQR()" class="modal-close"
+                    style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.6">×</button>
+        </div>
+        <canvas id="qrCanvasAdmin" width="220" height="220"
+                style="border:2px solid var(--primary);border-radius:10px;padding:10px;background:white"></canvas>
+        <div style="margin-top:16px;display:flex;gap:12px;justify-content:center">
+            <a id="qrDownloadAdmin" class="btn-primary" download=""
+               style="padding:8px 18px;text-decoration:none;border-radius:8px">Descarregar PNG</a>
+        </div>
+        <div style="margin-top:10px;font-size:11px;opacity:.5;font-family:monospace" id="qrUrlAdmin"></div>
+    </div>
+</div>
+
 </div> <!-- FECHA adminArea -->
 
 <!-- ================= MODAL FUNCIONÁRIO ================= -->
@@ -640,6 +706,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="admin.js"></script>

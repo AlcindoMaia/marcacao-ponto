@@ -1073,27 +1073,127 @@ window.guardarOrcamento = async function() {
 // CONSULTAR CAIXA
 // ============================================================
 async function renderCaixa() {
-  const { data: movs } = await SB.from("movimentos_financeiros")
-    .select("referencia, data_documento, tipo, valor_total, estado_pagamento, obras(nome), fornecedores(nome)")
-    .eq("ativo", true)
-    .order("data_documento", { ascending: false })
-    .limit(30);
+  const [movsRes, obrasRes, fornsRes, catsRes] = await Promise.all([
+    SB.from("movimentos_financeiros")
+      .select("referencia, data_documento, tipo, valor_total, estado_pagamento, obras(nome), fornecedores(nome)")
+      .eq("ativo", true).order("data_documento", { ascending: false }).limit(50),
+    SB.from("obras").select("id, nome").order("nome"),
+    SB.from("fornecedores").select("id, nome").order("nome"),
+    SB.from("categorias_financeiras").select("id, nome").order("nome"),
+  ]);
 
-  const entradas = (movs||[]).filter(m=>m.tipo==="entrada").reduce((s,m)=>s+Number(m.valor_total),0);
-  const saidas   = (movs||[]).filter(m=>m.tipo==="saida").reduce((s,m)=>s+Number(m.valor_total),0);
+  const movs    = movsRes.data || [];
+  const entradas = movs.filter(m=>m.tipo==="entrada").reduce((s,m)=>s+Number(m.valor_total),0);
+  const saidas   = movs.filter(m=>m.tipo==="saida").reduce((s,m)=>s+Number(m.valor_total),0);
+
+  const obrasOpts  = (obrasRes.data||[]).map(o=>`<option value="${o.id}">${o.nome}</option>`).join("");
+  const fornsOpts  = (fornsRes.data||[]).map(f=>`<option value="${f.id}">${f.nome}</option>`).join("");
+  const catsOpts   = (catsRes.data||[]).map(c=>`<option value="${c.id}">${c.nome}</option>`).join("");
 
   document.getElementById("mainContent").innerHTML = `
+
+    <!-- KPIs -->
     <div class="painel">
-      <div class="painel-title">Fluxo de Caixa</div>
-      <div class="visao-grid" style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div class="painel-title" style="margin:0;border:none;padding:0">Fluxo de Caixa</div>
+        <button onclick="toggleFormCaixa()" class="btn-adicionar" style="font-size:13px;padding:8px 20px">+ Novo Movimento</button>
+      </div>
+      <div class="visao-grid">
         <div class="kpi-card"><div class="kpi-label">Entradas</div><div class="kpi-value verde">${fmtEur(entradas)}</div></div>
         <div class="kpi-card"><div class="kpi-label">Saídas</div><div class="kpi-value vermelho">${fmtEur(saidas)}</div></div>
         <div class="kpi-card"><div class="kpi-label">Saldo</div><div class="kpi-value ${entradas-saidas>=0?"verde":"vermelho"}">${fmtEur(entradas-saidas)}</div></div>
       </div>
+    </div>
+
+    <!-- FORMULÁRIO NOVO MOVIMENTO (oculto por defeito) -->
+    <div class="painel" id="formCaixaWrap" style="display:none">
+      <div class="painel-title">Novo Movimento</div>
+
+      <div class="form-row">
+        <div>
+          <div class="kpi-label" style="margin-bottom:6px">Referência</div>
+          <input class="form-input" id="cxRef" placeholder="Ex: FT 2025/001">
+        </div>
+        <div>
+          <div class="kpi-label" style="margin-bottom:6px">Data</div>
+          <input class="form-input" id="cxData" type="date" value="${hoje()}">
+        </div>
+        <div>
+          <div class="kpi-label" style="margin-bottom:6px">Tipo</div>
+          <select class="form-select" id="cxTipo">
+            <option value="saida">Saída</option>
+            <option value="entrada">Entrada</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <div class="kpi-label" style="margin-bottom:6px">NIF Fornecedor</div>
+          <input class="form-input" id="cxNif" placeholder="Opcional">
+        </div>
+        <div>
+          <div class="kpi-label" style="margin-bottom:6px">Nome Fornecedor</div>
+          <input class="form-input" id="cxForn" placeholder="Nome">
+        </div>
+        <div>
+          <div class="kpi-label" style="margin-bottom:6px">Categoria</div>
+          <select class="form-select" id="cxCat">
+            <option value="">— Selecionar —</option>
+            ${catsOpts}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <div class="kpi-label" style="margin-bottom:6px">Obra</div>
+          <select class="form-select" id="cxObra">
+            <option value="">— Sem obra —</option>
+            ${obrasOpts}
+          </select>
+        </div>
+        <div>
+          <div class="kpi-label" style="margin-bottom:6px">Total c/ IVA (€)</div>
+          <input class="form-input" id="cxTotal" type="number" step="0.01" placeholder="0.00" oninput="calcBaseCaixa()">
+        </div>
+        <div>
+          <div class="kpi-label" style="margin-bottom:6px">IVA %</div>
+          <input class="form-input" id="cxIva" type="number" placeholder="23" oninput="calcBaseCaixa()">
+        </div>
+        <div>
+          <div class="kpi-label" style="margin-bottom:6px">Base s/IVA (auto)</div>
+          <input class="form-input" id="cxBase" type="number" step="0.01" readonly style="opacity:.6">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <div class="kpi-label" style="margin-bottom:6px">Estado</div>
+          <select class="form-select" id="cxEstado">
+            <option value="por_pagar">Por Pagar</option>
+            <option value="pago">Pago</option>
+          </select>
+        </div>
+        <div style="flex:2">
+          <div class="kpi-label" style="margin-bottom:6px">Observações</div>
+          <input class="form-input" id="cxObs" placeholder="Opcional">
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn-cancelar" onclick="toggleFormCaixa()">Cancelar</button>
+        <button class="btn-adicionar" onclick="guardarMovimentoCaixa()">Guardar</button>
+      </div>
+      <div class="form-msg" id="cxMsg"></div>
+    </div>
+
+    <!-- TABELA -->
+    <div class="painel">
       <table class="hist-table">
         <thead><tr><th>Data</th><th>Tipo</th><th>Ref.</th><th>Fornecedor / Obra</th><th style="text-align:right">Valor</th><th>Estado</th></tr></thead>
         <tbody>
-          ${(movs||[]).map(m=>`<tr>
+          ${movs.map(m=>`<tr>
             <td>${m.data_documento||""}</td>
             <td><span class="${m.tipo==="entrada"?"badge-entrada":"badge-saida"}">${m.tipo==="entrada"?"Entrada":"Saída"}</span></td>
             <td style="font-size:11px;opacity:.7">${m.referencia||"—"}</td>
@@ -1106,6 +1206,65 @@ async function renderCaixa() {
     </div>
   `;
 }
+
+window.toggleFormCaixa = function() {
+  const wrap = document.getElementById("formCaixaWrap");
+  if (wrap) wrap.style.display = wrap.style.display === "none" ? "block" : "none";
+};
+
+window.calcBaseCaixa = function() {
+  const total = Number(document.getElementById("cxTotal")?.value);
+  const iva   = Number(document.getElementById("cxIva")?.value);
+  const base  = document.getElementById("cxBase");
+  if (base && !isNaN(total) && !isNaN(iva) && iva >= 0)
+    base.value = (total / (1 + iva/100)).toFixed(2);
+};
+
+window.guardarMovimentoCaixa = async function() {
+  const msg   = document.getElementById("cxMsg");
+  const data  = document.getElementById("cxData")?.value;
+  const total = Number(document.getElementById("cxTotal")?.value);
+
+  if (!data || !total) { msg.textContent = "Data e valor são obrigatórios."; return; }
+
+  const nif   = document.getElementById("cxNif")?.value?.trim();
+  const forn  = document.getElementById("cxForn")?.value?.trim();
+  let fornecedor_id = null;
+
+  if (nif || forn) {
+    const { data: ex } = nif
+      ? await SB.from("fornecedores").select("id").eq("nif", nif).maybeSingle()
+      : { data: null };
+    if (ex) {
+      fornecedor_id = ex.id;
+    } else {
+      const { data: novo } = await SB.from("fornecedores")
+        .insert({ nif: nif||null, nome: forn||nif }).select("id").single();
+      fornecedor_id = novo?.id || null;
+    }
+  }
+
+  const base  = Number(document.getElementById("cxBase")?.value) || total;
+  const { error } = await SB.from("movimentos_financeiros").insert({
+    referencia:       document.getElementById("cxRef")?.value?.trim() || null,
+    data_documento:   data,
+    tipo:             document.getElementById("cxTipo")?.value,
+    fornecedor_id,
+    categoria_id:     document.getElementById("cxCat")?.value || null,
+    obra_id:          document.getElementById("cxObra")?.value || null,
+    valor_base:       base,
+    iva:              Number(document.getElementById("cxIva")?.value) || 0,
+    valor_total:      total,
+    estado_pagamento: document.getElementById("cxEstado")?.value,
+    observacoes:      document.getElementById("cxObs")?.value?.trim() || null,
+    ativo:            true
+  });
+
+  if (error) { msg.textContent = "Erro: " + error.message; return; }
+  msg.style.color = "#2a8a2a";
+  msg.textContent = "✓ Movimento registado.";
+  setTimeout(renderCaixa, 1000);
+};
 
 // ============================================================
 // ADIANTAMENTO DE CLIENTE
