@@ -2,234 +2,198 @@
 // SUPABASE — vem de config.js (SB já está disponível)
 // =======================================================
 
-// =======================================================
-// HELPERS
-// =======================================================
 function getDeviceId() {
     let id = localStorage.getItem("deviceId");
-    if (!id) {
-        id = crypto.randomUUID();
-        localStorage.setItem("deviceId", id);
-    }
+    if (!id) { id = crypto.randomUUID(); localStorage.setItem("deviceId", id); }
     return id;
 }
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
-    const R    = 6371e3;
-    const toRad = d => d * Math.PI / 180;
-    const φ1   = toRad(lat1), φ2 = toRad(lat2);
-    const Δφ   = toRad(lat2 - lat1);
-    const Δλ   = toRad(lon2 - lon1);
-    const a    = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const R = 6371e3, toRad = d => d * Math.PI / 180;
+    const φ1 = toRad(lat1), φ2 = toRad(lat2);
+    const Δφ = toRad(lat2-lat1), Δλ = toRad(lon2-lon1);
+    const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-async function getObra(obra_id) {
-    const { data, error } = await SB
-        .from("obras")
-        .select("*")
-        .eq("id", obra_id)
-        .maybeSingle();
-    if (error) return null;
+async function getObra(id) {
+    const { data } = await SB.from("obras").select("*").eq("id", id).maybeSingle();
     return data;
 }
 
 async function getFuncionario(deviceId) {
-    const { data, error } = await SB
-        .from("funcionarios")
-        .select("*")
-        .eq("device_id", deviceId)
-        .maybeSingle();
-    if (error) return null;
+    const { data } = await SB.from("funcionarios").select("*").eq("device_id", deviceId).maybeSingle();
     return data;
 }
 
 function startOfWeek() {
     const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() - d.getDay());
+    d.setHours(0,0,0,0);
+    d.setDate(d.getDate() - ((d.getDay()+6)%7));
     return d;
 }
 
-function endOfWeek() {
-    const s = startOfWeek();
-    s.setDate(s.getDate() + 7);
-    return s;
+const fmtHora = iso => new Date(iso).toLocaleTimeString("pt-PT", { hour:"2-digit", minute:"2-digit" });
+const fmtDia  = iso => new Date(iso).toLocaleDateString("pt-PT", { weekday:"short", day:"2-digit", month:"2-digit" });
+
+// =======================================================
+// UI
+// =======================================================
+function mostrarEcrã(id) {
+    ["ecrãLoading","ecrãBloqueio","ecrãPrincipal"].forEach(e => {
+        const el = document.getElementById(e);
+        if (el) el.style.display = e === id ? "flex" : "none";
+    });
+}
+
+function mostrarBloqueio(titulo, msg) {
+    document.getElementById("bloqueioTitulo").textContent = titulo;
+    document.getElementById("bloqueioMsg").innerHTML = msg;
+    mostrarEcrã("ecrãBloqueio");
+}
+
+function mostrarFeedback(msg, tipo = "info") {
+    const el = document.getElementById("feedback");
+    el.textContent = msg;
+    el.className = "feedback " + tipo;
+    if (tipo === "ok") setTimeout(() => { el.textContent=""; el.className="feedback"; }, 3000);
+}
+
+function actualizarBotao(ultimoTipo) {
+    const icon     = document.getElementById("btnIcon");
+    const label    = document.getElementById("btnLabel");
+    const sublabel = document.getElementById("btnSublabel");
+    if (ultimoTipo === "entrada") {
+        icon.textContent="⏹"; label.textContent="SAÍDA"; sublabel.textContent="Toca para registar saída";
+    } else {
+        icon.textContent="▶"; label.textContent="ENTRADA"; sublabel.textContent="Toca para registar entrada";
+    }
+}
+
+function actualizarEstado(registos) {
+    const dot   = document.getElementById("estadoDot");
+    const label = document.getElementById("estadoLabel");
+    const hora  = document.getElementById("estadoHora");
+    if (!registos || registos.length === 0) {
+        dot.className="estado-dot"; label.textContent="Sem registos hoje"; hora.textContent="";
+        return;
+    }
+    const u = registos[0];
+    dot.className   = "estado-dot " + u.tipo;
+    label.textContent = u.tipo === "entrada" ? "Em obra" : "Fora de obra";
+    hora.textContent  = "desde " + fmtHora(u.datahora);
 }
 
 // =======================================================
-// MOSTRAR BLOQUEIO — sem link de cadastro
-// O cadastro é controlado pelo administrador
+// HISTÓRICO
 // =======================================================
-function mostrarBloqueio(titulo, mensagem) {
-    const el = document.getElementById("bloqueado");
-    el.classList.remove("hidden");
-    el.innerHTML = `
-        <h3 class="error-title">${titulo}</h3>
-        <p>${mensagem}</p>
-    `;
+async function carregarHistorico(funcId) {
+    const inicio = startOfWeek();
+    const { data } = await SB.from("ponto").select("*")
+        .eq("funcionario_id", funcId)
+        .gte("datahora", inicio.toISOString())
+        .order("datahora", { ascending: false })
+        .limit(12);
+
+    const hoje = new Date().toISOString().split("T")[0];
+    const hojeRegs = (data||[]).filter(r => r.datahora.startsWith(hoje));
+    actualizarEstado(hojeRegs);
+    actualizarBotao(data?.[0]?.tipo ?? null);
+
+    const lista = document.getElementById("histLista");
+    if (!data || data.length === 0) {
+        lista.innerHTML = `<div style="padding:16px 0;font-size:13px;color:var(--text-muted);text-align:center">Sem registos esta semana</div>`;
+        return;
+    }
+    lista.innerHTML = data.map(r => `
+        <div class="hist-item">
+            <div class="hist-tipo ${r.tipo}"></div>
+            <div class="hist-texto">${fmtDia(r.datahora)}</div>
+            <div class="hist-hora">${r.tipo==="entrada"?"▶":"⏹"} ${fmtHora(r.datahora)}</div>
+        </div>`).join("");
 }
 
 // =======================================================
-// MAIN INIT
-// =======================================================
-const urlParams = new URLSearchParams(window.location.search);
-const obraID    = urlParams.get("obra");
-
-let funcionario = null;
-let obra        = null;
-
-document.addEventListener("DOMContentLoaded", async () => {
-
-    if (!obraID) {
-        mostrarBloqueio("QR inválido", "Este QR não contém referência de obra.");
-        return;
-    }
-
-    const deviceId = getDeviceId();
-
-    // 1) Validar funcionário
-    funcionario = await getFuncionario(deviceId);
-    if (!funcionario) {
-        mostrarBloqueio(
-            "Dispositivo não reconhecido",
-            "Este dispositivo não está autorizado. Contacte o administrador."
-        );
-        return;
-    }
-
-    // 2) Validar obra
-    obra = await getObra(obraID);
-    if (!obra) {
-        mostrarBloqueio("Obra não encontrada", "Este QR está inválido ou foi removido.");
-        return;
-    }
-
-    // Mostrar interface principal
-    document.getElementById("conteudo").classList.remove("hidden");
-    document.getElementById("msgOla").innerHTML   = `Olá <strong>${funcionario.nome}</strong>`;
-    document.getElementById("msgObra").innerHTML  = `Obra: <strong>${obra.nome}</strong>`;
-    document.getElementById("btnConfirmar").onclick = confirmarMarcacao;
-
-    carregarHistorico(funcionario.id);
-});
-
-// =======================================================
-// MARCAÇÃO DE PONTO
-// FIX: usa obra.raio em vez do valor fixo 120m
+// MARCAÇÃO
 // =======================================================
 async function confirmarMarcacao() {
     if (!navigator.geolocation) {
-        alert("Geolocalização indisponível neste dispositivo.");
-        return;
+        mostrarFeedback("GPS não disponível.", "erro"); return;
     }
-
-    // Desactivar botão durante o processo para evitar duplos cliques
-    const btn = document.getElementById("btnConfirmar");
-    btn.disabled = true;
-    btn.textContent = "A verificar localização...";
+    const btn = document.getElementById("btnMarcacao");
+    btn.classList.add("disabled");
+    document.getElementById("btnLabel").textContent  = "A localizar…";
+    document.getElementById("btnSublabel").textContent = "";
+    mostrarFeedback("A verificar localização…", "info");
 
     navigator.geolocation.getCurrentPosition(
         async pos => {
             try {
-                const lat  = pos.coords.latitude;
-                const lon  = pos.coords.longitude;
+                const { latitude: lat, longitude: lon } = pos.coords;
                 const dist = haversineDistance(lat, lon, obra.latitude, obra.longitude);
-
-                // FIX: usa o raio definido na obra, com fallback de 120m
                 const raio = obra.raio || 120;
-
                 if (dist > raio) {
-                    alert(`Fora do perímetro autorizado.\nDistância: ${Math.round(dist)}m\nMáximo: ${raio}m`);
+                    mostrarFeedback(`Fora do perímetro. ${Math.round(dist)}m (máx. ${raio}m)`, "erro");
                     return;
                 }
-
-                // Obter último registo para alternância entrada/saída
-                const { data: ult } = await SB
-                    .from("ponto")
-                    .select("tipo, datahora")
+                const { data: ult } = await SB.from("ponto").select("tipo")
                     .eq("funcionario_id", funcionario.id)
-                    .order("datahora", { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
-
-                const tipo = (ult?.tipo === "entrada") ? "saida" : "entrada";
-
-                const { error } = await SB
-                    .from("ponto")
-                    .insert({
-                        funcionario_id: funcionario.id,
-                        obra_id:        obraID,
-                        datahora:       new Date().toISOString(),
-                        latitude:       lat,
-                        longitude:      lon,
-                        tipo
-                    });
-
-                if (error) {
-                    alert("Erro ao registar ponto:\n" + error.message);
-                    console.error(error);
-                    return;
-                }
-
-                btn.textContent = tipo === "entrada" ? "✓ Entrada registada!" : "✓ Saída registada!";
-                setTimeout(() => {
-                    btn.textContent = "Confirmar Registo";
-                }, 2500);
-
-                carregarHistorico(funcionario.id);
-
+                    .order("datahora", { ascending: false }).limit(1).maybeSingle();
+                const tipo = ult?.tipo === "entrada" ? "saida" : "entrada";
+                const { error } = await SB.from("ponto").insert({
+                    funcionario_id: funcionario.id,
+                    obra_id: obraID,
+                    datahora: new Date().toISOString(),
+                    latitude: lat, longitude: lon, tipo
+                });
+                if (error) { mostrarFeedback("Erro ao registar. Tente novamente.", "erro"); return; }
+                mostrarFeedback(tipo==="entrada" ? "✓ Entrada registada!" : "✓ Saída registada!", "ok");
+                await carregarHistorico(funcionario.id);
             } finally {
-                btn.disabled = false;
+                btn.classList.remove("disabled");
             }
         },
-        err => {
-            alert("Não foi possível obter a localização. Verifique se o GPS está ativo.");
-            console.error(err);
-            btn.disabled = false;
-            btn.textContent = "Confirmar Registo";
+        () => {
+            mostrarFeedback("Não foi possível obter a localização. Verifique o GPS.", "erro");
+            btn.classList.remove("disabled");
+            actualizarBotao(null);
         },
         { enableHighAccuracy: true, timeout: 15000 }
     );
 }
 
 // =======================================================
-// HISTÓRICO SEMANAL
+// INIT
 // =======================================================
-async function carregarHistorico(funcId) {
-    const inicio = startOfWeek();
-    const fim    = endOfWeek();
+const urlParams  = new URLSearchParams(window.location.search);
+const obraID     = urlParams.get("obra");
+let funcionario  = null;
+let obra         = null;
 
-    const { data } = await SB
-        .from("ponto")
-        .select("*")
-        .eq("funcionario_id", funcId)
-        .gte("datahora", inicio.toISOString())
-        .lt("datahora", fim.toISOString())
-        .order("datahora", { ascending: false });
+document.addEventListener("DOMContentLoaded", async () => {
+    mostrarEcrã("ecrãLoading");
 
-    const histDiv  = document.getElementById("histSemanal");
-    const lastDiv  = document.getElementById("ultimaAcao");
-
-    if (data && data.length > 0) {
-        const u = data[0];
-        const label = u.tipo === "entrada" ? "Entrada" : "Saída";
-        lastDiv.innerHTML = `<strong>${label}</strong> — ${new Date(u.datahora).toLocaleString("pt-PT")}`;
-    } else {
-        lastDiv.innerHTML = "Sem registos esta semana.";
-    }
-
-    histDiv.innerHTML = "";
-    if (!data || data.length === 0) {
-        histDiv.innerHTML = "Sem registos esta semana.";
+    if (!obraID) {
+        mostrarBloqueio("QR inválido", "Este QR não contém uma referência de obra válida.<br>Peça ao responsável um novo QR Code.");
         return;
     }
 
-    data.forEach(r => {
-        const label = r.tipo === "entrada" ? "▶ Entrada" : "■ Saída";
-        histDiv.innerHTML += `
-            <div class="regItem">
-                <strong>${label}</strong> — ${new Date(r.datahora).toLocaleString("pt-PT")}
-            </div>`;
-    });
-}
+    funcionario = await getFuncionario(getDeviceId());
+    if (!funcionario) {
+        mostrarBloqueio("Dispositivo não autorizado",
+            "Este dispositivo não está registado no sistema.<br><br>Contacte o administrador.");
+        return;
+    }
+
+    obra = await getObra(obraID);
+    if (!obra) {
+        mostrarBloqueio("Obra não encontrada", "Este QR Code é inválido ou a obra foi removida.");
+        return;
+    }
+
+    mostrarEcrã("ecrãPrincipal");
+    document.getElementById("funcNome").textContent = funcionario.nome;
+    document.getElementById("obraNome").textContent = obra.nome;
+    document.getElementById("btnMarcacao").addEventListener("click", confirmarMarcacao);
+    await carregarHistorico(funcionario.id);
+});
