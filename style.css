@@ -136,7 +136,7 @@ body.dark .tab.active {
 }
 
 .tab-content { display: none; }
-.tab-content.active { display: block; }
+.tab-content.active { display: block; width: 100%; padding-bottom: 20px; }
 
 /* =======================================================
    INVENTÁRIO
@@ -795,12 +795,6 @@ body:not(.dark) .filtros-linha select {
    de estar dentro ou fora do .container
 ======================================================= */
 
-/* Tab activa */
-.tab-content.active {
-    display: block;
-    width: 100%;
-    padding-bottom: 20px;
-}
 
 
 
@@ -1019,13 +1013,8 @@ body:not(.dark) .inventario-header input {
     margin-bottom: 16px !important;
 }
 
-/* Tab-content — padding top reduzido */
-.tab-content.active {
-    padding-top: 4px;
-}
 
 /* grid-cards dentro de tab — sempre com margin-bottom 16px */
-.tab-content 
 
 /* =======================================================
    GRID CARDS — layout em linha
