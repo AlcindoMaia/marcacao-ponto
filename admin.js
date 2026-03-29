@@ -84,7 +84,7 @@ function mostrarPainel() {
 // =======================================================
 function inicializarPainel() {
     ativarTabs();
-    abrirTab("financeiro");
+    abrirTab("fluxo");
 }
 
 function ativarTabs() {
@@ -101,6 +101,7 @@ function abrirTab(nome) {
     if (!tabBtn || !tabDiv) return;
     tabBtn.classList.add("active");
     tabDiv.classList.add("active");
+    if (nome === "fluxo")        initFluxo();
     if (nome === "financeiro")   carregarFinanceiro();
     if (nome === "dashboard")    initDashboard();
     if (nome === "registos")     { gerarCalendario(); carregarRegistos(); }
@@ -114,27 +115,77 @@ function abrirTab(nome) {
 // FINANCEIRO
 // =======================================================
 async function carregarFinanceiro() {
-    const { data } = await SB.from("vw_kpis_financeiros_mes").select("*").single();
-    if (data) {
-        document.getElementById("kpiFuncionarios").textContent    = data.total_funcionarios ?? "–";
-        document.getElementById("kpiHoras").textContent           = data.total_horas_mes ?? "–";
-        document.getElementById("kpiDias").textContent            = data.total_dias_trabalhados ?? "–";
-        document.getElementById("kpiDiasIncompletos").textContent = data.total_dias_nao_completos ?? "–";
-        document.getElementById("kpiTotal").textContent           = Number(data.total_a_pagar || 0).toFixed(2) + " €";
-    }
-    const { data: linhas } = await SB.from("vw_dashboard_mes_atual").select("*");
+    // Determinar mês a consultar (filtro ou mês actual)
+    const filtroEl = document.getElementById("filtroMesFinanceiro");
+    const hoje     = new Date();
+    const anoMes   = filtroEl?.value || `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,"0")}`;
+    const [ano, mes] = anoMes.split("-").map(Number);
+    const inicio = `${ano}-${String(mes).padStart(2,"0")}-01`;
+    const ultimoDia = new Date(ano, mes, 0).getDate();
+    const fim    = `${ano}-${String(mes).padStart(2,"0")}-${ultimoDia}`;
+
+    // Buscar registos de ponto do mês seleccionado
+    const { data: registos } = await SB.from("vw_registos_ponto").select("*")
+        .gte("dia", inicio).lte("dia", fim);
+
     const tbody = document.querySelector("#tabelaFinanceira tbody");
     if (!tbody) return;
+
+    // Buscar funcionários com valor_dia
+    const { data: funcs } = await SB.from("funcionarios")
+        .select("id, nome, valor_dia, ativo").eq("ativo", true);
+
+    if (!registos || !funcs) { tbody.innerHTML = ""; return; }
+
+    // Agrupar por funcionário
+    const porFunc = {};
+    registos.forEach(r => {
+        if (!r.funcionario) return;
+        if (!porFunc[r.funcionario]) porFunc[r.funcionario] = { horas: 0, dias: 0 };
+        // Converter horas HH:MM → decimal, descontando 1h de almoço por dia
+        let h = 0;
+        if (r.horas && typeof r.horas === "string" && r.horas.includes(":")) {
+            const [hh, mm] = r.horas.split(":").map(Number);
+            h = hh + mm / 60;
+        } else {
+            h = Number(r.horas) || 0;
+        }
+        // Desconto de 1h de almoço por dia com registo de saída
+        if (h > 0) h = Math.max(0, h - 1);
+        porFunc[r.funcionario].horas += h;
+        porFunc[r.funcionario].dias  += 1;
+    });
+
+    // KPIs totais
+    let totalHoras = 0, totalDias = 0, totalPagar = 0;
+
     tbody.innerHTML = "";
-    linhas?.forEach(r => {
+    funcs.forEach(f => {
+        const dados = porFunc[f.nome];
+        if (!dados) return;
+        const horas = dados.horas;
+        const dias  = dados.dias;
+        const valor = f.valor_dia ? dias * f.valor_dia : 0;
+        totalHoras += horas;
+        totalDias  += dias;
+        totalPagar += valor;
         tbody.innerHTML += `<tr>
-            <td>${r.funcionario}</td>
-            <td>${r.horas_trabalhadas}</td>
-            <td>${r.dias_trabalhados}</td>
-            <td>${r.dias_nao_completos}</td>
-            <td>${Number(r.valor_a_receber || 0).toFixed(2)} €</td>
+            <td>${f.nome}</td>
+            <td>${horas.toFixed(2)}h</td>
+            <td>${dias}</td>
+            <td>${valor.toFixed(2)} €</td>
         </tr>`;
     });
+
+    // Actualizar KPIs
+    const kpiFEl = document.getElementById("kpiFuncionarios");
+    const kpiHEl = document.getElementById("kpiHoras");
+    const kpiDEl = document.getElementById("kpiDias");
+    const kpiTEl = document.getElementById("kpiTotal");
+    if (kpiFEl) kpiFEl.textContent = funcs.filter(f => porFunc[f.nome]).length;
+    if (kpiHEl) kpiHEl.textContent = totalHoras.toFixed(2) + "h";
+    if (kpiDEl) kpiDEl.textContent = totalDias;
+    if (kpiTEl) kpiTEl.textContent = totalPagar.toFixed(2) + " €";
 }
 
 // =======================================================
@@ -327,10 +378,10 @@ async function guardarEdicaoRegisto(tr, tdEditado) {
         }
     }
 
-    // Destacar células editadas com cor diferente
+    // Destacar células editadas — fica sempre amarelo
     tdEditado.classList.add("editado");
-    tr.classList.add("linha-editada");
-    tdEditado.style.color = "";
+    tdEditado.style.background = "rgba(244,185,66,0.18)";
+    tdEditado.style.color = "var(--primary)";
     tdEditado.title = "";
 }
 
@@ -750,18 +801,18 @@ async function carregarObras() {
             <td style="font-size:12px;opacity:.7">${o.morada || "—"}</td>
             <td style="text-align:center">${o.raio || 120}</td>
             <td>
-                <span class="badge-estado ${estado === "ativa" ? "pago" : estado === "concluida" ? "por_pagar" : "por_pagar"}">
+                <span class="badge-estado ${estado === "ativa" ? "pago" : "por_pagar"}">
                     ${estado.charAt(0).toUpperCase() + estado.slice(1)}
                 </span>
             </td>
-            <td class="acoes-td">
+            <td class="acoes-td" style="white-space:nowrap">
+                <button class="btn-acao" title="Editar">✏️</button>
                 <button class="btn-acao" title="Ver QR">🔲</button>
-            </td>
-            <td class="acoes-td">
                 <button class="btn-acao" title="${estado === "ativa" ? "Concluir" : "Reativar"}">${estado === "ativa" ? "✅" : "🔄"}</button>
             </td>`;
 
-        tr.querySelector("[title='Ver QR']").onclick = () => abrirModalQR(o);
+        tr.querySelector("[title='Editar']").onclick  = () => editarObra(o);
+        tr.querySelector("[title='Ver QR']").onclick  = () => abrirModalQR(o);
         tr.querySelector("[title='Concluir'], [title='Reativar']").onclick = () => toggleEstadoObra(o.id, o.nome, estado);
         tbody.appendChild(tr);
     });
@@ -792,6 +843,24 @@ function fecharModalQR() {
     document.getElementById("modalQR").classList.add("hidden");
 }
 
+async function editarObra(obra) {
+    const nome   = prompt("Nome da obra:", obra.nome);
+    if (nome === null) return;
+    const morada = prompt("Morada:", obra.morada || "");
+    if (morada === null) return;
+    const raio   = prompt("Raio GPS (metros):", obra.raio || 120);
+    if (raio === null) return;
+
+    const { error } = await SB.from("obras").update({
+        nome:   nome.trim(),
+        morada: morada.trim(),
+        raio:   parseInt(raio) || 120,
+    }).eq("id", obra.id);
+
+    if (error) { alert("Erro ao guardar: " + error.message); return; }
+    await carregarObras();
+}
+
 async function toggleEstadoObra(id, nome, estadoAtual) {
     const novoEstado = estadoAtual === "ativa" ? "concluida" : "ativa";
     const acao = novoEstado === "concluida" ? "concluir" : "reativar";
@@ -800,6 +869,138 @@ async function toggleEstadoObra(id, nome, estadoAtual) {
     const { error } = await SB.from("obras").update({ estado: novoEstado }).eq("id", id);
     if (error) { alert("Erro: " + error.message); return; }
     await carregarObras();
+}
+
+
+// =======================================================
+// SCANNER QR DE FATURAS PORTUGUESAS
+// =======================================================
+let qrStream = null;
+let qrAnimFrame = null;
+
+async function iniciarScanQR() {
+    const wrap  = document.getElementById("qrReaderWrap");
+    const video = document.getElementById("qrVideo");
+    const status = document.getElementById("qrStatus");
+    wrap.style.display = "block";
+
+    try {
+        qrStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" }
+        });
+        video.srcObject = qrStream;
+        await video.play();
+        status.textContent = "Aponte para o QR Code da fatura...";
+        scanFrame();
+    } catch(e) {
+        status.textContent = "Câmara não disponível. Cole o código manualmente.";
+    }
+}
+
+function scanFrame() {
+    const video  = document.getElementById("qrVideo");
+    const canvas = document.getElementById("qrCanvas");
+    if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
+        qrAnimFrame = requestAnimationFrame(scanFrame);
+        return;
+    }
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+
+    if (code) {
+        parsearQRFatura(code.data);
+        fecharScanQR();
+        return;
+    }
+    qrAnimFrame = requestAnimationFrame(scanFrame);
+}
+
+function fecharScanQR() {
+    if (qrStream) { qrStream.getTracks().forEach(t => t.stop()); qrStream = null; }
+    if (qrAnimFrame) { cancelAnimationFrame(qrAnimFrame); qrAnimFrame = null; }
+    const wrap = document.getElementById("qrReaderWrap");
+    if (wrap) wrap.style.display = "none";
+}
+
+function parsearQRFatura(texto) {
+    // Formato AT: A:NIF_EMITENTE*B:NIF_ADQUIRENTE*C:PAIS*D:TIPO*E:ESTADO*F:DATA*G:ATCUD*H:REF*I1:BASE*I2:IVA%*N:IVA_TOTAL*O:TOTAL_IVA*P:DESCONTO*Q:HASH*R:NUM_CERT
+    const status = document.getElementById("qrStatus");
+
+    try {
+        // Tentar parsing do formato AT
+        const campos = {};
+        texto.split("*").forEach(par => {
+            const sep = par.indexOf(":");
+            if (sep > 0) {
+                campos[par.substring(0, sep)] = par.substring(sep + 1);
+            }
+        });
+
+        let preenchido = 0;
+
+        // NIF fornecedor (campo A)
+        if (campos["A"]) {
+            document.getElementById("movNif").value = campos["A"];
+            preenchido++;
+        }
+
+        // Data (campo F — formato YYYYMMDD)
+        if (campos["F"] && campos["F"].length === 8) {
+            const ano = campos["F"].substring(0,4);
+            const mes = campos["F"].substring(4,6);
+            const dia = campos["F"].substring(6,8);
+            document.getElementById("movData").value = `${ano}-${mes}-${dia}`;
+            preenchido++;
+        }
+
+        // Referência (campo G = ATCUD ou H)
+        const ref = campos["G"] || campos["H"] || "";
+        if (ref) {
+            document.getElementById("movReferencia").value = ref.substring(0, 50);
+            preenchido++;
+        }
+
+        // Total com IVA (campo O)
+        if (campos["O"]) {
+            const total = parseFloat(campos["O"].replace(",", "."));
+            if (!isNaN(total)) {
+                document.getElementById("movTotal").value = total.toFixed(2);
+                // IVA % (campo I2 se existir)
+                if (campos["I2"]) {
+                    document.getElementById("movIva").value = campos["I2"];
+                    const base = total / (1 + parseFloat(campos["I2"]) / 100);
+                    document.getElementById("movBase").value = base.toFixed(2);
+                } else {
+                    // Tentar calcular pelo campo N (total IVA)
+                    if (campos["N"]) {
+                        const ivaVal = parseFloat(campos["N"].replace(",", "."));
+                        const base = total - ivaVal;
+                        const pct  = Math.round((ivaVal / base) * 100);
+                        document.getElementById("movIva").value   = pct;
+                        document.getElementById("movBase").value  = base.toFixed(2);
+                    }
+                }
+                preenchido++;
+            }
+        }
+
+        if (preenchido > 0) {
+            alert(`✓ QR lido com sucesso! ${preenchido} campo(s) preenchido(s).
+Completa a obra, categoria e estado manualmente.`);
+        } else {
+            // Tentar formato simples (texto livre)
+            alert("QR lido mas formato não reconhecido como fatura AT.
+Conteúdo: " + texto.substring(0, 100));
+        }
+
+    } catch(e) {
+        console.error("Erro a parsear QR:", e);
+        alert("Erro ao ler o QR. Verifique se é um QR de fatura portuguesa.");
+    }
 }
 
 // =======================================================
@@ -1015,7 +1216,7 @@ async function guardarArtigo() {
     fecharModalArtigo();
     // Pequeno delay para garantir que a view do Supabase reflecte o novo movimento
     await new Promise(r => setTimeout(r, 300));
-    await carregarArtigos();
+    await carregarArtigos(); // Stock actualizado via vw_stock_atual
 }
 
 async function apagarArtigo(id, nome) {
@@ -1282,4 +1483,10 @@ function ligarEventosGlobais() {
 
     // Financeiro
     document.getElementById("btnRefreshFinanceiro")?.addEventListener("click", carregarFinanceiro);
+    document.getElementById("filtroMesFinanceiro")?.addEventListener("change", carregarFinanceiro);
+    // Definir mês actual por defeito
+    const hoje2 = new Date();
+    const mesDefault = `${hoje2.getFullYear()}-${String(hoje2.getMonth()+1).padStart(2,"0")}`;
+    const filtroMesEl = document.getElementById("filtroMesFinanceiro");
+    if (filtroMesEl) filtroMesEl.value = mesDefault;
 }

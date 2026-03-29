@@ -1427,63 +1427,138 @@ window.guardarDespesa = async function(tipo, estado) {
 // ============================================================
 // COLABORADORES
 // ============================================================
-async function renderColaboradores() {
-  const anoAtual = new Date().getFullYear();
-  const mesAtual = new Date().getMonth() + 1;
-  const mesStr   = String(mesAtual).padStart(2,"0");
-  const inicio   = `${anoAtual}-${mesStr}-01`;
-  const fim      = `${anoAtual}-${mesStr}-${new Date(anoAtual,mesAtual,0).getDate()}`;
+// Estado do filtro de mês para colaboradores
+let colabMesSel = (() => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+})();
 
-  const [funcRes, kpiRes, registosRes] = await Promise.all([
-    SB.from("funcionarios").select("id, nome, codigo, valor_dia, ativo").order("nome"),
-    SB.from("vw_kpis_financeiros_mes").select("*").single(),
-    SB.from("vw_registos_ponto").select("funcionario, horas, dia").gte("dia",inicio).lte("dia",fim),
+async function renderColaboradores() {
+  const [ano, mes] = colabMesSel.split("-").map(Number);
+  const mesStr  = String(mes).padStart(2,"0");
+  const inicio  = `${ano}-${mesStr}-01`;
+  const fim     = `${ano}-${mesStr}-${new Date(ano,mes,0).getDate()}`;
+  const mesLabel = new Date(ano, mes-1, 1).toLocaleString("pt-PT",{month:"long",year:"numeric"});
+
+  const [funcRes, registosRes] = await Promise.all([
+    SB.from("funcionarios").select("id, nome, valor_dia, ativo").order("nome"),
+    SB.from("vw_registos_ponto").select("funcionario, horas, dia, obra").gte("dia",inicio).lte("dia",fim),
   ]);
 
   const funcs    = (funcRes.data||[]).filter(f => f.ativo !== false);
-  const kpi      = kpiRes.data || {};
   const registos = registosRes.data || [];
 
-  // Horas por funcionário no mês
-  const horasPorFunc = {};
+  // Horas e dias por funcionário — com desconto de 1h almoço
+  const dadosPorFunc = {};
   registos.forEach(r => {
-    if (!r.funcionario || !r.horas) return;
+    if (!r.funcionario) return;
+    if (!dadosPorFunc[r.funcionario]) dadosPorFunc[r.funcionario] = { horas: 0, dias: 0, registos: [] };
     let h = 0;
-    if (typeof r.horas === "string" && r.horas.includes(":")) {
+    if (r.horas && typeof r.horas === "string" && r.horas.includes(":")) {
       const [hh,mm] = r.horas.split(":").map(Number); h = hh + mm/60;
     } else h = Number(r.horas)||0;
-    horasPorFunc[r.funcionario] = (horasPorFunc[r.funcionario]||0) + h;
+    if (h > 0) h = Math.max(0, h - 1); // desconto 1h almoço
+    dadosPorFunc[r.funcionario].horas += h;
+    dadosPorFunc[r.funcionario].dias  += 1;
+    dadosPorFunc[r.funcionario].registos.push(r);
+  });
+
+  // Totais
+  let totalH = 0, totalD = 0, totalP = 0;
+  funcs.forEach(f => {
+    const d = dadosPorFunc[f.nome];
+    if (!d) return;
+    totalH += d.horas;
+    totalD += d.dias;
+    if (f.valor_dia) totalP += d.dias * f.valor_dia;
   });
 
   document.getElementById("mainContent").innerHTML = `
     <div class="painel">
-      <div class="painel-title">Resumo do Mês</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+        <div class="painel-title" style="margin:0;border:none;padding:0">Gestão de Equipa</div>
+        <input type="month" id="colabMesFiltro" value="${colabMesSel}"
+          style="padding:7px 12px;border-radius:8px;border:1px solid rgba(0,0,0,.15);background:rgba(255,255,255,.6);font-family:var(--font-title);font-size:13px;letter-spacing:.5px;cursor:pointer">
+      </div>
       <div class="visao-grid">
-        <div class="kpi-card"><div class="kpi-label">Total horas</div><div class="kpi-value neutro">${kpi.total_horas_mes||"–"}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Dias trabalhados</div><div class="kpi-value neutro">${kpi.total_dias_trabalhados||"–"}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Total a pagar</div><div class="kpi-value vermelho">${kpi.total_a_pagar?fmtEur(Number(kpi.total_a_pagar)):"–"}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Total horas</div><div class="kpi-value neutro">${totalH.toFixed(2)}h</div></div>
+        <div class="kpi-card"><div class="kpi-label">Dias trabalhados</div><div class="kpi-value neutro">${totalD}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Total a pagar</div><div class="kpi-value vermelho">${fmtEur(totalP)}</div></div>
       </div>
     </div>
 
     <div class="painel">
-      <div class="painel-title">Equipa — ${new Date().toLocaleString("pt-PT",{month:"long",year:"numeric"})}</div>
+      <div class="painel-title">Equipa — ${mesLabel}</div>
       <div class="colab-grid">
         ${funcs.map(f => {
-          const h = horasPorFunc[f.nome] || 0;
-          const dias = (registos.filter(r=>r.funcionario===f.nome)).length;
-          const valor = f.valor_dia ? (dias * f.valor_dia) : null;
+          const d = dadosPorFunc[f.nome] || { horas:0, dias:0, registos:[] };
+          const valor = f.valor_dia ? (d.dias * f.valor_dia) : null;
           return `
             <div class="colab-card">
               <div class="colab-avatar">${f.nome.charAt(0).toUpperCase()}</div>
               <div class="colab-nome">${f.nome}</div>
-              <div class="colab-horas">${h.toFixed(1)}h · ${dias} dias</div>
+              <div class="colab-horas">${d.horas.toFixed(2)}h · ${d.dias} dias</div>
               ${valor !== null ? `<div class="colab-valor">${fmtEur(valor)}</div>` : ""}
+              <button onclick="verHistoricoColab(${JSON.stringify(f.nome)}, ${JSON.stringify(dadosPorFunc[f.nome]?.registos||[])})"
+                style="margin-top:10px;width:100%;padding:6px;border-radius:6px;border:1px solid rgba(0,0,0,.15);background:rgba(0,0,0,.05);font-family:var(--font-title);font-size:11px;letter-spacing:.8px;text-transform:uppercase;cursor:pointer">
+                Histórico
+              </button>
             </div>`;
         }).join("")}
       </div>
     </div>
+
+    <!-- Modal histórico colaborador -->
+    <div id="modalHistColab" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;align-items:center;justify-content:center">
+      <div style="background:var(--bg);border-radius:var(--radius);padding:24px;max-width:560px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:var(--shadow)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div id="modalHistColabTitulo" style="font-family:var(--font-title);font-size:18px;letter-spacing:1px;text-transform:uppercase"></div>
+          <button onclick="document.getElementById('modalHistColab').style.display='none'"
+            style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.5">×</button>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px" id="tabelaHistColab">
+          <thead>
+            <tr>
+              <th style="padding:8px 12px;text-align:left;border-bottom:2px solid rgba(0,0,0,.1);font-family:var(--font-title);font-size:11px;letter-spacing:1px;text-transform:uppercase">Dia</th>
+              <th style="padding:8px 12px;text-align:left;border-bottom:2px solid rgba(0,0,0,.1);font-family:var(--font-title);font-size:11px;letter-spacing:1px;text-transform:uppercase">Obra</th>
+              <th style="padding:8px 12px;text-align:right;border-bottom:2px solid rgba(0,0,0,.1);font-family:var(--font-title);font-size:11px;letter-spacing:1px;text-transform:uppercase">Horas</th>
+            </tr>
+          </thead>
+          <tbody id="corpoHistColab"></tbody>
+        </table>
+      </div>
+    </div>
   `;
+
+  // Ligar filtro de mês
+  document.getElementById("colabMesFiltro").addEventListener("change", function() {
+    colabMesSel = this.value;
+    renderColaboradores();
+  });
 }
+
+window.verHistoricoColab = function(nome, regs) {
+  document.getElementById("modalHistColabTitulo").textContent = nome;
+  const corpo = document.getElementById("corpoHistColab");
+  if (!regs || regs.length === 0) {
+    corpo.innerHTML = `<tr><td colspan="3" style="padding:16px;text-align:center;opacity:.5">Sem registos</td></tr>`;
+  } else {
+    const sorted = [...regs].sort((a,b) => a.dia.localeCompare(b.dia));
+    corpo.innerHTML = sorted.map(r => {
+      let h = 0;
+      if (r.horas && typeof r.horas === "string" && r.horas.includes(":")) {
+        const [hh,mm] = r.horas.split(":").map(Number); h = hh+mm/60;
+      } else h = Number(r.horas)||0;
+      if (h > 0) h = Math.max(0, h-1);
+      return `<tr style="border-bottom:1px solid rgba(0,0,0,.05)">
+        <td style="padding:8px 12px">${r.dia}</td>
+        <td style="padding:8px 12px;opacity:.7">${r.obra||"—"}</td>
+        <td style="padding:8px 12px;text-align:right;font-weight:500">${h.toFixed(2)}h</td>
+      </tr>`;
+    }).join("");
+  }
+  document.getElementById("modalHistColab").style.display = "flex";
+};
 
 // ============================================================
 // UTILS

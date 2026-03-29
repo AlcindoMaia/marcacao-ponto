@@ -48,12 +48,11 @@
 
     <!-- TABS -->
     <div class="tabs">
-        <button class="tab active" data-tab="financeiro">Financeiro</button>
-        <button class="tab" data-tab="dashboard">Dashboard</button>
+        <button class="tab active" data-tab="fluxo">Fluxo de Caixa</button>
+        <button class="tab" data-tab="financeiro">Financeiro</button>
         <button class="tab" data-tab="registos">Registos</button>
         <button class="tab" data-tab="funcionarios">Funcionários</button>
         <button class="tab" data-tab="inventario">Inventário</button>
-        <button class="tab" data-tab="fluxo">Fluxo de Caixa</button>
         <button class="tab" data-tab="obras">Obras</button>
         <button class="tab" data-tab="gerarqr">Gerar QR</button>
     </div>
@@ -151,7 +150,7 @@
 </div>
   
     <!-- ================= TAB FINANCEIRO ================= -->
-    <div class="tab-content active" id="tab-financeiro">
+    <div class="tab-content" id="tab-financeiro">
 
         <!-- KPIs -->
         <div class="grid-cards">
@@ -167,20 +166,20 @@
                 <h3>Dias trabalhados</h3>
                 <div id="kpiDias" class="value">–</div>
             </div>
-            <div class="card metric warning">
-                <h3>Dias &lt; 8h</h3>
-                <div id="kpiDiasIncompletos" class="value">–</div>
-            </div>
-            <div class="card metric primary">
+<div class="card metric primary">
                 <h3>Total a pagar</h3>
                 <div id="kpiTotal" class="value">–</div>
             </div>
         </div>
 
-        <!-- AÇÕES -->
-        <div class="card filtros">
-            <button class="btn-primary" id="btnRefreshFinanceiro">Atualizar</button>
-            <button class="btn-secondary" id="btnExportExcel">Exportar Excel</button>
+        <!-- AÇÕES + FILTRO MÊS -->
+        <div class="card filtros" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <div style="display:flex;flex-direction:column;gap:4px">
+                <label style="font-size:11px;opacity:.6;text-transform:uppercase;letter-spacing:.05em">Mês</label>
+                <input type="month" id="filtroMesFinanceiro" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:var(--bg-dark-panel);color:var(--text-light);font-size:13px">
+            </div>
+            <button class="btn-primary" id="btnRefreshFinanceiro" style="margin-top:18px">Atualizar</button>
+            <button class="btn-secondary" id="btnExportExcel" style="margin-top:18px">Exportar Excel</button>
         </div>
 
         <!-- TABELA FINANCEIRA -->
@@ -192,7 +191,6 @@
                         <th>Funcionário</th>
                         <th>Horas</th>
                         <th>Dias</th>
-                        <th>Dias &lt; 8h</th>
                         <th>Valor (€)</th>
                     </tr>
                 </thead>
@@ -370,7 +368,7 @@
     </div>
 
     <!-- ================= TAB FLUXO DE CAIXA ================= -->
-<div class="tab-content" id="tab-fluxo">
+<div class="tab-content active" id="tab-fluxo">
 
     <!-- KPIs -->
     <div class="grid-cards">
@@ -449,7 +447,25 @@
     <div class="modal-content">
         <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center">
             <h2 id="modalMovTitulo">Novo Movimento</h2>
-            <button id="fecharModalMovBtn" class="modal-close" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--color-text-secondary)">×</button>
+            <div style="display:flex;gap:8px;align-items:center">
+                <button id="btnScanQR" title="Ler QR de fatura"
+                    style="background:var(--primary);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">
+                    📷 Ler QR Fatura
+                </button>
+                <button id="fecharModalMovBtn" class="modal-close" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--color-text-secondary)">×</button>
+            </div>
+        </div>
+
+        <!-- Leitor QR de fatura (oculto por defeito) -->
+        <div id="qrReaderWrap" style="display:none;margin-bottom:16px;border-radius:10px;overflow:hidden;position:relative;background:#000">
+            <video id="qrVideo" style="width:100%;max-height:220px;object-fit:cover" playsinline autoplay muted></video>
+            <canvas id="qrCanvas" style="display:none"></canvas>
+            <div style="position:absolute;top:8px;right:8px">
+                <button onclick="fecharScanQR()" style="background:rgba(0,0,0,.6);border:none;color:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px">✕ Fechar</button>
+            </div>
+            <div id="qrStatus" style="position:absolute;bottom:8px;left:0;right:0;text-align:center;color:#fff;font-size:12px;font-family:var(--font-body);background:rgba(0,0,0,.5);padding:4px">
+                A aguardar QR Code da fatura...
+            </div>
         </div>
 
         <div class="form-row">
@@ -621,7 +637,6 @@
                     <th>Morada</th>
                     <th>Raio (m)</th>
                     <th>Estado</th>
-                    <th>QR Code</th>
                     <th></th>
                 </tr>
             </thead>
@@ -708,6 +723,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script src="config.js"></script>
 <script src="admin.js"></script>
 
