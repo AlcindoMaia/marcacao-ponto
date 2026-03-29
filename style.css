@@ -93,22 +93,11 @@ h3 { font-size: 14px; letter-spacing: .3px; }
 /* =======================================================
    METRIC CARDS
 ======================================================= */
-.grid-cards {
-    display: flex;
-    gap: 24px;
-    flex-wrap: wrap;
-}
 
-.card.metric {
-    flex: 1;
-    min-width: 200px;
-}
 
-.card.metric .value {
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--primary);
-}
+
+
+
 
 .card.metric.warning .value { color: #ffb3b3; }
 .card.metric.primary .value { color: #000; }
@@ -287,21 +276,19 @@ body.dark table.dataTable tbody td {
 /* =======================================================
    RESPONSIVO
 ======================================================= */
-@media (max-width: 768px) {
+@media (max-width: 480px) {
 
     .container {
-        padding: 0 18px 24px;
+        padding: 0 12px 24px;
     }
 
     .header {
-        padding: 16px;
+        padding: 12px;
         flex-wrap: wrap;
-        gap: 12px;
+        gap: 10px;
     }
 
-    .grid-cards {
-        flex-direction: column;
-    }
+    
 
     .inventario-header {
         flex-direction: column;
@@ -714,27 +701,7 @@ body:not(.dark) #pesquisaObras {
     border-color: #ccc;
 }
 
-/* KPI cards — dimensões uniformes em todas as tabs */
-.card.metric {
-    min-width: 140px;
-    padding: 18px 20px;
-}
 
-.card.metric h3 {
-    font-size: 12px;
-    font-weight: 500;
-    opacity: .7;
-    text-transform: uppercase;
-    letter-spacing: .04em;
-    margin-bottom: 8px;
-}
-
-.card.metric .value {
-    font-size: 26px;
-    font-weight: 700;
-    color: var(--primary);
-    line-height: 1.1;
-}
 
 /* Tabelas internas — cabeçalho uniforme */
 #tabelaFuncionarios th,
@@ -828,42 +795,17 @@ body:not(.dark) .filtros-linha select {
    de estar dentro ou fora do .container
 ======================================================= */
 
-/* Tab activa — sem padding lateral (já vem do .container pai) */
+/* Tab activa */
 .tab-content.active {
     display: block;
+    width: 100%;
     padding-bottom: 20px;
 }
 
-/* KPI cards — altura mínima e padding uniformes */
-.card.metric {
-    flex: 1;
-    min-width: 160px;
-    padding: 20px 22px;
-}
 
-.card.metric h3 {
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .05em;
-    opacity: .65;
-    margin: 0 0 10px;
-}
-
-.card.metric .value {
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--primary);
-    line-height: 1;
-}
 
 /* grid-cards — gap e margin-bottom uniformes */
-.grid-cards {
-    display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
-    margin-bottom: 20px;
-}
+
 
 /* Barra de pesquisa + botão (inventário, funcionários, obras) */
 .inventario-header {
@@ -1083,6 +1025,296 @@ body:not(.dark) .inventario-header input {
 }
 
 /* grid-cards dentro de tab — sempre com margin-bottom 16px */
-.tab-content .grid-cards {
+.tab-content 
+
+/* =======================================================
+   GRID CARDS — layout em linha
+======================================================= */
+.grid-cards {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 20px;
+    width: 100%;
+}
+
+/* KPI cards — flex basis 110px permite 3-5 em linha */
+.card.metric {
+    flex: 1 1 110px;
+    min-width: 110px;
+    padding: 16px 20px;
+    margin-bottom: 0;
+}
+
+.card.metric h3 {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    opacity: .65;
+    margin: 0 0 8px;
+}
+
+.card.metric .value {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--primary);
+    line-height: 1;
+}
+
+/* cards dentro de grid-cards não têm margin-bottom próprio */
+.grid-cards .card {
+    margin-bottom: 0;
+}
+
+/* =======================================================
+   TABS — barra de navegação
+======================================================= */
+.tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
     margin-bottom: 16px;
+    padding: 0;
+}
+
+.tab {
+    padding: 7px 14px;
+    border-radius: 999px;
+    background: rgba(0,0,0,.06);
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.tab.active {
+    background: var(--primary);
+    color: #000;
+}
+
+body.dark .tab {
+    background: rgba(255,255,255,.08);
+    color: #fff;
+}
+
+body.dark .tab.active {
+    background: var(--primary);
+    color: #000;
+}
+
+/* =======================================================
+   MOBILE — admin responsivo
+======================================================= */
+@media (max-width: 600px) {
+
+    /* Header compacto */
+    .header {
+        padding: 12px 16px;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .logo {
+        height: 44px;
+    }
+
+    .header h1 {
+        font-size: 16px;
+    }
+
+    .dark-toggle {
+        font-size: 16px;
+    }
+
+    /* Container sem padding lateral excessivo */
+    .container {
+        padding: 0 12px 24px;
+    }
+
+    /* Tabs em scroll horizontal — sem quebra de linha */
+    .tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding-bottom: 4px;
+        margin-bottom: 12px;
+        gap: 6px;
+    }
+
+    .tabs::-webkit-scrollbar { display: none; }
+
+    .tab {
+        padding: 6px 12px;
+        font-size: 12px;
+        flex-shrink: 0;
+    }
+
+    /* KPI cards — 2 por linha em mobile */
+    .grid-cards {
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+
+    .card.metric {
+        flex: 1 1 calc(50% - 10px);
+        min-width: calc(50% - 10px);
+        padding: 12px 14px;
+    }
+
+    .card.metric .value {
+        font-size: 20px;
+    }
+
+    /* Cards gerais — padding reduzido */
+    .card {
+        padding: 14px 16px;
+    }
+
+    /* Barra de pesquisa + botão */
+    .inventario-header {
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+
+    .inventario-header input {
+        font-size: 13px;
+        height: 36px;
+    }
+
+    .btn-circular {
+        width: 36px !important;
+        height: 36px !important;
+        font-size: 20px !important;
+    }
+
+    /* Tabelas — scroll horizontal */
+    .card > table,
+    #tabelaRegistos,
+    #tabelaFinanceira,
+    #tabelaArtigos,
+    #tabelaFuncionarios,
+    #tabelaMovimentos,
+    #tabelaObras {
+        font-size: 11px;
+        min-width: 500px;
+    }
+
+    .card:has(table) {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Tabela wrapper com scroll */
+    .card-table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Headers de tabela menores */
+    #tabelaFuncionarios th,
+    #tabelaMovimentos th,
+    #tabelaObras th,
+    #tabelaArtigos th,
+    #tabelaRegistos th,
+    #tabelaFinanceira th {
+        padding: 8px 10px !important;
+        font-size: 10px !important;
+    }
+
+    #tabelaFuncionarios td,
+    #tabelaMovimentos td,
+    #tabelaObras td,
+    #tabelaArtigos td,
+    #tabelaRegistos td,
+    #tabelaFinanceira td {
+        padding: 8px 10px;
+        font-size: 11px;
+    }
+
+    /* Filtros fluxo caixa — em coluna em mobile */
+    .filtros-linha {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .filtros-linha .col {
+        min-width: 100%;
+    }
+
+    /* Modal em full screen em mobile */
+    .modal-content {
+        max-width: 100% !important;
+        margin: 0;
+        border-radius: 14px 14px 0 0;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    /* Form rows em coluna */
+    .form-row {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .form-group.input-sm,
+    .form-group.input-xs,
+    .form-group.input-md {
+        flex: 1 1 100%;
+        min-width: 100%;
+    }
+
+    /* Botões de acção mais fáceis de tocar */
+    .btn-acao {
+        font-size: 18px;
+        padding: 6px 8px;
+    }
+
+    /* Botões primário/secundário — full width em mobile */
+    .btn-primary,
+    .btn-secondary {
+        padding: 10px 16px;
+        font-size: 14px;
+    }
+
+    /* Login box */
+    #loginBox {
+        margin: 0 12px var(--space-lg);
+    }
+
+    /* Calendar compacto já serve mobile */
+}
+
+/* Tablet (601–900px) */
+@media (min-width: 601px) and (max-width: 900px) {
+
+    .container {
+        padding: 0 20px 28px;
+    }
+
+    .card.metric {
+        flex: 1 1 calc(33% - 12px);
+        min-width: calc(33% - 12px);
+    }
+
+    .tabs {
+        gap: 8px;
+    }
+
+    .tab {
+        font-size: 13px;
+        padding: 7px 13px;
+    }
+
+    .card {
+        padding: 18px 20px;
+    }
 }
