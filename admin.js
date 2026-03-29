@@ -108,7 +108,6 @@ function abrirTab(nome) {
     if (nome === "funcionarios") initFuncionarios();
     if (nome === "inventario")   initInventario();
     if (nome === "obras")        initObras();
-    if (nome === "fluxo")        initFluxo();
 }
 
 // =======================================================
@@ -993,8 +992,7 @@ function parsearQRFatura(texto) {
 Completa a obra, categoria e estado manualmente.`);
         } else {
             // Tentar formato simples (texto livre)
-            alert("QR lido mas formato não reconhecido como fatura AT.
-Conteúdo: " + texto.substring(0, 100));
+            alert("QR lido mas formato não reconhecido como fatura AT. Conteúdo: " + texto.substring(0, 100));
         }
 
     } catch(e) {
