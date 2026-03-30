@@ -85,6 +85,7 @@ function mostrarPainel() {
 function inicializarPainel() {
     ativarTabs();
     abrirTab("fluxo");
+    carregarNotificacoes(); // Carregar alertas iniciais
 }
 
 function ativarTabs() {
@@ -379,8 +380,7 @@ async function guardarEdicaoRegisto(tr, tdEditado) {
 
     // Destacar células editadas — fica sempre amarelo
     tdEditado.classList.add("editado");
-    tdEditado.style.setProperty("background", "rgba(244,185,66,0.18)", "important");
-    tdEditado.style.setProperty("color", "#f4b942", "important");
+    tdEditado.style.cssText += "; background: rgba(244,185,66,0.25) !important; color: #f4b942 !important; outline: 2px solid rgba(244,185,66,0.4) !important; outline-offset: -2px !important;";
     tdEditado.title = "";
 }
 
@@ -1018,7 +1018,33 @@ async function carregarUnidades() {
 }
 
 async function carregarArtigos() {
-    const { data, error } = await SB.from("vw_stock_atual").select("*").order("descricao");
+    // Buscar artigos directamente + movimentos de stock para calcular stock actual
+    const [{ data, error }, { data: movs }] = await Promise.all([
+        SB.from("artigos").select("id, codigo, descricao, tipo_artigo, preco_atual, stock_inicial, local_armazenamento, ativo").order("descricao"),
+        SB.from("movimentos_stock").select("artigo_id, tipo_movimento, quantidade")
+    ]);
+
+    // Calcular stock actual por artigo
+    const stockPorArtigo = {};
+    if (movs) {
+        movs.forEach(m => {
+            if (!stockPorArtigo[m.artigo_id]) stockPorArtigo[m.artigo_id] = 0;
+            if (m.tipo_movimento === "entrada" || m.tipo_movimento === "ajuste_entrada") {
+                stockPorArtigo[m.artigo_id] += Number(m.quantidade);
+            } else {
+                stockPorArtigo[m.artigo_id] -= Number(m.quantidade);
+            }
+        });
+    }
+
+    // Adicionar stock calculado a cada artigo
+    const dataComStock = (data || []).filter(a => a.ativo !== false).map(a => ({
+        ...a,
+        quantidade: (a.stock_inicial || 0) + (stockPorArtigo[a.id] || 0)
+    }));
+
+    // Substituir data pela versão calculada para o resto da função usar
+    const _data = dataComStock;
     const tbody = document.querySelector("#tabelaArtigos tbody");
     if (!tbody) return;
     if (error) {
@@ -1026,11 +1052,11 @@ async function carregarArtigos() {
         return;
     }
     tbody.innerHTML = "";
-    if (!data || data.length === 0) {
+    if (!_data || _data.length === 0) {
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;opacity:.6">Sem artigos. Clique + para adicionar.</td></tr>`;
         return;
     }
-    data.forEach(a => {
+    _data.forEach(a => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td>${a.codigo || ""}</td>

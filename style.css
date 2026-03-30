@@ -1169,16 +1169,7 @@ body.dark .tab.active {
 }
 
 
-/* =======================================================
-   CÉLULAS EDITADAS — sempre amarelas (cor + fundo)
-======================================================= */
-td.editado,
-.editavel.editado,
-.linha-editada td.editado {
-    background: rgba(244, 185, 66, 0.18) !important;
-    color: #f4b942 !important;
-    font-weight: 600 !important;
-}
+
 
 
 /* =======================================================
@@ -1320,4 +1311,23 @@ body:not(.dark) .filtros-linha input[type="date"] {
     .filtros-linha {
         grid-template-columns: 1fr 1fr !important;
     }
+}
+
+/* =======================================================
+   CÉLULAS EDITADAS — amarelo visível em qualquer tema
+======================================================= */
+.editavel.editado,
+td.editado,
+.linha-editada .editado {
+    background-color: rgba(244, 185, 66, 0.28) !important;
+    color: #f4b942 !important;
+    outline: 2px solid rgba(244, 185, 66, 0.5) !important;
+    outline-offset: -2px !important;
+    font-weight: 600 !important;
+}
+
+/* Impedir que hover sobrescreva o fundo amarelo */
+#tabelaRegistos tbody tr:hover td.editado,
+#tabelaRegistos tbody tr:hover .editavel.editado {
+    background-color: rgba(244, 185, 66, 0.35) !important;
 }

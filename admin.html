@@ -6,7 +6,7 @@
 
 <title>Painel Administrativo — Maia Solutions</title>
 
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=2">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
 <!-- jQuery -->
@@ -24,6 +24,22 @@
     <img src="Logo.png" class="logo">
     <h1>Painel Administrativo</h1>
 
+    <!-- NOTIFICAÇÕES -->
+    <div id="notifWrap" style="position:relative;display:inline-flex;align-items:center">
+        <button onclick="toggleNotificacoes()" title="Notificações"
+            style="background:none;border:none;cursor:pointer;font-size:20px;padding:6px 10px;position:relative;opacity:.8;transition:opacity .15s"
+            onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity='.8'">
+            🔔
+            <span id="notifBadge"
+                style="display:none;position:absolute;top:2px;right:2px;background:#e05c5c;color:#fff;
+                       border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:700;
+                       align-items:center;justify-content:center;font-family:var(--font-body)">0</span>
+        </button>
+        <div style="position:absolute;top:calc(100% + 8px);right:0;width:320px;background:var(--bg-dark-panel, #262626);
+                    border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.08);
+                    z-index:999;display:none;max-height:420px;overflow-y:auto" id="notifPainel">
+        </div>
+    </div>
     <!-- BOTÃO DARK MODE -->
     <button class="dark-toggle" id="darkBtn" onclick="toggleDark()">☀️</button>
     <!-- DASHBOARD -->
