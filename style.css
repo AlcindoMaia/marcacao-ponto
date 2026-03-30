@@ -486,43 +486,15 @@ body.dark table.dataTable tbody td {
 /* =======================================================
    FILTROS LINHA — LAYOUT FLEXÍVEL
 ======================================================= */
-.filtros-linha {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-    align-items: flex-end;
-}
 
-.filtros-linha .col {
-    flex: 1;
-    min-width: 140px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
 
-.filtros-linha label {
-    font-size: 12px;
-    opacity: .75;
-}
 
-.filtros-linha input,
-.filtros-linha select {
-    padding: 8px 10px;
-    border-radius: 8px;
-    border: 1px solid rgba(255,255,255,.15);
-    background: var(--bg-dark-panel);
-    color: var(--text-light);
-    font-size: 13px;
-}
 
-body:not(.dark) .filtros-linha input,
-body:not(.dark) .filtros-linha select {
-    background: var(--bg-panel);
-    color: var(--text-dark);
-    border-color: #ccc;
-}
+
+
+
+
+body:not(.dark) 
 
 /* =======================================================
    FORM GROUPS — MODAL
@@ -744,43 +716,14 @@ body:not(.dark) #tabelaObras td {
 }
 
 /* Filtros do fluxo de caixa — inputs com mesma altura dos selects */
-.filtros-linha input,
-.filtros-linha select {
-    height: 38px;
-    padding: 0 10px;
-    border-radius: 8px;
-    border: 1px solid rgba(255,255,255,.15);
-    background: var(--bg-dark-panel);
-    color: var(--text-light);
-    font-size: 13px;
-    width: 100%;
-}
 
-body:not(.dark) .filtros-linha input,
-body:not(.dark) .filtros-linha select {
-    background: var(--bg-panel);
-    color: var(--text-dark);
-    border-color: #ccc;
-}
 
-.filtros-linha label {
-    font-size: 11px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: .04em;
-    opacity: .6;
-    margin-bottom: 5px;
-    display: block;
-}
+body:not(.dark) 
+
+
 
 /* Botões dentro dos filtros — mesma altura */
-.filtros-linha .btn-primary,
-.filtros-linha .btn-secondary {
-    height: 38px;
-    padding: 0 16px;
-    white-space: nowrap;
-    font-size: 13px;
-}
+
 
 /* =======================================================
    LAYOUT UNIFORME DE TODAS AS TABS
@@ -876,47 +819,15 @@ body:not(.dark) #tabelaFinanceira td {
 }
 
 /* Filtros do fluxo de caixa */
-.filtros-linha {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-bottom: 14px;
-    align-items: flex-end;
-}
 
-.filtros-linha .col {
-    flex: 1;
-    min-width: 130px;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
 
-.filtros-linha label {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .05em;
-    opacity: .6;
-}
 
-.filtros-linha input,
-.filtros-linha select {
-    height: 38px;
-    padding: 0 10px;
-    border-radius: 8px;
-    border: 1px solid rgba(255,255,255,.15);
-    background: var(--bg-dark-panel);
-    color: var(--text-light);
-    font-size: 13px;
-}
 
-body:not(.dark) .filtros-linha input,
-body:not(.dark) .filtros-linha select {
-    background: var(--bg-panel);
-    color: var(--text-dark);
-    border-color: #ccc;
-}
+
+
+
+
+body:not(.dark) 
 
 /* Tabs button bar */
 .tabs {
@@ -935,9 +846,7 @@ body:not(.dark) .filtros-linha select {
 }
 
 /* Dentro de grid-cards, cards não têm margin-bottom — o gap trata */
-.grid-cards .card {
-    margin-bottom: 0;
-}
+
 
 /* Botão + circular — tamanho fixo igual em todas as tabs */
 #btnNovoArtigo,
@@ -1013,43 +922,17 @@ body:not(.dark) .inventario-header input {
 /* =======================================================
    GRID CARDS — layout em linha
 ======================================================= */
-.grid-cards {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 20px;
-    width: 100%;
-}
+
 
 /* KPI cards — flex basis 110px permite 3-5 em linha */
-.card.metric {
-    flex: 1 1 110px;
-    min-width: 110px;
-    padding: 16px 20px;
-    margin-bottom: 0;
-}
 
-.card.metric h3 {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .05em;
-    opacity: .65;
-    margin: 0 0 8px;
-}
 
-.card.metric .value {
-    font-size: 26px;
-    font-weight: 700;
-    color: var(--primary);
-    line-height: 1;
-}
+
+
+
 
 /* cards dentro de grid-cards não têm margin-bottom próprio */
-.grid-cards .card {
-    margin-bottom: 0;
-}
+
 
 /* =======================================================
    TABS — barra de navegação
@@ -1137,20 +1020,11 @@ body.dark .tab.active {
     }
 
     /* KPI cards — 2 por linha em mobile */
-    .grid-cards {
-        gap: 10px;
-        margin-bottom: 14px;
-    }
+    
 
-    .card.metric {
-        flex: 1 1 calc(50% - 10px);
-        min-width: calc(50% - 10px);
-        padding: 12px 14px;
-    }
+    
 
-    .card.metric .value {
-        font-size: 20px;
-    }
+    
 
     /* Cards gerais — padding reduzido */
     .card {
@@ -1219,14 +1093,9 @@ body.dark .tab.active {
     }
 
     /* Filtros fluxo caixa — em coluna em mobile */
-    .filtros-linha {
-        flex-direction: column;
-        gap: 8px;
-    }
+    
 
-    .filtros-linha .col {
-        min-width: 100%;
-    }
+    
 
     /* Modal em full screen em mobile */
     .modal-content {
@@ -1283,10 +1152,7 @@ body.dark .tab.active {
         padding: 0 20px 28px;
     }
 
-    .card.metric {
-        flex: 1 1 160px;
-        min-width: 160px;
-    }
+    
 
     .tabs {
         gap: 8px;
@@ -1318,12 +1184,81 @@ td.editado,
 /* =======================================================
    FLUXO DE CAIXA — filtros redesenhados
 ======================================================= */
-.filtros-linha {
+
+
+
+
+
+
+
+
+
+
+body:not(.dark) 
+
+
+
+
+
+/* Responsivo filtros */
+@media (max-width: 768px) {
+    
+    
+}
+
+@media (max-width: 480px) {
+    
+    
+}
+
+/* =======================================================
+   GRID-CARDS — CSS Grid (não Flexbox) para KPI cards
+   auto-fit com minmax garante sempre em linha
+======================================================= */
+.grid-cards {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr auto auto;
-    gap: 12px;
-    align-items: end;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+    width: 100%;
+}
+
+.card.metric {
+    padding: 16px 20px;
     margin-bottom: 0;
+}
+
+.card.metric h3 {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    opacity: .65;
+    margin: 0 0 8px;
+}
+
+.card.metric .value {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--primary);
+    line-height: 1;
+}
+
+@media (max-width: 480px) {
+    .grid-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* =======================================================
+   FILTROS FLUXO DE CAIXA — grid 5 colunas numa linha
+======================================================= */
+.filtros-linha {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto !important;
+    gap: 12px !important;
+    align-items: end !important;
+    margin-bottom: 0 !important;
 }
 
 .filtros-linha .col {
@@ -1333,36 +1268,26 @@ td.editado,
     min-width: 0;
 }
 
-.filtros-linha .col-datas {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    grid-column: span 2;
-}
-
 .filtros-linha label {
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 10px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: .06em;
-    opacity: .55;
+    letter-spacing: .07em;
+    opacity: .5;
     white-space: nowrap;
 }
 
 .filtros-linha select,
 .filtros-linha input[type="date"] {
-    height: 40px;
-    padding: 0 12px;
+    height: 38px;
+    padding: 0 10px;
     border-radius: 8px;
     border: 1px solid rgba(255,255,255,.1);
     background: rgba(255,255,255,.06);
     color: var(--text-light);
     font-size: 13px;
-    font-family: var(--font-body, inherit);
     width: 100%;
     cursor: pointer;
-    appearance: none;
-    -webkit-appearance: none;
 }
 
 body:not(.dark) .filtros-linha select,
@@ -1375,34 +1300,24 @@ body:not(.dark) .filtros-linha input[type="date"] {
 .filtros-linha select:focus,
 .filtros-linha input[type="date"]:focus {
     outline: 2px solid var(--primary);
-    border-color: var(--primary);
 }
 
 .filtros-linha .btn-primary,
 .filtros-linha .btn-secondary {
-    height: 40px;
-    padding: 0 18px;
+    height: 38px;
+    padding: 0 16px;
     white-space: nowrap;
     flex-shrink: 0;
-    align-self: end;
 }
 
-/* Responsivo filtros */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     .filtros-linha {
-        grid-template-columns: 1fr 1fr;
-    }
-    .filtros-linha .col-datas {
-        grid-column: span 2;
+        grid-template-columns: 1fr 1fr 1fr !important;
     }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 600px) {
     .filtros-linha {
-        grid-template-columns: 1fr;
-    }
-    .filtros-linha .col-datas {
-        grid-column: span 1;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr 1fr !important;
     }
 }
