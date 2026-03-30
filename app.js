@@ -36,6 +36,14 @@ function startOfWeek() {
 const fmtHora = iso => new Date(iso).toLocaleTimeString("pt-PT", { hour:"2-digit", minute:"2-digit" });
 const fmtDia  = iso => new Date(iso).toLocaleDateString("pt-PT", { weekday:"short", day:"2-digit", month:"2-digit" });
 
+function calcHoras(entIso, saiIso) {
+    const diff = new Date(saiIso) - new Date(entIso);
+    if (diff <= 0) return null;
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    return `${h}h${m > 0 ? String(m).padStart(2,"0") : ""}`;
+}
+
 // =======================================================
 // UI
 // =======================================================
@@ -105,12 +113,32 @@ async function carregarHistorico(funcId) {
         lista.innerHTML = `<div style="padding:16px 0;font-size:13px;color:var(--text-muted);text-align:center">Sem registos esta semana</div>`;
         return;
     }
-    lista.innerHTML = data.map(r => `
-        <div class="hist-item">
-            <div class="hist-tipo ${r.tipo}"></div>
-            <div class="hist-texto">${fmtDia(r.datahora)}</div>
-            <div class="hist-hora">${r.tipo==="entrada"?"▶":"⏹"} ${fmtHora(r.datahora)}</div>
-        </div>`).join("");
+    // Agrupar registos por dia
+    const porDia = {};
+    data.forEach(r => {
+        const dia = r.datahora.split("T")[0];
+        if (!porDia[dia]) porDia[dia] = [];
+        porDia[dia].push(r);
+    });
+
+    const diasOrdenados = Object.keys(porDia).sort().reverse();
+    const dHoje = new Date().toISOString().split("T")[0];
+    const dOntem = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+
+    lista.innerHTML = diasOrdenados.map(dia => {
+        const registosDia = porDia[dia];
+        const diaLabel = dia === dHoje ? "Hoje" : dia === dOntem ? "Ontem" : fmtDia(registosDia[0].datahora);
+        const entrada = registosDia.find(r => r.tipo === "entrada");
+        const saida   = registosDia.find(r => r.tipo === "saida");
+        const horas   = (entrada && saida) ? calcHoras(entrada.datahora, saida.datahora) : null;
+
+        return `<div class="hist-item">
+            <div class="hist-tipo ${entrada ? "entrada" : "saida"}"></div>
+            <div class="hist-texto">${diaLabel}</div>
+            <div class="hist-data">${entrada ? fmtHora(entrada.datahora) : "—"} → ${saida ? fmtHora(saida.datahora) : "—"}</div>
+            <div class="hist-hora">${horas || ""}</div>
+        </div>`;
+    }).join("");
 }
 
 // =======================================================
@@ -196,4 +224,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("obraNome").textContent = obra.nome;
     document.getElementById("btnMarcacao").addEventListener("click", confirmarMarcacao);
     await carregarHistorico(funcionario.id);
+
+    // Relógio em tempo real
+    function actualizarRelogio() {
+        const el = document.getElementById("horaActual");
+        if (el) el.textContent = new Date().toLocaleTimeString("pt-PT", { hour:"2-digit", minute:"2-digit", second:"2-digit" });
+    }
+    actualizarRelogio();
+    setInterval(actualizarRelogio, 1000);
 });

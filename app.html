@@ -11,122 +11,177 @@
 
 <style>
 /* ============================================================
-   RESET & BASE
+   TOKENS
 ============================================================ */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 :root {
-  --gold:        #f4b942;
-  --gold-dk:     #d29d36;
-  --gold-lt:     #fde89a;
-  --bg:          #141414;
-  --bg2:         #1e1e1e;
-  --bg3:         #272727;
-  --border:      rgba(255,255,255,.08);
-  --text:        #f0f0f0;
-  --text-muted:  rgba(255,255,255,.45);
-  --green:       #4caf7d;
-  --red:         #e05c5c;
-  --radius:      16px;
-  --radius-sm:   10px;
-  --font-title:  'Oswald', sans-serif;
-  --font-body:   'Inter', sans-serif;
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --gold:       #f4b942;
+  --gold-dk:    #d29d36;
+  --gold-glow:  rgba(244,185,66,.3);
+  --bg:         #111;
+  --bg2:        #1a1a1a;
+  --bg3:        #222;
+  --border:     rgba(255,255,255,.07);
+  --text:       #f0f0f0;
+  --muted:      rgba(255,255,255,.4);
+  --green:      #4caf7d;
+  --green-bg:   rgba(76,175,125,.12);
+  --red:        #e05c5c;
+  --red-bg:     rgba(224,92,92,.1);
+  --radius:     18px;
+  --radius-sm:  12px;
+  --font-h:     'Oswald', sans-serif;
+  --font-b:     'Inter', sans-serif;
+  --safe-b:     env(safe-area-inset-bottom, 0px);
 }
 
-html, body {
-  height: 100%;
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { height: 100%; }
+
+body {
+  min-height: 100dvh;
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font-body);
+  font-family: var(--font-b);
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
+  overflow-x: hidden;
 }
 
 /* ============================================================
-   LAYOUT PRINCIPAL
+   LOADING
+============================================================ */
+.ecrã-loading {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  background: var(--bg);
+}
+
+.loading-logo {
+  height: 64px;
+  width: auto;
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+.loading-txt {
+  font-family: var(--font-h);
+  font-size: 11px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: .3; transform: scale(.97); }
+  50%       { opacity: .8; transform: scale(1); }
+}
+
+/* ============================================================
+   BLOQUEIO
+============================================================ */
+.ecrã-bloqueio {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 28px;
+  text-align: center;
+  gap: 14px;
+  background: var(--bg);
+}
+
+.bloqueio-icon { font-size: 56px; margin-bottom: 4px; }
+
+.bloqueio-titulo {
+  font-family: var(--font-h);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: .8px;
+  color: var(--text);
+}
+
+.bloqueio-msg {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.7;
+  max-width: 280px;
+}
+
+/* ============================================================
+   ECRÃ PRINCIPAL
 ============================================================ */
 .screen {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding: 0 0 calc(20px + var(--safe-bottom));
+  padding-bottom: calc(28px + var(--safe-b));
 }
 
-/* ============================================================
-   HEADER
-============================================================ */
+/* ── Header ── */
 .header {
   padding: 20px 20px 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
 }
 
-.logo {
-  height: 48px;
-  width: auto;
-}
+.logo { height: 44px; width: auto; }
 
 .header-obra {
-  font-family: var(--font-title);
-  font-size: 13px;
+  text-align: right;
+  font-family: var(--font-h);
+  font-size: 11px;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: var(--text-muted);
-  text-align: right;
-  max-width: 160px;
-  line-height: 1.3;
+  color: var(--muted);
+  line-height: 1.4;
 }
 
 .header-obra span {
   display: block;
+  font-size: 13px;
   color: var(--gold);
-  font-size: 14px;
   font-weight: 500;
 }
 
-/* ============================================================
-   HERO — nome + estado
-============================================================ */
+/* ── Hero ── */
 .hero {
-  padding: 28px 20px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  padding: 24px 20px 0;
 }
 
 .hero-greeting {
-  font-family: var(--font-title);
-  font-size: 13px;
-  letter-spacing: 1.5px;
+  font-family: var(--font-h);
+  font-size: 12px;
+  letter-spacing: 2px;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--muted);
+  margin-bottom: 4px;
 }
 
 .hero-name {
-  font-family: var(--font-title);
-  font-size: 30px;
+  font-family: var(--font-h);
+  font-size: 28px;
   font-weight: 500;
-  letter-spacing: 1px;
+  letter-spacing: .5px;
   line-height: 1.1;
-  color: var(--text);
 }
 
-/* ============================================================
-   ESTADO ACTUAL — entrada/saída
-============================================================ */
+/* ── Barra de estado ── */
 .estado-bar {
-  margin: 0 20px 20px;
+  margin: 16px 20px 0;
   background: var(--bg2);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 14px 16px;
+  padding: 12px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border: 1px solid var(--border);
 }
 
 .estado-info {
@@ -136,45 +191,57 @@ html, body {
 }
 
 .estado-dot {
-  width: 10px;
-  height: 10px;
+  width: 9px; height: 9px;
   border-radius: 50%;
-  background: var(--text-muted);
+  background: var(--muted);
   flex-shrink: 0;
+  transition: background .3s, box-shadow .3s;
 }
 
-.estado-dot.entrada { background: var(--green); box-shadow: 0 0 8px rgba(76,175,125,.5); }
-.estado-dot.saida   { background: var(--red);   box-shadow: 0 0 8px rgba(224,92,92,.4); }
+.estado-dot.entrada {
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(76,175,125,.2), 0 0 8px rgba(76,175,125,.4);
+  animation: ping 2s ease infinite;
+}
+
+.estado-dot.saida {
+  background: var(--red);
+  box-shadow: 0 0 6px rgba(224,92,92,.4);
+}
+
+@keyframes ping {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(76,175,125,.2), 0 0 8px rgba(76,175,125,.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(76,175,125,.05), 0 0 12px rgba(76,175,125,.5); }
+}
 
 .estado-label {
-  font-family: var(--font-title);
+  font-family: var(--font-h);
   font-size: 13px;
-  letter-spacing: .8px;
+  letter-spacing: .5px;
   text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.estado-hora {
-  font-family: var(--font-title);
-  font-size: 15px;
-  font-weight: 500;
   color: var(--text);
 }
 
-/* ============================================================
-   BOTÃO PRINCIPAL DE MARCAÇÃO
-============================================================ */
+.estado-hora {
+  font-family: var(--font-h);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ── Botão principal ── */
 .btn-wrap {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 0 20px;
+  padding: 32px 20px 24px;
+  gap: 16px;
 }
 
 .btn-marcacao {
-  width: 200px;
-  height: 200px;
+  width: 188px;
+  height: 188px;
   border-radius: 50%;
   border: none;
   cursor: pointer;
@@ -182,81 +249,83 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   position: relative;
-  transition: transform .15s, box-shadow .15s;
-  user-select: none;
+  outline: none;
   -webkit-tap-highlight-color: transparent;
-  background: radial-gradient(circle at 40% 35%, var(--gold-lt), var(--gold) 50%, var(--gold-dk));
+  user-select: none;
+  transition: transform .15s cubic-bezier(.34,1.56,.64,1), box-shadow .2s;
+  background: radial-gradient(circle at 38% 32%, #ffe08a, var(--gold) 45%, var(--gold-dk));
   box-shadow:
-    0 0 0 12px rgba(244,185,66,.08),
-    0 0 0 24px rgba(244,185,66,.04),
-    0 20px 60px rgba(244,185,66,.25),
-    0 4px 20px rgba(0,0,0,.4);
+    0 0 0 14px rgba(244,185,66,.07),
+    0 0 0 28px rgba(244,185,66,.03),
+    0 24px 64px rgba(244,185,66,.22),
+    0 8px 24px rgba(0,0,0,.5);
 }
 
 .btn-marcacao:active {
-  transform: scale(.95);
+  transform: scale(.94);
   box-shadow:
     0 0 0 6px rgba(244,185,66,.1),
-    0 10px 30px rgba(244,185,66,.2),
-    0 2px 10px rgba(0,0,0,.4);
+    0 8px 24px rgba(244,185,66,.15),
+    0 4px 12px rgba(0,0,0,.4);
 }
 
 .btn-marcacao.disabled {
   background: var(--bg3);
   box-shadow: none;
-  cursor: not-allowed;
+  cursor: default;
   opacity: .5;
+  transform: none;
 }
 
 .btn-icon {
-  font-size: 44px;
+  font-size: 48px;
   line-height: 1;
+  position: relative;
+  z-index: 1;
 }
 
 .btn-label {
-  font-family: var(--font-title);
-  font-size: 16px;
+  font-family: var(--font-h);
+  font-size: 14px;
   font-weight: 600;
-  letter-spacing: 2px;
+  letter-spacing: 2.5px;
   text-transform: uppercase;
-  color: #1a1100;
+  color: #1a1000;
+  position: relative;
+  z-index: 1;
 }
 
 .btn-sublabel {
-  font-family: var(--font-body);
-  font-size: 11px;
-  color: rgba(0,0,0,.5);
+  font-size: 10px;
+  color: rgba(0,0,0,.45);
   letter-spacing: .5px;
-  margin-top: -6px;
+  margin-top: -4px;
+  position: relative;
+  z-index: 1;
 }
 
-/* Anel de loading */
-.btn-marcacao.loading .btn-icon::after {
-  content: '';
-  position: absolute;
-  inset: 8px;
-  border-radius: 50%;
-  border: 3px solid rgba(0,0,0,.2);
-  border-top-color: rgba(0,0,0,.7);
-  animation: spin .8s linear infinite;
+/* Hora actual abaixo do botão */
+.hora-actual {
+  font-family: var(--font-h);
+  font-size: 32px;
+  font-weight: 300;
+  letter-spacing: 3px;
+  color: var(--text);
+  opacity: .7;
 }
 
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ============================================================
-   MENSAGEM DE FEEDBACK
-============================================================ */
+/* ── Feedback ── */
 .feedback {
-  margin: 12px 20px 0;
-  padding: 12px 16px;
+  margin: 0 20px;
+  padding: 12px 18px;
   border-radius: var(--radius-sm);
-  font-family: var(--font-title);
-  font-size: 14px;
+  font-family: var(--font-h);
+  font-size: 13px;
   letter-spacing: .5px;
   text-align: center;
-  min-height: 46px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -264,24 +333,23 @@ html, body {
 }
 
 .feedback:empty { opacity: 0; }
-.feedback.ok    { background: rgba(76,175,125,.12); color: var(--green); border: 1px solid rgba(76,175,125,.2); }
-.feedback.erro  { background: rgba(224,92,92,.1);   color: var(--red);   border: 1px solid rgba(224,92,92,.2); }
-.feedback.info  { background: rgba(244,185,66,.1);  color: var(--gold);  border: 1px solid rgba(244,185,66,.2); }
+.feedback.ok   { background: var(--green-bg); color: var(--green); border: 1px solid rgba(76,175,125,.2); }
+.feedback.erro { background: var(--red-bg);   color: var(--red);   border: 1px solid rgba(224,92,92,.2); }
+.feedback.info { background: rgba(244,185,66,.08); color: var(--gold); border: 1px solid rgba(244,185,66,.2); }
 
-/* ============================================================
-   HISTÓRICO SEMANAL
-============================================================ */
+/* ── Histórico ── */
 .historico {
   margin: 20px 20px 0;
 }
 
 .historico-titulo {
-  font-family: var(--font-title);
-  font-size: 12px;
-  letter-spacing: 1.5px;
+  font-family: var(--font-h);
+  font-size: 10px;
+  letter-spacing: 2px;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--muted);
   margin-bottom: 10px;
+  padding-left: 2px;
 }
 
 .hist-lista {
@@ -292,17 +360,19 @@ html, body {
 
 .hist-item {
   background: var(--bg2);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 10px 14px;
+  padding: 11px 16px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  border: 1px solid var(--border);
+  gap: 12px;
+  transition: background .15s;
 }
 
+.hist-item:active { background: var(--bg3); }
+
 .hist-tipo {
-  width: 8px;
-  height: 8px;
+  width: 7px; height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -314,78 +384,20 @@ html, body {
   flex: 1;
   font-size: 13px;
   color: var(--text);
+  font-weight: 500;
+}
+
+.hist-data {
+  font-size: 11px;
+  color: var(--muted);
 }
 
 .hist-hora {
-  font-family: var(--font-title);
-  font-size: 13px;
-  color: var(--text-muted);
-  letter-spacing: .3px;
-}
-
-/* ============================================================
-   ECRÃ DE BLOQUEIO (dispositivo não registado)
-============================================================ */
-.ecrã-bloqueio {
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 28px;
-  text-align: center;
-  gap: 16px;
-}
-
-.bloqueio-icon {
-  font-size: 64px;
-  margin-bottom: 8px;
-}
-
-.bloqueio-titulo {
-  font-family: var(--font-title);
-  font-size: 22px;
-  font-weight: 500;
-  letter-spacing: 1px;
-  color: var(--text);
-}
-
-.bloqueio-msg {
+  font-family: var(--font-h);
   font-size: 14px;
-  color: var(--text-muted);
-  line-height: 1.6;
-  max-width: 280px;
-}
-
-/* ============================================================
-   ECRÃ DE LOADING INICIAL
-============================================================ */
-.ecrã-loading {
-  min-height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.loading-logo {
-  height: 70px;
-  opacity: .6;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: .4; }
-  50%       { opacity: .8; }
-}
-
-.loading-txt {
-  font-family: var(--font-title);
-  font-size: 12px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--text-muted);
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: .3px;
 }
 </style>
 </head>
@@ -436,10 +448,11 @@ html, body {
   <!-- Botão principal -->
   <div class="btn-wrap">
     <button class="btn-marcacao" id="btnMarcacao">
-      <div class="btn-icon" id="btnIcon">⏱</div>
-      <div class="btn-label" id="btnLabel">Marcar</div>
+      <div class="btn-icon" id="btnIcon">▶</div>
+      <div class="btn-label" id="btnLabel">Entrada</div>
       <div class="btn-sublabel" id="btnSublabel">Toca para registar</div>
     </button>
+    <div class="hora-actual" id="horaActual">--:--</div>
   </div>
 
   <!-- Feedback -->
@@ -455,6 +468,7 @@ html, body {
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
 </body>
