@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#111">
+<title>Maia — Registo Diário</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --gold:     #f4b942;
+  --gold-dk:  #d29d36;
+  --bg:       #111;
+  --bg2:      #1a1a1a;
+  --bg3:      #222;
+  --border:   rgba(255,255,255,.08);
+  --text:     #f0f0f0;
+  --muted:    rgba(255,255,255,.4);
+  --green:    #4caf7d;
+  --red:      #e05c5c;
+  --orange:   #f4a942;
+  --radius:   14px;
+  --radsm:    10px;
+  --fh:       'Oswald', sans-serif;
+  --fb:       'Inter', sans-serif;
+  --safe-b:   env(safe-area-inset-bottom, 0px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; }
+body {
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--fb);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+/* ── Loading ── */
+#ecrãLoading {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+.loading-logo { height: 56px; animation: pulse 1.8s ease-in-out infinite; }
+.loading-txt  { font-family: var(--fh); font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--muted); }
+@keyframes pulse { 0%,100%{opacity:.3} 50%{opacity:.8} }
+
+/* ── Bloqueio ── */
+#ecrãBloqueio {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 28px;
+  text-align: center;
+  gap: 14px;
+}
+.bloqueio-icon   { font-size: 52px; margin-bottom: 4px; }
+.bloqueio-titulo { font-family: var(--fh); font-size: 20px; font-weight: 500; letter-spacing: .8px; }
+.bloqueio-msg    { font-size: 14px; color: var(--muted); line-height: 1.7; max-width: 280px; }
+.btn-login {
+  margin-top: 12px;
+  padding: 12px 28px;
+  border-radius: var(--radsm);
+  border: none;
+  background: var(--gold);
+  color: #1a1000;
+  font-family: var(--fh);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* ── Ecrã principal ── */
+#ecrãPrincipal {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: calc(20px + var(--safe-b));
+}
+
+/* Header */
+.header {
+  padding: 20px 20px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.logo { height: 40px; }
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.btn-comparar {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,.15);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--fh);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.btn-sair {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: none;
+  background: rgba(255,255,255,.08);
+  color: var(--muted);
+  font-family: var(--fh);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* Hero */
+.hero {
+  padding: 20px 20px 0;
+}
+.hero-data {
+  font-family: var(--fh);
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 4px;
+}
+.hero-titulo {
+  font-family: var(--fh);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: .5px;
+  line-height: 1.2;
+}
+.hero-sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* Filtro de data */
+.filtro-data {
+  margin: 16px 20px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.filtro-data input[type="date"] {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: var(--radsm);
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  color: var(--text);
+  font-family: var(--fh);
+  font-size: 14px;
+  letter-spacing: .5px;
+}
+.btn-carregar {
+  padding: 10px 18px;
+  border-radius: var(--radsm);
+  border: none;
+  background: var(--gold);
+  color: #1a1000;
+  font-family: var(--fh);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Lista de funcionários */
+.func-lista {
+  margin: 16px 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.func-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.func-card-header {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.func-avatar {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--gold-dk);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--fh);
+  font-size: 18px;
+  font-weight: 500;
+  color: #1a1000;
+  flex-shrink: 0;
+}
+
+.func-info { flex: 1; min-width: 0; }
+.func-nome {
+  font-family: var(--fh);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: .3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.func-resumo {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.func-toggle {
+  font-size: 18px;
+  color: var(--muted);
+  transition: transform .2s;
+  flex-shrink: 0;
+}
+.func-card.aberto .func-toggle { transform: rotate(180deg); }
+
+/* Linhas de registo */
+.func-linhas {
+  display: none;
+  padding: 0 16px 14px;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.func-card.aberto .func-linhas { display: flex; }
+
+.linha-registo {
+  display: grid;
+  grid-template-columns: 1fr 90px 36px;
+  gap: 8px;
+  align-items: center;
+}
+
+.linha-registo select,
+.linha-registo input[type="number"] {
+  padding: 8px 10px;
+  border-radius: var(--radsm);
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text);
+  font-family: var(--fb);
+  font-size: 13px;
+  width: 100%;
+  -webkit-appearance: none;
+}
+
+.linha-registo input[type="number"] {
+  text-align: center;
+}
+
+.btn-rm-linha {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(224,92,92,.15);
+  color: var(--red);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.btn-add-linha {
+  margin-top: 4px;
+  padding: 7px 14px;
+  border-radius: var(--radsm);
+  border: 1px dashed rgba(244,185,66,.3);
+  background: transparent;
+  color: var(--gold);
+  font-family: var(--fh);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  width: 100%;
+}
+
+/* Estado guardado */
+.func-card.guardado { border-color: rgba(76,175,125,.4); }
+.func-card.guardado .func-avatar { background: var(--green); }
+
+/* Botão guardar tudo */
+.btn-guardar-tudo {
+  margin: 20px 20px 0;
+  padding: 16px;
+  border-radius: var(--radius);
+  border: none;
+  background: linear-gradient(135deg, var(--gold), var(--gold-dk));
+  color: #1a1000;
+  font-family: var(--fh);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  width: calc(100% - 40px);
+  box-shadow: 0 4px 20px rgba(244,185,66,.25);
+  transition: transform .15s, box-shadow .15s;
+}
+.btn-guardar-tudo:active {
+  transform: scale(.98);
+  box-shadow: 0 2px 10px rgba(244,185,66,.15);
+}
+
+/* Feedback */
+.feedback-geral {
+  margin: 12px 20px 0;
+  padding: 12px 16px;
+  border-radius: var(--radsm);
+  font-family: var(--fh);
+  font-size: 13px;
+  letter-spacing: .5px;
+  text-align: center;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.feedback-geral:empty { display: none; }
+.feedback-geral.ok    { background: rgba(76,175,125,.12); color: var(--green); border: 1px solid rgba(76,175,125,.2); }
+.feedback-geral.erro  { background: rgba(224,92,92,.1);   color: var(--red);   border: 1px solid rgba(224,92,92,.2); }
+
+/* ── PAINEL COMPARAÇÃO ── */
+#ecrãComparacao {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: calc(20px + var(--safe-b));
+}
+
+.comp-header {
+  padding: 20px 20px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.btn-back {
+  background: none;
+  border: none;
+  color: var(--gold);
+  font-size: 22px;
+  cursor: pointer;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.comp-titulo {
+  font-family: var(--fh);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.comp-lista {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comp-item {
+  background: var(--bg2);
+  border-radius: var(--radsm);
+  padding: 12px 14px;
+  border-left: 3px solid transparent;
+}
+.comp-item.ok               { border-left-color: var(--green); }
+.comp-item.horas_diferentes { border-left-color: var(--orange); }
+.comp-item.obra_diferente   { border-left-color: var(--orange); }
+.comp-item.sem_registo_colab{ border-left-color: var(--red); }
+.comp-item.registo_incompleto{ border-left-color: var(--red); }
+
+.comp-nome {
+  font-family: var(--fh);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: .3px;
+  margin-bottom: 4px;
+}
+.comp-detalhe {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.comp-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+.badge-ok       { background: rgba(76,175,125,.15); color: var(--green); }
+.badge-aviso    { background: rgba(244,185,66,.15); color: var(--orange); }
+.badge-erro     { background: rgba(224,92,92,.12); color: var(--red); }
+
+/* Login overlay */
+#ecrãLogin {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+}
+.login-box {
+  width: 100%;
+  max-width: 340px;
+  text-align: center;
+}
+.login-logo { height: 64px; margin-bottom: 24px; }
+.login-titulo {
+  font-family: var(--fh);
+  font-size: 18px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 24px;
+  color: var(--text);
+}
+.login-input {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: var(--radsm);
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  color: var(--text);
+  font-family: var(--fh);
+  font-size: 14px;
+  letter-spacing: .5px;
+  margin-bottom: 12px;
+}
+.login-btn {
+  width: 100%;
+  padding: 13px;
+  border-radius: var(--radsm);
+  border: none;
+  background: var(--gold);
+  color: #1a1000;
+  font-family: var(--fh);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.login-msg { font-size: 13px; color: var(--red); margin-top: 10px; min-height: 18px; font-family: var(--fh); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="ecrãLogin" style="display:flex">
+  <div class="login-box">
+    <img src="Logo.png" class="login-logo" alt="Maia Solutions">
+    <div class="login-titulo">Registo Diário</div>
+    <input class="login-input" id="loginEmail" type="email" placeholder="Email" autocomplete="email">
+    <input class="login-input" id="loginPassword" type="password" placeholder="Password">
+    <button class="login-btn" id="loginBtn">Entrar</button>
+    <div class="login-msg" id="loginMsg"></div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="ecrãLoading" style="display:none">
+  <img src="Logo.png" class="loading-logo" alt="Maia">
+  <div class="loading-txt">A carregar…</div>
+</div>
+
+<!-- ECRÃ PRINCIPAL -->
+<div id="ecrãPrincipal" style="display:none">
+
+  <div class="header">
+    <img src="Logo.png" class="logo" alt="Maia">
+    <div class="header-right">
+      <button class="btn-comparar" onclick="mostrarComparacao()">⚖ Comparar</button>
+      <button class="btn-sair" onclick="fazerLogout()">Sair</button>
+    </div>
+  </div>
+
+  <div class="hero">
+    <div class="hero-data" id="heroData">—</div>
+    <div class="hero-titulo">Quem trabalhou hoje?</div>
+    <div class="hero-sub">Regista as horas e obras de cada colaborador</div>
+  </div>
+
+  <!-- Filtro de data -->
+  <div class="filtro-data">
+    <input type="date" id="dataRegisto">
+    <button class="btn-carregar" onclick="carregarParaData()">Carregar</button>
+  </div>
+
+  <!-- Lista de funcionários -->
+  <div class="func-lista" id="funcLista"></div>
+
+  <!-- Botão guardar -->
+  <button class="btn-guardar-tudo" onclick="guardarTudo()">✓ Guardar Registo</button>
+  <div class="feedback-geral" id="feedbackGeral"></div>
+
+</div>
+
+<!-- ECRÃ COMPARAÇÃO -->
+<div id="ecrãComparacao" style="display:none">
+  <div class="comp-header">
+    <button class="btn-back" onclick="voltarPrincipal()">‹</button>
+    <div class="comp-titulo">Comparação de Registos</div>
+  </div>
+  <div class="comp-lista" id="compLista">
+    <div style="padding:32px;text-align:center;opacity:.4;font-size:13px">A carregar…</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="registo-admin.js"></script>
+</body>
+</html>
