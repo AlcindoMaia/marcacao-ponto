@@ -362,10 +362,7 @@ body.dark table.dataTable tbody td {
 }
 
 /* Linha editada */
-.linha-editada td.editado {
-    color: #ffcc00;
-    font-weight: 600;
-}
+
 /* ================= INVENTÁRIO TABELA ================= */
 
 #tabelaArtigos {
@@ -619,10 +616,7 @@ body:not(.dark) .form-group select {
 /* ================= EDIÇÃO DE REGISTOS ================= */
 
 /* Célula editada — destaque âmbar */
-td.editado {
-    color: #f4b942 !important;
-    font-weight: 600;
-}
+
 
 /* Linha com qualquer célula editada */
 tr.linha-editada {
@@ -1290,8 +1284,8 @@ body.dark .tab.active {
     }
 
     .card.metric {
-        flex: 1 1 calc(33% - 12px);
-        min-width: calc(33% - 12px);
+        flex: 1 1 160px;
+        min-width: 160px;
     }
 
     .tabs {
@@ -1305,5 +1299,110 @@ body.dark .tab.active {
 
     .card {
         padding: 18px 20px;
+    }
+}
+
+
+/* =======================================================
+   CÉLULAS EDITADAS — sempre amarelas (cor + fundo)
+======================================================= */
+td.editado,
+.editavel.editado,
+.linha-editada td.editado {
+    background: rgba(244, 185, 66, 0.18) !important;
+    color: #f4b942 !important;
+    font-weight: 600 !important;
+}
+
+
+/* =======================================================
+   FLUXO DE CAIXA — filtros redesenhados
+======================================================= */
+.filtros-linha {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto auto;
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 0;
+}
+
+.filtros-linha .col {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+
+.filtros-linha .col-datas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    grid-column: span 2;
+}
+
+.filtros-linha label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    opacity: .55;
+    white-space: nowrap;
+}
+
+.filtros-linha select,
+.filtros-linha input[type="date"] {
+    height: 40px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,.1);
+    background: rgba(255,255,255,.06);
+    color: var(--text-light);
+    font-size: 13px;
+    font-family: var(--font-body, inherit);
+    width: 100%;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+body:not(.dark) .filtros-linha select,
+body:not(.dark) .filtros-linha input[type="date"] {
+    background: rgba(0,0,0,.04);
+    color: var(--text-dark);
+    border-color: #d0d0d0;
+}
+
+.filtros-linha select:focus,
+.filtros-linha input[type="date"]:focus {
+    outline: 2px solid var(--primary);
+    border-color: var(--primary);
+}
+
+.filtros-linha .btn-primary,
+.filtros-linha .btn-secondary {
+    height: 40px;
+    padding: 0 18px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    align-self: end;
+}
+
+/* Responsivo filtros */
+@media (max-width: 768px) {
+    .filtros-linha {
+        grid-template-columns: 1fr 1fr;
+    }
+    .filtros-linha .col-datas {
+        grid-column: span 2;
+    }
+}
+
+@media (max-width: 480px) {
+    .filtros-linha {
+        grid-template-columns: 1fr;
+    }
+    .filtros-linha .col-datas {
+        grid-column: span 1;
+        grid-template-columns: 1fr 1fr;
     }
 }

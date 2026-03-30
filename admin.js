@@ -379,8 +379,8 @@ async function guardarEdicaoRegisto(tr, tdEditado) {
 
     // Destacar células editadas — fica sempre amarelo
     tdEditado.classList.add("editado");
-    tdEditado.style.background = "rgba(244,185,66,0.18)";
-    tdEditado.style.color = "var(--primary)";
+    tdEditado.style.setProperty("background", "rgba(244,185,66,0.18)", "important");
+    tdEditado.style.setProperty("color", "#f4b942", "important");
     tdEditado.title = "";
 }
 
