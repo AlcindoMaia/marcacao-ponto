@@ -818,7 +818,7 @@ async function carregarObras() {
 }
 
 function abrirModalQR(obra) {
-    const url = `https://alcindomaia.github.io/marcacao-ponto/?obra=${obra.id}`;
+    const url = `https://alcindomaia.github.io/marcacao-ponto/app.html?obra=${obra.id}`;
     document.getElementById("modalQRTitulo").textContent = obra.nome;
     document.getElementById("qrUrlAdmin").textContent    = url;
 

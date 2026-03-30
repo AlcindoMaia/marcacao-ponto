@@ -65,7 +65,7 @@ document.getElementById("btnGerar").addEventListener("click", async () => {
     const obraID = data.id;
 
     // Gerar QR code
-    const qrURL = "https://alcindomaia.github.io/marcacao-ponto/?obra=" + obraID;
+    const qrURL = "https://alcindomaia.github.io/marcacao-ponto/app.html?obra=" + obraID;
     const canvas = document.getElementById("qrCanvas");
 
     new QRious({
