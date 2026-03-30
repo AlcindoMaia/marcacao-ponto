@@ -239,12 +239,18 @@ async function guardarTudo() {
         return;
     }
 
-    // Apagar registos existentes para esta data e substituir
-    const { error: errDel } = await SB.from("registos_admin")
-        .delete()
+    // Buscar IDs existentes para esta data e apagar individualmente
+    const { data: existentes } = await SB.from("registos_admin")
+        .select("id")
         .eq("data", data);
 
-    if (errDel) { feedback("Erro ao limpar registos anteriores.", "erro"); return; }
+    if (existentes && existentes.length > 0) {
+        const ids = existentes.map(r => r.id);
+        const { error: errDel } = await SB.from("registos_admin")
+            .delete()
+            .in("id", ids);
+        if (errDel) { feedback("Erro ao atualizar: " + errDel.message, "erro"); return; }
+    }
 
     const { error } = await SB.from("registos_admin").insert(registos);
     if (error) { feedback("Erro ao guardar: " + error.message, "erro"); return; }
