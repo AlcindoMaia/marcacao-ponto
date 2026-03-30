@@ -42,6 +42,8 @@
     </div>
     <!-- BOTÃO DARK MODE -->
     <button class="dark-toggle" id="darkBtn" onclick="toggleDark()">☀️</button>
+    <!-- REGISTO DIÁRIO -->
+    <a href="registo-admin.html" class="btn-secondary" style="font-size:13px;padding:6px 14px;margin-left:8px;text-decoration:none;background:var(--primary);color:#000;font-weight:600">📋 Registo Diário</a>
     <!-- DASHBOARD -->
     <a href="dashboard.html" class="btn-secondary" style="font-size:13px;padding:6px 14px;margin-left:8px;text-decoration:none">⬅ Dashboard</a>
     <!-- LOGOUT -->
@@ -200,7 +202,7 @@
 
         <!-- TABELA FINANCEIRA -->
         <div class="card">
-            <h2>Resumo Financeiro — Mês Atual</h2>
+            <h2>Resumo Financeiro <span style="font-size:12px;opacity:.5;font-weight:400">(baseado em registos admin)</span></h2>
             <table id="tabelaFinanceira" class="display">
                 <thead>
                     <tr>

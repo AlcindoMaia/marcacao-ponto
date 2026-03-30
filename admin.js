@@ -115,56 +115,47 @@ function abrirTab(nome) {
 // FINANCEIRO
 // =======================================================
 async function carregarFinanceiro() {
-    // Determinar mês a consultar (filtro ou mês actual)
+    // Determinar mês a consultar
     const filtroEl = document.getElementById("filtroMesFinanceiro");
     const hoje     = new Date();
     const anoMes   = filtroEl?.value || `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,"0")}`;
     const [ano, mes] = anoMes.split("-").map(Number);
-    const inicio = `${ano}-${String(mes).padStart(2,"0")}-01`;
+    const inicio   = `${ano}-${String(mes).padStart(2,"0")}-01`;
     const ultimoDia = new Date(ano, mes, 0).getDate();
-    const fim    = `${ano}-${String(mes).padStart(2,"0")}-${ultimoDia}`;
-
-    // Buscar registos de ponto do mês seleccionado
-    const { data: registos } = await SB.from("vw_registos_ponto").select("*")
-        .gte("dia", inicio).lte("dia", fim);
+    const fim      = `${ano}-${String(mes).padStart(2,"0")}-${ultimoDia}`;
 
     const tbody = document.querySelector("#tabelaFinanceira tbody");
     if (!tbody) return;
 
-    // Buscar funcionários com valor_dia
-    const { data: funcs } = await SB.from("funcionarios")
-        .select("id, nome, valor_dia, ativo").eq("ativo", true);
+    // Buscar registos_admin do mês (fonte de verdade para salários)
+    const [registosRes, funcsRes] = await Promise.all([
+        SB.from("registos_admin")
+            .select("funcionario_id, horas, data, obras(nome)")
+            .gte("data", inicio).lte("data", fim),
+        SB.from("funcionarios")
+            .select("id, nome, valor_dia, ativo").eq("ativo", true)
+    ]);
 
-    if (!registos || !funcs) { tbody.innerHTML = ""; return; }
+    const registos = registosRes.data || [];
+    const funcs    = funcsRes.data    || [];
 
-    // Agrupar por funcionário
+    // Agrupar por funcionário — somar horas e dias únicos
     const porFunc = {};
     registos.forEach(r => {
-        if (!r.funcionario) return;
-        if (!porFunc[r.funcionario]) porFunc[r.funcionario] = { horas: 0, dias: 0 };
-        // Converter horas HH:MM → decimal, descontando 1h de almoço por dia
-        let h = 0;
-        if (r.horas && typeof r.horas === "string" && r.horas.includes(":")) {
-            const [hh, mm] = r.horas.split(":").map(Number);
-            h = hh + mm / 60;
-        } else {
-            h = Number(r.horas) || 0;
-        }
-        // Desconto de 1h de almoço por dia com registo de saída
-        if (h > 0) h = Math.max(0, h - 1);
-        porFunc[r.funcionario].horas += h;
-        porFunc[r.funcionario].dias  += 1;
+        const fid = r.funcionario_id;
+        if (!porFunc[fid]) porFunc[fid] = { horas: 0, dias: new Set() };
+        porFunc[fid].horas += Number(r.horas) || 0;
+        porFunc[fid].dias.add(r.data); // dias únicos trabalhados
     });
 
-    // KPIs totais
     let totalHoras = 0, totalDias = 0, totalPagar = 0;
-
     tbody.innerHTML = "";
+
     funcs.forEach(f => {
-        const dados = porFunc[f.nome];
+        const dados = porFunc[f.id];
         if (!dados) return;
         const horas = dados.horas;
-        const dias  = dados.dias;
+        const dias  = dados.dias.size;
         const valor = f.valor_dia ? dias * f.valor_dia : 0;
         totalHoras += horas;
         totalDias  += dias;
@@ -177,12 +168,12 @@ async function carregarFinanceiro() {
         </tr>`;
     });
 
-    // Actualizar KPIs
+    // KPIs
     const kpiFEl = document.getElementById("kpiFuncionarios");
     const kpiHEl = document.getElementById("kpiHoras");
     const kpiDEl = document.getElementById("kpiDias");
     const kpiTEl = document.getElementById("kpiTotal");
-    if (kpiFEl) kpiFEl.textContent = funcs.filter(f => porFunc[f.nome]).length;
+    if (kpiFEl) kpiFEl.textContent = funcs.filter(f => porFunc[f.id]).length;
     if (kpiHEl) kpiHEl.textContent = totalHoras.toFixed(2) + "h";
     if (kpiDEl) kpiDEl.textContent = totalDias;
     if (kpiTEl) kpiTEl.textContent = totalPagar.toFixed(2) + " €";
