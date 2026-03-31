@@ -115,6 +115,23 @@ body {
   text-transform: uppercase;
   cursor: pointer;
 }
+.btn-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: var(--text);
+  font-size: 16px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background .15s;
+}
+.btn-nav:hover { background: rgba(255,255,255,.12); }
+
 .btn-sair {
   padding: 6px 14px;
   border-radius: 20px;
@@ -512,6 +529,8 @@ body {
   <div class="header">
     <img src="Logo.png" class="logo" alt="Maia">
     <div class="header-right">
+      <a href="admin.html" class="btn-nav" title="Admin">⚙</a>
+      <a href="dashboard.html" class="btn-nav" title="Dashboard">◱</a>
       <button class="btn-comparar" onclick="mostrarComparacao()">⚖ Comparar</button>
       <button class="btn-sair" onclick="fazerLogout()">Sair</button>
     </div>

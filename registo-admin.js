@@ -191,7 +191,7 @@ function adicionarLinha(container, funcId, registo = null, btnAdd = null) {
     inputHoras.max         = "24";
     inputHoras.step        = "0.5";
     inputHoras.placeholder = "h";
-    inputHoras.value       = registo ? Number(registo.horas).toString() : "";
+    inputHoras.value       = registo ? Number(registo.horas).toString() : "8";
 
     // Botão remover
     const btnRm = document.createElement("button");
