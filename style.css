@@ -1,404 +1,325 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* =======================================================
+   MAIA SOLUTIONS — ADMIN STYLES
+   Design alinhado com o dashboard.html (Figma)
+   Reescrita completa — Março 2026
+======================================================= */
 
+/* ── Google Fonts ─────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600&family=Inter:wght@300;400;500;600&display=swap');
+
+/* ── Tokens ────────────────────────────────────────── */
 :root {
-    --primary: #f4b942;
-    --primary-dark: #d29d36;
+    /* Cores — idênticas ao dashboard */
+    --bg:          #f5f2ed;
+    --panel:       rgba(217,217,217,0.44);
+    --panel-solid: rgba(217,217,217,0.85);
+    --primary:     #f4b942;
+    --primary-dk:  #d29d36;
+    --primary-lt:  rgba(244,185,66,0.15);
+    --text-dark:   #1a1a1a;
+    --text-light:  #ffffff;
+    --text-muted:  #666;
+    --shadow:      0 4px 16px rgba(0,0,0,0.1);
+    --shadow-lg:   0 8px 32px rgba(0,0,0,0.15);
+    --radius:      10px;
+    --radius-sm:   8px;
+    --space-sm:    12px;
+    --space-md:    20px;
+    --space-lg:    28px;
 
-    --bg-light: #f4f4f4;
-    --bg-panel: #ffffff;
+    /* Tipografia */
+    --font-title:  'Oswald', sans-serif;
+    --font-body:   'Inter', sans-serif;
 
-    --bg-dark: #1b1b1b;
-    --bg-dark-panel: #262626;
-
-    --text-dark: #1b1b1b;
-    --text-light: #ffffff;
-
-    --shadow: 0 6px 22px rgba(0,0,0,0.12);
-    --radius: 14px;
-    --transition: 0.25s ease;
-
-    --space-lg: 32px;
-    --space-md: 24px;
-    --space-sm: 14px;
+    /* Estados */
+    --color-ok:    #2a8a2a;
+    --color-err:   #c0392b;
+    --color-warn:  #f4a942;
+    --bg-ok:       rgba(42,138,42,0.1);
+    --bg-err:      rgba(192,57,43,0.08);
+    --bg-warn:     rgba(244,169,66,0.12);
 }
 
-/* =======================================================
-   DARK MODE
-======================================================= */
-body.dark {
-    --bg-light: #1b1b1b;
-    --bg-panel: #202020;
-    --text-dark: #ffffff;
-    --shadow: 0 0 14px rgba(255,255,255,0.05);
-}
+/* ── Reset ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* =======================================================
-   GLOBAL
-======================================================= */
-body {
-    background: var(--bg-light);
-    margin: 0;
-    font-family: "Inter", sans-serif;
+html, body {
+    height: 100%;
+    font-family: var(--font-body);
+    font-size: 14px;
     color: var(--text-dark);
-    line-height: 1.5;
-    transition: background var(--transition), color var(--transition);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
 }
 
-.hidden { display: none !important; }
+/* ── Fundo com textura (jornal financeiro) ─────────── */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+        repeating-linear-gradient(0deg, transparent, transparent 24px, rgba(0,0,0,.025) 24px, rgba(0,0,0,.025) 25px),
+        repeating-linear-gradient(90deg, transparent, transparent 60px, rgba(0,0,0,.015) 60px, rgba(0,0,0,.015) 61px);
+    pointer-events: none;
+    z-index: 0;
+}
 
-h1 { font-size: 22px; font-weight: 600; }
-h2 { font-size: 18px; margin-bottom: 18px; }
-h3 { font-size: 14px; letter-spacing: .3px; }
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+        radial-gradient(ellipse at 20% 50%, rgba(200,168,130,.07) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 20%, rgba(180,150,110,.05) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+}
 
-/* =======================================================
-   HEADER
-======================================================= */
+/* ── Header ────────────────────────────────────────── */
 .header {
-    background: var(--bg-panel);
-    padding: 18px 32px;
+    position: relative;
+    z-index: 100;
+    background: var(--panel);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: var(--shadow);
     display: flex;
     align-items: center;
-    gap: 20px;
-    box-shadow: var(--shadow);
-    margin-bottom: var(--space-lg);
+    padding: 0 28px;
+    height: 72px;
+    gap: 16px;
 }
 
-.logo { height: 65px; }
+.logo {
+    height: 52px;
+    width: auto;
+    flex-shrink: 0;
+}
+
+.header h1 {
+    font-family: var(--font-title);
+    font-size: 20px;
+    font-weight: 400;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dark);
+    flex: 1;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
 
 .dark-toggle {
-    margin-left: auto;
+    background: none;
     border: none;
-    background: transparent;
-    font-size: 20px;
+    font-size: 18px;
     cursor: pointer;
+    padding: 6px;
+    border-radius: 50%;
+    transition: background .15s;
 }
+.dark-toggle:hover { background: rgba(0,0,0,.06); }
 
-/* =======================================================
-   CONTAINER & CARDS
-======================================================= */
+/* ── Container ─────────────────────────────────────── */
 .container {
-    max-width: 1200px;
-    margin: auto;
-    padding: 0 28px 32px;
+    position: relative;
+    z-index: 1;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 28px 40px;
 }
 
-.card {
-    background: var(--bg-panel);
-    padding: 22px 24px;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    margin-bottom: 20px;
-}
-
-/* =======================================================
-   METRIC CARDS
-======================================================= */
-
-
-
-
-
-
-.card.metric.warning .value { color: #ffb3b3; }
-.card.metric.primary .value { color: #000; }
-
-/* =======================================================
-   TABS
-======================================================= */
+/* ── Tabs ──────────────────────────────────────────── */
 .tabs {
     display: flex;
-    gap: 12px;
-    margin-bottom: var(--space-lg);
+    gap: 6px;
+    padding: 20px 0 16px;
     flex-wrap: wrap;
 }
 
 .tab {
+    font-family: var(--font-title);
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 1px;
+    text-transform: uppercase;
     padding: 8px 18px;
     border-radius: 999px;
-    background: rgba(0,0,0,0.06);
-    font-weight: 600;
+    border: 1px solid rgba(0,0,0,.12);
+    background: rgba(217,217,217,0.5);
+    color: var(--text-dark);
     cursor: pointer;
-    border: none;
+    white-space: nowrap;
+    transition: background .15s, border-color .15s, color .15s;
+}
+
+.tab:hover {
+    background: rgba(217,217,217,0.8);
+    border-color: rgba(0,0,0,.2);
 }
 
 .tab.active {
     background: var(--primary);
-    color: #000;
-}
-
-body.dark .tab {
-    background: rgba(255,255,255,0.08);
-}
-
-body.dark .tab.active {
-    background: var(--primary);
-    color: #000;
-}
-
-.tab-content { display: none; }
-.tab-content.active { display: block; width: 100%; padding-bottom: 20px; }
-
-/* =======================================================
-   INVENTÁRIO
-======================================================= */
-
-.inventario-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 20px;
-}
-
-#pesquisaInventario {
-    flex: 1;
-    padding: 10px 14px;
-    border-radius: 10px;
-    border: 1px solid #ccc;
-    font-size: 14px;
-}
-
-.btn-round {
-    width: 42px;
-    height: 42px;
-    font-size: 22px;
-    border-radius: 50%;
-    background: var(--primary);
-    border: none;
-    cursor: pointer;
-}
-
-/* =======================================================
-   MODAL
-======================================================= */
-
-.modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.6);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 20px;
-}
-
-.modal-content {
-    background: var(--bg-panel);
-    padding: 28px;
-    border-radius: 14px;
-    width: 100%;
-    max-width: 520px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
-
-/* Labels fora das caixas */
-.modal-content label {
-    font-size: 13px;
-    margin-bottom: 4px;
+    border-color: var(--primary-dk);
+    color: #1a1000;
     font-weight: 500;
 }
 
-.modal-content input,
-.modal-content select {
-    padding: 8px 10px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    font-size: 14px;
+/* ── Tab content ───────────────────────────────────── */
+.tab-content { display: none; }
+.tab-content.active {
+    display: block;
+    width: 100%;
+    animation: fadeIn .18s ease;
 }
 
-/* Inputs compactos */
-#artCodigo { max-width: 200px; }
-#artIva { max-width: 80px; }
-#artQtdInicial { max-width: 100px; }
-#artPreco { max-width: 140px; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
-.modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    margin-top: 10px;
-}
-
-/* =======================================================
-   FLUXO DE CAIXA
-======================================================= */
-
-#tab-fluxo .card {
-    max-width: 900px;
-}
-
-#tab-fluxo input,
-#tab-fluxo select {
-    padding: 8px 10px;
-    border-radius: 8px;
-    font-size: 14px;
-}
-
-/* =======================================================
-   BOTÕES
-======================================================= */
-.btn-primary,
-.btn-secondary {
-    padding: 10px 18px;
+/* ── Card ──────────────────────────────────────────── */
+.card {
+    background: var(--panel);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: 20px 24px;
     border-radius: var(--radius);
-    border: none;
-    font-weight: 600;
-    cursor: pointer;
+    box-shadow: var(--shadow);
+    margin-bottom: var(--space-md);
 }
 
-.btn-primary {
-    background: var(--primary);
-    color: #1b1b1b;
+.card h2 {
+    font-family: var(--font-title);
+    font-size: 15px;
+    font-weight: 400;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dark);
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(0,0,0,.08);
 }
+
+/* ── KPI Grid ──────────────────────────────────────── */
+.grid-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 14px;
+    margin-bottom: var(--space-md);
+}
+
+.card.metric {
+    padding: 16px 20px;
+    margin-bottom: 0;
+}
+
+.card.metric h3 {
+    font-family: var(--font-title);
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.card.metric .value {
+    font-family: var(--font-title);
+    font-size: 28px;
+    font-weight: 500;
+    color: var(--primary-dk);
+    line-height: 1;
+    letter-spacing: .5px;
+}
+
+.card.metric.primary .value { color: var(--primary-dk); }
+.card.metric.warning .value { color: var(--color-warn); }
+
+/* ── Barra de pesquisa (sem card) ──────────────────── */
+.inventario-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: var(--space-md);
+}
+
+.inventario-header input,
+.input-lg {
+    flex: 1;
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(0,0,0,.12);
+    background: rgba(255,255,255,.6);
+    color: var(--text-dark);
+    font-family: var(--font-body);
+    font-size: 14px;
+    outline: none;
+    transition: border-color .15s, background .15s;
+}
+
+.inventario-header input:focus,
+.input-lg:focus {
+    border-color: var(--primary);
+    background: rgba(255,255,255,.9);
+}
+
+/* ── Botão circular + ──────────────────────────────── */
+.btn-circular {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+    padding: 0 !important;
+    font-size: 22px !important;
+    line-height: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+}
+
+/* ── Botões primário / secundário ──────────────────── */
+.btn-primary {
+    font-family: var(--font-title);
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 9px 20px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: var(--primary);
+    color: #1a1000;
+    cursor: pointer;
+    transition: background .15s, transform .1s;
+    white-space: nowrap;
+}
+.btn-primary:hover   { background: var(--primary-dk); color: #fff; }
+.btn-primary:active  { transform: scale(.97); }
 
 .btn-secondary {
-    background: #bdbdbd;
-}
-
-/* =======================================================
-   TABELAS
-======================================================= */
-table.dataTable thead th {
-    background: var(--primary);
-    color: #000;
-}
-
-table.dataTable tbody tr:hover {
-    background: rgba(244,185,66,.18);
-}
-
-body.dark table.dataTable tbody td {
-    color: white !important;
-}
-
-/* =======================================================
-   RESPONSIVO
-======================================================= */
-@media (max-width: 480px) {
-
-    .container {
-        padding: 0 12px 24px;
-    }
-
-    .header {
-        padding: 12px;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    
-
-    .inventario-header {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .modal-content {
-        max-width: 100%;
-    }
-
-}
-
-/* ================= CALENDÁRIO COMPACTO ================= */
-
-.calendar-day {
-    padding: 5px 2px;
-    text-align: center;
-    border-radius: 6px;
+    font-family: var(--font-title);
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 9px 20px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(0,0,0,.15);
+    background: rgba(217,217,217,0.6);
+    color: var(--text-dark);
     cursor: pointer;
-    font-size: 12px;
-    background: rgba(255,255,255,0.05);
     transition: background .15s;
-}
-
-.calendar-day:hover {
-    background: var(--primary);
-    color: black;
-}
-
-.calendar-day.active {
-    background: var(--primary);
-    color: black;
-    font-weight: 600;
-}
-
-/* ================= TABELA REGISTOS ================= */
-
-#tabelaRegistos {
-    border-collapse: collapse;
-    width: 100%;
-}
-
-#tabelaRegistos th {
-    background: var(--primary);
-    color: black;
-    padding: 12px;
-    text-align: left;
-}
-
-#tabelaRegistos td {
-    padding: 10px 14px;
-}
-
-#tabelaRegistos tbody tr:nth-child(even) {
-    background: rgba(255,255,255,0.03);
-}
-
-#tabelaRegistos tbody tr:hover {
-    background: rgba(244,185,66,.18);
-}
-
-/* Estado */
-.estado-ok {
-    color: #5ad65a;
-    font-weight: 600;
-}
-
-.estado-incompleto {
-    color: #ff7a7a;
-    font-weight: 600;
-}
-
-/* Linha editada */
-
-/* ================= INVENTÁRIO TABELA ================= */
-
-#tabelaArtigos {
-    border-collapse: collapse;
-    width: 100%;
-}
-
-#tabelaArtigos th {
-    background: var(--primary);
-    color: black;
-    padding: 12px;
-    text-align: left;
-}
-
-#tabelaArtigos td {
-    padding: 10px 14px;
-}
-
-#tabelaArtigos tbody tr:nth-child(even) {
-    background: rgba(255,255,255,0.03);
-}
-
-#tabelaArtigos tbody tr:hover {
-    background: rgba(244,185,66,.18);
-}
-
-
-
-/* =======================================================
-   BOTÕES DE AÇÃO NAS TABELAS
-======================================================= */
-.acoes-td {
     white-space: nowrap;
-    text-align: center;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
+.btn-secondary:hover { background: rgba(217,217,217,0.9); }
 
+/* ── Botões de acção nas tabelas ───────────────────── */
 .btn-acao {
     background: none;
     border: none;
@@ -409,841 +330,117 @@ body.dark table.dataTable tbody td {
     opacity: .7;
     transition: opacity .15s, background .15s;
 }
+.btn-acao:hover { opacity: 1; background: rgba(0,0,0,.06); }
 
-.btn-acao:hover {
-    opacity: 1;
-    background: rgba(255,255,255,.08);
-}
-
-/* =======================================================
-   BADGES — TIPO MOVIMENTO
-======================================================= */
-.badge-tipo {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.badge-tipo.entrada {
-    background: rgba(90,214,90,.15);
-    color: #5ad65a;
-}
-
-.badge-tipo.saida {
-    background: rgba(255,122,122,.15);
-    color: #ff7a7a;
-}
-
-/* =======================================================
-   BADGES — ESTADO PAGAMENTO
-======================================================= */
-.badge-estado {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.badge-estado.pago {
-    background: rgba(90,214,90,.15);
-    color: #5ad65a;
-}
-
-.badge-estado.por_pagar {
-    background: rgba(244,185,66,.15);
-    color: var(--primary);
-}
-
-/* =======================================================
-   TABELA MOVIMENTOS FINANCEIROS
-======================================================= */
-#tabelaMovimentos {
-    border-collapse: collapse;
-    width: 100%;
-}
-
-#tabelaMovimentos th {
-    background: var(--primary);
-    color: black;
-    padding: 12px;
-    text-align: left;
-    font-size: 13px;
-}
-
-#tabelaMovimentos td {
-    padding: 10px 12px;
-    font-size: 13px;
-    border-bottom: 1px solid rgba(255,255,255,.04);
-}
-
-#tabelaMovimentos tbody tr:hover {
-    background: rgba(244,185,66,.08);
-}
-
-/* =======================================================
-   FILTROS LINHA — LAYOUT FLEXÍVEL
-======================================================= */
-
-
-
-
-
-
-
-
-body:not(.dark) 
-
-/* =======================================================
-   FORM GROUPS — MODAL
-======================================================= */
-.form-row {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-}
-
-.form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    flex: 1;
-    min-width: 120px;
-}
-
-.form-group.input-xs  { flex: 0 0 70px;  min-width: 70px; }
-.form-group.input-sm  { flex: 0 0 120px; min-width: 100px; }
-.form-group.input-md  { flex: 0 0 180px; min-width: 140px; }
-
-.form-group label {
-    font-size: 12px;
-    opacity: .75;
-}
-
-.form-group input,
-.form-group select {
-    padding: 8px 10px;
-    border-radius: 8px;
-    border: 1px solid rgba(255,255,255,.15);
-    background: var(--bg-dark-panel);
-    color: var(--text-light);
-    font-size: 14px;
-}
-
-body:not(.dark) .form-group input,
-body:not(.dark) .form-group select {
-    background: #f7f7f7;
-    color: var(--text-dark);
-    border-color: #ccc;
-}
-
-/* Modal header */
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 4px;
-}
-
-.modal-close {
-    background: none;
-    border: none;
-    font-size: 22px;
-    cursor: pointer;
-    color: var(--text-light);
-    opacity: .6;
-    line-height: 1;
-}
-
-.modal-close:hover { opacity: 1; }
-
-/* =======================================================
-   TABELA FUNCIONÁRIOS
-======================================================= */
-#tabelaFuncionarios {
-    border-collapse: collapse;
-    width: 100%;
-}
-
-#tabelaFuncionarios th {
-    background: var(--primary);
-    color: black;
-    padding: 12px;
-    text-align: left;
-    font-size: 13px;
-}
-
-#tabelaFuncionarios td {
-    padding: 10px 12px;
-    font-size: 13px;
-    border-bottom: 1px solid rgba(255,255,255,.04);
-}
-
-#tabelaFuncionarios tbody tr:hover {
-    background: rgba(244,185,66,.08);
-}
-
-/* ================= EDIÇÃO DE REGISTOS ================= */
-
-/* Célula editada — destaque âmbar */
-
-
-/* Linha com qualquer célula editada */
-tr.linha-editada {
-    background: rgba(244, 185, 66, 0.06) !important;
-}
-
-/* Célula em foco durante edição */
-td.editavel:focus {
-    outline: 2px solid var(--primary);
-    border-radius: 4px;
-    background: rgba(244, 185, 66, 0.08);
-}
-
-/* Célula com erro de formato */
-td.editavel[title] {
-    text-decoration: underline wavy #ff7a7a;
-}
-
-/* ================= TABELA OBRAS ================= */
-#tabelaObras {
-    border-collapse: collapse;
-    width: 100%;
-}
-
-#tabelaObras th {
-    background: var(--primary);
-    color: black;
-    padding: 12px;
-    text-align: left;
-    font-size: 13px;
-}
-
-#tabelaObras td {
-    padding: 10px 12px;
-    font-size: 13px;
-    border-bottom: 1px solid rgba(255,255,255,.04);
-}
-
-#tabelaObras tbody tr:hover {
-    background: rgba(244,185,66,.08);
-}
-
-/* =======================================================
-   CONSISTÊNCIA ENTRE TABS — espaçamentos uniformes
-======================================================= */
-
-
-
-/* Barra superior com pesquisa + botão — uniforme em todas as tabs */
-.inventario-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 20px;
-}
-
-/* Input de pesquisa — uniforme */
-#pesquisaInventario,
-#pesquisaFuncionarios,
-#pesquisaObras {
-    flex: 1;
-    padding: 10px 14px;
-    border-radius: 10px;
-    border: 1px solid rgba(255,255,255,.15);
-    background: var(--bg-dark-panel);
-    color: var(--text-light);
-    font-size: 14px;
-}
-
-body:not(.dark) #pesquisaInventario,
-body:not(.dark) #pesquisaFuncionarios,
-body:not(.dark) #pesquisaObras {
-    background: var(--bg-panel);
-    color: var(--text-dark);
-    border-color: #ccc;
-}
-
-
-
-/* Tabelas internas — cabeçalho uniforme */
-#tabelaFuncionarios th,
-#tabelaMovimentos th,
-#tabelaObras th,
-#tabelaArtigos th,
-#tabelaRegistos th {
-    background: var(--primary);
-    color: #000;
-    padding: 11px 14px;
-    text-align: left;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: .03em;
-    text-transform: uppercase;
-}
-
-/* Células — padding uniforme */
-#tabelaFuncionarios td,
-#tabelaMovimentos td,
-#tabelaObras td {
-    padding: 10px 14px;
-    font-size: 13px;
-    border-bottom: 1px solid rgba(255,255,255,.04);
-    vertical-align: middle;
-}
-
-body:not(.dark) #tabelaFuncionarios td,
-body:not(.dark) #tabelaMovimentos td,
-body:not(.dark) #tabelaObras td {
-    border-bottom-color: rgba(0,0,0,.05);
-}
-
-/* Hover nas linhas — uniforme */
-#tabelaFuncionarios tbody tr:hover,
-#tabelaMovimentos tbody tr:hover,
-#tabelaObras tbody tr:hover {
-    background: rgba(244,185,66,.1);
-}
-
-/* Coluna de ações — centrada e compacta */
 .acoes-td {
     white-space: nowrap;
     text-align: right;
-    padding-right: 10px !important;
+    padding-right: 8px !important;
 }
 
-/* Filtros do fluxo de caixa — inputs com mesma altura dos selects */
-
-
-body:not(.dark) 
-
-
-
-/* Botões dentro dos filtros — mesma altura */
-
-
-/* =======================================================
-   LAYOUT UNIFORME DE TODAS AS TABS
-   Garante que o conteúdo de cada tab tem as mesmas
-   margens laterais e espaçamentos independentemente
-   de estar dentro ou fora do .container
-======================================================= */
-
-
-
-
-/* grid-cards — gap e margin-bottom uniformes */
-
-
-/* Barra de pesquisa + botão (inventário, funcionários, obras) */
-.inventario-header {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    margin-bottom: 20px;
+/* ── Tabelas ───────────────────────────────────────── */
+table.display,
+#tabelaFinanceira,
+#tabelaFuncionarios,
+#tabelaMovimentos,
+#tabelaObras,
+#tabelaArtigos,
+#tabelaRegistos {
+    border-collapse: collapse;
+    width: 100%;
 }
 
-.inventario-header input {
-    flex: 1;
-    padding: 10px 14px;
-    border-radius: 10px;
-    border: 1px solid rgba(255,255,255,.15);
-    background: var(--bg-dark-panel);
-    color: var(--text-light);
-    font-size: 14px;
-    height: 42px;
-}
-
-body:not(.dark) .inventario-header input {
-    background: var(--bg-panel);
-    color: var(--text-dark);
-    border-color: #ccc;
-}
-
-/* Cabeçalho de tabela — uniforme */
 table.display thead th,
+#tabelaFinanceira thead th,
 #tabelaFuncionarios thead th,
 #tabelaMovimentos thead th,
 #tabelaObras thead th,
 #tabelaArtigos thead th,
-#tabelaRegistos thead th,
-#tabelaFinanceira thead th {
+#tabelaRegistos thead th {
     background: var(--primary) !important;
-    color: #000 !important;
-    padding: 11px 14px !important;
-    font-size: 12px !important;
-    font-weight: 600 !important;
+    color: #1a1000 !important;
+    font-family: var(--font-title) !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    letter-spacing: 1px !important;
     text-transform: uppercase !important;
-    letter-spacing: .04em !important;
+    padding: 11px 14px !important;
+    text-align: left !important;
     border: none !important;
 }
 
-/* Células de todas as tabelas — padding uniforme */
-#tabelaFuncionarios td,
-#tabelaMovimentos td,
-#tabelaObras td,
-#tabelaArtigos td,
-#tabelaRegistos td,
-#tabelaFinanceira td {
+table.display tbody td,
+#tabelaFinanceira tbody td,
+#tabelaFuncionarios tbody td,
+#tabelaMovimentos tbody td,
+#tabelaObras tbody td,
+#tabelaArtigos tbody td,
+#tabelaRegistos tbody td {
     padding: 10px 14px;
     font-size: 13px;
-    border-bottom: 1px solid rgba(255,255,255,.05);
+    border-bottom: 1px solid rgba(0,0,0,.05);
     vertical-align: middle;
 }
 
-body:not(.dark) #tabelaFuncionarios td,
-body:not(.dark) #tabelaMovimentos td,
-body:not(.dark) #tabelaObras td,
-body:not(.dark) #tabelaArtigos td,
-body:not(.dark) #tabelaRegistos td,
-body:not(.dark) #tabelaFinanceira td {
-    border-bottom-color: rgba(0,0,0,.05);
-}
-
-/* Hover uniforme em todas as tabelas */
+table.display tbody tr:hover,
+#tabelaFinanceira tbody tr:hover,
 #tabelaFuncionarios tbody tr:hover,
 #tabelaMovimentos tbody tr:hover,
 #tabelaObras tbody tr:hover,
 #tabelaArtigos tbody tr:hover,
-#tabelaRegistos tbody tr:hover,
-#tabelaFinanceira tbody tr:hover {
-    background: rgba(244,185,66,.1) !important;
+#tabelaRegistos tbody tr:hover {
+    background: rgba(244,185,66,.08) !important;
 }
 
-/* card dentro das tabs — margin-bottom consistente */
-.tab-content .card {
-    margin-bottom: 20px;
+/* Células editáveis */
+.editavel {
+    cursor: text;
+    border-radius: 4px;
+    transition: background .15s;
+}
+.editavel:hover   { background: rgba(244,185,66,.1); }
+.editavel:focus   { outline: 2px solid var(--primary); background: rgba(255,255,255,.8); }
+
+.editavel.editado,
+td.editado {
+    background: rgba(244,185,66,.22) !important;
+    color: var(--primary-dk) !important;
+    outline: 2px solid rgba(244,185,66,.45) !important;
+    outline-offset: -2px !important;
+    font-weight: 600 !important;
 }
 
-/* Filtros do fluxo de caixa */
-
-
-
-
-
-
-
-
-body:not(.dark) 
-
-/* Tabs button bar */
-.tabs {
-    margin-bottom: var(--space-lg);
+#tabelaRegistos tbody tr:hover td.editado,
+#tabelaRegistos tbody tr:hover .editavel.editado {
+    background: rgba(244,185,66,.32) !important;
 }
 
-/* Responsivo */
-@media (max-width: 768px) {
-    .tab-content.active {
-        padding-bottom: 20px;
-    }
-    .container {
-        padding-left: 16px;
-        padding-right: 16px;
-    }
-}
-
-/* Dentro de grid-cards, cards não têm margin-bottom — o gap trata */
-
-
-/* Botão + circular — tamanho fixo igual em todas as tabs */
-#btnNovoArtigo,
-#btnNovoFuncionario,
-#btnNovaObra {
-    width: 42px !important;
-    height: 42px !important;
-    font-size: 22px !important;
-    border-radius: 50% !important;
-    padding: 0 !important;
-    flex-shrink: 0 !important;
-    line-height: 1;
-    display: flex;
+/* ── Badges de estado ──────────────────────────────── */
+.badge-estado {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-}
-
-/* Tabelas sem classe dedicada — border-collapse e width */
-#tabelaMovimentos,
-#tabelaFuncionarios,
-#tabelaObras {
-    border-collapse: collapse;
-    width: 100%;
-}
-
-/* =======================================================
-   BOTÃO CIRCULAR — uniforme em todas as tabs
-======================================================= */
-.btn-circular {
-    width: 42px !important;
-    height: 42px !important;
-    border-radius: 50% !important;
-    padding: 0 !important;
-    font-size: 24px !important;
-    line-height: 1 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    flex-shrink: 0 !important;
-}
-
-/* Input dentro do card da barra de pesquisa */
-.inventario-header input {
-    flex: 1;
-    padding: 9px 14px;
-    border-radius: 8px;
-    border: 1px solid rgba(255,255,255,.12);
-    background: rgba(255,255,255,.07);
-    color: var(--text-light);
-    font-size: 14px;
-    height: 38px;
-    outline: none;
-}
-
-body:not(.dark) .inventario-header input {
-    background: rgba(0,0,0,.04);
-    color: var(--text-dark);
-    border-color: #ddd;
-}
-
-.inventario-header input:focus {
-    border-color: var(--primary);
-}
-
-/* Tabs — reduzir espaço abaixo */
-.tabs {
-    margin-bottom: 16px !important;
-}
-
-
-/* grid-cards dentro de tab — sempre com margin-bottom 16px */
-
-/* =======================================================
-   GRID CARDS — layout em linha
-======================================================= */
-
-
-/* KPI cards — flex basis 110px permite 3-5 em linha */
-
-
-
-
-
-
-/* cards dentro de grid-cards não têm margin-bottom próprio */
-
-
-/* =======================================================
-   TABS — barra de navegação
-======================================================= */
-.tabs {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 16px;
-    padding: 0;
-}
-
-.tab {
-    padding: 7px 14px;
+    padding: 3px 10px;
     border-radius: 999px;
-    background: rgba(0,0,0,.06);
-    font-weight: 600;
-    cursor: pointer;
-    border: none;
-    font-size: 13px;
-    white-space: nowrap;
-}
-
-.tab.active {
-    background: var(--primary);
-    color: #000;
-}
-
-body.dark .tab {
-    background: rgba(255,255,255,.08);
-    color: #fff;
-}
-
-body.dark .tab.active {
-    background: var(--primary);
-    color: #000;
-}
-
-/* =======================================================
-   MOBILE — admin responsivo
-======================================================= */
-@media (max-width: 600px) {
-
-    /* Header compacto */
-    .header {
-        padding: 12px 16px;
-        gap: 10px;
-        flex-wrap: wrap;
-    }
-
-    .logo {
-        height: 44px;
-    }
-
-    .header h1 {
-        font-size: 16px;
-    }
-
-    .dark-toggle {
-        font-size: 16px;
-    }
-
-    /* Container sem padding lateral excessivo */
-    .container {
-        padding: 0 12px 24px;
-    }
-
-    /* Tabs em scroll horizontal — sem quebra de linha */
-    .tabs {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-        padding-bottom: 4px;
-        margin-bottom: 12px;
-        gap: 6px;
-    }
-
-    .tabs::-webkit-scrollbar { display: none; }
-
-    .tab {
-        padding: 6px 12px;
-        font-size: 12px;
-        flex-shrink: 0;
-    }
-
-    /* KPI cards — 2 por linha em mobile */
-    
-
-    
-
-    
-
-    /* Cards gerais — padding reduzido */
-    .card {
-        padding: 14px 16px;
-    }
-
-    /* Barra de pesquisa + botão */
-    .inventario-header {
-        gap: 10px;
-        margin-bottom: 12px;
-    }
-
-    .inventario-header input {
-        font-size: 13px;
-        height: 36px;
-    }
-
-    .btn-circular {
-        width: 36px !important;
-        height: 36px !important;
-        font-size: 20px !important;
-    }
-
-    /* Tabelas — scroll horizontal */
-    .card > table,
-    #tabelaRegistos,
-    #tabelaFinanceira,
-    #tabelaArtigos,
-    #tabelaFuncionarios,
-    #tabelaMovimentos,
-    #tabelaObras {
-        font-size: 11px;
-        min-width: 500px;
-    }
-
-    .card:has(table) {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    /* Tabela wrapper com scroll */
-    .card-table-wrap {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    /* Headers de tabela menores */
-    #tabelaFuncionarios th,
-    #tabelaMovimentos th,
-    #tabelaObras th,
-    #tabelaArtigos th,
-    #tabelaRegistos th,
-    #tabelaFinanceira th {
-        padding: 8px 10px !important;
-        font-size: 10px !important;
-    }
-
-    #tabelaFuncionarios td,
-    #tabelaMovimentos td,
-    #tabelaObras td,
-    #tabelaArtigos td,
-    #tabelaRegistos td,
-    #tabelaFinanceira td {
-        padding: 8px 10px;
-        font-size: 11px;
-    }
-
-    /* Filtros fluxo caixa — em coluna em mobile */
-    
-
-    
-
-    /* Modal em full screen em mobile */
-    .modal-content {
-        max-width: 100% !important;
-        margin: 0;
-        border-radius: 14px 14px 0 0;
-        max-height: 90vh;
-        overflow-y: auto;
-    }
-
-    .modal {
-        align-items: flex-end;
-        padding: 0;
-    }
-
-    /* Form rows em coluna */
-    .form-row {
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .form-group.input-sm,
-    .form-group.input-xs,
-    .form-group.input-md {
-        flex: 1 1 100%;
-        min-width: 100%;
-    }
-
-    /* Botões de acção mais fáceis de tocar */
-    .btn-acao {
-        font-size: 18px;
-        padding: 6px 8px;
-    }
-
-    /* Botões primário/secundário — full width em mobile */
-    .btn-primary,
-    .btn-secondary {
-        padding: 10px 16px;
-        font-size: 14px;
-    }
-
-    /* Login box */
-    #loginBox {
-        margin: 0 12px var(--space-lg);
-    }
-
-    /* Calendar compacto já serve mobile */
-}
-
-/* Tablet (601–900px) */
-@media (min-width: 601px) and (max-width: 900px) {
-
-    .container {
-        padding: 0 20px 28px;
-    }
-
-    
-
-    .tabs {
-        gap: 8px;
-    }
-
-    .tab {
-        font-size: 13px;
-        padding: 7px 13px;
-    }
-
-    .card {
-        padding: 18px 20px;
-    }
-}
-
-
-
-
-
-/* =======================================================
-   FLUXO DE CAIXA — filtros redesenhados
-======================================================= */
-
-
-
-
-
-
-
-
-
-
-body:not(.dark) 
-
-
-
-
-
-/* Responsivo filtros */
-@media (max-width: 768px) {
-    
-    
-}
-
-@media (max-width: 480px) {
-    
-    
-}
-
-/* =======================================================
-   GRID-CARDS — CSS Grid (não Flexbox) para KPI cards
-   auto-fit com minmax garante sempre em linha
-======================================================= */
-.grid-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 16px;
-    margin-bottom: 20px;
-    width: 100%;
-}
-
-.card.metric {
-    padding: 16px 20px;
-    margin-bottom: 0;
-}
-
-.card.metric h3 {
+    font-family: var(--font-title);
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 500;
+    letter-spacing: .8px;
     text-transform: uppercase;
-    letter-spacing: .05em;
-    opacity: .65;
-    margin: 0 0 8px;
 }
+.badge-estado.pago        { background: var(--bg-ok);   color: var(--color-ok); }
+.badge-estado.por_pagar   { background: var(--bg-warn);  color: var(--color-warn); }
+.badge-estado.vencido     { background: var(--bg-err);   color: var(--color-err); }
 
-.card.metric .value {
-    font-size: 26px;
-    font-weight: 700;
-    color: var(--primary);
-    line-height: 1;
-}
+.estado-ok          { color: var(--color-ok);   font-weight: 600; font-size: 12px; }
+.estado-incompleto  { color: var(--color-err);  font-weight: 600; font-size: 12px; }
 
-@media (max-width: 480px) {
-    .grid-cards {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
+/* Badges tipo entrada/saída */
+.badge-entrada { background: var(--bg-ok);   color: var(--color-ok);   padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.badge-saida   { background: var(--bg-err);  color: var(--color-err);  padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.badge-pago    { background: var(--bg-ok);   color: var(--color-ok);   padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+.badge-por-pagar { background: var(--bg-warn); color: var(--color-warn); padding: 2px 8px; border-radius: 4px; font-size: 11px; }
 
-/* =======================================================
-   FILTROS FLUXO DE CAIXA — grid 5 colunas numa linha
-======================================================= */
+/* ── Filtros (Fluxo de Caixa) ──────────────────────── */
 .filtros-linha {
     display: grid !important;
     grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto !important;
@@ -1260,74 +457,307 @@ body:not(.dark)
 }
 
 .filtros-linha label {
+    font-family: var(--font-title);
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 400;
+    letter-spacing: 1.2px;
     text-transform: uppercase;
-    letter-spacing: .07em;
-    opacity: .5;
-    white-space: nowrap;
+    color: var(--text-muted);
 }
 
 .filtros-linha select,
 .filtros-linha input[type="date"] {
     height: 38px;
     padding: 0 10px;
-    border-radius: 8px;
-    border: 1px solid rgba(255,255,255,.1);
-    background: rgba(255,255,255,.06);
-    color: var(--text-light);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(0,0,0,.12);
+    background: rgba(255,255,255,.6);
+    color: var(--text-dark);
+    font-family: var(--font-body);
     font-size: 13px;
     width: 100%;
     cursor: pointer;
-}
-
-body:not(.dark) .filtros-linha select,
-body:not(.dark) .filtros-linha input[type="date"] {
-    background: rgba(0,0,0,.04);
-    color: var(--text-dark);
-    border-color: #d0d0d0;
+    outline: none;
 }
 
 .filtros-linha select:focus,
-.filtros-linha input[type="date"]:focus {
-    outline: 2px solid var(--primary);
-}
+.filtros-linha input[type="date"]:focus { border-color: var(--primary); }
 
 .filtros-linha .btn-primary,
 .filtros-linha .btn-secondary {
     height: 38px;
     padding: 0 16px;
-    white-space: nowrap;
-    flex-shrink: 0;
+    align-self: end;
 }
 
-@media (max-width: 900px) {
-    .filtros-linha {
-        grid-template-columns: 1fr 1fr 1fr !important;
-    }
+/* ── Formulários nos modais ────────────────────────── */
+input, select, textarea {
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--text-dark);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(0,0,0,.12);
+    background: rgba(255,255,255,.7);
+    padding: 8px 12px;
+    outline: none;
+    transition: border-color .15s;
+    width: 100%;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+
+label {
+    font-family: var(--font-title);
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 5px;
 }
 
+.form-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 120px;
+}
+
+.form-group.input-xs { flex: 0 0 80px;  min-width: 80px; }
+.form-group.input-sm { flex: 0 0 120px; min-width: 120px; }
+.form-group.input-md { flex: 0 0 160px; min-width: 160px; }
+.form-group.input-lg { flex: 0 0 240px; min-width: 240px; }
+.form-group.input-addon { position: relative; }
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(0,0,0,.08);
+}
+
+/* ── Modais ────────────────────────────────────────── */
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.35);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.modal.hidden { display: none; }
+
+.modal-content {
+    background: #faf8f4;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    padding: 28px;
+    width: 100%;
+    max-width: 680px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(0,0,0,.08);
+}
+
+.modal-header h2 {
+    font-family: var(--font-title);
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    border: none;
+    margin: 0;
+    padding: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    opacity: .5;
+    padding: 0;
+    transition: opacity .15s;
+}
+.modal-close:hover { opacity: 1; }
+
+/* ── Login box ─────────────────────────────────────── */
+#loginBox {
+    background: var(--panel-solid);
+    backdrop-filter: blur(12px);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    padding: 40px;
+    max-width: 380px;
+    margin: 60px auto;
+    text-align: center;
+}
+
+#loginBox h2 {
+    font-family: var(--font-title);
+    font-size: 18px;
+    font-weight: 400;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    border: none;
+    padding: 0;
+}
+
+#loginBox input {
+    margin-bottom: 12px;
+}
+
+/* ── Calendário ────────────────────────────────────── */
+.calendar-day {
+    text-align: center;
+    padding: 5px 3px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background .12s;
+}
+.calendar-day:hover { background: rgba(244,185,66,.2); }
+.calendar-day.active { background: var(--primary); color: #1a1000; font-weight: 600; }
+.calendar-day.has-data { font-weight: 600; color: var(--primary-dk); }
+
+/* ── Filtros card ──────────────────────────────────── */
+.card.filtros {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 14px 20px;
+}
+
+/* Filtro mês do financeiro */
+#filtroMesFinanceiro {
+    padding: 7px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(0,0,0,.12);
+    background: rgba(255,255,255,.6);
+    font-family: var(--font-title);
+    font-size: 13px;
+    letter-spacing: .5px;
+    cursor: pointer;
+    width: auto;
+}
+
+/* ── Notificações ──────────────────────────────────── */
+.notif-section-title {
+    padding: 10px 16px 6px;
+    font-family: var(--font-title);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-top: 1px solid rgba(0,0,0,.06);
+}
+.notif-section-title:first-child { border-top: none; }
+
+.notif-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(0,0,0,.04);
+    border-left: 3px solid transparent;
+    transition: background .12s;
+}
+.notif-item:hover { background: rgba(0,0,0,.02); }
+.notif-item.notif-urgente { border-left-color: var(--color-err); }
+.notif-item.notif-aviso   { border-left-color: var(--primary); }
+.notif-item-info { flex: 1; min-width: 0; }
+.notif-item-titulo { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notif-item-sub    { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.notif-item.notif-urgente .notif-item-sub { color: var(--color-err); }
+.notif-item-valor  { font-size: 13px; font-weight: 700; color: var(--color-err); flex-shrink: 0; }
+.notif-empty { padding: 20px 16px; text-align: center; font-size: 13px; color: var(--text-muted); }
+
+/* ── Histórico de stock ────────────────────────────── */
+#histCorpo td { font-size: 12px; padding: 7px 10px; border-bottom: 1px solid rgba(0,0,0,.05); }
+#histCorpo tr:last-child td { border-bottom: none; }
+
+/* ── Responsivo mobile ─────────────────────────────── */
 @media (max-width: 600px) {
-    .filtros-linha {
-        grid-template-columns: 1fr 1fr !important;
+    .container { padding: 0 14px 32px; }
+
+    .tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding-bottom: 4px;
+        gap: 5px;
     }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab { font-size: 11px; padding: 6px 12px; flex-shrink: 0; }
+
+    .grid-cards { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .card.metric .value { font-size: 22px; }
+    .card { padding: 14px 16px; }
+
+    .filtros-linha { grid-template-columns: 1fr 1fr !important; }
+
+    .modal-content { padding: 20px 16px; }
+    .form-row { flex-direction: column; gap: 10px; }
+    .form-group.input-xs,
+    .form-group.input-sm,
+    .form-group.input-md { flex: 1 1 100%; min-width: 100%; }
+
+    .header { padding: 0 16px; height: 60px; }
+    .logo { height: 40px; }
+    .header h1 { font-size: 16px; }
 }
 
-/* =======================================================
-   CÉLULAS EDITADAS — amarelo visível em qualquer tema
-======================================================= */
-.editavel.editado,
-td.editado,
-.linha-editada .editado {
-    background-color: rgba(244, 185, 66, 0.28) !important;
-    color: #f4b942 !important;
-    outline: 2px solid rgba(244, 185, 66, 0.5) !important;
-    outline-offset: -2px !important;
-    font-weight: 600 !important;
+@media (min-width: 601px) and (max-width: 900px) {
+    .container { padding: 0 20px 32px; }
+    .grid-cards { grid-template-columns: repeat(3, 1fr); }
+    .filtros-linha { grid-template-columns: 1fr 1fr 1fr !important; }
 }
 
-/* Impedir que hover sobrescreva o fundo amarelo */
-#tabelaRegistos tbody tr:hover td.editado,
-#tabelaRegistos tbody tr:hover .editavel.editado {
-    background-color: rgba(244, 185, 66, 0.35) !important;
+/* ── Dark mode toggle (mantido para compatibilidade) ── */
+body.dark {
+    background: #1b1b1b;
+    color: #f0f0f0;
 }
+body.dark::before, body.dark::after { display: none; }
+body.dark .header { background: rgba(30,30,30,.95); }
+body.dark .card { background: #262626; box-shadow: 0 4px 16px rgba(0,0,0,.3); }
+body.dark .card.metric h3 { color: rgba(255,255,255,.5); }
+body.dark .card.metric .value { color: var(--primary); }
+body.dark .tab { background: rgba(255,255,255,.08); color: #f0f0f0; border-color: rgba(255,255,255,.1); }
+body.dark .tab.active { background: var(--primary); color: #1a1000; border-color: var(--primary-dk); }
+body.dark input, body.dark select { background: rgba(255,255,255,.07); color: #f0f0f0; border-color: rgba(255,255,255,.12); }
+body.dark .inventario-header input { background: rgba(255,255,255,.07); color: #f0f0f0; }
+body.dark table thead th { background: var(--primary) !important; }
+body.dark table tbody td { border-bottom-color: rgba(255,255,255,.05); }
+body.dark table tbody tr:hover { background: rgba(244,185,66,.1) !important; }
+body.dark .modal { background: rgba(0,0,0,.6); }
+body.dark .modal-content { background: #1e1e1e; }
+body.dark .filtros-linha select,
+body.dark .filtros-linha input[type="date"] { background: rgba(255,255,255,.07); color: #f0f0f0; }
+body.dark #loginBox { background: rgba(30,30,30,.95); }
+body.dark label { color: rgba(255,255,255,.45); }

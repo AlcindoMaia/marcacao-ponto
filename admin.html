@@ -35,7 +35,7 @@
                        border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:700;
                        align-items:center;justify-content:center;font-family:var(--font-body)">0</span>
         </button>
-        <div style="position:absolute;top:calc(100% + 8px);right:0;width:320px;background:var(--bg-dark-panel, #262626);
+        <div style="position:absolute;top:calc(100% + 8px);right:0;width:320px;background:#faf8f4;
                     border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.08);
                     z-index:999;display:none;max-height:420px;overflow-y:auto" id="notifPainel">
         </div>
@@ -470,7 +470,7 @@
                     style="background:var(--primary);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">
                     📷 Ler QR Fatura
                 </button>
-                <button id="fecharModalMovBtn" class="modal-close" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--color-text-secondary)">×</button>
+                <button id="fecharModalMovBtn" class="modal-close" style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.5">×</button>
             </div>
         </div>
 
@@ -575,13 +575,11 @@
 <!-- ================= TAB FUNCIONÁRIOS ================= -->
 <div class="tab-content" id="tab-funcionarios">
 
-    <!-- Barra superior com card -->
-    <div class="card" style="padding:14px 20px;margin-bottom:16px">
-        <div class="inventario-header" style="margin-bottom:0">
-            <input type="text" id="pesquisaFuncionarios"
-                   placeholder="Pesquisar por nome ou código">
-            <button id="btnNovoFuncionario" class="btn-primary btn-circular">+</button>
-        </div>
+    <!-- Barra superior -->
+    <div class="inventario-header">
+        <input type="text" id="pesquisaFuncionarios"
+               placeholder="Pesquisar por nome ou código">
+        <button id="btnNovoFuncionario" class="btn-primary btn-circular">+</button>
     </div>
 
     <!-- KPIs em cards -->
@@ -623,12 +621,10 @@
 <!-- ================= TAB OBRAS ================= -->
 <div class="tab-content" id="tab-obras">
 
-    <div class="card" style="padding:14px 20px;margin-bottom:16px">
-        <div class="inventario-header" style="margin-bottom:0">
-            <input type="text" id="pesquisaObras"
-                   placeholder="Pesquisar por nome ou código">
-            <button id="btnNovaObra" class="btn-primary btn-circular">+</button>
-        </div>
+    <div class="inventario-header">
+        <input type="text" id="pesquisaObras"
+               placeholder="Pesquisar por nome ou código">
+        <button id="btnNovaObra" class="btn-primary btn-circular">+</button>
     </div>
 
     <div class="grid-cards">
