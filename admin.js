@@ -1,3 +1,27 @@
+
+// =======================================================
+// DARK MODE
+// =======================================================
+function toggleDark() {
+    const isDark = document.body.classList.toggle('dark');
+    localStorage.setItem('darkMode', isDark);
+    const btn = document.getElementById('darkBtn');
+    if (btn) btn.textContent = isDark ? '☀️' : '🌙';
+}
+
+function iniciarDarkMode() {
+    const saved = localStorage.getItem('darkMode');
+    // Ignorar dark mode guardado — usar sempre o design claro por defeito
+    // (o utilizador pode activar manualmente)
+    if (saved === 'true') {
+        // Não activar automaticamente — reset para claro
+        localStorage.removeItem('darkMode');
+    }
+    document.body.classList.remove('dark');
+    const btn = document.getElementById('darkBtn');
+    if (btn) btn.textContent = '🌙';
+}
+
 // =======================================================
 // SUPABASE — vem de config.js (SB já está disponível)
 // =======================================================
