@@ -53,7 +53,8 @@ window.addEventListener("load", async () => {
     }
 
     // Mostrar form de login
-    document.getElementById("loginBox").classList.remove("hidden");
+    const lb = document.getElementById("loginBox");
+    if (lb) lb.style.display = "flex";
     document.getElementById("emailInput")?.focus();
 
     document.getElementById("btnLogin")?.addEventListener("click", fazerLogin);
@@ -98,8 +99,10 @@ async function fazerLogout() {
 }
 
 function mostrarPainel() {
-    document.getElementById("loginBox").classList.add("hidden");
-    document.getElementById("adminArea").classList.remove("hidden");
+    const lb = document.getElementById("loginBox");
+    if (lb) lb.style.display = "none";
+    const aa = document.getElementById("adminArea");
+    if (aa) aa.classList.remove("hidden");
     inicializarPainel();
 }
 
@@ -2226,6 +2229,8 @@ function abrirSettingsTOC() {
 
 function fecharModalTOC() {
     document.getElementById('modalTOC').classList.add('hidden');
+    document.getElementById('tocMsg').textContent     = '';
+    document.getElementById('tocSincMsg').textContent = '';
 }
 
 function guardarConfigTOC() {
@@ -2257,7 +2262,11 @@ async function testarConexaoTOC() {
         msg.style.color = 'var(--color-ok)';
         actualizarEstadoTOC();
     } catch(e) {
-        msg.textContent = '✗ Erro: ' + e.message;
+        if (e.message.includes('fetch') || e.message.includes('CORS')) {
+            msg.textContent = '✗ CORS: a API do TOC Online não permite pedidos directos do browser. Necessário proxy ou integração server-side.';
+        } else {
+            msg.textContent = '✗ Erro: ' + e.message;
+        }
         msg.style.color = 'var(--color-err)';
     }
 }

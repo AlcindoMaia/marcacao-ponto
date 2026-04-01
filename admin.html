@@ -59,16 +59,27 @@
     <button class="btn-secondary" onclick="fazerLogout()" style="font-size:13px;padding:6px 14px;margin-left:8px">Sair</button>
 </header>
 
-<!-- LOGIN -->
-<div id="loginBox" class="card hidden" style="max-width:400px;margin:40px auto">
-    <h2>Área Restrita</h2>
-    <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px">
-        <input id="emailInput" type="email" placeholder="Email" style="padding:10px 12px;border-radius:8px;border:1px solid rgba(0,0,0,.15);font-size:14px">
-        <input id="passwordInput" type="password" placeholder="Password" style="padding:10px 12px;border-radius:8px;border:1px solid rgba(0,0,0,.15);font-size:14px">
+<!-- LOGIN OVERLAY — fixo, cobre toda a página quando activo -->
+<div id="loginBox" style="
+    position:fixed;inset:0;z-index:9999;
+    background:rgba(245,242,237,0.97);
+    display:flex;align-items:center;justify-content:center;
+    backdrop-filter:blur(4px);
+">
+    <div class="card" style="max-width:400px;width:90%;padding:32px">
+        <h2 style="font-family:var(--font-title);font-size:18px;font-weight:400;letter-spacing:2px;text-transform:uppercase;text-align:center;margin-bottom:24px">Área Restrita</h2>
+        <div style="display:flex;flex-direction:column;gap:10px">
+            <input id="emailInput" type="email" placeholder="Email" autocomplete="email">
+            <input id="passwordInput" type="password" placeholder="Password" autocomplete="current-password">
+            <button id="btnLogin" class="btn-primary" style="width:100%;padding:12px;font-size:14px;margin-top:4px">ENTRAR</button>
+        </div>
+        <div id="pinMsg" style="font-size:13px;color:var(--color-err);text-align:center;margin-top:10px;min-height:18px"></div>
     </div>
-    <p id="pinMsg" style="margin-top:8px;font-size:13px;min-height:18px"></p>
-    <button class="btn-primary" id="btnLogin" style="width:100%;margin-top:4px">Entrar</button>
 </div>
+
+
+
+
 
 <!-- ÁREA ADMIN -->
 <div id="adminArea" class="container hidden">
