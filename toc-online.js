@@ -1,143 +1,145 @@
 // =======================================================
 // INTEGRAÇÃO TOC ONLINE — Maia Solutions
-// OAuth2 client_credentials → Clientes, Fornecedores, Faturas
+// Fluxo OAuth2 Authorization Code via Supabase Edge Function
 // =======================================================
 
 const TOC = (() => {
 
-    let _config = {
-        clientId: '', clientSecret: '',
-        apiBase: '', oauthUrl: '',
-    };
-    let _token = null, _tokenExp = 0;
+    const SUPABASE_PROJECT = 'npyosbigynxmxdakcymg';
+    const PROXY_URL = `https://${SUPABASE_PROJECT}.supabase.co/functions/v1/toc-proxy`;
 
-    function carregarConfig() {
-        const s = localStorage.getItem('toc_config');
-        if (s) _config = { ..._config, ...JSON.parse(s) };
-    }
-    function guardarConfig(cfg) {
-        _config = { ..._config, ...cfg };
-        localStorage.setItem('toc_config', JSON.stringify(_config));
-    }
-    function estaConfigurado() {
-        return !!(_config.clientId && _config.clientSecret && _config.apiBase && _config.oauthUrl);
-    }
+    let _token = null;
 
-    async function obterToken() {
-        if (_token && Date.now() < _tokenExp - 60000) return _token;
-        const r = await fetch(_config.oauthUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-                grant_type: 'client_credentials',
-                client_id: _config.clientId,
-                client_secret: _config.clientSecret,
-                scope: 'openid'
-            })
-        });
-        if (!r.ok) throw new Error('TOC auth falhou: ' + r.status);
-        const d = await r.json();
-        _token = d.access_token;
-        _tokenExp = Date.now() + (d.expires_in || 3600) * 1000;
-        return _token;
+    // ── Guardar/carregar token ────────────────────────────────────
+    function carregarToken() {
+        _token = localStorage.getItem('toc_access_token');
+        // Ver se veio no URL fragment após o callback OAuth
+        const hash = window.location.hash;
+        if (hash.includes('toc_token=')) {
+            const m = hash.match(/toc_token=([^&]+)/);
+            if (m) {
+                _token = decodeURIComponent(m[1]);
+                localStorage.setItem('toc_access_token', _token);
+                // Limpar o fragment do URL
+                history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+        }
     }
 
-    async function api(path, opts = {}) {
-        // Usar o proxy Supabase Edge Function para evitar o CORS
-        // A Edge Function autentica e reencaminha o pedido para o TOC Online
-        const projetoId = _config.supabaseProjectId || 'npyosbigynxmxdakcymg';
-        const proxyUrl  = `https://${projetoId}.supabase.co/functions/v1/toc-proxy`;
+    function estaAutenticado() { return !!_token; }
+    function estaConfigurado() { return true; } // configuração está na Edge Function
 
-        const r = await fetch(proxyUrl, {
-            ...opts,
+    // ── Iniciar fluxo de autorização ─────────────────────────────
+    async function iniciarAutorizacao() {
+        const resp = await fetch(`${PROXY_URL}?action=auth_url`);
+        const data = await resp.json();
+        if (data.auth_url) {
+            // Abrir numa janela popup para não perder o estado do admin
+            const popup = window.open(data.auth_url, 'toc_auth', 'width=600,height=700');
+            // Monitorizar o fecho do popup (o redirect vem de volta para o admin)
+            const check = setInterval(() => {
+                if (popup?.closed) {
+                    clearInterval(check);
+                    carregarToken();
+                }
+            }, 500);
+        }
+    }
+
+    function desligar() {
+        _token = null;
+        localStorage.removeItem('toc_access_token');
+    }
+
+    // ── Pedido autenticado via proxy ──────────────────────────────
+    async function api(path) {
+        if (!_token) throw new Error('Não autenticado no TOC Online. Clica em "Autorizar TOC".');
+        const resp = await fetch(PROXY_URL, {
             headers: {
-                'Content-Type':    'application/json',
-                'x-toc-path':      path,
-                ...(opts.headers || {})
+                'x-toc-path':  path,
+                'x-toc-token': _token,
+                'x-toc-action': 'api',
             }
         });
-        if (!r.ok) throw new Error('TOC Proxy ' + path + ': ' + r.status);
-        return r.json();
+        if (resp.status === 401) {
+            _token = null;
+            localStorage.removeItem('toc_access_token');
+            throw new Error('Token expirado. Autoriza novamente o TOC Online.');
+        }
+        if (!resp.ok) throw new Error('TOC API ' + path + ': ' + resp.status);
+        return resp.json();
     }
 
-    // Autenticação local já não é necessária (a Edge Function trata disso)
-    // Mantida para compatibilidade mas não é chamada
-    async function obterToken_unused() {
-        if (_token && Date.now() < _tokenExp - 60000) return _token;
-        const r = await fetch(_config.oauthUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-                grant_type: 'client_credentials',
-                client_id: _config.clientId,
-                client_secret: _config.clientSecret,
-                scope: 'openid'
-            })
-        });
-        if (!r.ok) throw new Error('TOC auth: ' + r.status);
-        const d = await r.json();
-        _token = d.access_token;
-        _tokenExp = Date.now() + (d.expires_in || 3600) * 1000;
-        return _token;
-    }
-
+    // ── CLIENTES ──────────────────────────────────────────────────
     async function listarClientes(q = '') {
         const p = q ? '?filter[search]=' + encodeURIComponent(q) : '';
         const d = await api('/customers' + p);
         return (d.data || []).map(c => ({
-            id: c.id,
-            nome: c.attributes?.name || '',
-            nif: c.attributes?.tax_registration_number || '',
-            email: c.attributes?.email || '',
-            tel: c.attributes?.phone || '',
+            id:     c.id,
+            nome:   c.attributes?.name || '',
+            nif:    c.attributes?.tax_registration_number || '',
+            email:  c.attributes?.email || '',
+            tel:    c.attributes?.phone || '',
             morada: [c.attributes?.address, c.attributes?.city, c.attributes?.postal_code].filter(Boolean).join(', '),
         }));
     }
 
+    // ── FORNECEDORES ──────────────────────────────────────────────
     async function listarFornecedores(q = '') {
         const p = q ? '?filter[search]=' + encodeURIComponent(q) : '';
         const d = await api('/suppliers' + p);
         return (d.data || []).map(f => ({
-            id: f.id, nome: f.attributes?.name || '',
-            nif: f.attributes?.tax_registration_number || '', email: f.attributes?.email || '',
+            id:    f.id,
+            nome:  f.attributes?.name || '',
+            nif:   f.attributes?.tax_registration_number || '',
+            email: f.attributes?.email || '',
         }));
     }
 
+    // ── SERVIÇOS / ARTIGOS ────────────────────────────────────────
     async function listarServicos(q = '') {
         const p = q ? '?filter[search]=' + encodeURIComponent(q) : '';
         const d = await api('/items' + p);
         return (d.data || []).map(s => ({
-            id: s.id, codigo: s.attributes?.item_code || '',
+            id:        s.id,
+            codigo:    s.attributes?.item_code || '',
             descricao: s.attributes?.name || '',
-            preco: parseFloat(s.attributes?.price || 0),
-            unidade: s.attributes?.unit || 'un',
+            preco:     parseFloat(s.attributes?.price || 0),
+            unidade:   s.attributes?.unit || 'un',
         }));
     }
 
+    // ── FATURAS EMITIDAS ──────────────────────────────────────────
     async function listarFaturasVenda(ini, fim) {
-        const d = await api('/sale_invoices?filter[date][from]=' + ini + '&filter[date][to]=' + fim);
+        const d = await api(`/sale_invoices?filter[date][from]=${ini}&filter[date][to]=${fim}`);
         return (d.data || []).map(f => ({
-            id: f.id, numero: f.attributes?.document_number || '',
-            data: f.attributes?.date || '', cliente: f.attributes?.customer_name || '',
-            valor_base: parseFloat(f.attributes?.net_amount || 0),
-            iva: parseFloat(f.attributes?.tax_amount || 0),
+            id:          f.id,
+            numero:      f.attributes?.document_number || '',
+            data:        f.attributes?.date || '',
+            cliente:     f.attributes?.customer_name || '',
+            valor_base:  parseFloat(f.attributes?.net_amount || 0),
+            iva:         parseFloat(f.attributes?.tax_amount || 0),
             valor_total: parseFloat(f.attributes?.gross_amount || 0),
-            pago: f.attributes?.payment_status === 'paid',
+            pago:        f.attributes?.payment_status === 'paid',
         }));
     }
 
+    // ── FATURAS DE COMPRA ─────────────────────────────────────────
     async function listarFaturasCompra(ini, fim) {
-        const d = await api('/purchase_invoices?filter[date][from]=' + ini + '&filter[date][to]=' + fim);
+        const d = await api(`/purchase_invoices?filter[date][from]=${ini}&filter[date][to]=${fim}`);
         return (d.data || []).map(f => ({
-            id: f.id, numero: f.attributes?.document_number || '',
-            data: f.attributes?.date || '', fornecedor: f.attributes?.supplier_name || '',
-            valor_base: parseFloat(f.attributes?.net_amount || 0),
-            iva: parseFloat(f.attributes?.tax_amount || 0),
+            id:          f.id,
+            numero:      f.attributes?.document_number || '',
+            data:        f.attributes?.date || '',
+            fornecedor:  f.attributes?.supplier_name || '',
+            valor_base:  parseFloat(f.attributes?.net_amount || 0),
+            iva:         parseFloat(f.attributes?.tax_amount || 0),
             valor_total: parseFloat(f.attributes?.gross_amount || 0),
-            pago: f.attributes?.payment_status === 'paid',
+            pago:        f.attributes?.payment_status === 'paid',
         }));
     }
 
+    // ── SINCRONIZAR MÊS → Supabase ────────────────────────────────
     async function sincronizarMes(ano, mes) {
         const ini = `${ano}-${String(mes).padStart(2,'0')}-01`;
         const fim = `${ano}-${String(mes).padStart(2,'0')}-${new Date(ano, mes, 0).getDate()}`;
@@ -162,9 +164,8 @@ const TOC = (() => {
             })),
         ];
 
-        if (!movs.length) return { ok: true, importados: 0 };
+        if (!movs.length) return { ok: true, importados: 0, entradas: 0, saidas: 0 };
 
-        // Remover registos TOC deste mês antes de reinserir
         await SB.from('movimentos_financeiros').delete()
             .eq('fonte', 'toc_online').gte('data_documento', ini).lte('data_documento', fim);
 
@@ -173,7 +174,13 @@ const TOC = (() => {
         return { ok: true, importados: movs.length, entradas: fv.length, saidas: fc.length };
     }
 
-    return { carregarConfig, guardarConfig, estaConfigurado, listarClientes, listarFornecedores, listarServicos, listarFaturasVenda, listarFaturasCompra, sincronizarMes };
-})();
+    // Carregar token ao iniciar (inclui verificar URL fragment)
+    carregarToken();
 
-TOC.carregarConfig();
+    return {
+        estaAutenticado, estaConfigurado,
+        iniciarAutorizacao, desligar, carregarToken,
+        listarClientes, listarFornecedores, listarServicos,
+        listarFaturasVenda, listarFaturasCompra, sincronizarMes,
+    };
+})();

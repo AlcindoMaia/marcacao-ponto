@@ -2329,3 +2329,134 @@ window.addEventListener("load", () => {
     setTimeout(actualizarEstadoTOC, 500);
 });
 
+
+
+// =======================================================
+// INTEGRAÇÃO TOC ONLINE — UI do admin (fluxo OAuth2 correcto)
+// =======================================================
+
+function actualizarEstadoTOC() {
+    const dot = document.getElementById('tocStatusDot');
+    if (!dot) return;
+    // Verde se autenticado, amarelo se configurado mas não autenticado, cinzento se não configurado
+    if (TOC.estaAutenticado()) {
+        dot.style.background = '#4caf7d';
+        dot.title = 'TOC Online ligado';
+    } else {
+        dot.style.background = '#f4b942';
+        dot.title = 'TOC Online não autenticado';
+    }
+}
+
+function abrirSettingsTOC() {
+    const agora = new Date();
+    document.getElementById('tocSincMes').value =
+        `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}`;
+    document.getElementById('tocMsg').textContent     = '';
+    document.getElementById('tocSincMsg').textContent = '';
+    actualizarEstadoTOC();
+    document.getElementById('modalTOC').classList.remove('hidden');
+}
+
+function fecharModalTOC() {
+    document.getElementById('modalTOC').classList.add('hidden');
+    document.getElementById('tocMsg').textContent     = '';
+    document.getElementById('tocSincMsg').textContent = '';
+}
+
+async function autorizarTOC() {
+    const msg = document.getElementById('tocMsg');
+    msg.textContent = 'A abrir janela de autorização…'; msg.style.color = '';
+    try {
+        await TOC.iniciarAutorizacao();
+        // Monitorizar o token — aparece no URL fragment quando o popup fecha
+        const wait = setInterval(() => {
+            TOC.carregarToken();
+            if (TOC.estaAutenticado()) {
+                clearInterval(wait);
+                msg.textContent = '✓ TOC Online autorizado com sucesso!';
+                msg.style.color = 'var(--color-ok)';
+                actualizarEstadoTOC();
+            }
+        }, 1000);
+        setTimeout(() => clearInterval(wait), 120000); // timeout 2 min
+    } catch(e) {
+        msg.textContent = '✗ Erro: ' + e.message;
+        msg.style.color = 'var(--color-err)';
+    }
+}
+
+function desligarTOC() {
+    TOC.desligar();
+    actualizarEstadoTOC();
+    const msg = document.getElementById('tocMsg');
+    msg.textContent = 'Desligado do TOC Online.'; msg.style.color = 'var(--text-muted)';
+}
+
+async function testarConexaoTOC() {
+    const msg = document.getElementById('tocMsg');
+    msg.textContent = 'A testar…'; msg.style.color = '';
+    try {
+        const clientes = await TOC.listarClientes();
+        msg.textContent = `✓ Ligação OK — ${clientes.length} clientes encontrados.`;
+        msg.style.color = 'var(--color-ok)';
+        actualizarEstadoTOC();
+    } catch(e) {
+        msg.textContent = '✗ ' + e.message;
+        msg.style.color = 'var(--color-err)';
+    }
+}
+
+async function sincronizarTOC() {
+    const msg = document.getElementById('tocSincMsg');
+    const mesVal = document.getElementById('tocSincMes').value;
+    if (!mesVal) { msg.textContent = 'Selecciona um mês.'; return; }
+    const [ano, mes] = mesVal.split('-').map(Number);
+    msg.textContent = `A importar ${mes}/${ano}…`; msg.style.color = '';
+    try {
+        const r = await TOC.sincronizarMes(ano, mes);
+        msg.textContent = `✓ ${r.importados} movimentos importados (${r.entradas} entradas, ${r.saidas} saídas).`;
+        msg.style.color = 'var(--color-ok)';
+        if (document.getElementById('tab-fluxo')?.classList.contains('active')) initFluxo();
+    } catch(e) {
+        msg.textContent = '✗ ' + e.message;
+        msg.style.color = 'var(--color-err)';
+    }
+}
+
+async function importarClientesTOC() {
+    const msg = document.getElementById('tocSincMsg');
+    msg.textContent = 'A importar clientes…'; msg.style.color = '';
+    try {
+        const clientes = await TOC.listarClientes();
+        localStorage.setItem('toc_clientes', JSON.stringify(clientes));
+        msg.textContent = `✓ ${clientes.length} clientes importados.`;
+        msg.style.color = 'var(--color-ok)';
+    } catch(e) {
+        msg.textContent = '✗ ' + e.message;
+        msg.style.color = 'var(--color-err)';
+    }
+}
+
+async function importarFornecedoresTOC() {
+    const msg = document.getElementById('tocSincMsg');
+    msg.textContent = 'A importar fornecedores…'; msg.style.color = '';
+    try {
+        const forns = await TOC.listarFornecedores();
+        for (const f of forns) {
+            await SB.from('fornecedores').upsert(
+                { nome: f.nome, nif: f.nif || null },
+                { onConflict: 'nome' }
+            );
+        }
+        msg.textContent = `✓ ${forns.length} fornecedores sincronizados.`;
+        msg.style.color = 'var(--color-ok)';
+    } catch(e) {
+        msg.textContent = '✗ ' + e.message;
+        msg.style.color = 'var(--color-err)';
+    }
+}
+
+window.addEventListener("load", () => {
+    setTimeout(actualizarEstadoTOC, 500);
+});
