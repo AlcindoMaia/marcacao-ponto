@@ -109,6 +109,7 @@ function abrirTab(nome) {
     if (nome === "funcionarios") initFuncionarios();
     if (nome === "inventario")   initInventario();
     if (nome === "obras")        initObras();
+    if (nome === "orcamentos")    initOrcamentos();
 }
 
 // =======================================================
@@ -1505,3 +1506,628 @@ function ligarEventosGlobais() {
     const filtroMesEl = document.getElementById("filtroMesFinanceiro");
     if (filtroMesEl) filtroMesEl.value = mesDefault;
 }
+
+// =======================================================
+// ORÇAMENTOS — CRUD + PDF
+// =======================================================
+
+let _orcamentos      = [];
+let _orcObras        = [];
+let _orcEditId       = null;
+let _catCounter      = 0;
+
+const CATEGORIAS_DEFAULT = [
+    'Demolição e Preparação',
+    'Fundações e Estrutura',
+    'Alvenaria e Rebocos',
+    'Pavimentos e Revestimentos',
+    'Carpintaria / Caixilharia',
+    'Instalações Eléctricas',
+    'Instalações Hidráulicas / AVAC',
+    'Pladur',
+    'Pintura e Acabamentos',
+    'Outros Trabalhos',
+];
+
+async function initOrcamentos() {
+    await carregarOrcamentos();
+
+    // Ligar eventos
+    document.getElementById('pesquisaOrcamentos')?.addEventListener('input', filtrarTabelaOrc);
+    document.getElementById('filtroEstadoOrc')?.addEventListener('change', filtrarTabelaOrc);
+    document.getElementById('btnNovoOrcamento')?.addEventListener('click', () => abrirModalOrcamento());
+}
+
+// ── Carregar lista ──────────────────────────────────────────
+async function carregarOrcamentos() {
+    const { data, error } = await SB.from('orcamentos')
+        .select('*, obras(nome)')
+        .order('created_at', { ascending: false });
+
+    const tbody = document.querySelector('#tabelaOrcamentos tbody');
+    if (!tbody) return;
+
+    if (error) { tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:red">Erro: ${error.message}</td></tr>`; return; }
+
+    _orcamentos = data || [];
+
+    // KPIs
+    const total     = _orcamentos.length;
+    const aceites   = _orcamentos.filter(o => o.estado === 'aceite').length;
+    const pendentes = _orcamentos.filter(o => ['rascunho','enviado'].includes(o.estado)).length;
+    const valor     = _orcamentos.filter(o => o.estado === 'aceite').reduce((s,o) => s + Number(o.total_com_iva||0), 0);
+
+    document.getElementById('orcKpiTotal').textContent    = total;
+    document.getElementById('orcKpiAceites').textContent  = aceites;
+    document.getElementById('orcKpiPendentes').textContent= pendentes;
+    document.getElementById('orcKpiValor').textContent    = valor.toFixed(2) + ' €';
+
+    renderTabelaOrc(_orcamentos);
+}
+
+function renderTabelaOrc(lista) {
+    const tbody = document.querySelector('#tabelaOrcamentos tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!lista.length) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;opacity:.5">Sem orçamentos. Clique + para criar.</td></tr>`;
+        return;
+    }
+
+    const estadoCores = { rascunho:'por_pagar', enviado:'por_pagar', aceite:'pago', recusado:'vencido', cancelado:'vencido' };
+    const estadoLabels = { rascunho:'Rascunho', enviado:'Enviado', aceite:'Aceite', recusado:'Recusado', cancelado:'Cancelado' };
+
+    lista.forEach(o => {
+        const tr = document.createElement('tr');
+        const vencido = o.validade && o.validade < new Date().toISOString().split('T')[0] && o.estado === 'enviado';
+        tr.innerHTML = `
+            <td style="font-family:monospace;font-size:12px;font-weight:600">${o.numero || '—'}</td>
+            <td>${o.data || '—'}</td>
+            <td style="font-weight:500">${o.cliente_nome || '—'}</td>
+            <td style="font-size:12px;opacity:.7">${o.obras?.nome || o.obra_descricao || '—'}</td>
+            <td style="text-align:right;font-weight:600">${Number(o.total_com_iva||0).toFixed(2)} €</td>
+            <td><span class="badge-estado ${estadoCores[o.estado]||'por_pagar'}">${estadoLabels[o.estado]||o.estado}</span></td>
+            <td style="font-size:12px;${vencido?'color:var(--color-err)':''}">${o.validade||'—'}</td>
+            <td class="acoes-td">
+                <button class="btn-acao" title="Editar">✏️</button>
+                <button class="btn-acao" title="Duplicar">📋</button>
+                <button class="btn-acao" title="PDF">📄</button>
+                <button class="btn-acao" title="Apagar">🗑️</button>
+            </td>`;
+        tr.querySelector("[title='Editar']").onclick  = () => abrirModalOrcamento(o.id);
+        tr.querySelector("[title='Duplicar']").onclick= () => duplicarOrcamento(o.id);
+        tr.querySelector("[title='PDF']").onclick     = () => exportarPDFOrcamento(o.id);
+        tr.querySelector("[title='Apagar']").onclick  = () => apagarOrcamento(o.id, o.numero);
+        tbody.appendChild(tr);
+    });
+}
+
+function filtrarTabelaOrc() {
+    const q      = document.getElementById('pesquisaOrcamentos')?.value.toLowerCase() || '';
+    const estado = document.getElementById('filtroEstadoOrc')?.value || '';
+    const filtrado = _orcamentos.filter(o =>
+        (!q || (o.numero||'').toLowerCase().includes(q) || (o.cliente_nome||'').toLowerCase().includes(q) || (o.obra_descricao||'').toLowerCase().includes(q)) &&
+        (!estado || o.estado === estado)
+    );
+    renderTabelaOrc(filtrado);
+}
+
+// ── Modal ───────────────────────────────────────────────────
+async function abrirModalOrcamento(id = null) {
+    _orcEditId = id;
+    _catCounter = 0;
+    document.getElementById('orcCategorias').innerHTML = '';
+    document.getElementById('orcMsg').textContent = '';
+
+    // Carregar obras para o select
+    if (_orcObras.length === 0) {
+        const { data } = await SB.from('obras').select('id, nome').order('nome');
+        _orcObras = data || [];
+    }
+    const selObra = document.getElementById('orcObra');
+    selObra.innerHTML = '<option value="">— Sem obra —</option>' +
+        _orcObras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('');
+
+    if (id) {
+        // Carregar dados do orçamento
+        document.getElementById('modalOrcTitulo').textContent = 'Editar Orçamento';
+        const [orcRes, catRes] = await Promise.all([
+            SB.from('orcamentos').select('*').eq('id', id).single(),
+            SB.from('orcamento_categorias').select('*, orcamento_linhas(*)').eq('orcamento_id', id).order('ordem'),
+        ]);
+        const o = orcRes.data;
+        if (!o) return;
+
+        document.getElementById('orcNumero').value    = o.numero || '';
+        document.getElementById('orcData').value      = o.data || '';
+        document.getElementById('orcValidade').value  = o.validade || '';
+        document.getElementById('orcIva').value       = o.taxa_iva || 23;
+        document.getElementById('orcObra').value      = o.obra_id || '';
+        document.getElementById('orcObraDesc').value  = o.obra_descricao || '';
+        document.getElementById('orcClienteNome').value   = o.cliente_nome || '';
+        document.getElementById('orcClienteNif').value    = o.cliente_nif || '';
+        document.getElementById('orcClienteMorada').value = o.cliente_morada || '';
+        document.getElementById('orcClienteEmail').value  = o.cliente_email || '';
+        document.getElementById('orcClienteTel').value    = o.cliente_tel || '';
+        document.getElementById('orcPrazo').value     = o.prazo_obra || '';
+        document.getElementById('orcCondicoes').value = o.condicoes_pag || '';
+        document.getElementById('orcNotas').value     = o.notas || '';
+
+        // Carregar categorias e linhas
+        (catRes.data || []).forEach(cat => {
+            const linhas = (cat.orcamento_linhas || []).sort((a,b) => a.ordem - b.ordem);
+            adicionarCategoria(cat.nome, linhas, cat.id);
+        });
+    } else {
+        document.getElementById('modalOrcTitulo').textContent = 'Novo Orçamento';
+        document.getElementById('orcNumero').value    = '';
+        document.getElementById('orcData').value      = new Date().toISOString().split('T')[0];
+        document.getElementById('orcValidade').value  = '';
+        document.getElementById('orcIva').value       = 23;
+        document.getElementById('orcObra').value      = '';
+        document.getElementById('orcObraDesc').value  = '';
+        ['orcClienteNome','orcClienteNif','orcClienteMorada','orcClienteEmail','orcClienteTel','orcPrazo','orcCondicoes','orcNotas']
+            .forEach(id => { document.getElementById(id).value = ''; });
+
+        // Adicionar categorias default
+        CATEGORIAS_DEFAULT.forEach(nome => adicionarCategoria(nome, []));
+    }
+
+    actualizarTotaisOrc();
+    document.getElementById('modalOrcamento').classList.remove('hidden');
+}
+
+function fecharModalOrcamento() {
+    document.getElementById('modalOrcamento').classList.add('hidden');
+    _orcEditId = null;
+}
+
+// ── Categorias e Linhas ─────────────────────────────────────
+function adicionarCategoria(nome = '', linhas = [], catDbId = null) {
+    const cid = ++_catCounter;
+    const container = document.getElementById('orcCategorias');
+
+    const div = document.createElement('div');
+    div.className = 'orc-categoria';
+    div.dataset.cid = cid;
+    if (catDbId) div.dataset.dbId = catDbId;
+    div.style.cssText = 'border:1px solid rgba(0,0,0,.1);border-radius:var(--radius-sm);margin-bottom:12px;overflow:hidden';
+
+    div.innerHTML = `
+        <div style="background:rgba(244,185,66,.12);padding:10px 14px;display:flex;align-items:center;gap:10px">
+            <input value="${nome}" placeholder="Nome da categoria" data-cid="${cid}"
+                style="flex:1;border:none;background:transparent;font-family:var(--font-title);font-size:13px;font-weight:500;letter-spacing:.5px;text-transform:uppercase;outline:none;color:var(--text-dark)">
+            <button onclick="adicionarLinha(${cid},'mao_obra')" class="btn-secondary" style="font-size:11px;padding:4px 10px">+ M.O.</button>
+            <button onclick="adicionarLinha(${cid},'material')" class="btn-secondary" style="font-size:11px;padding:4px 10px">+ Mat.</button>
+            <button onclick="adicionarLinha(${cid},'outro')" class="btn-secondary" style="font-size:11px;padding:4px 10px">+ Outro</button>
+            <button onclick="this.closest('.orc-categoria').remove();actualizarTotaisOrc()" style="background:none;border:none;cursor:pointer;opacity:.4;font-size:18px;padding:0 4px">×</button>
+        </div>
+        <div class="orc-linhas" data-cid="${cid}" style="padding:0">
+            <div style="display:grid;grid-template-columns:24px 120px 1fr 70px 90px 90px 32px;gap:0;background:rgba(244,185,66,.25);font-family:var(--font-title);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);padding:5px 14px">
+                <span></span><span>Tipo</span><span>Descrição</span><span>Un</span><span style="text-align:right">Qtd</span><span style="text-align:right">Preço Un.</span><span></span>
+            </div>
+        </div>`;
+
+    container.appendChild(div);
+
+    // Adicionar linhas existentes
+    linhas.forEach(l => adicionarLinha(cid, l.tipo, l));
+    if (linhas.length === 0) {
+        adicionarLinha(cid, 'mao_obra');
+        adicionarLinha(cid, 'material');
+    }
+}
+
+let _linhaCounter = 0;
+
+function adicionarLinha(cid, tipo = 'material', dados = null) {
+    const linhasDiv = document.querySelector(`.orc-linhas[data-cid="${cid}"]`);
+    if (!linhasDiv) return;
+    const lid = ++_linhaCounter;
+
+    const tipoLabel  = { mao_obra:'Mão Obra', material:'Material', outro:'Outro' };
+    const tipoCor    = { mao_obra:'rgba(42,138,42,.15)', material:'rgba(74,144,226,.12)', outro:'rgba(244,185,66,.12)' };
+
+    const div = document.createElement('div');
+    div.className = 'orc-linha';
+    div.dataset.lid = lid;
+    div.dataset.tipo = tipo;
+    if (dados?.id) div.dataset.dbId = dados.id;
+    div.style.cssText = `display:grid;grid-template-columns:24px 120px 1fr 70px 90px 90px 32px;gap:0;align-items:center;padding:5px 14px;border-bottom:1px solid rgba(0,0,0,.04);background:${tipoCor[tipo]||''}`;
+
+    div.innerHTML = `
+        <span style="font-size:10px;opacity:.4">${lid}</span>
+        <span style="font-family:var(--font-title);font-size:10px;letter-spacing:.5px;color:var(--text-muted)">${tipoLabel[tipo]}</span>
+        <input value="${dados?.descricao||''}" placeholder="Descrição do trabalho / artigo" data-field="descricao"
+            style="border:none;background:transparent;font-size:13px;padding:3px 6px;outline:none;border-radius:4px">
+        <input value="${dados?.unidade||'vg'}" data-field="unidade"
+            style="border:none;background:transparent;font-size:12px;padding:3px 4px;text-align:center;outline:none;width:100%;border-radius:4px">
+        <input value="${dados?.quantidade||1}" type="number" min="0" step="0.01" data-field="quantidade"
+            style="border:none;background:transparent;font-size:12px;padding:3px 6px;text-align:right;outline:none;border-radius:4px"
+            oninput="actualizarTotaisOrc()">
+        <input value="${dados?.preco_unitario||''}" type="number" min="0" step="0.01" placeholder="0.00" data-field="preco_unitario"
+            style="border:none;background:transparent;font-size:12px;padding:3px 6px;text-align:right;outline:none;border-radius:4px"
+            oninput="actualizarTotaisOrc()">
+        <button onclick="this.closest('.orc-linha').remove();actualizarTotaisOrc()"
+            style="background:none;border:none;cursor:pointer;opacity:.3;font-size:16px;padding:0;text-align:center">×</button>`;
+
+    linhasDiv.appendChild(div);
+}
+
+// ── Totais ──────────────────────────────────────────────────
+function actualizarTotaisOrc() {
+    let maoObra = 0, materiais = 0, outros = 0;
+
+    document.querySelectorAll('.orc-linha').forEach(linha => {
+        const qtd   = parseFloat(linha.querySelector('[data-field="quantidade"]')?.value) || 0;
+        const preco = parseFloat(linha.querySelector('[data-field="preco_unitario"]')?.value) || 0;
+        const total = qtd * preco;
+        const tipo  = linha.dataset.tipo;
+        if (tipo === 'mao_obra')  maoObra   += total;
+        else if (tipo === 'material') materiais += total;
+        else outros += total;
+    });
+
+    const semIva  = maoObra + materiais + outros;
+    const iva     = semIva * (parseFloat(document.getElementById('orcIva')?.value || 23) / 100);
+    const comIva  = semIva + iva;
+
+    const fmt = v => v.toFixed(2) + ' €';
+    document.getElementById('totalMaoObra').textContent  = fmt(maoObra);
+    document.getElementById('totalMateriais').textContent= fmt(materiais);
+    document.getElementById('totalOutros').textContent   = fmt(outros);
+    document.getElementById('totalSemIva').textContent   = fmt(semIva);
+    document.getElementById('totalIva').textContent      = fmt(iva);
+    document.getElementById('totalComIva').textContent   = fmt(comIva);
+}
+
+document.getElementById('orcIva')?.addEventListener('input', actualizarTotaisOrc);
+
+// ── Guardar ─────────────────────────────────────────────────
+async function guardarOrcamento(estado = 'rascunho') {
+    const msg = document.getElementById('orcMsg');
+    const clienteNome = document.getElementById('orcClienteNome').value.trim();
+    if (!clienteNome) { msg.textContent = 'O nome do cliente é obrigatório.'; msg.style.color='var(--color-err)'; return; }
+
+    msg.textContent = 'A guardar...'; msg.style.color = '';
+
+    // Calcular totais
+    let maoObra = 0, materiais = 0, outros = 0;
+    document.querySelectorAll('.orc-linha').forEach(l => {
+        const qtd = parseFloat(l.querySelector('[data-field="quantidade"]')?.value)||0;
+        const pu  = parseFloat(l.querySelector('[data-field="preco_unitario"]')?.value)||0;
+        const t = qtd*pu;
+        if (l.dataset.tipo==='mao_obra') maoObra+=t;
+        else if (l.dataset.tipo==='material') materiais+=t;
+        else outros+=t;
+    });
+    const semIva = maoObra+materiais+outros;
+    const ivaP   = parseFloat(document.getElementById('orcIva').value)||23;
+    const totalI = semIva*(ivaP/100);
+    const comIva = semIva+totalI;
+
+    const payload = {
+        estado,
+        cliente_nome:    clienteNome,
+        cliente_nif:     document.getElementById('orcClienteNif').value.trim()||null,
+        cliente_morada:  document.getElementById('orcClienteMorada').value.trim()||null,
+        cliente_email:   document.getElementById('orcClienteEmail').value.trim()||null,
+        cliente_tel:     document.getElementById('orcClienteTel').value.trim()||null,
+        data:            document.getElementById('orcData').value||null,
+        validade:        document.getElementById('orcValidade').value||null,
+        taxa_iva:        ivaP,
+        obra_id:         document.getElementById('orcObra').value||null,
+        obra_descricao:  document.getElementById('orcObraDesc').value.trim()||null,
+        prazo_obra:      document.getElementById('orcPrazo').value.trim()||null,
+        condicoes_pag:   document.getElementById('orcCondicoes').value.trim()||null,
+        notas:           document.getElementById('orcNotas').value.trim()||null,
+        subtotal_mao_obra:  maoObra,
+        subtotal_materiais: materiais,
+        subtotal_outros:    outros,
+        total_sem_iva:   semIva,
+        total_iva:       totalI,
+        total_com_iva:   comIva,
+        updated_at:      new Date().toISOString(),
+    };
+
+    let orcId = _orcEditId;
+
+    if (orcId) {
+        const { error } = await SB.from('orcamentos').update(payload).eq('id', orcId);
+        if (error) { msg.textContent='Erro: '+error.message; msg.style.color='var(--color-err)'; return; }
+    } else {
+        // Gerar número
+        const { data: numData } = await SB.rpc('gerar_numero_orcamento');
+        payload.numero = numData || ('ORC-' + Date.now());
+        const { data: novo, error } = await SB.from('orcamentos').insert(payload).select('id').single();
+        if (error) { msg.textContent='Erro: '+error.message; msg.style.color='var(--color-err)'; return; }
+        orcId = novo.id;
+        _orcEditId = orcId;
+        document.getElementById('orcNumero').value = payload.numero;
+    }
+
+    // Guardar categorias e linhas
+    // Apagar categorias existentes e reinserir
+    if (_orcEditId) {
+        await SB.from('orcamento_categorias').delete().eq('orcamento_id', orcId);
+    }
+
+    const cats = document.querySelectorAll('.orc-categoria');
+    for (let i = 0; i < cats.length; i++) {
+        const cat = cats[i];
+        const nomeInput = cat.querySelector('input[data-cid]');
+        const nomeCat = nomeInput?.value.trim() || 'Categoria';
+
+        const { data: catData, error: catErr } = await SB.from('orcamento_categorias')
+            .insert({ orcamento_id: orcId, nome: nomeCat, ordem: i })
+            .select('id').single();
+        if (catErr) continue;
+        const catId = catData.id;
+
+        const linhas = cat.querySelectorAll('.orc-linha');
+        const linhasPayload = [];
+        for (let j = 0; j < linhas.length; j++) {
+            const l = linhas[j];
+            const desc = l.querySelector('[data-field="descricao"]')?.value.trim();
+            const qtd  = parseFloat(l.querySelector('[data-field="quantidade"]')?.value)||1;
+            const pu   = parseFloat(l.querySelector('[data-field="preco_unitario"]')?.value)||0;
+            if (!desc) continue;
+            linhasPayload.push({
+                orcamento_id: orcId, categoria_id: catId,
+                tipo: l.dataset.tipo, descricao: desc,
+                unidade: l.querySelector('[data-field="unidade"]')?.value || 'vg',
+                quantidade: qtd, preco_unitario: pu, ordem: j
+            });
+        }
+        if (linhasPayload.length) await SB.from('orcamento_linhas').insert(linhasPayload);
+    }
+
+    msg.textContent = '✓ Orçamento guardado!'; msg.style.color='var(--color-ok)';
+    await carregarOrcamentos();
+
+    if (estado === 'enviado') {
+        setTimeout(() => exportarPDFOrcamento(orcId), 500);
+    } else {
+        setTimeout(fecharModalOrcamento, 1200);
+    }
+}
+
+// ── Duplicar ────────────────────────────────────────────────
+async function duplicarOrcamento(id) {
+    if (!confirm('Duplicar este orçamento?')) return;
+    const [orcRes, catRes] = await Promise.all([
+        SB.from('orcamentos').select('*').eq('id', id).single(),
+        SB.from('orcamento_categorias').select('*, orcamento_linhas(*)').eq('orcamento_id', id).order('ordem'),
+    ]);
+    const o = orcRes.data;
+    if (!o) return;
+
+    const { data: numData } = await SB.rpc('gerar_numero_orcamento');
+    const novoPayload = { ...o, id: undefined, numero: numData, estado:'rascunho', duplicado_de: id, created_at: undefined, updated_at: undefined };
+    const { data: novo } = await SB.from('orcamentos').insert(novoPayload).select('id').single();
+    if (!novo) return;
+
+    for (const cat of (catRes.data || [])) {
+        const { data: newCat } = await SB.from('orcamento_categorias')
+            .insert({ orcamento_id: novo.id, nome: cat.nome, ordem: cat.ordem }).select('id').single();
+        if (!newCat) continue;
+        const linhas = (cat.orcamento_linhas || []).map(l => ({
+            orcamento_id: novo.id, categoria_id: newCat.id,
+            tipo: l.tipo, descricao: l.descricao, unidade: l.unidade,
+            quantidade: l.quantidade, preco_unitario: l.preco_unitario, ordem: l.ordem
+        }));
+        if (linhas.length) await SB.from('orcamento_linhas').insert(linhas);
+    }
+
+    await carregarOrcamentos();
+}
+
+// ── Apagar ──────────────────────────────────────────────────
+async function apagarOrcamento(id, numero) {
+    if (!confirm(`Apagar o orçamento ${numero}? Esta acção não pode ser revertida.`)) return;
+    await SB.from('orcamentos').delete().eq('id', id);
+    await carregarOrcamentos();
+}
+
+// ── Exportar PDF ────────────────────────────────────────────
+async function exportarPDFOrcamento(id) {
+    // Buscar todos os dados
+    const [orcRes, catRes] = await Promise.all([
+        SB.from('orcamentos').select('*, obras(nome)').eq('id', id).single(),
+        SB.from('orcamento_categorias').select('*, orcamento_linhas(*)').eq('orcamento_id', id).order('ordem'),
+    ]);
+    const o   = orcRes.data;
+    const cats = (catRes.data || []).map(c => ({
+        ...c,
+        linhas: (c.orcamento_linhas || []).sort((a,b) => a.ordem-b.ordem)
+    }));
+
+    if (!o) return;
+
+    const fmt  = v => Number(v||0).toFixed(2);
+    const ivaP = Number(o.taxa_iva||23);
+
+    // Gerar HTML do PDF
+    let tabelaHTML = '';
+    cats.forEach(cat => {
+        if (!cat.linhas.length) return;
+        tabelaHTML += `
+            <tr class="cat-header">
+                <td colspan="6">${cat.nome.toUpperCase()}</td>
+            </tr>`;
+        cat.linhas.forEach(l => {
+            const total = Number(l.quantidade) * Number(l.preco_unitario);
+            const tipoLabel = { mao_obra:'M.O.', material:'Mat.', outro:'Outro' }[l.tipo] || '';
+            tabelaHTML += `
+            <tr>
+                <td class="tipo-badge tipo-${l.tipo}">${tipoLabel}</td>
+                <td>${l.descricao}</td>
+                <td class="num">${l.unidade||'vg'}</td>
+                <td class="num">${Number(l.quantidade).toFixed(2)}</td>
+                <td class="num">${fmt(l.preco_unitario)} €</td>
+                <td class="num">${fmt(total)} €</td>
+            </tr>`;
+        });
+    });
+
+    const htmlContent = `<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<title>Orçamento ${o.numero}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600&family=Inter:wght@300;400;500;600&display=swap');
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Inter',sans-serif; font-size:11px; color:#222; background:#fff; padding:28px 32px; }
+
+  /* Header */
+  .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:28px; padding-bottom:20px; border-bottom:2px solid #f4b942; }
+  .logo-area { }
+  .empresa-nome { font-family:'Oswald',sans-serif; font-size:22px; font-weight:500; letter-spacing:2px; text-transform:uppercase; color:#1a1a1a; }
+  .empresa-sub  { font-size:10px; color:#888; letter-spacing:1px; text-transform:uppercase; margin-top:2px; }
+  .orc-info { text-align:right; }
+  .orc-numero { font-family:'Oswald',sans-serif; font-size:20px; font-weight:600; color:#f4b942; letter-spacing:1px; }
+  .orc-estado { display:inline-block; padding:2px 10px; border-radius:4px; font-size:10px; font-weight:600; letter-spacing:1px; text-transform:uppercase; margin-top:4px; background:rgba(244,185,66,.15); color:#a8845c; }
+  .orc-datas  { font-size:10px; color:#888; margin-top:6px; line-height:1.6; }
+
+  /* Cliente + Obra */
+  .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px; }
+  .info-box  { background:#faf8f4; border-radius:6px; padding:12px 16px; }
+  .info-box h3 { font-family:'Oswald',sans-serif; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:#a8845c; margin-bottom:8px; }
+  .info-box p  { font-size:11px; line-height:1.7; color:#333; }
+  .info-box .destaque { font-weight:600; font-size:12px; color:#1a1a1a; }
+
+  /* Tabela de trabalhos */
+  .tabela-titulo { font-family:'Oswald',sans-serif; font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:#888; margin-bottom:8px; }
+  table { width:100%; border-collapse:collapse; margin-bottom:20px; }
+  thead th { font-family:'Oswald',sans-serif; font-size:10px; letter-spacing:1px; text-transform:uppercase; background:#f4b942; color:#1a1000; padding:7px 10px; text-align:left; }
+  thead th.num { text-align:right; }
+  .cat-header td { font-family:'Oswald',sans-serif; font-size:11px; font-weight:500; letter-spacing:.8px; background:#f5f2ed; color:#a8845c; padding:6px 10px; border-bottom:1px solid rgba(0,0,0,.06); }
+  tbody tr td { padding:5px 10px; border-bottom:1px solid rgba(0,0,0,.05); font-size:11px; vertical-align:middle; }
+  tbody tr:last-child td { border-bottom:none; }
+  .num { text-align:right; }
+  .tipo-badge { font-size:9px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; padding:1px 5px; border-radius:3px; white-space:nowrap; }
+  .tipo-mao_obra  { background:rgba(42,138,42,.12);  color:#2a8a2a; }
+  .tipo-material  { background:rgba(74,144,226,.12); color:#2a5eb0; }
+  .tipo-outro     { background:rgba(244,185,66,.15); color:#a8845c; }
+
+  /* Totais */
+  .totais-wrap { display:grid; grid-template-columns:1fr 280px; gap:20px; margin-bottom:24px; }
+  .condicoes { background:#faf8f4; border-radius:6px; padding:14px 16px; }
+  .condicoes h3 { font-family:'Oswald',sans-serif; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:#a8845c; margin-bottom:8px; }
+  .condicoes p { font-size:11px; line-height:1.7; color:#333; margin-bottom:6px; }
+  .totais-box { }
+  .totais-linha { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(0,0,0,.06); font-size:11px; }
+  .totais-linha.final { border-bottom:none; border-top:2px solid #f4b942; margin-top:4px; padding-top:8px; }
+  .totais-linha.final .label { font-family:'Oswald',sans-serif; font-size:14px; font-weight:600; letter-spacing:.5px; }
+  .totais-linha.final .valor { font-family:'Oswald',sans-serif; font-size:16px; font-weight:600; color:#a8845c; }
+  .totais-linha .label { color:#555; }
+  .totais-linha .valor { font-weight:600; }
+
+  /* Assinatura */
+  .assinatura-grid { display:grid; grid-template-columns:1fr 1fr; gap:40px; margin-top:32px; padding-top:20px; border-top:1px solid rgba(0,0,0,.1); }
+  .assin-box h3 { font-family:'Oswald',sans-serif; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:#888; margin-bottom:16px; }
+  .assin-linha { border-bottom:1px solid #999; height:36px; margin-bottom:6px; }
+  .assin-legenda { font-size:9px; color:#aaa; }
+
+  /* Footer */
+  .footer { text-align:center; font-size:9px; color:#aaa; margin-top:24px; padding-top:12px; border-top:1px solid rgba(0,0,0,.06); }
+
+  @media print { body { padding:12px 16px; } }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+    <div class="logo-area">
+        <div class="empresa-nome">Maia Solutions</div>
+        <div class="empresa-sub">Construção Civil &amp; Remodelações</div>
+    </div>
+    <div class="orc-info">
+        <div class="orc-numero">${o.numero}</div>
+        <div class="orc-estado">${{rascunho:'Rascunho',enviado:'Enviado',aceite:'Aceite',recusado:'Recusado'}[o.estado]||o.estado}</div>
+        <div class="orc-datas">
+            Data: ${o.data || '—'}<br>
+            ${o.validade ? 'Válido até: ' + o.validade : ''}
+        </div>
+    </div>
+</div>
+
+<!-- CLIENTE + OBRA -->
+<div class="info-grid">
+    <div class="info-box">
+        <h3>Cliente</h3>
+        <p class="destaque">${o.cliente_nome}</p>
+        ${o.cliente_nif    ? `<p>NIF: ${o.cliente_nif}</p>` : ''}
+        ${o.cliente_morada ? `<p>${o.cliente_morada}</p>` : ''}
+        ${o.cliente_email  ? `<p>${o.cliente_email}</p>` : ''}
+        ${o.cliente_tel    ? `<p>${o.cliente_tel}</p>` : ''}
+    </div>
+    <div class="info-box">
+        <h3>Obra / Trabalho</h3>
+        <p class="destaque">${o.obras?.nome || o.obra_descricao || '—'}</p>
+        ${o.prazo_obra ? `<p>Prazo: ${o.prazo_obra}</p>` : ''}
+    </div>
+</div>
+
+<!-- TABELA DE TRABALHOS -->
+<div class="tabela-titulo">Discriminação dos Trabalhos</div>
+<table>
+    <thead>
+        <tr>
+            <th style="width:40px">Tipo</th>
+            <th>Descrição</th>
+            <th class="num" style="width:40px">Un</th>
+            <th class="num" style="width:60px">Qtd</th>
+            <th class="num" style="width:80px">Preço Un.</th>
+            <th class="num" style="width:80px">Total</th>
+        </tr>
+    </thead>
+    <tbody>${tabelaHTML}</tbody>
+</table>
+
+<!-- TOTAIS + CONDIÇÕES -->
+<div class="totais-wrap">
+    <div class="condicoes">
+        ${o.condicoes_pag ? `<h3>Condições de Pagamento</h3><p>${o.condicoes_pag}</p>` : ''}
+        ${o.notas ? `<h3 style="margin-top:10px">Notas</h3><p>${o.notas}</p>` : ''}
+    </div>
+    <div class="totais-box">
+        <div class="totais-linha"><span class="label">Mão de Obra</span><span class="valor">${fmt(o.subtotal_mao_obra)} €</span></div>
+        <div class="totais-linha"><span class="label">Materiais</span><span class="valor">${fmt(o.subtotal_materiais)} €</span></div>
+        ${Number(o.subtotal_outros)>0 ? `<div class="totais-linha"><span class="label">Outros</span><span class="valor">${fmt(o.subtotal_outros)} €</span></div>` : ''}
+        <div class="totais-linha"><span class="label">Subtotal s/ IVA</span><span class="valor">${fmt(o.total_sem_iva)} €</span></div>
+        <div class="totais-linha"><span class="label">IVA ${ivaP}%</span><span class="valor">${fmt(o.total_iva)} €</span></div>
+        <div class="totais-linha final"><span class="label">Total</span><span class="valor">${fmt(o.total_com_iva)} €</span></div>
+    </div>
+</div>
+
+<!-- ASSINATURAS -->
+<div class="assinatura-grid">
+    <div class="assin-box">
+        <h3>Maia Solutions</h3>
+        <div class="assin-linha"></div>
+        <div class="assin-legenda">Assinatura e carimbo</div>
+    </div>
+    <div class="assin-box">
+        <h3>Cliente — ${o.cliente_nome}</h3>
+        <div class="assin-linha"></div>
+        <div class="assin-legenda">Assinatura (aceite do orçamento)</div>
+    </div>
+</div>
+
+<div class="footer">
+    Maia Solutions — Construção Civil &amp; Remodelações · ${o.numero} · ${o.data || ''}
+</div>
+
+<script>window.print();</script>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank', 'width=900,height=700');
+    win.document.write(htmlContent);
+    win.document.close();
+}
+

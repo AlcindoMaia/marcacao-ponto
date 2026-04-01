@@ -68,6 +68,7 @@
     <div class="tabs">
         <button class="tab active" data-tab="fluxo">Fluxo de Caixa</button>
         <button class="tab" data-tab="financeiro">Financeiro</button>
+        <button class="tab" data-tab="orcamentos">Orçamentos</button>
         <button class="tab" data-tab="registos">Registos</button>
         <button class="tab" data-tab="funcionarios">Funcionários</button>
         <button class="tab" data-tab="inventario">Inventário</button>
@@ -658,6 +659,172 @@
         </table>
     </div>
 
+</div>
+
+<!-- ================= TAB ORÇAMENTOS ================= -->
+<div class="tab-content" id="tab-orcamentos">
+
+    <!-- Barra superior -->
+    <div class="inventario-header">
+        <input type="text" id="pesquisaOrcamentos" placeholder="Pesquisar por número, cliente ou obra">
+        <div style="display:flex;gap:8px;flex-shrink:0">
+            <select id="filtroEstadoOrc" style="height:40px;padding:0 10px;border-radius:var(--radius-sm);border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.6);font-size:13px">
+                <option value="">— Todos —</option>
+                <option value="rascunho">Rascunho</option>
+                <option value="enviado">Enviado</option>
+                <option value="aceite">Aceite</option>
+                <option value="recusado">Recusado</option>
+            </select>
+            <button id="btnNovoOrcamento" class="btn-primary btn-circular">+</button>
+        </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="grid-cards">
+        <div class="card metric">
+            <h3>Total</h3>
+            <div id="orcKpiTotal" class="value">–</div>
+        </div>
+        <div class="card metric">
+            <h3>Aceites</h3>
+            <div id="orcKpiAceites" class="value" style="color:var(--color-ok)">–</div>
+        </div>
+        <div class="card metric">
+            <h3>Pendentes</h3>
+            <div id="orcKpiPendentes" class="value" style="color:var(--color-warn)">–</div>
+        </div>
+        <div class="card metric">
+            <h3>Valor Total</h3>
+            <div id="orcKpiValor" class="value">–</div>
+        </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="card" style="overflow-x:auto">
+        <table id="tabelaOrcamentos">
+            <thead>
+                <tr>
+                    <th>Número</th>
+                    <th>Data</th>
+                    <th>Cliente</th>
+                    <th>Obra</th>
+                    <th style="text-align:right">Total c/ IVA</th>
+                    <th>Estado</th>
+                    <th>Validade</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+</div>
+
+<!-- ================= MODAL ORÇAMENTO ================= -->
+<div id="modalOrcamento" class="modal hidden">
+    <div class="modal-content" style="max-width:900px;max-height:92vh;overflow-y:auto">
+        <div class="modal-header">
+            <h2 id="modalOrcTitulo">Novo Orçamento</h2>
+            <button onclick="fecharModalOrcamento()" class="modal-close">×</button>
+        </div>
+
+        <!-- Dados do cliente e obra -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+
+            <div>
+                <div style="font-family:var(--font-title);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px">Cliente</div>
+                <div class="form-row">
+                    <div class="form-group"><label>Nome *</label><input id="orcClienteNome" placeholder="Nome do cliente"></div>
+                    <div class="form-group input-sm"><label>NIF</label><input id="orcClienteNif" placeholder="Opcional"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Morada</label><input id="orcClienteMorada" placeholder="Morada"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Email</label><input id="orcClienteEmail" type="email" placeholder="email@exemplo.pt"></div>
+                    <div class="form-group"><label>Telefone</label><input id="orcClienteTel" placeholder="+351 ..."></div>
+                </div>
+            </div>
+
+            <div>
+                <div style="font-family:var(--font-title);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px">Orçamento</div>
+                <div class="form-row">
+                    <div class="form-group input-sm"><label>Número</label><input id="orcNumero" placeholder="Auto" readonly style="opacity:.6"></div>
+                    <div class="form-group input-sm"><label>Data</label><input id="orcData" type="date"></div>
+                    <div class="form-group input-sm"><label>Validade</label><input id="orcValidade" type="date"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Obra</label><select id="orcObra"><option value="">— Sem obra —</option></select></div>
+                    <div class="form-group input-sm"><label>IVA %</label><input id="orcIva" type="number" value="23"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Descrição da Obra</label><input id="orcObraDesc" placeholder="Ex: Remodelação de habitação"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Categorias e linhas -->
+        <div style="font-family:var(--font-title);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px">
+            Trabalhos
+        </div>
+        <div id="orcCategorias"></div>
+        <button onclick="adicionarCategoria()" class="btn-secondary" style="margin-bottom:20px;width:100%">
+            + Adicionar Categoria
+        </button>
+
+        <!-- Condições e notas -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+            <div>
+                <div class="form-group"><label>Prazo de Obra</label><input id="orcPrazo" placeholder="Ex: 60 dias úteis após adjudicação"></div>
+            </div>
+            <div>
+                <div class="form-group"><label>Condições de Pagamento</label><input id="orcCondicoes" placeholder="Ex: 30% entrada, 70% na conclusão"></div>
+            </div>
+        </div>
+        <div class="form-group" style="margin-bottom:20px">
+            <label>Notas / Observações</label>
+            <textarea id="orcNotas" rows="3" placeholder="Notas adicionais..." style="resize:vertical"></textarea>
+        </div>
+
+        <!-- Totais -->
+        <div class="card" style="background:rgba(244,185,66,.06);border:1px solid rgba(244,185,66,.2);margin-bottom:20px">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;text-align:center">
+                <div>
+                    <div style="font-family:var(--font-title);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Mão de Obra</div>
+                    <div id="totalMaoObra" style="font-family:var(--font-title);font-size:18px;font-weight:500">0.00 €</div>
+                </div>
+                <div>
+                    <div style="font-family:var(--font-title);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Materiais</div>
+                    <div id="totalMateriais" style="font-family:var(--font-title);font-size:18px;font-weight:500">0.00 €</div>
+                </div>
+                <div>
+                    <div style="font-family:var(--font-title);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Outros</div>
+                    <div id="totalOutros" style="font-family:var(--font-title);font-size:18px;font-weight:500">0.00 €</div>
+                </div>
+            </div>
+            <div style="border-top:1px solid rgba(244,185,66,.2);margin-top:14px;padding-top:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;text-align:center">
+                <div>
+                    <div style="font-family:var(--font-title);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Subtotal s/ IVA</div>
+                    <div id="totalSemIva" style="font-family:var(--font-title);font-size:18px;font-weight:500">0.00 €</div>
+                </div>
+                <div>
+                    <div style="font-family:var(--font-title);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">IVA</div>
+                    <div id="totalIva" style="font-family:var(--font-title);font-size:18px;font-weight:500">0.00 €</div>
+                </div>
+                <div>
+                    <div style="font-family:var(--font-title);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Total c/ IVA</div>
+                    <div id="totalComIva" style="font-family:var(--font-title);font-size:22px;font-weight:600;color:var(--primary-dk)">0.00 €</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="fecharModalOrcamento()">Cancelar</button>
+            <button class="btn-secondary" onclick="guardarOrcamento('rascunho')">Guardar Rascunho</button>
+            <button class="btn-primary" onclick="guardarOrcamento('enviado')">Guardar e Exportar PDF</button>
+        </div>
+        <div id="orcMsg" style="margin-top:8px;font-size:13px;min-height:18px"></div>
+    </div>
 </div>
 
 </div> <!-- FECHA adminArea -->
