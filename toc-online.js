@@ -43,13 +43,42 @@ const TOC = (() => {
     }
 
     async function api(path, opts = {}) {
-        const token = await obterToken();
-        const r = await fetch(_config.apiBase + path, {
+        // Usar o proxy Supabase Edge Function para evitar o CORS
+        // A Edge Function autentica e reencaminha o pedido para o TOC Online
+        const projetoId = _config.supabaseProjectId || 'npyosbigynxmxdakcymg';
+        const proxyUrl  = `https://${projetoId}.supabase.co/functions/v1/toc-proxy`;
+
+        const r = await fetch(proxyUrl, {
             ...opts,
-            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', ...(opts.headers || {}) }
+            headers: {
+                'Content-Type':    'application/json',
+                'x-toc-path':      path,
+                ...(opts.headers || {})
+            }
         });
-        if (!r.ok) throw new Error('TOC API ' + path + ': ' + r.status);
+        if (!r.ok) throw new Error('TOC Proxy ' + path + ': ' + r.status);
         return r.json();
+    }
+
+    // Autenticação local já não é necessária (a Edge Function trata disso)
+    // Mantida para compatibilidade mas não é chamada
+    async function obterToken_unused() {
+        if (_token && Date.now() < _tokenExp - 60000) return _token;
+        const r = await fetch(_config.oauthUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                grant_type: 'client_credentials',
+                client_id: _config.clientId,
+                client_secret: _config.clientSecret,
+                scope: 'openid'
+            })
+        });
+        if (!r.ok) throw new Error('TOC auth: ' + r.status);
+        const d = await r.json();
+        _token = d.access_token;
+        _tokenExp = Date.now() + (d.expires_in || 3600) * 1000;
+        return _token;
     }
 
     async function listarClientes(q = '') {
