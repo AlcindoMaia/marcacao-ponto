@@ -42,7 +42,7 @@ let chartFuncs    = null;
 // =======================================================
 // AUTH — Login com Supabase Auth (email + password)
 // =======================================================
-window.addEventListener("DOMContentLoaded", async () => {
+window.addEventListener("load", async () => {
     ligarEventosGlobais();
 
     // Verificar se já há sessão activa
@@ -2316,7 +2316,7 @@ async function importarFornecedoresTOC() {
 }
 
 // Actualizar estado do botão TOC ao carregar
-document.addEventListener('DOMContentLoaded', () => {
+window.addEventListener("load", () => {
     setTimeout(actualizarEstadoTOC, 500);
 });
 
