@@ -2349,6 +2349,13 @@ function actualizarEstadoTOC() {
 }
 
 function abrirSettingsTOC() {
+    // Pré-preencher credenciais guardadas
+    const cfg = JSON.parse(localStorage.getItem('toc_config') || '{}');
+    const elId = document.getElementById('tocClientId');
+    const elOu = document.getElementById('tocOauthUrl');
+    if (elId) elId.value = cfg.clientId  || '';
+    if (elOu) elOu.value = cfg.oauthUrl  || 'https://app35.toconline.pt/oauth';
+
     const agora = new Date();
     document.getElementById('tocSincMes').value =
         `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}`;
@@ -2358,18 +2365,32 @@ function abrirSettingsTOC() {
     document.getElementById('modalTOC').classList.remove('hidden');
 }
 
+function guardarConfigTOC() {
+    const cfg = {
+        clientId: (document.getElementById('tocClientId')?.value || '').trim(),
+        oauthUrl: (document.getElementById('tocOauthUrl')?.value || 'https://app35.toconline.pt/oauth').trim(),
+    };
+    localStorage.setItem('toc_config', JSON.stringify(cfg));
+    const msg = document.getElementById('tocMsg');
+    msg.textContent = '✓ Credenciais guardadas. Agora clica em "Autorizar TOC Online".';
+    msg.style.color = 'var(--color-ok)';
+}
+
 function fecharModalTOC() {
     document.getElementById('modalTOC').classList.add('hidden');
     document.getElementById('tocMsg').textContent     = '';
     document.getElementById('tocSincMsg').textContent = '';
 }
 
-async function autorizarTOC() {
+function autorizarTOC() {
+    // NÃO pode ser async — window.open tem de ser no mesmo tick do click
     const msg = document.getElementById('tocMsg');
-    msg.textContent = 'A abrir janela de autorização…'; msg.style.color = '';
     try {
-        await TOC.iniciarAutorizacao();
-        // Monitorizar o token — aparece no URL fragment quando o popup fecha
+        TOC.iniciarAutorizacao(); // abre popup imediatamente
+        msg.textContent = '🔐 Janela de autorização aberta — faz login no TOC Online…';
+        msg.style.color = '';
+
+        // Verificar periodicamente se o token chegou
         const wait = setInterval(() => {
             TOC.carregarToken();
             if (TOC.estaAutenticado()) {
@@ -2379,9 +2400,9 @@ async function autorizarTOC() {
                 actualizarEstadoTOC();
             }
         }, 1000);
-        setTimeout(() => clearInterval(wait), 120000); // timeout 2 min
+        setTimeout(() => clearInterval(wait), 180000); // timeout 3 min
     } catch(e) {
-        msg.textContent = '✗ Erro: ' + e.message;
+        msg.textContent = '✗ ' + e.message;
         msg.style.color = 'var(--color-err)';
     }
 }

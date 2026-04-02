@@ -30,20 +30,52 @@ const TOC = (() => {
     function estaConfigurado() { return true; } // configuração está na Edge Function
 
     // ── Iniciar fluxo de autorização ─────────────────────────────
-    async function iniciarAutorizacao() {
-        const resp = await fetch(`${PROXY_URL}?action=auth_url`);
-        const data = await resp.json();
-        if (data.auth_url) {
-            // Abrir numa janela popup para não perder o estado do admin
-            const popup = window.open(data.auth_url, 'toc_auth', 'width=600,height=700');
-            // Monitorizar o fecho do popup (o redirect vem de volta para o admin)
-            const check = setInterval(() => {
-                if (popup?.closed) {
-                    clearInterval(check);
-                    carregarToken();
-                }
-            }, 500);
+    function iniciarAutorizacao() {
+        // Construir o URL de autorização directamente (sem fetch para não bloquear popup)
+        const cfg = JSON.parse(localStorage.getItem('toc_config') || '{}');
+        const clientId  = cfg.clientId  || '';
+        const oauthUrl  = cfg.oauthUrl  || 'https://app35.toconline.pt/oauth';
+        const redirectUri = `${PROXY_URL}?action=callback`;
+
+        if (!clientId) {
+            throw new Error('Client ID não configurado. Guarda as credenciais primeiro.');
         }
+
+        const params = new URLSearchParams({
+            client_id:     clientId,
+            redirect_uri:  redirectUri,
+            response_type: 'code',
+            scope:         'commercial',
+        });
+
+        const authUrl = `${oauthUrl}/auth?${params}`;
+
+        // Abrir popup IMEDIATAMENTE (no mesmo tick do click — não pode ser após await)
+        const popup = window.open(authUrl, 'toc_auth', 'width=620,height=720,left=200,top=100');
+
+        if (!popup) {
+            throw new Error('Popup bloqueado pelo browser. Permite popups para este site e tenta novamente.');
+        }
+
+        // Monitorizar o fecho do popup — quando fecha, verificar se o token chegou
+        const check = setInterval(() => {
+            try {
+                // Tentar ler o URL do popup quando redireciona para o admin
+                if (popup.location?.hash?.includes('toc_token=')) {
+                    carregarToken();
+                    clearInterval(check);
+                    popup.close();
+                }
+            } catch(e) { /* cross-origin — popup ainda está no TOC */ }
+
+            if (popup.closed) {
+                clearInterval(check);
+                carregarToken(); // Tentar carregar token mesmo assim
+            }
+        }, 500);
+
+        // Timeout 3 minutos
+        setTimeout(() => clearInterval(check), 180000);
     }
 
     function desligar() {

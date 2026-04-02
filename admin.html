@@ -883,10 +883,22 @@
             <button onclick="fecharModalTOC()" class="modal-close">×</button>
         </div>
 
-        <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px;line-height:1.6">
-            Liga o admin ao TOC Online para importar automaticamente faturas, clientes e fornecedores.
-            A autorização é feita em segurança através do servidor — as credenciais nunca passam pelo browser.
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.6">
+            Liga o admin ao TOC Online para importar faturas, clientes e fornecedores automaticamente.
         </p>
+
+        <!-- Credenciais (guardadas localmente) -->
+        <div class="form-group" style="margin-bottom:10px">
+            <label>Client ID</label>
+            <input id="tocClientId" placeholder="pt518392074_c378307-...">
+        </div>
+        <div class="form-row" style="margin-bottom:16px">
+            <div class="form-group">
+                <label>OAuth URL</label>
+                <input id="tocOauthUrl" placeholder="https://app35.toconline.pt/oauth">
+            </div>
+        </div>
+        <button class="btn-secondary" onclick="guardarConfigTOC()" style="margin-bottom:16px;width:100%">Guardar Credenciais</button>
 
         <!-- Estado + Botões de autenticação -->
         <div style="display:flex;gap:10px;margin-bottom:16px">
