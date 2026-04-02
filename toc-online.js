@@ -35,7 +35,7 @@ const TOC = (() => {
         const cfg = JSON.parse(localStorage.getItem('toc_config') || '{}');
         const clientId  = cfg.clientId  || '';
         const oauthUrl  = cfg.oauthUrl  || 'https://app35.toconline.pt/oauth';
-        const redirectUri = `${PROXY_URL}?action=callback`;
+        const redirectUri = PROXY_URL; // URI limpo sem query string — obrigatório no TOC Online
 
         if (!clientId) {
             throw new Error('Client ID não configurado. Guarda as credenciais primeiro.');
