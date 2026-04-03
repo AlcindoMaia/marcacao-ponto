@@ -2383,24 +2383,12 @@ function fecharModalTOC() {
 }
 
 function autorizarTOC() {
-    // NÃO pode ser async — window.open tem de ser no mesmo tick do click
     const msg = document.getElementById('tocMsg');
     try {
-        TOC.iniciarAutorizacao(); // abre popup imediatamente
-        msg.textContent = '🔐 Janela de autorização aberta — faz login no TOC Online…';
+        msg.textContent = 'A redirecionar para o TOC Online…';
         msg.style.color = '';
-
-        // Verificar periodicamente se o token chegou
-        const wait = setInterval(() => {
-            TOC.carregarToken();
-            if (TOC.estaAutenticado()) {
-                clearInterval(wait);
-                msg.textContent = '✓ TOC Online autorizado com sucesso!';
-                msg.style.color = 'var(--color-ok)';
-                actualizarEstadoTOC();
-            }
-        }, 1000);
-        setTimeout(() => clearInterval(wait), 180000); // timeout 3 min
+        // Pequeno delay para o utilizador ver a mensagem antes do redirect
+        setTimeout(() => TOC.iniciarAutorizacao(), 300);
     } catch(e) {
         msg.textContent = '✗ ' + e.message;
         msg.style.color = 'var(--color-err)';

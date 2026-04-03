@@ -31,51 +31,26 @@ const TOC = (() => {
 
     // ── Iniciar fluxo de autorização ─────────────────────────────
     function iniciarAutorizacao() {
-        // Construir o URL de autorização directamente (sem fetch para não bloquear popup)
         const cfg = JSON.parse(localStorage.getItem('toc_config') || '{}');
-        const clientId  = cfg.clientId  || '';
-        const oauthUrl  = cfg.oauthUrl  || 'https://app35.toconline.pt/oauth';
-        const redirectUri = PROXY_URL; // URI limpo sem query string — obrigatório no TOC Online
+        const clientId = cfg.clientId || '';
+        const oauthUrl = cfg.oauthUrl || 'https://app35.toconline.pt/oauth';
 
         if (!clientId) {
             throw new Error('Client ID não configurado. Guarda as credenciais primeiro.');
         }
 
+        // Guardar URL actual para voltar depois do redirect
+        sessionStorage.setItem('toc_return_url', window.location.href.split('#')[0]);
+
         const params = new URLSearchParams({
             client_id:     clientId,
-            redirect_uri:  redirectUri,
+            redirect_uri:  PROXY_URL,
             response_type: 'code',
             scope:         'commercial',
         });
 
-        const authUrl = `${oauthUrl}/auth?${params}`;
-
-        // Abrir popup IMEDIATAMENTE (no mesmo tick do click — não pode ser após await)
-        const popup = window.open(authUrl, 'toc_auth', 'width=620,height=720,left=200,top=100');
-
-        if (!popup) {
-            throw new Error('Popup bloqueado pelo browser. Permite popups para este site e tenta novamente.');
-        }
-
-        // Monitorizar o fecho do popup — quando fecha, verificar se o token chegou
-        const check = setInterval(() => {
-            try {
-                // Tentar ler o URL do popup quando redireciona para o admin
-                if (popup.location?.hash?.includes('toc_token=')) {
-                    carregarToken();
-                    clearInterval(check);
-                    popup.close();
-                }
-            } catch(e) { /* cross-origin — popup ainda está no TOC */ }
-
-            if (popup.closed) {
-                clearInterval(check);
-                carregarToken(); // Tentar carregar token mesmo assim
-            }
-        }, 500);
-
-        // Timeout 3 minutos
-        setTimeout(() => clearInterval(check), 180000);
+        // Redirecionar na mesma janela — mais fiável que popup (não pode ser bloqueado)
+        window.location.href = `${oauthUrl}/auth?${params}`;
     }
 
     function desligar() {
