@@ -2382,15 +2382,6 @@ function fecharModalTOC() {
     document.getElementById('tocSincMsg').textContent = '';
 }
 
-function autorizarTOC() {
-    // Redirecionar IMEDIATAMENTE — sem setTimeout (bloqueia navegação)
-    try {
-        TOC.iniciarAutorizacao();
-    } catch(e) {
-        const msg = document.getElementById('tocMsg');
-        if (msg) { msg.textContent = '✗ ' + e.message; msg.style.color = 'var(--color-err)'; }
-    }
-}
 
 function desligarTOC() {
     TOC.desligar();
@@ -2466,3 +2457,24 @@ async function importarFornecedoresTOC() {
 window.addEventListener("load", () => {
     setTimeout(actualizarEstadoTOC, 500);
 });
+// =======================================================
+// autorizarTOC — versão definitiva (usa Edge Function para obter URL)
+// =======================================================
+function autorizarTOC() {
+    const msg = document.getElementById('tocMsg');
+    if (msg) { msg.textContent = 'A conectar ao TOC Online…'; msg.style.color = ''; }
+
+    fetch('https://npyosbigynxmxdakcymg.supabase.co/functions/v1/toc-proxy?action=auth_url')
+    .then(r => r.json())
+    .then(d => {
+        if (d.auth_url) {
+            sessionStorage.setItem('toc_return_url', window.location.href.split('#')[0]);
+            window.location.href = d.auth_url;
+        } else {
+            if (msg) { msg.textContent = '✗ Erro: ' + JSON.stringify(d); msg.style.color = 'var(--color-err)'; }
+        }
+    })
+    .catch(e => {
+        if (msg) { msg.textContent = '✗ ' + e.message; msg.style.color = 'var(--color-err)'; }
+    });
+}
