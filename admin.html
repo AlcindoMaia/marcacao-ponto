@@ -25,7 +25,7 @@
     <h1>Painel Administrativo</h1>
 
     <!-- TOC ONLINE SETTINGS -->
-    <button onclick="abrirSettingsTOC()" title="Integração TOC Online"
+    <button onclick="abrirSettingsTOC()" title="Importar SAF-T do TOC Online"
         style="background:none;border:1px solid rgba(0,0,0,.15);border-radius:20px;cursor:pointer;
                font-size:12px;padding:5px 12px;font-family:var(--font-title);letter-spacing:.5px;
                color:var(--text-dark);display:flex;align-items:center;gap:6px"
@@ -875,81 +875,39 @@
     </div>
 </div>
 
-<!-- ═══════════════ MODAL TOC ONLINE ═══════════════ -->
+<!-- ═══════════════ MODAL TOC / SAF-T ═══════════════ -->
 <div id="modalTOC" class="modal hidden">
-    <div class="modal-content" style="max-width:480px">
+    <div class="modal-content" style="max-width:520px">
         <div class="modal-header">
-            <h2>TOC Online</h2>
+            <h2>Importar do TOC Online</h2>
             <button onclick="fecharModalTOC()" class="modal-close">×</button>
         </div>
 
-        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.6">
-            Liga o admin ao TOC Online para importar faturas, clientes e fornecedores automaticamente.
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px;line-height:1.7">
+            Exporta o <strong>SAF-T</strong> do TOC Online e importa aqui — as faturas ficam automaticamente no Fluxo de Caixa.
         </p>
 
-        <!-- Credenciais (guardadas localmente) -->
-        <div class="form-group" style="margin-bottom:10px">
-            <label>Client ID</label>
-            <input id="tocClientId" placeholder="pt518392074_c378307-...">
-        </div>
-        <div class="form-row" style="margin-bottom:16px">
-            <div class="form-group">
-                <label>OAuth URL</label>
-                <input id="tocOauthUrl" placeholder="https://app35.toconline.pt/oauth">
-            </div>
-        </div>
-        <button class="btn-secondary" onclick="guardarConfigTOC()" style="margin-bottom:16px;width:100%">Guardar Credenciais</button>
-
-        <!-- Estado + Botões de autenticação -->
-        <div style="display:flex;gap:10px;margin-bottom:16px">
-            <button class="btn-primary" onclick="autorizarTOC()" style="flex:1">
-                🔐 Autorizar TOC Online
-            </button>
-            <button class="btn-secondary" onclick="testarConexaoTOC()" style="flex:1">
-                Testar
-            </button>
-            <button class="btn-secondary" onclick="desligarTOC()" style="padding:0 12px" title="Desligar">
-                ✕
-            </button>
+        <div style="background:rgba(244,185,66,.08);border:1px solid rgba(244,185,66,.2);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:20px;font-size:13px;line-height:1.7">
+            <strong style="font-family:var(--font-title);letter-spacing:.5px">Como exportar o SAF-T:</strong><br>
+            TOC Online → <strong>Contabilidade → SAF-T</strong> → selecciona o período → exporta o ficheiro XML
         </div>
 
-        <div id="tocMsg" style="font-size:13px;min-height:18px;margin-bottom:16px"></div>
-
-        <hr style="border:none;border-top:1px solid rgba(0,0,0,.08);margin-bottom:16px">
-
-        <!-- Sincronização -->
-        <div style="font-family:var(--font-title);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px">
-            Sincronizar Dados
+        <div style="margin-bottom:16px">
+            <label style="font-family:var(--font-title);font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;display:block">Ficheiro SAF-T (.xml)</label>
+            <input type="file" id="saftFicheiro" accept=".xml"
+                style="width:100%;padding:10px;border:1px solid rgba(0,0,0,.12);border-radius:var(--radius-sm);background:rgba(255,255,255,.6);font-size:13px;cursor:pointer">
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin-bottom:10px">
-            <div>
-                <div style="font-size:13px;font-weight:500">Importar faturas do mês</div>
-                <div style="font-size:11px;color:var(--text-muted)">Faturas emitidas + compras → Fluxo de Caixa</div>
-            </div>
-            <div style="display:flex;gap:8px;align-items:center">
-                <input type="month" id="tocSincMes" style="height:36px;padding:0 10px;border-radius:var(--radius-sm);border:1px solid rgba(0,0,0,.12);font-size:13px">
-                <button class="btn-primary" onclick="sincronizarTOC()" style="height:36px;padding:0 14px;white-space:nowrap">Importar</button>
-            </div>
-        </div>
+        <button class="btn-primary" onclick="importarSAFT(document.getElementById('saftFicheiro').files[0])" style="width:100%;padding:12px;font-size:14px">
+            ↑ Importar Faturas
+        </button>
 
-        <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin-bottom:10px">
-            <div>
-                <div style="font-size:13px;font-weight:500">Importar clientes</div>
-                <div style="font-size:11px;color:var(--text-muted)">Disponíveis para auto-complete nos orçamentos</div>
-            </div>
-            <button class="btn-secondary" onclick="importarClientesTOC()" style="height:36px;padding:0 14px">Importar</button>
-        </div>
+        <div id="saftMsg" style="font-size:13px;min-height:18px;margin-top:12px;text-align:center"></div>
 
-        <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center">
-            <div>
-                <div style="font-size:13px;font-weight:500">Importar fornecedores</div>
-                <div style="font-size:11px;color:var(--text-muted)">Sincroniza a lista de fornecedores</div>
-            </div>
-            <button class="btn-secondary" onclick="importarFornecedoresTOC()" style="height:36px;padding:0 14px">Importar</button>
-        </div>
+        <hr style="border:none;border-top:1px solid rgba(0,0,0,.08);margin:20px 0 16px">
 
-        <div id="tocSincMsg" style="font-size:13px;min-height:18px;margin-top:12px"></div>
+        <div style="font-family:var(--font-title);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px">Última Importação</div>
+        <div id="saftHistorico" style="font-size:12px;color:var(--text-muted)">—</div>
     </div>
 </div>
 
@@ -1033,7 +991,9 @@
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script src="config.js"></script>
 <script src="toc-online.js"></script>
+<script src="saft-import.js"></script>
 <script src="toc-online.js"></script>
+<script src="saft-import.js"></script>
 <script src="admin.js"></script>
 
 <script>
