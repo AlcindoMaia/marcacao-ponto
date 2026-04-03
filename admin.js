@@ -2383,15 +2383,12 @@ function fecharModalTOC() {
 }
 
 function autorizarTOC() {
-    const msg = document.getElementById('tocMsg');
+    // Redirecionar IMEDIATAMENTE — sem setTimeout (bloqueia navegação)
     try {
-        msg.textContent = 'A redirecionar para o TOC Online…';
-        msg.style.color = '';
-        // Pequeno delay para o utilizador ver a mensagem antes do redirect
-        setTimeout(() => TOC.iniciarAutorizacao(), 300);
+        TOC.iniciarAutorizacao();
     } catch(e) {
-        msg.textContent = '✗ ' + e.message;
-        msg.style.color = 'var(--color-err)';
+        const msg = document.getElementById('tocMsg');
+        if (msg) { msg.textContent = '✗ ' + e.message; msg.style.color = 'var(--color-err)'; }
     }
 }
 
