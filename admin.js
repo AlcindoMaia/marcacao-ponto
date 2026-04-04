@@ -1510,7 +1510,6 @@ function ligarEventosGlobais() {
     // Fluxo — modal
     document.getElementById("btnNovoMovimento")?.addEventListener("click", () => abrirModalMovimento());
     document.getElementById("btnScanQR")?.addEventListener("click", iniciarScanQR);
-    document.getElementById("btnFecharScanQR")?.addEventListener("click", fecharScanQR);
     document.getElementById("btnGuardarMov")?.addEventListener("click", guardarMovimento);
     document.getElementById("fecharModalMovBtn")?.addEventListener("click", fecharModalMovimento);
     document.getElementById("modalMovimento")?.addEventListener("click", e => {
