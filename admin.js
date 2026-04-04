@@ -217,7 +217,7 @@ function gerarCalendario() {
     if (!grid || !title) return;
     const ano = currentDate.getFullYear();
     const mes = currentDate.getMonth();
-    title.textContent = currentDate.toLocaleString("pt-PT", { month: "long", year: "numeric" });
+    title.textContent = currentDate.toLocaleString("pt-PT", { month: "long", year: "numeric", timeZone: "Europe/Lisbon" });
     grid.innerHTML = "";
     const primeiroDia = new Date(ano, mes, 1).getDay();
     const diasNoMes   = new Date(ano, mes + 1, 0).getDate();
@@ -276,7 +276,7 @@ async function carregarRegistos() {
         return;
     }
 
-    const fmt = v => v ? v.substring(11, 16) : "";
+    const fmt = v => v ? new Date(v).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Lisbon" }) : "";
 
     data.forEach(r => {
         const tr = document.createElement("tr");
@@ -663,7 +663,7 @@ async function carregarFuncionarios() {
 
     data.forEach(f => {
         const ativo    = f.ativo !== false;
-        const data_reg = f.created_at ? new Date(f.created_at).toLocaleDateString("pt-PT") : "—";
+        const data_reg = f.created_at ? new Date(f.created_at).toLocaleDateString("pt-PT", { timeZone: "Europe/Lisbon" }) : "—";
         const temDevice = !!f.device_id;
 
         const tr = document.createElement("tr");
