@@ -1044,21 +1044,43 @@ async function initInventario() {
     await carregarUnidades();
     // Sub-tabs do inventário
     document.querySelectorAll(".inv-subtab").forEach(btn => {
-        btn.onclick = () => {
-            document.querySelectorAll(".inv-subtab").forEach(b => b.classList.remove("active"));
-            document.querySelectorAll(".inv-subtab-content").forEach(c => c.classList.remove("active"));
+        btn.onclick = async () => {
+            document.querySelectorAll(".inv-subtab").forEach(b => {
+                b.classList.remove("active");
+                b.style.borderBottomColor = "transparent";
+                b.style.color = "var(--text-muted)";
+            });
+            document.querySelectorAll(".inv-subtab-content").forEach(c => c.style.display = "none");
             btn.classList.add("active");
-            document.getElementById("invTab-" + btn.dataset.invtab)?.classList.add("active");
+            btn.style.borderBottomColor = "var(--primary)";
+            btn.style.color = "var(--primary)";
+            const target = document.getElementById("invTab-" + btn.dataset.invtab);
+            if (target) target.style.display = "block";
+            if (btn.dataset.invtab === "movimentos") {
+                await carregarFiltrosMovStock();
+                await carregarMovimentosStock();
+            }
         };
     });
     await carregarArtigos();
 }
 
 async function abrirSubTabMovimentos() {
-    document.querySelectorAll(".inv-subtab").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".inv-subtab-content").forEach(c => c.classList.remove("active"));
-    document.querySelector('.inv-subtab[data-invtab="movimentos"]')?.classList.add("active");
-    document.getElementById("invTab-movimentos")?.classList.add("active");
+    document.querySelectorAll(".inv-subtab").forEach(b => {
+        b.classList.remove("active");
+        b.style.borderBottomColor = "transparent";
+        b.style.color = "var(--text-muted)";
+    });
+    document.querySelectorAll(".inv-subtab-content").forEach(c => c.style.display = "none");
+    const btnMov = document.querySelector('.inv-subtab[data-invtab="movimentos"]');
+    if (btnMov) {
+        btnMov.classList.add("active");
+        btnMov.style.borderBottomColor = "var(--primary)";
+        btnMov.style.color = "var(--primary)";
+    }
+    const tabMov = document.getElementById("invTab-movimentos");
+    if (tabMov) tabMov.style.display = "block";
+    await carregarFiltrosMovStock();
     await carregarMovimentosStock();
 }
 

@@ -116,6 +116,14 @@ async function confirmarMovimentoStock() {
 
   if (error) { mostrarFeedback("Erro ao registar. Tente novamente.", "erro"); return; }
 
+  // Actualizar local_armazenamento do artigo com o local do movimento
+  const nomeLocal = obra === "armazem"
+    ? "Armazém"
+    : obras.find(o => o.id === obra)?.nome || "";
+  if (nomeLocal) {
+    await SB.from("artigos").update({ local_armazenamento: nomeLocal }).eq("id", artigo.id);
+  }
+
   mostrarFeedback(`✓ ${tipo === "entrada" ? "Entrada" : "Saída"} de ${qtd} registada!`, "ok");
   document.getElementById("quantidade").value = "";
   document.querySelector('input[name="tipoMov"]')?.parentElement?.querySelectorAll('input').forEach(r => r.checked = false);
@@ -154,6 +162,10 @@ async function confirmarMovimentacao() {
   btn.textContent = "Confirmar Movimentação";
 
   if (error) { mostrarFeedback("Erro ao registar. Tente novamente.", "erro"); return; }
+
+  // Actualizar local_armazenamento do artigo com o destino
+  await SB.from("artigos").update({ local_armazenamento: nomeDestino }).eq("id", artigo.id);
+  artigo.local_armazenamento = nomeDestino;
 
   mostrarFeedback(`✓ ${artigo.descricao} movido para ${nomeDestino}!`, "ok");
   document.getElementById("obraOrigem").value  = "";
