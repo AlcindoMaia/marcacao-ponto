@@ -15,6 +15,15 @@
 <!-- DataTables -->
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 
+
+<style>
+.inv-subtab.active {
+    border-bottom-color: var(--primary) !important;
+    color: var(--primary) !important;
+}
+.inv-subtab-content { display: none; }
+.inv-subtab-content.active { display: block; }
+</style>
 </head>
 
 
@@ -243,34 +252,96 @@
 <!-- ================= TAB INVENTÁRIO ================= -->
 <div class="tab-content" id="tab-inventario">
 
-    <!-- Barra superior -->
-    <div class="inventario-header">
-
-        <input type="text"
-               id="pesquisaInventario"
-               class="input-lg"
-               placeholder="Pesquisar por código, descrição ou tipo">
-
-        <button id="btnNovoArtigo" class="btn-primary" style="width:42px;height:42px;font-size:22px;border-radius:50%;padding:0;flex-shrink:0">+</button>
-
+    <!-- Sub-tabs -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:0">
+        <button class="inv-subtab active" data-invtab="artigos"
+            style="background:none;border:none;border-bottom:2px solid var(--primary);color:var(--primary);padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;font-family:var(--font-title);letter-spacing:.5px">
+            📦 ARTIGOS
+        </button>
+        <button class="inv-subtab" data-invtab="movimentos"
+            style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;font-family:var(--font-title);letter-spacing:.5px"
+            onclick="abrirSubTabMovimentos()">
+            📋 MOVIMENTOS
+        </button>
+        <button id="btnImprimirLote"
+            style="margin-left:auto;background:rgba(244,185,66,.12);border:1px solid rgba(244,185,66,.3);color:var(--primary);padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;opacity:.4"
+            onclick="imprimirLote()">
+            🖨️ Imprimir Lote
+        </button>
     </div>
 
-    <!-- Tabela -->
-    <div class="card">
-        <table id="tabelaArtigos" class="display">
-            <thead>
-                <tr>
-                    <th>Código</th>
-                    <th>Descrição</th>
-                    <th>Tipo</th>
-                    <th>Preço</th>
-                    <th>Stock</th>
-                    <th>Local</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+    <!-- SUB-TAB: ARTIGOS -->
+    <div id="invTab-artigos" class="inv-subtab-content" style="display:block">
+        <div class="inventario-header">
+            <input type="text" id="pesquisaInventario" class="input-lg"
+                   placeholder="Pesquisar por código, descrição ou tipo">
+            <button id="btnNovoArtigo" class="btn-primary"
+                style="width:42px;height:42px;font-size:22px;border-radius:50%;padding:0;flex-shrink:0">+</button>
+        </div>
+        <div class="card">
+            <table id="tabelaArtigos" class="display">
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Descrição</th>
+                        <th>Tipo</th>
+                        <th>Preço</th>
+                        <th>Stock</th>
+                        <th>Local</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- SUB-TAB: MOVIMENTOS STOCK -->
+    <div id="invTab-movimentos" class="inv-subtab-content" style="display:none">
+
+        <!-- Filtros -->
+        <div class="card" style="margin-bottom:12px;padding:14px 16px">
+            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
+                <div style="flex:1;min-width:140px">
+                    <div style="font-size:11px;opacity:.5;margin-bottom:4px;font-family:var(--font-title);letter-spacing:.5px">ARTIGO</div>
+                    <input id="filtroMovArtigo" class="input-lg" style="height:36px;font-size:13px" placeholder="Código ou descrição">
+                </div>
+                <div style="flex:1;min-width:140px">
+                    <div style="font-size:11px;opacity:.5;margin-bottom:4px;font-family:var(--font-title);letter-spacing:.5px">FUNCIONÁRIO</div>
+                    <select id="filtroMovFunc" style="height:36px;font-size:13px;width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0 10px">
+                        <option value="">— Todos —</option>
+                    </select>
+                </div>
+                <div style="flex:1;min-width:120px">
+                    <div style="font-size:11px;opacity:.5;margin-bottom:4px;font-family:var(--font-title);letter-spacing:.5px">DE</div>
+                    <input id="filtroMovInicio" type="date" style="height:36px;font-size:13px;width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0 10px">
+                </div>
+                <div style="flex:1;min-width:120px">
+                    <div style="font-size:11px;opacity:.5;margin-bottom:4px;font-family:var(--font-title);letter-spacing:.5px">ATÉ</div>
+                    <input id="filtroMovFim" type="date" style="height:36px;font-size:13px;width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0 10px">
+                </div>
+                <button id="btnLimparFiltrosMov" class="btn-secondary" style="height:36px;white-space:nowrap">Limpar</button>
+            </div>
+        </div>
+
+        <!-- Tabela movimentos -->
+        <div class="card" style="overflow-x:auto">
+            <table id="tabelaMovStock" class="display">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Artigo</th>
+                        <th>Tipo</th>
+                        <th style="text-align:right">Qtd</th>
+                        <th>Funcionário</th>
+                        <th>Origem</th>
+                        <th>Destino</th>
+                        <th>Observações</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
 
 </div>
@@ -630,6 +701,7 @@
                     <th>Valor/dia</th>
                     <th>Estado</th>
                     <th>Dispositivo</th>
+                    <th>Stock</th>
                     <th></th>
                 </tr>
             </thead>
@@ -1003,6 +1075,53 @@ function toggleDark() {
         document.body.classList.contains("dark") ? "☀️" : "🌙";
 }
 </script>
+
+
+<!-- ================= MODAL ETIQUETA QR ================= -->
+<div id="modalEtiqueta" class="modal hidden">
+    <div class="modal-content" style="max-width:420px">
+
+        <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h2>🏷️ Etiqueta QR</h2>
+            <button id="fecharModalEtiquetaBtn" class="modal-close"
+                    style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.6">×</button>
+        </div>
+
+        <!-- Info artigo -->
+        <div style="background:rgba(244,185,66,.08);border:1px solid rgba(244,185,66,.2);border-radius:10px;padding:12px 16px;margin-bottom:18px">
+            <div style="font-size:11px;opacity:.5;font-family:var(--font-title);letter-spacing:.5px;margin-bottom:4px">ARTIGO</div>
+            <div id="etqArtigoNome" style="font-weight:700;font-size:15px"></div>
+            <div id="etqArtigoCodigo" style="font-size:12px;opacity:.6;font-family:monospace;margin-top:2px"></div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Tamanho da etiqueta</label>
+                <select id="etqTamanho">
+                    <option value="pequeno">Pequeno — 5×3 cm</option>
+                    <option value="medio" selected>Médio — 9×5 cm</option>
+                    <option value="grande">Grande — 14×9 cm</option>
+                </select>
+            </div>
+            <div class="form-group input-sm">
+                <label>Quantidade</label>
+                <input id="etqQuantidade" type="number" min="1" max="50" value="1">
+            </div>
+        </div>
+
+        <div id="etqMsg" style="font-size:13px;min-height:20px;margin-bottom:12px;color:var(--color-ok)"></div>
+
+        <div class="modal-actions" style="flex-direction:column;gap:8px">
+            <button class="btn-primary" id="btnImprimirDirecto" style="width:100%">
+                🖨️ Imprimir agora
+            </button>
+            <button class="btn-secondary" id="btnAdicionarLote" style="width:100%">
+                + Adicionar ao lote
+            </button>
+        </div>
+
+    </div>
+</div>
 
 </body>
 </html>

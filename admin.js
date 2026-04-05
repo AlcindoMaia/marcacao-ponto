@@ -683,12 +683,16 @@ async function carregarFuncionarios() {
                     : `<span style="font-size:11px;color:#f4b942">Sem dispositivo</span>`}
             </td>
             <td class="acoes-td">
+            <td>
+                <button class="btn-acao" title="${f.acesso_stock ? 'Revogar Stock' : 'Dar Acesso Stock'}" style="font-size:11px;padding:3px 8px;background:${f.acesso_stock ? 'rgba(90,214,90,.15)' : 'rgba(255,255,255,.06)'};color:${f.acesso_stock ? '#5ad65a' : '#888'}">📦 ${f.acesso_stock ? "Stock ✓" : "Stock"}</button>
+            </td>
                 <button class="btn-acao" title="Editar">✏️</button>
                 <button class="btn-acao" title="${ativo ? "Desativar" : "Ativar"}">${ativo ? "🔴" : "🟢"}</button>
             </td>`;
 
-        tr.querySelectorAll(".btn-acao")[0].onclick = () => abrirModalFuncionario(f);
-        tr.querySelectorAll(".btn-acao")[1].onclick = () => toggleAtivoFuncionario(f.id, f.nome, ativo);
+        tr.querySelectorAll(".btn-acao")[0].onclick = () => toggleAcessoStock(f.id, f.nome, !!f.acesso_stock);
+        tr.querySelectorAll(".btn-acao")[1].onclick = () => abrirModalFuncionario(f);
+        tr.querySelectorAll(".btn-acao")[2].onclick = () => toggleAtivoFuncionario(f.id, f.nome, ativo);
         tbody.appendChild(tr);
     });
 }
@@ -757,6 +761,18 @@ async function toggleAtivoFuncionario(id, nome, ativoAtual) {
 
     const { error } = await SB.from("funcionarios")
         .update({ ativo: !ativoAtual })
+        .eq("id", id);
+
+    if (error) { alert("Erro: " + error.message); return; }
+    await carregarFuncionarios();
+}
+
+async function toggleAcessoStock(id, nome, temAcesso) {
+    const acao = temAcesso ? "revogar o acesso ao stock" : "dar acesso ao stock";
+    if (!confirm(`${temAcesso ? "Revogar" : "Dar"} acesso ao stock a "${nome}"?`)) return;
+
+    const { error } = await SB.from("funcionarios")
+        .update({ acesso_stock: !temAcesso })
         .eq("id", id);
 
     if (error) { alert("Erro: " + error.message); return; }
@@ -1026,7 +1042,24 @@ Completa a obra, categoria e estado manualmente.`);
 // =======================================================
 async function initInventario() {
     await carregarUnidades();
+    // Sub-tabs do inventário
+    document.querySelectorAll(".inv-subtab").forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll(".inv-subtab").forEach(b => b.classList.remove("active"));
+            document.querySelectorAll(".inv-subtab-content").forEach(c => c.classList.remove("active"));
+            btn.classList.add("active");
+            document.getElementById("invTab-" + btn.dataset.invtab)?.classList.add("active");
+        };
+    });
     await carregarArtigos();
+}
+
+async function abrirSubTabMovimentos() {
+    document.querySelectorAll(".inv-subtab").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".inv-subtab-content").forEach(c => c.classList.remove("active"));
+    document.querySelector('.inv-subtab[data-invtab="movimentos"]')?.classList.add("active");
+    document.getElementById("invTab-movimentos")?.classList.add("active");
+    await carregarMovimentosStock();
 }
 
 async function carregarUnidades() {
@@ -1088,11 +1121,13 @@ async function carregarArtigos() {
             <td class="acoes-td">
                 <button class="btn-acao" title="Editar">✏️</button>
                 <button class="btn-acao" title="Histórico">📋</button>
+                <button class="btn-acao" title="Etiqueta QR">🏷️</button>
                 <button class="btn-acao btn-apagar-art" title="Apagar">🗑️</button>
             </td>`;
-        tr.querySelector("[title='Editar']").onclick    = () => abrirModalArtigo(a);
-        tr.querySelector("[title='Histórico']").onclick = () => abrirHistoricoStock(a.id, a.descricao);
-        tr.querySelector("[title='Apagar']").onclick    = () => apagarArtigo(a.id, a.descricao);
+        tr.querySelector("[title='Editar']").onclick      = () => abrirModalArtigo(a);
+        tr.querySelector("[title='Histórico']").onclick   = () => abrirHistoricoStock(a.id, a.descricao);
+        tr.querySelector("[title='Etiqueta QR']").onclick = () => abrirModalEtiqueta(a);
+        tr.querySelector("[title='Apagar']").onclick      = () => apagarArtigo(a.id, a.descricao);
         tbody.appendChild(tr);
     });
 }
@@ -1261,6 +1296,260 @@ async function guardarArtigo() {
     // Pequeno delay para garantir que a view do Supabase reflecte o novo movimento
     await new Promise(r => setTimeout(r, 300));
     await carregarArtigos(); // Stock actualizado via vw_stock_atual
+}
+
+
+// =======================================================
+// ETIQUETAS QR — IMPRESSÃO
+// =======================================================
+let loteEtiquetas = []; // Lote de etiquetas acumuladas
+
+function abrirModalEtiqueta(artigo) {
+    document.getElementById("etqArtigoNome").textContent  = artigo.descricao;
+    document.getElementById("etqArtigoCodigo").textContent = artigo.codigo || "—";
+    document.getElementById("etqQuantidade").value        = 1;
+    document.getElementById("etqTamanho").value           = "medio";
+    document.getElementById("etqMsg").textContent         = "";
+    // Guardar artigo no modal para uso posterior
+    document.getElementById("modalEtiqueta").dataset.artigoId     = artigo.id;
+    document.getElementById("modalEtiqueta").dataset.artigoCodigo = artigo.codigo;
+    document.getElementById("modalEtiqueta").dataset.artigoNome   = artigo.descricao;
+    document.getElementById("modalEtiqueta").dataset.artigoTipo   = artigo.tipo_artigo;
+    document.getElementById("modalEtiqueta").classList.remove("hidden");
+    actualizarPreviewLote();
+}
+
+function fecharModalEtiqueta() {
+    document.getElementById("modalEtiqueta").classList.add("hidden");
+}
+
+function actualizarPreviewLote() {
+    const n = loteEtiquetas.length;
+    const btnLote = document.getElementById("btnImprimirLote");
+    if (btnLote) {
+        btnLote.textContent = n > 0 ? `🖨️ Imprimir Lote (${n})` : "🖨️ Imprimir Lote";
+        btnLote.style.opacity = n > 0 ? "1" : ".4";
+    }
+}
+
+function adicionarAoLote() {
+    const modal = document.getElementById("modalEtiqueta");
+    const qtd   = parseInt(document.getElementById("etqQuantidade").value) || 1;
+    const tam   = document.getElementById("etqTamanho").value;
+    loteEtiquetas.push({
+        codigo: modal.dataset.artigoCodigo,
+        nome:   modal.dataset.artigoNome,
+        tipo:   modal.dataset.artigoTipo,
+        qtd,
+        tam
+    });
+    document.getElementById("etqMsg").textContent = `✓ Adicionado ao lote (${loteEtiquetas.length} artigo${loteEtiquetas.length > 1 ? "s" : ""})`;
+    document.getElementById("etqMsg").style.color = "var(--color-ok)";
+    actualizarPreviewLote();
+}
+
+function imprimirEtiquetaDirecta() {
+    const modal = document.getElementById("modalEtiqueta");
+    const qtd   = parseInt(document.getElementById("etqQuantidade").value) || 1;
+    const tam   = document.getElementById("etqTamanho").value;
+    const item  = { codigo: modal.dataset.artigoCodigo, nome: modal.dataset.artigoNome, tipo: modal.dataset.artigoTipo, qtd, tam };
+    gerarPaginaImpressao([item]);
+    fecharModalEtiqueta();
+}
+
+function imprimirLote() {
+    if (loteEtiquetas.length === 0) { alert("O lote está vazio. Adiciona artigos primeiro."); return; }
+    gerarPaginaImpressao(loteEtiquetas);
+    loteEtiquetas = [];
+    actualizarPreviewLote();
+}
+
+function gerarPaginaImpressao(itens) {
+    // Tamanhos das etiquetas em mm
+    const dims = { pequeno: [50, 30], medio: [90, 50], grande: [140, 90] };
+
+    // Gerar HTML de cada etiqueta
+    let etiquetasHTML = "";
+    const url_base = "https://alcindomaia.github.io/marcacao-ponto/stock.html?artigo=";
+
+    itens.forEach(item => {
+        const [w, h] = dims[item.tam] || dims.medio;
+        const url    = url_base + encodeURIComponent(item.codigo);
+        const tipoLabel = { consumivel: "Consumível", mercadoria: "Mercadoria", equipamento: "Equipamento", ferramenta: "Ferramenta" }[item.tipo] || item.tipo;
+
+        for (let i = 0; i < item.qtd; i++) {
+            etiquetasHTML += `
+            <div class="etiqueta etq-${item.tam}" style="width:${w}mm;height:${h}mm">
+                <div class="etq-header">
+                    <span class="etq-empresa">MAIA SOLUTIONS</span>
+                    <span class="etq-tipo">${tipoLabel}</span>
+                </div>
+                <div class="etq-body">
+                    <canvas class="etq-qr" data-url="${url}" width="100" height="100"></canvas>
+                    <div class="etq-info">
+                        <div class="etq-codigo">${item.codigo}</div>
+                        <div class="etq-nome">${item.nome}</div>
+                    </div>
+                </div>
+            </div>`;
+        }
+    });
+
+    const html = `<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>Etiquetas — Maia Solutions</title>
+<script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"><\/script>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:#fff; font-family:'Inter',system-ui,sans-serif; }
+  .pagina { display:flex; flex-wrap:wrap; gap:4mm; padding:8mm; }
+  .etiqueta {
+    border: 0.5mm solid #ccc;
+    border-radius: 2mm;
+    display: flex;
+    flex-direction: column;
+    padding: 2mm;
+    page-break-inside: avoid;
+    overflow: hidden;
+  }
+  .etq-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 0.3mm solid #eee;
+    padding-bottom: 1mm;
+    margin-bottom: 1.5mm;
+  }
+  .etq-empresa { font-size: 5pt; font-weight: 700; letter-spacing: .5pt; color: #f4b942; }
+  .etq-tipo    { font-size: 4pt; color: #999; text-transform: uppercase; letter-spacing: .3pt; }
+  .etq-body    { display: flex; flex: 1; align-items: center; gap: 2mm; }
+  .etq-qr      { flex-shrink: 0; }
+  .etq-info    { flex: 1; min-width: 0; }
+  .etq-codigo  { font-size: 8pt; font-weight: 800; letter-spacing: .5pt; margin-bottom: 1mm; }
+  .etq-nome    { font-size: 7pt; color: #333; line-height: 1.3; word-break: break-word; }
+
+  /* Tamanhos de QR e texto por tamanho de etiqueta */
+  .etq-pequeno .etq-qr   { width: 16mm; height: 16mm; }
+  .etq-pequeno .etq-codigo { font-size: 6pt; }
+  .etq-pequeno .etq-nome   { font-size: 5pt; }
+
+  .etq-medio .etq-qr   { width: 26mm; height: 26mm; }
+  .etq-medio .etq-codigo { font-size: 9pt; }
+  .etq-medio .etq-nome   { font-size: 8pt; }
+
+  .etq-grande .etq-qr   { width: 42mm; height: 42mm; }
+  .etq-grande .etq-codigo { font-size: 12pt; }
+  .etq-grande .etq-nome   { font-size: 11pt; }
+
+  @media print {
+    body { margin:0; }
+    .pagina { gap:2mm; padding:5mm; }
+  }
+</style>
+</head>
+<body>
+<div class="pagina">${etiquetasHTML}</div>
+<script>
+  document.querySelectorAll(".etq-qr").forEach(canvas => {
+    const size = canvas.offsetWidth || parseInt(canvas.style.width) || 80;
+    new QRious({ element: canvas, value: canvas.dataset.url, size: size * 3.78, level: "H", background: "#ffffff", foreground: "#000000" });
+  });
+  setTimeout(() => window.print(), 600);
+<\/script>
+</body>
+</html>`;
+
+    const win = window.open("", "_blank", "width=900,height=700");
+    win.document.write(html);
+    win.document.close();
+}
+
+// =======================================================
+// MOVIMENTOS STOCK — sub-tab do inventário
+// =======================================================
+async function carregarMovimentosStock() {
+    const tbody = document.querySelector("#tabelaMovStock tbody");
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;opacity:.6">A carregar…</td></tr>`;
+
+    // Filtros
+    const filtroArtigo = document.getElementById("filtroMovArtigo")?.value?.toLowerCase() || "";
+    const filtroFunc   = document.getElementById("filtroMovFunc")?.value   || "";
+    const filtroObra   = document.getElementById("filtroMovObra")?.value   || "";
+    const filtroInicio = document.getElementById("filtroMovInicio")?.value || "";
+    const filtroFim    = document.getElementById("filtroMovFim")?.value    || "";
+
+    let query = SB.from("movimentos_stock")
+        .select(`id, tipo_movimento, quantidade, data_movimento, observacoes, created_at,
+                 artigos(codigo, descricao, tipo_artigo),
+                 funcionarios(nome),
+                 obra_origem:obras!movimentos_stock_obra_origem_id_fkey(nome),
+                 obra_destino:obras!movimentos_stock_obra_destino_id_fkey(nome)`)
+        .order("data_movimento", { ascending: false })
+        .order("created_at",     { ascending: false })
+        .limit(200);
+
+    if (filtroFunc)   query = query.eq("funcionario_id", filtroFunc);
+    if (filtroInicio) query = query.gte("data_movimento", filtroInicio);
+    if (filtroFim)    query = query.lte("data_movimento", filtroFim);
+
+    const { data, error } = await query;
+    if (error) { tbody.innerHTML = `<tr><td colspan="8" style="color:#ff7a7a;text-align:center;padding:16px">Erro: ${error.message}</td></tr>`; return; }
+
+    let lista = data || [];
+
+    // Filtro de artigo (client-side por texto)
+    if (filtroArtigo) {
+        lista = lista.filter(m =>
+            (m.artigos?.codigo || "").toLowerCase().includes(filtroArtigo) ||
+            (m.artigos?.descricao || "").toLowerCase().includes(filtroArtigo)
+        );
+    }
+    // Filtro de obra (client-side)
+    if (filtroObra) {
+        lista = lista.filter(m => m.obra_origem?.id === filtroObra || m.obra_destino?.id === filtroObra);
+    }
+
+    tbody.innerHTML = "";
+    if (!lista.length) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;opacity:.6">Sem movimentos com estes filtros.</td></tr>`;
+        return;
+    }
+
+    const tipoLabel = { entrada: "Entrada", saida: "Saída", ajuste_entrada: "Ajuste +", ajuste_saida: "Ajuste −", inicial: "Inicial" };
+    const tipoCor   = { entrada: "#5ad65a", saida: "#ff7a7a", ajuste_entrada: "#f4b942", ajuste_saida: "#f4b942", inicial: "#85b7eb" };
+
+    lista.forEach(m => {
+        const cor    = tipoCor[m.tipo_movimento]   || "#888";
+        const label  = tipoLabel[m.tipo_movimento] || m.tipo_movimento;
+        const origem  = m.obra_origem?.nome  || (m.observacoes?.includes("Armazém") ? "Armazém" : "—");
+        const destino = m.obra_destino?.nome || (m.observacoes?.includes("Armazém") ? "Armazém" : "—");
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td style="font-size:12px;opacity:.7">${m.data_movimento || "—"}</td>
+            <td>
+                <div style="font-weight:600;font-size:13px">${m.artigos?.descricao || "—"}</div>
+                <div style="font-size:11px;opacity:.5;font-family:monospace">${m.artigos?.codigo || ""}</div>
+            </td>
+            <td><span style="color:${cor};font-weight:700;font-size:12px">${label}</span></td>
+            <td style="text-align:right;font-weight:600">${m.quantidade ?? "—"}</td>
+            <td style="font-size:13px">${m.funcionarios?.nome || "—"}</td>
+            <td style="font-size:12px;opacity:.8">${origem}</td>
+            <td style="font-size:12px;opacity:.8">${destino}</td>
+            <td style="font-size:11px;opacity:.6">${m.observacoes || "—"}</td>`;
+        tbody.appendChild(tr);
+    });
+}
+
+async function carregarFiltrosMovStock() {
+    // Preencher select de funcionários
+    const selFunc = document.getElementById("filtroMovFunc");
+    if (selFunc && selFunc.options.length <= 1) {
+        const { data } = await SB.from("funcionarios").select("id, nome").order("nome");
+        data?.forEach(f => { selFunc.innerHTML += `<option value="${f.id}">${f.nome}</option>`; });
+    }
 }
 
 async function apagarArtigo(id, nome) {
@@ -1499,6 +1788,26 @@ function ligarEventosGlobais() {
     document.getElementById("btnNovoArtigo")?.addEventListener("click", () => abrirModalArtigo());
     document.getElementById("guardarArtigoBtn")?.addEventListener("click", guardarArtigo);
     document.getElementById("fecharModalBtn")?.addEventListener("click", fecharModalArtigo);
+
+    // Etiquetas QR
+    document.getElementById("btnImprimirDirecto")?.addEventListener("click", imprimirEtiquetaDirecta);
+    document.getElementById("btnAdicionarLote")?.addEventListener("click", adicionarAoLote);
+    document.getElementById("btnImprimirLote")?.addEventListener("click", imprimirLote);
+    document.getElementById("fecharModalEtiquetaBtn")?.addEventListener("click", fecharModalEtiqueta);
+    document.getElementById("modalEtiqueta")?.addEventListener("click", e => {
+        if (e.target.id === "modalEtiqueta") fecharModalEtiqueta();
+    });
+
+    // Movimentos stock — filtros
+    ["filtroMovArtigo","filtroMovFunc","filtroMovObra","filtroMovInicio","filtroMovFim"].forEach(id => {
+        document.getElementById(id)?.addEventListener("change", carregarMovimentosStock);
+        document.getElementById(id)?.addEventListener("input",  carregarMovimentosStock);
+    });
+    document.getElementById("btnLimparFiltrosMov")?.addEventListener("click", () => {
+        ["filtroMovArtigo","filtroMovFunc","filtroMovObra","filtroMovInicio","filtroMovFim"]
+            .forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+        carregarMovimentosStock();
+    });
     document.getElementById("modalArtigo")?.addEventListener("click", e => {
         if (e.target.id === "modalArtigo") fecharModalArtigo();
     });

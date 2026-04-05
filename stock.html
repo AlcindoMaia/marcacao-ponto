@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Stock — Maia Solutions</title>
+<style>
+  :root {
+    --primary:    #f4b942;
+    --bg:         #0f0f0f;
+    --surface:    #1a1a1a;
+    --surface2:   #242424;
+    --border:     rgba(255,255,255,.08);
+    --text:       #f0f0f0;
+    --text-muted: #888;
+    --ok:         #5ad65a;
+    --err:        #ff7a7a;
+    --radius:     14px;
+    --font:       'Inter', system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Ecrãs ── */
+  .ecrã {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100dvh;
+    padding: 24px;
+    text-align: center;
+    gap: 16px;
+  }
+
+  /* Loading */
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Bloqueio */
+  .bloqueio-icon { font-size: 48px; }
+  #bloqueioTitulo { font-size: 20px; font-weight: 700; }
+  #bloqueioMsg    { font-size: 14px; color: var(--text-muted); line-height: 1.6; }
+
+  /* ── Principal ── */
+  #ecrãPrincipal {
+    display: none;
+    flex-direction: column;
+    min-height: 100dvh;
+    padding: 0;
+  }
+
+  /* Header */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .header-logo {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--primary);
+  }
+  .header-user {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* Ficha do artigo */
+  .artigo-card {
+    background: var(--surface);
+    margin: 16px;
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .artigo-codigo {
+    background: var(--primary);
+    color: #000;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 1px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    white-space: nowrap;
+  }
+  .artigo-info { flex: 1; min-width: 0; }
+  .artigo-nome {
+    font-size: 16px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .artigo-tipo {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .stock-actual {
+    display: none;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary);
+    margin-top: 4px;
+  }
+
+  /* Formulários */
+  .form-area {
+    flex: 1;
+    padding: 0 16px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* Toggle entrada/saída */
+  .tipo-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .tipo-toggle label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px;
+    border-radius: var(--radius);
+    border: 2px solid var(--border);
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 700;
+    transition: all .15s;
+  }
+  .tipo-toggle input { display: none; }
+  .tipo-toggle input[value="entrada"]:checked + span,
+  .tipo-toggle label:has(input[value="entrada"]:checked) {
+    border-color: var(--ok);
+    background: rgba(90,214,90,.12);
+    color: var(--ok);
+  }
+  .tipo-toggle input[value="saida"]:checked + span,
+  .tipo-toggle label:has(input[value="saida"]:checked) {
+    border-color: var(--err);
+    background: rgba(255,122,122,.12);
+    color: var(--err);
+  }
+
+  /* Campo quantidade */
+  .campo-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  input[type="number"],
+  select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    color: var(--text);
+    font-size: 16px;
+    font-family: var(--font);
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  input[type="number"]:focus,
+  select:focus {
+    border-color: var(--primary);
+  }
+  input[type="number"] { text-align: center; font-size: 24px; font-weight: 700; }
+
+  /* Select obra */
+  .select-wrap { position: relative; }
+  .select-wrap::after {
+    content: "▾";
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+
+  /* Botão confirmar */
+  .btn-confirmar {
+    width: 100%;
+    padding: 16px;
+    border: none;
+    border-radius: var(--radius);
+    background: var(--primary);
+    color: #000;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: .5px;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: opacity .15s;
+  }
+  .btn-confirmar:disabled { opacity: .5; cursor: default; }
+
+  /* Feedback */
+  .feedback {
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    min-height: 44px;
+    transition: all .2s;
+  }
+  .feedback.ok   { background: rgba(90,214,90,.15);  color: var(--ok); }
+  .feedback.erro { background: rgba(255,122,122,.15); color: var(--err); }
+  .feedback.info { background: rgba(244,185,66,.1);   color: var(--primary); }
+
+  /* Secção */
+  .secção-titulo {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="ecrãLoading" class="ecrã" style="display:flex">
+  <div class="spinner"></div>
+  <p style="color:var(--text-muted);font-size:14px">A verificar acesso…</p>
+</div>
+
+<!-- BLOQUEIO -->
+<div id="ecrãBloqueio" class="ecrã">
+  <div class="bloqueio-icon">🔒</div>
+  <div id="bloqueioTitulo">Acesso negado</div>
+  <div id="bloqueioMsg"></div>
+</div>
+
+<!-- PRINCIPAL -->
+<div id="ecrãPrincipal">
+
+  <div class="header">
+    <span class="header-logo">Maia Solutions</span>
+    <span class="header-user" id="funcNome"></span>
+  </div>
+
+  <!-- Ficha do artigo -->
+  <div class="artigo-card">
+    <div class="artigo-codigo" id="artigoCodigo"></div>
+    <div class="artigo-info">
+      <div class="artigo-nome" id="artigoNome"></div>
+      <div class="artigo-tipo" id="artigoTipo"></div>
+      <div class="stock-actual" id="stockActual"></div>
+    </div>
+  </div>
+
+  <div class="form-area">
+
+    <!-- FORM: Materiais / Consumíveis (stock variável) -->
+    <div id="formStock" style="display:none;flex-direction:column;gap:16px">
+
+      <div>
+        <div class="secção-titulo">Tipo de Movimento</div>
+        <div class="tipo-toggle">
+          <label>
+            <input type="radio" name="tipoMov" value="entrada">
+            <span>▲ Entrada</span>
+          </label>
+          <label>
+            <input type="radio" name="tipoMov" value="saida">
+            <span>▼ Saída</span>
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <div class="campo-label">Quantidade</div>
+        <input type="number" id="quantidade" min="0.01" step="0.01" placeholder="0">
+      </div>
+
+      <div>
+        <div class="campo-label">Obra / Local</div>
+        <div class="select-wrap">
+          <select id="obraStock" class="selectObra"></select>
+        </div>
+      </div>
+
+      <div id="feedback" class="feedback"></div>
+      <button class="btn-confirmar" id="btnConfirmarStock">Confirmar</button>
+
+    </div>
+
+    <!-- FORM: Equipamentos / Ferramentas (movimentação) -->
+    <div id="formMovimentacao" style="display:none;flex-direction:column;gap:16px">
+
+      <div>
+        <div class="campo-label">Origem (onde está agora)</div>
+        <div class="select-wrap">
+          <select id="obraOrigem" class="selectObra"></select>
+        </div>
+      </div>
+
+      <div>
+        <div class="campo-label">Destino (para onde vai)</div>
+        <div class="select-wrap">
+          <select id="obraDestino" class="selectObra"></select>
+        </div>
+      </div>
+
+      <div id="feedback" class="feedback"></div>
+      <button class="btn-confirmar" id="btnConfirmarMovim">Confirmar Movimentação</button>
+
+    </div>
+
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="stock.js"></script>
+</body>
+</html>
