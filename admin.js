@@ -1859,7 +1859,8 @@ async function carregarMovimentos() {
     let query = SB.from("movimentos_financeiros")
         .select(`id, referencia, data_documento, tipo,
                  valor_base, iva, valor_total, estado_pagamento, observacoes,
-                 fornecedores(nome), categorias_financeiras(nome), obras(nome)`)
+                 obra_id, categoria_id, fornecedor_id,
+                 fornecedores(id, nome, nif), categorias_financeiras(id, nome), obras(id, nome)`)
         .order("data_documento", { ascending: false });
 
     if (obra)        query = query.eq("obra_id", obra);
@@ -1938,9 +1939,16 @@ function abrirModalMovimento(mov = null) {
     document.getElementById("movTotal").value      = mov?.valor_total || "";
     document.getElementById("movEstado").value     = mov?.estado_pagamento || "por_pagar";
     document.getElementById("movObs").value        = mov?.observacoes || "";
-    document.getElementById("movNif").value        = "";
+    document.getElementById("movNif").value        = mov?.fornecedores?.nif || "";
     document.getElementById("movFornecedor").value = mov?.fornecedores?.nome || "";
     document.getElementById("movMsg").textContent  = "";
+
+    // Preencher selects de obra e categoria com os IDs correctos
+    const selObra = document.getElementById("movObra");
+    const selCat  = document.getElementById("movCategoria");
+    if (selObra) selObra.value  = mov?.obra_id       || "";
+    if (selCat)  selCat.value   = mov?.categoria_id  || "";
+
     document.getElementById("modalMovimento").classList.remove("hidden");
 }
 
