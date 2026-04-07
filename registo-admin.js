@@ -361,10 +361,11 @@ async function guardarTudo() {
     }
 
     // Apagar apenas registos de presença (preservar faltas)
+    // Usar filter explícito para tratar NULL — no Postgres NULL != 'falta' é NULL, não TRUE
     const { error: errDel } = await SB.from("registos_admin")
         .delete()
         .eq("data", data)
-        .neq("tipo", "falta");
+        .or("tipo.eq.presenca,tipo.is.null");
     if (errDel) { feedback("Erro ao atualizar: " + errDel.message, "erro"); return; }
 
     const { error } = await SB.from("registos_admin").insert(registos);
