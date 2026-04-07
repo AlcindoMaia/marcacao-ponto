@@ -134,7 +134,7 @@ async function carregarParaData() {
 
     // Buscar registos já existentes para esta data
     const { data: existentes } = await SB.from("registos_admin")
-        .select("id, funcionario_id, obra_id, horas, observacoes")
+        .select("id, funcionario_id, obra_id, horas, observacoes, tipo")
         .eq("data", data);
 
     renderFuncionarios(existentes || []);
@@ -282,8 +282,6 @@ function adicionarLinha(container, funcId, registo = null, btnAdd = null) {
 // FALTA
 // =======================================================
 async function marcarFalta(funcId, funcNome) {
-    if (!confirm(`Marcar falta para ${funcNome} em ${fmtDataLabel(_dataActual)}?`)) return;
-
     const data = _dataActual;
 
     // Apagar registos existentes deste funcionário nesta data
