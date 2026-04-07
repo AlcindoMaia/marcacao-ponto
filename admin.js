@@ -841,14 +841,19 @@ async function carregarObras() {
                 </span>
             </td>
             <td class="acoes-td" style="white-space:nowrap">
-                <button class="btn-acao" title="Editar">✏️</button>
-                <button class="btn-acao" title="Ver QR">🔲</button>
-                <button class="btn-acao" title="${estado === "ativa" ? "Concluir" : "Reativar"}">${estado === "ativa" ? "✅" : "🔄"}</button>
+                <button class="btn-acao btn-painel-obra" title="Ver Painel">📊</button>
+                <button class="btn-acao btn-editar-obra" title="Editar">✏️</button>
+                <button class="btn-acao btn-qr-obra" title="Ver QR">🔲</button>
+                <button class="btn-acao btn-estado-obra" title="${estado === "ativa" ? "Concluir" : "Reativar"}">${estado === "ativa" ? "✅" : "🔄"}</button>
+                <button class="btn-acao btn-eliminar-obra" title="Eliminar" style="opacity:.5">🗑️</button>
             </td>`;
 
-        tr.querySelector("[title='Editar']").onclick  = () => editarObra(o);
-        tr.querySelector("[title='Ver QR']").onclick  = () => abrirModalQR(o);
-        tr.querySelector("[title='Concluir'], [title='Reativar']").onclick = () => toggleEstadoObra(o.id, o.nome, estado);
+        // Usar classes em vez de querySelector composto — evita o bug
+        tr.querySelector(".btn-painel-obra").onclick   = () => abrirPainelObra(o);
+        tr.querySelector(".btn-editar-obra").onclick  = () => editarObra(o);
+        tr.querySelector(".btn-qr-obra").onclick      = () => abrirModalQR(o);
+        tr.querySelector(".btn-estado-obra").onclick  = () => toggleEstadoObra(o.id, o.nome, estado);
+        tr.querySelector(".btn-eliminar-obra").onclick = () => eliminarObra(o.id, o.nome);
         tbody.appendChild(tr);
     });
 }
@@ -898,11 +903,40 @@ async function editarObra(obra) {
 
 async function toggleEstadoObra(id, nome, estadoAtual) {
     const novoEstado = estadoAtual === "ativa" ? "concluida" : "ativa";
-    const acao = novoEstado === "concluida" ? "concluir" : "reativar";
-    if (!confirm(`${acao.charAt(0).toUpperCase() + acao.slice(1)} a obra "${nome}"?`)) return;
+    const acao = novoEstado === "concluida" ? "Concluir" : "Reativar";
+    if (!confirm(`${acao} a obra "${nome}"?`)) return;
 
-    const { error } = await SB.from("obras").update({ estado: novoEstado }).eq("id", id);
-    if (error) { alert("Erro: " + error.message); return; }
+    const { error } = await SB.from("obras")
+        .update({ estado: novoEstado })
+        .eq("id", id);
+    if (error) { alert("Erro ao actualizar estado: " + error.message); return; }
+    await carregarObras();
+}
+
+async function eliminarObra(id, nome) {
+    // Verificar se tem dados associados antes de eliminar
+    const [{ count: nMovs }, { count: nPonto }, { count: nMovStock }] = await Promise.all([
+        SB.from("movimentos_financeiros").select("id", { count: "exact", head: true }).eq("obra_id", id),
+        SB.from("ponto").select("id", { count: "exact", head: true }).eq("obra_id", id),
+        SB.from("movimentos_stock").select("id", { count: "exact", head: true })
+            .or(`obra_origem_id.eq.${id},obra_destino_id.eq.${id}`)
+    ]);
+
+    const total = (nMovs || 0) + (nPonto || 0) + (nMovStock || 0);
+
+    let aviso = `Eliminar a obra "${nome}"?`;
+    if (total > 0) {
+        aviso = `⚠️ A obra "${nome}" tem dados associados:\n`;
+        if (nMovs)     aviso += `• ${nMovs} movimento(s) financeiro(s)\n`;
+        if (nPonto)    aviso += `• ${nPonto} registo(s) de ponto\n`;
+        if (nMovStock) aviso += `• ${nMovStock} movimento(s) de stock\n`;
+        aviso += `\nEliminar a obra NÃO apaga esses registos — ficam sem obra associada.\nContinuar?`;
+    }
+
+    if (!confirm(aviso)) return;
+
+    const { error } = await SB.from("obras").delete().eq("id", id);
+    if (error) { alert("Erro ao eliminar: " + error.message); return; }
     await carregarObras();
 }
 
@@ -1582,6 +1616,207 @@ async function apagarArtigo(id, nome) {
 }
 
 // =======================================================
+
+// =======================================================
+// PAINEL DE OBRA — modal completo com sub-tabs
+// =======================================================
+let _painelObraActual = null;
+
+async function abrirPainelObra(obra) {
+    _painelObraActual = obra;
+    document.getElementById("painelObraNome").textContent   = obra.nome;
+    document.getElementById("painelObraCodigo").textContent = obra.codigo || "—";
+    const estadoEl = document.getElementById("painelObraEstado");
+    estadoEl.textContent = obra.estado === "ativa" ? "Ativa" : "Concluída";
+    estadoEl.className   = "badge-estado " + (obra.estado === "ativa" ? "pago" : "por_pagar");
+    document.getElementById("painelObraMorada").textContent = obra.morada || "";
+    document.getElementById("modalPainelObra").classList.remove("hidden");
+    abrirPainelTab("resumo");
+}
+
+function fecharPainelObra() {
+    document.getElementById("modalPainelObra").classList.add("hidden");
+    _painelObraActual = null;
+}
+
+function abrirPainelTab(tab) {
+    document.querySelectorAll(".painel-tab").forEach(b => {
+        b.classList.remove("active");
+        b.style.borderBottomColor = "transparent";
+        b.style.color = "var(--text-muted)";
+    });
+    document.querySelectorAll(".painel-tab-content").forEach(c => c.style.display = "none");
+    const btn = document.querySelector(`.painel-tab[data-tab="${tab}"]`);
+    if (btn) { btn.classList.add("active"); btn.style.borderBottomColor = "var(--primary)"; btn.style.color = "var(--primary)"; }
+    const el = document.getElementById(`painelTab-${tab}`);
+    if (el) el.style.display = "block";
+    if (tab === "resumo")     carregarPainelResumo();
+    if (tab === "financeiro") carregarPainelFinanceiro();
+    if (tab === "ponto")      carregarPainelPonto();
+    if (tab === "stock")      carregarPainelStock();
+}
+
+async function carregarPainelResumo() {
+    const obraId = _painelObraActual.id;
+    const el = document.getElementById("painelTab-resumo");
+    el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">A carregar...</div>`;
+
+    const [movsRes, orcRes, pontoRes] = await Promise.all([
+        SB.from("movimentos_financeiros").select("tipo, valor_total, categorias_financeiras(nome)").eq("obra_id", obraId).eq("ativo", true),
+        SB.from("orcamentos").select("numero, estado, total_com_iva, total_sem_iva, subtotal_mao_obra, subtotal_materiais").eq("obra_id", obraId),
+        SB.from("vw_registos_ponto").select("funcionario, horas, dia").eq("obra", _painelObraActual.nome)
+    ]);
+
+    const movs  = movsRes.data  || [];
+    const orcs  = orcRes.data   || [];
+    const ponto = pontoRes.data || [];
+
+    const totalEntradas = movs.filter(m => m.tipo === "entrada").reduce((s,m) => s + Number(m.valor_total), 0);
+    const totalSaidas   = movs.filter(m => m.tipo === "saida").reduce((s,m) => s + Number(m.valor_total), 0);
+    const margem        = totalEntradas - totalSaidas;
+    const margemPct     = totalEntradas > 0 ? ((margem / totalEntradas) * 100).toFixed(1) : null;
+    const orcAceite     = orcs.filter(o => o.estado === "aceite");
+    const totalOrc      = orcAceite.reduce((s,o) => s + Number(o.total_com_iva||0), 0);
+    const desvio        = totalOrc > 0 ? totalOrc - totalSaidas : null;
+    let totalHoras = 0;
+    ponto.forEach(r => {
+        if (r.horas && r.horas.includes(":")) { const [h,m] = r.horas.split(":").map(Number); totalHoras += h + m/60; }
+    });
+
+    const fmt = v => Number(v).toFixed(2) + " €";
+    const corMargem = margem >= 0 ? "#5ad65a" : "#ff7a7a";
+
+    el.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+            <div class="card" style="padding:16px;text-align:center">
+                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">RECEBIDO</div>
+                <div style="font-size:20px;font-weight:800;color:#5ad65a">${fmt(totalEntradas)}</div>
+            </div>
+            <div class="card" style="padding:16px;text-align:center">
+                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">GASTO</div>
+                <div style="font-size:20px;font-weight:800;color:#ff7a7a">${fmt(totalSaidas)}</div>
+            </div>
+            <div class="card" style="padding:16px;text-align:center">
+                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">MARGEM BRUTA</div>
+                <div style="font-size:20px;font-weight:800;color:${corMargem}">${fmt(margem)}</div>
+                ${margemPct ? `<div style="font-size:12px;color:${corMargem};opacity:.8">${margemPct}%</div>` : ""}
+            </div>
+            <div class="card" style="padding:16px;text-align:center">
+                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">HORAS OBRA</div>
+                <div style="font-size:20px;font-weight:800;color:var(--primary)">${totalHoras.toFixed(1)}h</div>
+            </div>
+        </div>
+        ${totalOrc > 0 ? `
+        <div class="card" style="padding:16px;margin-bottom:12px">
+            <div style="font-size:11px;opacity:.5;margin-bottom:12px;font-family:var(--font-title);letter-spacing:.5px">ORÇAMENTO VS REAL</div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Orçamento aceite</span><span style="font-weight:700">${fmt(totalOrc)}</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Gasto real</span><span style="font-weight:700;color:#ff7a7a">${fmt(totalSaidas)}</span></div>
+            <div style="border-top:1px solid var(--border);margin:8px 0;padding-top:8px;display:flex;justify-content:space-between;font-size:14px">
+                <span style="font-weight:600">Desvio</span>
+                <span style="font-weight:800;color:${desvio >= 0 ? "#5ad65a" : "#ff7a7a"}">${desvio >= 0 ? "+" : ""}${fmt(desvio)}</span>
+            </div>
+            <div style="background:rgba(255,255,255,.08);border-radius:4px;height:8px;margin-top:10px;overflow:hidden">
+                <div style="height:100%;border-radius:4px;background:${totalSaidas <= totalOrc ? "#5ad65a" : "#ff7a7a"};width:${Math.min((totalSaidas/totalOrc)*100,100).toFixed(0)}%"></div>
+            </div>
+            <div style="font-size:11px;opacity:.5;margin-top:4px;text-align:right">${((totalSaidas/totalOrc)*100).toFixed(0)}% do orçamento utilizado</div>
+        </div>` : `<div class="card" style="padding:14px;opacity:.5;font-size:13px;text-align:center;margin-bottom:12px">Sem orçamento aceite associado.</div>`}
+        ${orcs.length > 0 ? `<div class="card" style="padding:14px"><div style="font-size:11px;opacity:.5;margin-bottom:10px;font-family:var(--font-title);letter-spacing:.5px">ORÇAMENTOS</div>${orcs.map(o => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;font-family:monospace">${o.numero}</span><span class="badge-estado ${o.estado === "aceite" ? "pago" : "por_pagar"}" style="font-size:10px">${o.estado}</span><span style="font-size:13px;font-weight:700">${fmt(o.total_com_iva)}</span></div>`).join("")}</div>` : ""}`;
+}
+
+async function carregarPainelFinanceiro() {
+    const el = document.getElementById("painelTab-financeiro");
+    el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">A carregar...</div>`;
+    const { data } = await SB.from("movimentos_financeiros")
+        .select("data_documento, tipo, referencia, valor_total, observacoes, fornecedores(nome), categorias_financeiras(nome)")
+        .eq("obra_id", _painelObraActual.id).eq("ativo", true)
+        .order("data_documento", { ascending: false });
+    if (!data?.length) { el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">Sem movimentos financeiros.</div>`; return; }
+    const porCat = {};
+    data.forEach(m => {
+        const cat = m.categorias_financeiras?.nome || "Sem categoria";
+        if (!porCat[cat]) porCat[cat] = { entradas:0, saidas:0, items:[] };
+        if (m.tipo === "entrada") porCat[cat].entradas += Number(m.valor_total);
+        else porCat[cat].saidas += Number(m.valor_total);
+        porCat[cat].items.push(m);
+    });
+    el.innerHTML = Object.entries(porCat).map(([cat, d]) => `
+        <div class="card" style="margin-bottom:10px;padding:0;overflow:hidden">
+            <div style="padding:10px 14px;background:rgba(244,185,66,.08);display:flex;justify-content:space-between;align-items:center">
+                <span style="font-family:var(--font-title);font-size:11px;letter-spacing:.5px;text-transform:uppercase">${cat}</span>
+                <span style="font-size:13px;font-weight:700;color:${d.saidas > 0 ? "#ff7a7a" : "#5ad65a"}">
+                    ${d.entradas > 0 ? "+" + d.entradas.toFixed(2) + " € " : ""}${d.saidas > 0 ? "−" + d.saidas.toFixed(2) + " €" : ""}
+                </span>
+            </div>
+            ${d.items.map(m => `<div style="padding:8px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12px">
+                <div><div style="opacity:.6">${m.data_documento}</div><div style="font-weight:500">${m.fornecedores?.nome || m.observacoes || m.referencia || "—"}</div></div>
+                <div style="font-weight:700;color:${m.tipo === "entrada" ? "#5ad65a" : "#ff7a7a"}">${m.tipo === "entrada" ? "+" : "−"}${Number(m.valor_total).toFixed(2)} €</div>
+            </div>`).join("")}
+        </div>`).join("");
+}
+
+async function carregarPainelPonto() {
+    const el = document.getElementById("painelTab-ponto");
+    el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">A carregar...</div>`;
+    const { data } = await SB.from("vw_registos_ponto")
+        .select("funcionario, dia, horas, entrada, saida, estado")
+        .eq("obra", _painelObraActual.nome)
+        .order("dia", { ascending: false });
+    if (!data?.length) { el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">Sem registos de ponto.</div>`; return; }
+    const porFunc = {};
+    data.forEach(r => {
+        if (!porFunc[r.funcionario]) porFunc[r.funcionario] = { horas:0, dias:0 };
+        if (r.horas?.includes(":")) { const [h,m] = r.horas.split(":").map(Number); porFunc[r.funcionario].horas += h + m/60; }
+        porFunc[r.funcionario].dias++;
+    });
+    const fmt = iso => iso ? iso.substring(11,16) : "—";
+    el.innerHTML = `
+        <div class="card" style="margin-bottom:12px;padding:0;overflow:hidden">
+            <div style="padding:10px 14px;background:rgba(244,185,66,.08);font-family:var(--font-title);font-size:11px;letter-spacing:.5px;text-transform:uppercase">Por Funcionário</div>
+            ${Object.entries(porFunc).sort((a,b) => b[1].horas - a[1].horas).map(([nome, d]) => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border)">
+                <span style="font-weight:600;font-size:13px">${nome}</span>
+                <div style="text-align:right"><div style="font-weight:700;color:var(--primary)">${d.horas.toFixed(1)}h</div><div style="font-size:11px;opacity:.5">${d.dias} dia${d.dias!==1?"s":""}</div></div>
+            </div>`).join("")}
+        </div>
+        <div class="card" style="overflow-x:auto;padding:0">
+            <table class="display" style="margin:0">
+                <thead><tr><th>Data</th><th>Funcionário</th><th>Entrada</th><th>Saída</th><th>Horas</th><th>Estado</th></tr></thead>
+                <tbody>${data.slice(0,100).map(r => `<tr>
+                    <td style="font-size:12px;opacity:.7">${r.dia}</td>
+                    <td style="font-weight:500">${r.funcionario}</td>
+                    <td>${fmt(r.entrada)}</td><td>${fmt(r.saida)}</td>
+                    <td style="font-weight:700;color:var(--primary)">${r.horas||"—"}</td>
+                    <td><span class="badge-estado ${r.estado==="OK"?"pago":"por_pagar"}" style="font-size:10px">${r.estado}</span></td>
+                </tr>`).join("")}</tbody>
+            </table>
+        </div>`;
+}
+
+async function carregarPainelStock() {
+    const el = document.getElementById("painelTab-stock");
+    el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">A carregar...</div>`;
+    const { data } = await SB.from("movimentos_stock")
+        .select("data_movimento, tipo_movimento, quantidade, observacoes, artigos(codigo, descricao), funcionarios(nome)")
+        .or(`obra_origem_id.eq.${_painelObraActual.id},obra_destino_id.eq.${_painelObraActual.id}`)
+        .order("data_movimento", { ascending: false });
+    if (!data?.length) { el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">Sem movimentos de stock.</div>`; return; }
+    const tipoCor = { entrada:"#5ad65a", saida:"#ff7a7a", ajuste_entrada:"#f4b942", ajuste_saida:"#f4b942" };
+    const tipoLabel = { entrada:"Entrada", saida:"Saída", ajuste_entrada:"Ajuste +", ajuste_saida:"Ajuste −" };
+    el.innerHTML = `<div class="card" style="overflow-x:auto;padding:0">
+        <table class="display" style="margin:0">
+            <thead><tr><th>Data</th><th>Artigo</th><th>Tipo</th><th style="text-align:right">Qtd</th><th>Funcionário</th><th>Obs</th></tr></thead>
+            <tbody>${data.map(m => `<tr>
+                <td style="font-size:12px;opacity:.7">${m.data_movimento}</td>
+                <td><div style="font-weight:600;font-size:13px">${m.artigos?.descricao||"—"}</div><div style="font-size:11px;opacity:.5;font-family:monospace">${m.artigos?.codigo||""}</div></td>
+                <td><span style="color:${tipoCor[m.tipo_movimento]||"#888"};font-weight:700;font-size:12px">${tipoLabel[m.tipo_movimento]||m.tipo_movimento}</span></td>
+                <td style="text-align:right;font-weight:700">${m.quantidade}</td>
+                <td style="font-size:12px">${m.funcionarios?.nome||"—"}</td>
+                <td style="font-size:11px;opacity:.6">${m.observacoes||"—"}</td>
+            </tr>`).join("")}</tbody>
+        </table>
+    </div>`;
+}
+
 // FLUXO DE CAIXA — COMPLETO
 // =======================================================
 async function initFluxo() {

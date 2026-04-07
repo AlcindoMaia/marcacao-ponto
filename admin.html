@@ -1122,6 +1122,58 @@ function toggleDark() {
     </div>
 </div>
 
+
+<!-- ================= MODAL PAINEL DE OBRA ================= -->
+<div id="modalPainelObra" class="modal hidden">
+    <div class="modal-content" style="max-width:700px;max-height:90vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
+
+        <!-- Header fixo -->
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div>
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+                        <h2 id="painelObraNome" style="font-size:18px"></h2>
+                        <span id="painelObraEstado" class="badge-estado pago" style="font-size:11px"></span>
+                    </div>
+                    <div style="font-size:12px;opacity:.5;font-family:monospace" id="painelObraCodigo"></div>
+                    <div style="font-size:12px;opacity:.5;margin-top:2px" id="painelObraMorada"></div>
+                </div>
+                <button onclick="fecharPainelObra()" class="modal-close"
+                    style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.5;flex-shrink:0">×</button>
+            </div>
+
+            <!-- Sub-tabs -->
+            <div style="display:flex;gap:0;margin-top:14px;border-bottom:1px solid var(--border)">
+                <button class="painel-tab" data-tab="resumo" onclick="abrirPainelTab('resumo')"
+                    style="background:none;border:none;border-bottom:2px solid var(--primary);color:var(--primary);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title);letter-spacing:.5px">
+                    📊 RESUMO
+                </button>
+                <button class="painel-tab" data-tab="financeiro" onclick="abrirPainelTab('financeiro')"
+                    style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title);letter-spacing:.5px">
+                    💰 FINANCEIRO
+                </button>
+                <button class="painel-tab" data-tab="ponto" onclick="abrirPainelTab('ponto')"
+                    style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title);letter-spacing:.5px">
+                    🕐 PONTO
+                </button>
+                <button class="painel-tab" data-tab="stock" onclick="abrirPainelTab('stock')"
+                    style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title);letter-spacing:.5px">
+                    📦 STOCK
+                </button>
+            </div>
+        </div>
+
+        <!-- Conteúdo scrollável -->
+        <div style="flex:1;overflow-y:auto;padding:16px">
+            <div id="painelTab-resumo"     class="painel-tab-content" style="display:block"></div>
+            <div id="painelTab-financeiro" class="painel-tab-content" style="display:none"></div>
+            <div id="painelTab-ponto"      class="painel-tab-content" style="display:none"></div>
+            <div id="painelTab-stock"      class="painel-tab-content" style="display:none"></div>
+        </div>
+
+    </div>
+</div>
+
 </body>
 </html>
 
