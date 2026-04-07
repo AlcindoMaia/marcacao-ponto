@@ -346,23 +346,26 @@ async function guardarTudo() {
         });
     }
 
+    // Permitir guardar mesmo que só hajam faltas (registos de presença podem ser zero)
     if (registos.length === 0) {
-        feedback("Nenhuma hora preenchida.", "erro");
+        // Verificar se há pelo menos uma falta marcada
+        const temFaltasNaDom = document.querySelectorAll(".func-card.tem-falta").length > 0;
+        if (!temFaltasNaDom) {
+            feedback("Nenhuma hora preenchida.", "erro");
+            return;
+        }
+        // Só faltas — nada a inserir, as faltas já estão na BD
+        feedback("✓ Registo guardado!", "ok");
+        await carregarParaData();
         return;
     }
 
-    // Buscar IDs existentes para esta data e apagar individualmente
-    const { data: existentes } = await SB.from("registos_admin")
-        .select("id")
-        .eq("data", data);
-
-    if (existentes && existentes.length > 0) {
-        const ids = existentes.map(r => r.id);
-        const { error: errDel } = await SB.from("registos_admin")
-            .delete()
-            .in("id", ids);
-        if (errDel) { feedback("Erro ao atualizar: " + errDel.message, "erro"); return; }
-    }
+    // Apagar apenas registos de presença (preservar faltas)
+    const { error: errDel } = await SB.from("registos_admin")
+        .delete()
+        .eq("data", data)
+        .neq("tipo", "falta");
+    if (errDel) { feedback("Erro ao atualizar: " + errDel.message, "erro"); return; }
 
     const { error } = await SB.from("registos_admin").insert(registos);
     if (error) { feedback("Erro ao guardar: " + error.message, "erro"); return; }
