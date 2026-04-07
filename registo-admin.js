@@ -156,11 +156,17 @@ function renderFuncionarios(existentes) {
         card.dataset.funcId = f.id;
         if (registosFunc.length > 0) card.classList.add("guardado");
 
+        // Verificar se já tem falta marcada (antes de calcular resumo)
+        const temFalta = registosFunc.some(r => r.tipo === "falta");
+
         // Resumo das horas já registadas
-        const totalH = registosFunc.reduce((s, r) => s + Number(r.horas), 0);
-        const resumo = registosFunc.length > 0
-            ? `${totalH.toFixed(1)}h · ${registosFunc.length} obra(s)`
-            : "Sem registo";
+        const registosPresenca = registosFunc.filter(r => r.tipo !== "falta");
+        const totalH = registosPresenca.reduce((s, r) => s + Number(r.horas), 0);
+        const resumo = temFalta
+            ? "🔴 Falta"
+            : registosPresenca.length > 0
+                ? `${totalH.toFixed(1)}h · ${registosPresenca.length} obra(s)`
+                : "Sem registo";
 
         card.innerHTML = `
             <div class="func-card-header">
@@ -179,18 +185,20 @@ function renderFuncionarios(existentes) {
             card.classList.toggle("aberto");
         });
 
+        // Aplicar classes visuais
+        if (temFalta) {
+            card.classList.add("tem-falta");
+        } else if (registosPresenca.length > 0) {
+            card.classList.add("guardado");
+        }
+
         lista.appendChild(card);
 
         // Adicionar linhas de registo
         const linhasDiv = document.getElementById(`linhas-${f.id}`);
 
-        // Verificar se já tem falta marcada
-        const temFalta = registosFunc.some(r => r.tipo === "falta");
-
         if (temFalta) {
             // Mostrar estado de falta
-            card.classList.add("tem-falta");
-            card.querySelector(".func-resumo").textContent = "🔴 Falta";
             const faltaDiv = document.createElement("div");
             faltaDiv.className = "linha-falta";
             faltaDiv.innerHTML = `
@@ -241,6 +249,14 @@ function adicionarLinha(container, funcId, registo = null, btnAdd = null) {
     inputHoras.step        = "0.5";
     inputHoras.placeholder = "h";
     inputHoras.value       = registo ? Number(registo.horas).toString() : "";
+
+    // Ao seleccionar obra, preencher 8h automaticamente se o campo estiver vazio
+    selectObra.addEventListener("change", () => {
+        if (selectObra.value && !inputHoras.value) {
+            inputHoras.value = "8";
+            inputHoras.select();
+        }
+    });
 
     // Botão remover
     const btnRm = document.createElement("button");
@@ -355,19 +371,8 @@ async function guardarTudo() {
 
     feedback(`✓ ${registos.length} linha(s) guardada(s) com sucesso!`, "ok");
 
-    // Actualizar visual dos cards
-    document.querySelectorAll(".func-card").forEach(card => {
-        const funcId = card.dataset.funcId;
-        const temLinhas = [...document.querySelectorAll(`.linha-registo[data-func-id="${funcId}"]`)]
-            .some(l => parseFloat(l.querySelector("input").value) > 0);
-        card.classList.toggle("guardado", temLinhas);
-        // Actualizar resumo
-        const totalH = [...document.querySelectorAll(`.linha-registo[data-func-id="${funcId}"]`)]
-            .reduce((s, l) => s + (parseFloat(l.querySelector("input").value) || 0), 0);
-        const nObras = [...document.querySelectorAll(`.linha-registo[data-func-id="${funcId}"]`)]
-            .filter(l => parseFloat(l.querySelector("input").value) > 0).length;
-        if (temLinhas) card.querySelector(".func-resumo").textContent = `${totalH.toFixed(1)}h · ${nObras} obra(s)`;
-    });
+    // Recarregar para reflectir estado actual (inclui faltas)
+    await carregarParaData();
 }
 
 // =======================================================
