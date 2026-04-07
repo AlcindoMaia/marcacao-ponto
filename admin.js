@@ -159,7 +159,7 @@ async function carregarFinanceiro() {
     // Buscar registos_admin do mês (fonte de verdade para salários)
     const [registosRes, funcsRes] = await Promise.all([
         SB.from("registos_admin")
-            .select("funcionario_id, horas, data, obras(nome)")
+            .select("funcionario_id, horas, data, tipo, obra_id, obras(nome)")
             .gte("data", inicio).lte("data", fim),
         SB.from("funcionarios")
             .select("id, nome, valor_dia, ativo").eq("ativo", true)
@@ -168,13 +168,15 @@ async function carregarFinanceiro() {
     const registos = registosRes.data || [];
     const funcs    = funcsRes.data    || [];
 
-    // Agrupar por funcionário — somar horas e dias únicos
+    // Agrupar por funcionário — excluir faltas e registos sem obra
     const porFunc = {};
     registos.forEach(r => {
+        if (r.tipo === "falta") return;     // faltas não contam
+        if (!r.obra_id) return;             // sem obra não conta
         const fid = r.funcionario_id;
         if (!porFunc[fid]) porFunc[fid] = { horas: 0, dias: new Set() };
         porFunc[fid].horas += Number(r.horas) || 0;
-        porFunc[fid].dias.add(r.data); // dias únicos trabalhados
+        porFunc[fid].dias.add(r.data);
     });
 
     let totalHoras = 0, totalDias = 0, totalPagar = 0;

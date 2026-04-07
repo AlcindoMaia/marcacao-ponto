@@ -76,6 +76,32 @@ async function init() {
 async function iniciarApp() {
     mostrarEcrã("ecrãLoading");
 
+    // Injectar CSS para botão de falta
+    if (!document.getElementById("estilosFalta")) {
+        const style = document.createElement("style");
+        style.id = "estilosFalta";
+        style.textContent = `
+            .btn-falta {
+                width: 100%; margin: 6px 0 0; padding: 10px;
+                background: rgba(224,92,92,.12); border: 1px solid rgba(224,92,92,.35);
+                color: #e05c5c; border-radius: 8px; font-size: 13px; font-weight: 700;
+                cursor: pointer; letter-spacing: .3px;
+            }
+            .btn-falta:hover { background: rgba(224,92,92,.22); }
+            .btn-cancelar-falta {
+                padding: 5px 12px; background: rgba(224,92,92,.12); border: 1px solid rgba(224,92,92,.3);
+                color: #e05c5c; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;
+            }
+            .linha-falta {
+                display: flex; justify-content: space-between; align-items: center;
+                padding: 12px 14px; background: rgba(224,92,92,.07); border-radius: 8px; margin: 6px 0;
+            }
+            .func-card.tem-falta .func-card-header { border-left: 3px solid #e05c5c; }
+            .func-card.tem-falta .func-avatar { background: rgba(224,92,92,.2); color: #e05c5c; }
+        `;
+        document.head.appendChild(style);
+    }
+
     // Carregar dados base
     const [obrasRes, funcsRes] = await Promise.all([
         SB.from("obras").select("id, nome").order("nome"),
@@ -158,18 +184,41 @@ function renderFuncionarios(existentes) {
         // Adicionar linhas de registo
         const linhasDiv = document.getElementById(`linhas-${f.id}`);
 
-        if (registosFunc.length > 0) {
+        // Verificar se já tem falta marcada
+        const temFalta = registosFunc.some(r => r.tipo === "falta");
+
+        if (temFalta) {
+            // Mostrar estado de falta
+            card.classList.add("tem-falta");
+            card.querySelector(".func-resumo").textContent = "🔴 Falta";
+            const faltaDiv = document.createElement("div");
+            faltaDiv.className = "linha-falta";
+            faltaDiv.innerHTML = `
+                <span style="color:var(--red,#e05c5c);font-weight:700;font-size:13px">🔴 Falta registada</span>
+                <button class="btn-cancelar-falta" onclick="cancelarFalta('${f.id}')">Cancelar falta</button>
+            `;
+            linhasDiv.appendChild(faltaDiv);
+        } else if (registosFunc.length > 0) {
             registosFunc.forEach(r => adicionarLinha(linhasDiv, f.id, r));
         } else {
             adicionarLinha(linhasDiv, f.id, null);
         }
 
-        // Botão adicionar linha
-        const btnAdd = document.createElement("button");
-        btnAdd.className = "btn-add-linha";
-        btnAdd.textContent = "+ Adicionar outra obra";
-        btnAdd.onclick = () => adicionarLinha(linhasDiv, f.id, null, btnAdd);
-        linhasDiv.appendChild(btnAdd);
+        if (!temFalta) {
+            // Botão de Falta
+            const btnFalta = document.createElement("button");
+            btnFalta.className = "btn-falta";
+            btnFalta.textContent = "🔴 Marcar Falta";
+            btnFalta.onclick = (e) => { e.stopPropagation(); marcarFalta(f.id, f.nome); };
+            linhasDiv.appendChild(btnFalta);
+
+            // Botão adicionar linha
+            const btnAdd = document.createElement("button");
+            btnAdd.className = "btn-add-linha";
+            btnAdd.textContent = "+ Adicionar outra obra";
+            btnAdd.onclick = () => adicionarLinha(linhasDiv, f.id, null, btnAdd);
+            linhasDiv.appendChild(btnAdd);
+        }
     });
 }
 
@@ -191,7 +240,7 @@ function adicionarLinha(container, funcId, registo = null, btnAdd = null) {
     inputHoras.max         = "24";
     inputHoras.step        = "0.5";
     inputHoras.placeholder = "h";
-    inputHoras.value       = registo ? Number(registo.horas).toString() : "8";
+    inputHoras.value       = registo ? Number(registo.horas).toString() : "";
 
     // Botão remover
     const btnRm = document.createElement("button");
@@ -214,6 +263,49 @@ function adicionarLinha(container, funcId, registo = null, btnAdd = null) {
 }
 
 // =======================================================
+// FALTA
+// =======================================================
+async function marcarFalta(funcId, funcNome) {
+    if (!confirm(`Marcar falta para ${funcNome} em ${fmtDataLabel(_dataActual)}?`)) return;
+
+    const data = _dataActual;
+
+    // Apagar registos existentes deste funcionário nesta data
+    const { data: existentes } = await SB.from("registos_admin")
+        .select("id").eq("data", data).eq("funcionario_id", funcId);
+
+    if (existentes?.length > 0) {
+        await SB.from("registos_admin").delete().in("id", existentes.map(r => r.id));
+    }
+
+    // Inserir registo de falta
+    const { error } = await SB.from("registos_admin").insert({
+        data,
+        funcionario_id: funcId,
+        obra_id:        null,
+        horas:          0,
+        tipo:           "falta",
+        observacoes:    "Falta"
+    });
+
+    if (error) { feedback("Erro ao registar falta: " + error.message, "erro"); return; }
+
+    feedback(`✓ Falta de ${funcNome} registada.`, "ok");
+    await carregarParaData();
+}
+
+async function cancelarFalta(funcId) {
+    const data = _dataActual;
+    const { data: existentes } = await SB.from("registos_admin")
+        .select("id").eq("data", data).eq("funcionario_id", funcId).eq("tipo", "falta");
+
+    if (existentes?.length > 0) {
+        await SB.from("registos_admin").delete().in("id", existentes.map(r => r.id));
+    }
+    await carregarParaData();
+}
+
+// =======================================================
 // GUARDAR TUDO
 // =======================================================
 async function guardarTudo() {
@@ -226,11 +318,17 @@ async function guardarTudo() {
         const obraId = linha.querySelector("select").value || null;
         const horas  = parseFloat(linha.querySelector("input").value);
         if (!horas || horas <= 0) continue; // ignorar linhas sem horas
+        if (!obraId) {
+            feedback("Seleciona a obra para todos os registos antes de guardar.", "erro");
+            linha.querySelector("select").style.borderColor = "var(--red, #e05c5c)";
+            return;
+        }
         registos.push({
             data,
             funcionario_id: funcId,
             obra_id:        obraId,
-            horas:          horas
+            horas:          horas,
+            tipo:           "presenca"
         });
     }
 
