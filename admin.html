@@ -201,50 +201,221 @@
     <!-- ================= TAB FINANCEIRO ================= -->
     <div class="tab-content" id="tab-financeiro">
 
-        <!-- KPIs -->
-        <div class="grid-cards">
-            <div class="card metric">
-                <h3>Funcionários</h3>
-                <div id="kpiFuncionarios" class="value">–</div>
+        <!-- SUB-TABS FINANCEIRO -->
+        <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:0">
+            <button class="fin-subtab active" data-fintab="ordenados"
+                style="background:none;border:none;border-bottom:2px solid var(--primary);color:var(--primary);padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;font-family:var(--font-title);letter-spacing:.5px">
+                👥 ORDENADOS
+            </button>
+            <button class="fin-subtab" data-fintab="dre"
+                style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;font-family:var(--font-title);letter-spacing:.5px">
+                📊 DRE
+            </button>
+            <button class="fin-subtab" data-fintab="fluxo"
+                style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;font-family:var(--font-title);letter-spacing:.5px">
+                📈 FLUXO DE CAIXA
+            </button>
+            <button class="fin-subtab" data-fintab="orcado"
+                style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;font-family:var(--font-title);letter-spacing:.5px">
+                🎯 ORÇADO VS. REAL
+            </button>
+        </div>
+
+        <!-- SUB-TAB: ORDENADOS (existente) -->
+        <div id="finTab-ordenados" class="fin-subtab-content" style="display:block">
+            <div class="grid-cards">
+                <div class="card metric">
+                    <h3>Funcionários</h3>
+                    <div id="kpiFuncionarios" class="value">–</div>
+                </div>
+                <div class="card metric">
+                    <h3>Horas do mês</h3>
+                    <div id="kpiHoras" class="value">–</div>
+                </div>
+                <div class="card metric">
+                    <h3>Dias trabalhados</h3>
+                    <div id="kpiDias" class="value">–</div>
+                </div>
+                <div class="card metric primary">
+                    <h3>Total a pagar</h3>
+                    <div id="kpiTotal" class="value">–</div>
+                </div>
             </div>
-            <div class="card metric">
-                <h3>Horas do mês</h3>
-                <div id="kpiHoras" class="value">–</div>
+            <div class="card filtros" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <div style="display:flex;flex-direction:column;gap:4px">
+                    <label style="font-size:11px;opacity:.6;text-transform:uppercase;letter-spacing:.05em">Mês</label>
+                    <input type="month" id="filtroMesFinanceiro" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:var(--bg-dark-panel);color:var(--text-light);font-size:13px">
+                </div>
+                <button class="btn-primary" id="btnRefreshFinanceiro" style="margin-top:18px">Atualizar</button>
+                <button class="btn-secondary" id="btnExportExcel" style="margin-top:18px">Exportar Excel</button>
             </div>
-            <div class="card metric">
-                <h3>Dias trabalhados</h3>
-                <div id="kpiDias" class="value">–</div>
-            </div>
-<div class="card metric primary">
-                <h3>Total a pagar</h3>
-                <div id="kpiTotal" class="value">–</div>
+            <div class="card">
+                <h2>Resumo Financeiro <span style="font-size:12px;opacity:.5;font-weight:400">(baseado em registos admin)</span></h2>
+                <table id="tabelaFinanceira" class="display">
+                    <thead><tr><th>Funcionário</th><th>Horas</th><th>Dias</th><th>Valor (€)</th></tr></thead>
+                    <tbody></tbody>
+                </table>
             </div>
         </div>
 
-        <!-- AÇÕES + FILTRO MÊS -->
-        <div class="card filtros" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <div style="display:flex;flex-direction:column;gap:4px">
-                <label style="font-size:11px;opacity:.6;text-transform:uppercase;letter-spacing:.05em">Mês</label>
-                <input type="month" id="filtroMesFinanceiro" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:var(--bg-dark-panel);color:var(--text-light);font-size:13px">
+        <!-- SUB-TAB: DRE -->
+        <div id="finTab-dre" class="fin-subtab-content" style="display:none">
+            <div class="card filtros" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+                <div style="display:flex;flex-direction:column;gap:4px">
+                    <label style="font-size:11px;opacity:.6;text-transform:uppercase;letter-spacing:.05em">Período</label>
+                    <select id="drePeriodo" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:var(--bg-dark-panel);color:var(--text-light);font-size:13px">
+                        <option value="mes">Este mês</option>
+                        <option value="trimestre">Este trimestre</option>
+                        <option value="ano" selected>Este ano</option>
+                        <option value="total">Tudo</option>
+                    </select>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:4px">
+                    <label style="font-size:11px;opacity:.6;text-transform:uppercase;letter-spacing:.05em">Obra</label>
+                    <select id="dreObra" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:var(--bg-dark-panel);color:var(--text-light);font-size:13px">
+                        <option value="">Todas as obras</option>
+                    </select>
+                </div>
+                <button class="btn-primary" onclick="carregarDRE()" style="margin-top:18px">Calcular</button>
             </div>
-            <button class="btn-primary" id="btnRefreshFinanceiro" style="margin-top:18px">Atualizar</button>
-            <button class="btn-secondary" id="btnExportExcel" style="margin-top:18px">Exportar Excel</button>
+
+            <!-- KPIs DRE -->
+            <div class="grid-cards" style="margin-bottom:16px">
+                <div class="card metric" style="border-left:3px solid #5ad65a">
+                    <h3>Total Receitas</h3>
+                    <div id="dreReceitas" class="value" style="color:#5ad65a">–</div>
+                </div>
+                <div class="card metric" style="border-left:3px solid #ff7a7a">
+                    <h3>Total Custos</h3>
+                    <div id="dreCustos" class="value" style="color:#ff7a7a">–</div>
+                </div>
+                <div class="card metric primary" style="border-left:3px solid var(--primary)">
+                    <h3>Resultado</h3>
+                    <div id="dreResultado" class="value">–</div>
+                </div>
+                <div class="card metric" style="border-left:3px solid #a78bfa">
+                    <h3>Margem</h3>
+                    <div id="dreMargem" class="value" style="color:#a78bfa">–</div>
+                </div>
+            </div>
+
+            <!-- Detalhes DRE -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div class="card">
+                    <h3 style="color:#5ad65a;margin-bottom:12px">📥 RECEITAS</h3>
+                    <div id="dreDetalheReceitas"></div>
+                </div>
+                <div class="card">
+                    <h3 style="color:#ff7a7a;margin-bottom:12px">📤 CUSTOS</h3>
+                    <div id="dreDetalheCustos"></div>
+                </div>
+            </div>
         </div>
 
-        <!-- TABELA FINANCEIRA -->
-        <div class="card">
-            <h2>Resumo Financeiro <span style="font-size:12px;opacity:.5;font-weight:400">(baseado em registos admin)</span></h2>
-            <table id="tabelaFinanceira" class="display">
-                <thead>
-                    <tr>
-                        <th>Funcionário</th>
-                        <th>Horas</th>
-                        <th>Dias</th>
-                        <th>Valor (€)</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+        <!-- SUB-TAB: FLUXO DE CAIXA -->
+        <div id="finTab-fluxo" class="fin-subtab-content" style="display:none">
+            <div class="card filtros" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+                <div style="display:flex;flex-direction:column;gap:4px">
+                    <label style="font-size:11px;opacity:.6;text-transform:uppercase;letter-spacing:.05em">Horizonte</label>
+                    <select id="fluxoHorizonte" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:var(--bg-dark-panel);color:var(--text-light);font-size:13px">
+                        <option value="30">30 dias</option>
+                        <option value="60" selected>60 dias</option>
+                        <option value="90">90 dias</option>
+                    </select>
+                </div>
+                <button class="btn-primary" onclick="carregarFluxo()" style="margin-top:18px">Atualizar</button>
+            </div>
+            <!-- KPIs fluxo -->
+            <div class="grid-cards" style="margin-bottom:16px">
+                <div class="card metric" style="border-left:3px solid #5ad65a">
+                    <h3>Entradas Previstas</h3>
+                    <div id="fluxoEntradas" class="value" style="color:#5ad65a">–</div>
+                </div>
+                <div class="card metric" style="border-left:3px solid #ff7a7a">
+                    <h3>Saídas Previstas</h3>
+                    <div id="fluxoSaidas" class="value" style="color:#ff7a7a">–</div>
+                </div>
+                <div class="card metric primary">
+                    <h3>Saldo Previsto</h3>
+                    <div id="fluxoSaldo" class="value">–</div>
+                </div>
+                <div class="card metric" style="border-left:3px solid #f97316">
+                    <h3>Pagamentos em Atraso</h3>
+                    <div id="fluxoAtraso" class="value" style="color:#f97316">–</div>
+                </div>
+            </div>
+            <!-- Tabela fluxo -->
+            <div class="card">
+                <h3 style="margin-bottom:12px">Movimentos por Pagar / Receber</h3>
+                <table style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead>
+                        <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
+                            <th style="text-align:left;padding:8px;opacity:.6">Data</th>
+                            <th style="text-align:left;padding:8px;opacity:.6">Descrição</th>
+                            <th style="text-align:left;padding:8px;opacity:.6">Obra</th>
+                            <th style="text-align:right;padding:8px;opacity:.6">Valor</th>
+                            <th style="text-align:center;padding:8px;opacity:.6">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fluxoTabela"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- SUB-TAB: ORÇADO VS. REAL -->
+        <div id="finTab-orcado" class="fin-subtab-content" style="display:none">
+            <div class="card filtros" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+                <div style="display:flex;flex-direction:column;gap:4px">
+                    <label style="font-size:11px;opacity:.6;text-transform:uppercase;letter-spacing:.05em">Obra</label>
+                    <select id="orcadoObra" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:var(--bg-dark-panel);color:var(--text-light);font-size:13px">
+                        <option value="">Seleciona uma obra</option>
+                    </select>
+                </div>
+                <button class="btn-primary" onclick="carregarOrcadoReal()" style="margin-top:18px">Calcular</button>
+            </div>
+            <!-- KPIs orçado -->
+            <div class="grid-cards" style="margin-bottom:16px">
+                <div class="card metric">
+                    <h3>Orçado Total</h3>
+                    <div id="orcadoTotal" class="value">–</div>
+                </div>
+                <div class="card metric" style="border-left:3px solid #ff7a7a">
+                    <h3>Gasto Real</h3>
+                    <div id="orcadoReal" class="value" style="color:#ff7a7a">–</div>
+                </div>
+                <div class="card metric primary">
+                    <h3>Desvio</h3>
+                    <div id="orcadoDesvio" class="value">–</div>
+                </div>
+                <div class="card metric">
+                    <h3>Execução</h3>
+                    <div id="orcadoPercent" class="value">–</div>
+                </div>
+            </div>
+            <!-- Barra progresso -->
+            <div class="card" style="margin-bottom:16px">
+                <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px">
+                    <span style="opacity:.6">Execução orçamental</span>
+                    <span id="orcadoBarLabel" style="font-weight:600">–</span>
+                </div>
+                <div style="background:rgba(255,255,255,.08);border-radius:8px;height:12px;overflow:hidden">
+                    <div id="orcadoBar" style="height:100%;background:var(--primary);border-radius:8px;width:0%;transition:width .5s ease"></div>
+                </div>
+            </div>
+            <!-- Tabela por categoria -->
+            <div class="card">
+                <h3 style="margin-bottom:12px">Detalhe por Categoria</h3>
+                <table style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead>
+                        <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
+                            <th style="text-align:left;padding:8px;opacity:.6">Categoria</th>
+                            <th style="text-align:right;padding:8px;opacity:.6">Gasto Real</th>
+                            <th style="text-align:right;padding:8px;opacity:.6">% do Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orcadoTabela"></tbody>
+                </table>
+            </div>
         </div>
 
     </div>

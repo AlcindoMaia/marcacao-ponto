@@ -2105,6 +2105,24 @@ function ligarEventosGlobais() {
     // Financeiro
     document.getElementById("btnRefreshFinanceiro")?.addEventListener("click", carregarFinanceiro);
     document.getElementById("filtroMesFinanceiro")?.addEventListener("change", carregarFinanceiro);
+
+    // Sub-tabs Financeiro
+    document.querySelectorAll(".fin-subtab").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const tab = btn.dataset.fintab;
+            document.querySelectorAll(".fin-subtab").forEach(b => {
+                b.style.borderBottomColor = "transparent";
+                b.style.color = "var(--text-muted)";
+            });
+            btn.style.borderBottomColor = "var(--primary)";
+            btn.style.color = "var(--primary)";
+            document.querySelectorAll(".fin-subtab-content").forEach(c => c.style.display = "none");
+            document.getElementById(`finTab-${tab}`).style.display = "block";
+            if (tab === "dre")    carregarDRE();
+            if (tab === "fluxo") carregarFluxo();
+            if (tab === "orcado") iniciarOrcadoReal();
+        });
+    });
     // Definir mês actual por defeito
     const hoje2 = new Date();
     const mesDefault = `${hoje2.getFullYear()}-${String(hoje2.getMonth()+1).padStart(2,"0")}`;
@@ -3034,6 +3052,167 @@ async function importarFornecedoresTOC() {
 window.addEventListener("load", () => {
     setTimeout(actualizarEstadoTOC, 500);
 });
+// =======================================================
+// DRE — DEMONSTRAÇÃO DE RESULTADOS
+// =======================================================
+async function carregarDRE() {
+    const periodo = document.getElementById("drePeriodo")?.value || "ano";
+    const obraId  = document.getElementById("dreObra")?.value || "";
+    const hoje = new Date();
+    let inicio, fim;
+    if (periodo === "mes") {
+        inicio = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,"0")}-01`;
+        fim    = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,"0")}-31`;
+    } else if (periodo === "trimestre") {
+        const tri = Math.floor(hoje.getMonth() / 3);
+        inicio = `${hoje.getFullYear()}-${String(tri*3+1).padStart(2,"0")}-01`;
+        fim    = `${hoje.getFullYear()}-${String(Math.min(tri*3+3,12)).padStart(2,"0")}-31`;
+    } else if (periodo === "ano") {
+        inicio = `${hoje.getFullYear()}-01-01`;
+        fim    = `${hoje.getFullYear()}-12-31`;
+    } else { inicio = "2000-01-01"; fim = "2099-12-31"; }
+
+    let query = SB.from("movimentos_financeiros")
+        .select("tipo, valor_total, categoria_id, categorias_financeiras(nome), estado_pagamento")
+        .eq("ativo", true).gte("data_documento", inicio).lte("data_documento", fim);
+    if (obraId) query = query.eq("obra_id", obraId);
+    const { data } = await query;
+    if (!data) return;
+
+    const receitas  = data.filter(m => m.tipo === "entrada");
+    const custos    = data.filter(m => m.tipo === "saida");
+    const totalRec  = receitas.reduce((s,m) => s + Number(m.valor_total), 0);
+    const totalCus  = custos.reduce((s,m) => s + Number(m.valor_total), 0);
+    const resultado = totalRec - totalCus;
+    const margem    = totalRec > 0 ? (resultado / totalRec * 100) : 0;
+
+    document.getElementById("dreReceitas").textContent = totalRec.toFixed(2) + " €";
+    document.getElementById("dreCustos").textContent   = totalCus.toFixed(2) + " €";
+    const resEl = document.getElementById("dreResultado");
+    resEl.textContent = resultado.toFixed(2) + " €";
+    resEl.style.color = resultado >= 0 ? "#5ad65a" : "#ff7a7a";
+    document.getElementById("dreMargem").textContent = margem.toFixed(1) + "%";
+
+    const recByCat = {};
+    receitas.forEach(m => { const c = m.categorias_financeiras?.nome || "Sem categoria"; recByCat[c] = (recByCat[c]||0) + Number(m.valor_total); });
+    document.getElementById("dreDetalheReceitas").innerHTML = Object.entries(recByCat).sort((a,b)=>b[1]-a[1]).map(([cat,val]) =>
+        `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
+            <span style="opacity:.8">${cat}</span><span style="color:#5ad65a;font-weight:600">${val.toFixed(2)} €</span></div>`
+    ).join("") || "<p style='opacity:.4;font-size:13px'>Sem receitas no período</p>";
+
+    const cusByCat = {};
+    custos.forEach(m => { const c = m.categorias_financeiras?.nome || "Sem categoria"; cusByCat[c] = (cusByCat[c]||0) + Number(m.valor_total); });
+    document.getElementById("dreDetalheCustos").innerHTML = Object.entries(cusByCat).sort((a,b)=>b[1]-a[1]).map(([cat,val]) =>
+        `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
+            <span style="opacity:.8">${cat}</span><span style="color:#ff7a7a;font-weight:600">${val.toFixed(2)} €</span></div>`
+    ).join("") || "<p style='opacity:.4;font-size:13px'>Sem custos no período</p>";
+
+    // Popular select de obras no DRE
+    const dreObraEl = document.getElementById("dreObra");
+    if (dreObraEl && dreObraEl.options.length <= 1) {
+        const { data: obras } = await SB.from("obras").select("id, nome").eq("ativo", true).order("nome");
+        (obras||[]).forEach(o => { const opt = document.createElement("option"); opt.value=o.id; opt.textContent=o.nome; dreObraEl.appendChild(opt); });
+    }
+}
+
+// =======================================================
+// FLUXO DE CAIXA — PREVISÃO
+// =======================================================
+async function carregarFluxo() {
+    const horizonte = parseInt(document.getElementById("fluxoHorizonte")?.value || "60");
+    const hoje = new Date();
+    const fim  = new Date(hoje); fim.setDate(fim.getDate() + horizonte);
+    const hojeStr = hoje.toISOString().split("T")[0];
+    const fimStr  = fim.toISOString().split("T")[0];
+
+    const [prevRes, atrRes] = await Promise.all([
+        SB.from("movimentos_financeiros").select("tipo,valor_total,data_documento,observacoes,fornecedores(nome),obras(nome),referencia")
+          .eq("estado_pagamento","por_pagar").eq("ativo",true).gte("data_documento",hojeStr).lte("data_documento",fimStr).order("data_documento"),
+        SB.from("movimentos_financeiros").select("tipo,valor_total,data_documento,observacoes,fornecedores(nome),obras(nome),referencia")
+          .eq("estado_pagamento","por_pagar").eq("ativo",true).lt("data_documento",hojeStr).order("data_documento")
+    ]);
+
+    const previstos = prevRes.data || [];
+    const atrasados = atrRes.data  || [];
+    const totalEnt  = previstos.filter(m=>m.tipo==="entrada").reduce((s,m)=>s+Number(m.valor_total),0);
+    const totalSai  = previstos.filter(m=>m.tipo==="saida").reduce((s,m)=>s+Number(m.valor_total),0);
+    const totalAtr  = atrasados.reduce((s,m)=>s+Number(m.valor_total),0);
+
+    document.getElementById("fluxoEntradas").textContent = totalEnt.toFixed(2) + " €";
+    document.getElementById("fluxoSaidas").textContent   = totalSai.toFixed(2) + " €";
+    document.getElementById("fluxoAtraso").textContent   = totalAtr.toFixed(2) + " €";
+    const saldoEl = document.getElementById("fluxoSaldo");
+    const saldo = totalEnt - totalSai;
+    saldoEl.textContent = saldo.toFixed(2) + " €";
+    saldoEl.style.color = saldo >= 0 ? "#5ad65a" : "#ff7a7a";
+
+    const tbody = document.getElementById("fluxoTabela");
+    const todos = [...atrasados.map(m=>({...m,atrasado:true})), ...previstos];
+    tbody.innerHTML = todos.length === 0
+        ? `<tr><td colspan="5" style="text-align:center;padding:20px;opacity:.4">Sem movimentos pendentes</td></tr>`
+        : todos.map(m => {
+            const ent = m.tipo==="entrada", atr = m.atrasado;
+            const desc = m.fornecedores?.nome || m.observacoes || m.referencia || "—";
+            return `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+                <td style="padding:8px;font-size:13px;${atr?"color:#f97316":""}">${m.data_documento}</td>
+                <td style="padding:8px;font-size:13px">${desc}</td>
+                <td style="padding:8px;font-size:13px;opacity:.7">${m.obras?.nome||"—"}</td>
+                <td style="padding:8px;font-size:13px;text-align:right;color:${ent?"#5ad65a":"#ff7a7a"};font-weight:600">${ent?"+":"–"}${Number(m.valor_total).toFixed(2)} €</td>
+                <td style="padding:8px;text-align:center"><span style="font-size:11px;padding:2px 8px;border-radius:12px;background:${atr?"rgba(249,115,22,.15)":"rgba(255,255,255,.08)"};color:${atr?"#f97316":"var(--text-muted)"}">
+                    ${atr?"ATRASADO":"Previsto"}</span></td>
+            </tr>`;
+        }).join("");
+}
+
+// =======================================================
+// ORÇADO VS. REAL
+// =======================================================
+async function iniciarOrcadoReal() {
+    const sel = document.getElementById("orcadoObra");
+    if (sel && sel.options.length <= 1) {
+        const { data: obras } = await SB.from("obras").select("id, nome").eq("ativo", true).order("nome");
+        (obras||[]).forEach(o => { const opt = document.createElement("option"); opt.value=o.id; opt.textContent=o.nome; sel.appendChild(opt); });
+    }
+}
+
+async function carregarOrcadoReal() {
+    const obraId = document.getElementById("orcadoObra")?.value;
+    if (!obraId) { alert("Seleciona uma obra"); return; }
+
+    const [orcRes, gastosRes] = await Promise.all([
+        SB.from("orcamentos").select("valor_total").eq("obra_id",obraId).eq("ativo",true).order("criado_em",{ascending:false}).limit(1).maybeSingle(),
+        SB.from("movimentos_financeiros").select("valor_total,categoria_id,categorias_financeiras(nome)").eq("obra_id",obraId).eq("tipo","saida").eq("ativo",true)
+    ]);
+
+    const totalOrcado = orcRes.data?.valor_total || 0;
+    const gastos      = gastosRes.data || [];
+    const totalReal   = gastos.reduce((s,m) => s+Number(m.valor_total), 0);
+    const desvio      = totalReal - totalOrcado;
+    const percent     = totalOrcado > 0 ? (totalReal / totalOrcado * 100) : 0;
+
+    document.getElementById("orcadoTotal").textContent   = totalOrcado > 0 ? totalOrcado.toFixed(2)+" €" : "Sem orçamento";
+    document.getElementById("orcadoReal").textContent    = totalReal.toFixed(2) + " €";
+    const devEl = document.getElementById("orcadoDesvio");
+    devEl.textContent = (desvio>=0?"+":"")+desvio.toFixed(2)+" €";
+    devEl.style.color = desvio<=0 ? "#5ad65a" : "#ff7a7a";
+    document.getElementById("orcadoPercent").textContent = percent.toFixed(1)+"%";
+
+    const pct = Math.min(percent,100);
+    const bar = document.getElementById("orcadoBar");
+    bar.style.width      = pct+"%";
+    bar.style.background = pct<80?"var(--primary)":pct<100?"#f97316":"#ff7a7a";
+    document.getElementById("orcadoBarLabel").textContent = percent.toFixed(1)+"% executado";
+
+    const catMap = {};
+    gastos.forEach(m => { const c=m.categorias_financeiras?.nome||"Sem categoria"; catMap[c]=(catMap[c]||0)+Number(m.valor_total); });
+    document.getElementById("orcadoTabela").innerHTML = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).map(([cat,val]) =>
+        `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+            <td style="padding:8px;font-size:13px">${cat}</td>
+            <td style="padding:8px;font-size:13px;text-align:right;color:#ff7a7a;font-weight:600">${val.toFixed(2)} €</td>
+            <td style="padding:8px;font-size:13px;text-align:right;opacity:.6">${totalReal>0?(val/totalReal*100).toFixed(1):0}%</td>
+        </tr>`).join("") || `<tr><td colspan="3" style="padding:20px;text-align:center;opacity:.4">Sem gastos registados</td></tr>`;
+}
+
 // =======================================================
 // autorizarTOC — versão definitiva (usa Edge Function para obter URL)
 // =======================================================
