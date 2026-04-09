@@ -735,7 +735,6 @@
                     <th>Obra</th>
                     <th style="text-align:right">Total</th>
                     <th>Estado</th>
-                    <th style="min-width:120px">Progresso</th>
                     <th></th>
                 </tr>
             </thead>
@@ -1179,9 +1178,9 @@
 </div> <!-- FECHA adminArea -->
 
 <!-- ===== MODAL EDITAR OBRA ===== -->
-<div id="modalEditarObra" class="modal-overlay hidden" style="z-index:1100">
-    <div class="modal-box" style="max-width:460px">
-        <h3 style="margin-bottom:18px;font-family:var(--font-title);letter-spacing:.5px">✏️ Editar Obra</h3>
+<div id="modalEditarObra" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1100;align-items:center;justify-content:center">
+    <div style="background:var(--bg-dark-panel,#2a2a2a);border-radius:16px;padding:28px;width:100%;max-width:460px;box-shadow:0 8px 40px rgba(0,0,0,.5)">
+        <h3 style="margin-bottom:18px;font-family:var(--font-title,sans-serif);letter-spacing:.5px;color:var(--text-light,#fff)">✏️ Editar Obra</h3>
         <input type="hidden" id="editObraId">
         <div class="form-row">
             <div class="form-group">
@@ -1210,7 +1209,7 @@
             </div>
         </div>
         <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">
-            <button class="btn-secondary" onclick="document.getElementById('modalEditarObra').classList.add('hidden')">Cancelar</button>
+            <button class="btn-secondary" onclick="document.getElementById('modalEditarObra').style.display='none'">Cancelar</button>
             <button class="btn-primary" onclick="guardarEditObra()">💾 Guardar</button>
         </div>
     </div>
