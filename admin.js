@@ -842,6 +842,17 @@ async function carregarObras() {
                     ${estado.charAt(0).toUpperCase() + estado.slice(1)}
                 </span>
             </td>
+            <td>
+                ${o.percentagem_conclusao != null ? `
+                <div style="display:flex;align-items:center;gap:6px">
+                    <div style="flex:1;background:rgba(255,255,255,.1);border-radius:4px;height:6px;overflow:hidden">
+                        <div style="width:${Math.min(o.percentagem_conclusao,100)}%;height:100%;background:${o.percentagem_conclusao>=100?"#5ad65a":o.percentagem_conclusao>=75?"var(--primary)":"#a78bfa"};border-radius:4px"></div>
+                    </div>
+                    <span style="font-size:11px;opacity:.7;white-space:nowrap">${o.percentagem_conclusao}%</span>
+                </div>
+                ${o.data_conclusao_prevista ? `<div style="font-size:10px;opacity:.5;margin-top:2px;${new Date(o.data_conclusao_prevista) < new Date() && estado==="ativa" ? "color:#f97316;opacity:1;font-weight:600" : ""}">📅 ${o.data_conclusao_prevista}</div>` : ""}
+                ` : "<span style='opacity:.3;font-size:11px'>—</span>"}
+            </td>
             <td class="acoes-td" style="white-space:nowrap">
                 <button class="btn-acao btn-painel-obra" title="Ver Painel">📊</button>
                 <button class="btn-acao btn-editar-obra" title="Editar">✏️</button>
@@ -886,20 +897,45 @@ function fecharModalQR() {
 }
 
 async function editarObra(obra) {
-    const nome   = prompt("Nome da obra:", obra.nome);
-    if (nome === null) return;
-    const morada = prompt("Morada:", obra.morada || "");
-    if (morada === null) return;
-    const raio   = prompt("Raio GPS (metros):", obra.raio || 120);
-    if (raio === null) return;
+    // Usar modal de edição de obra (ver admin.html #modalEditarObra)
+    const modal = document.getElementById("modalEditarObra");
+    if (!modal) {
+        // Fallback: prompts simples
+        const nome   = prompt("Nome da obra:", obra.nome);
+        if (nome === null) return;
+        const morada = prompt("Morada:", obra.morada || "");
+        if (morada === null) return;
+        const raio   = prompt("Raio GPS (metros):", obra.raio || 120);
+        if (raio === null) return;
+        await SB.from("obras").update({ nome: nome.trim(), morada: morada.trim(), raio: parseInt(raio) || 120 }).eq("id", obra.id);
+        await carregarObras(); return;
+    }
+    // Preencher modal
+    document.getElementById("editObraId").value       = obra.id;
+    document.getElementById("editObraNome").value     = obra.nome || "";
+    document.getElementById("editObraMorada").value   = obra.morada || "";
+    document.getElementById("editObraRaio").value     = obra.raio || 120;
+    document.getElementById("editObraPercent").value  = obra.percentagem_conclusao ?? "";
+    document.getElementById("editObraData").value     = obra.data_conclusao_prevista || "";
+    modal.classList.remove("hidden");
+}
 
-    const { error } = await SB.from("obras").update({
-        nome:   nome.trim(),
-        morada: morada.trim(),
-        raio:   parseInt(raio) || 120,
-    }).eq("id", obra.id);
-
-    if (error) { alert("Erro ao guardar: " + error.message); return; }
+async function guardarEditObra() {
+    const id      = document.getElementById("editObraId").value;
+    const nome    = document.getElementById("editObraNome").value.trim();
+    const morada  = document.getElementById("editObraMorada").value.trim();
+    const raio    = parseInt(document.getElementById("editObraRaio").value) || 120;
+    const percent = document.getElementById("editObraPercent").value;
+    const dataC   = document.getElementById("editObraData").value;
+    if (!nome) { alert("Nome obrigatório"); return; }
+    const payload = {
+        nome, morada, raio,
+        percentagem_conclusao:   percent !== "" ? parseInt(percent) : null,
+        data_conclusao_prevista: dataC || null
+    };
+    const { error } = await SB.from("obras").update(payload).eq("id", id);
+    if (error) { alert("Erro: " + error.message); return; }
+    document.getElementById("modalEditarObra").classList.add("hidden");
     await carregarObras();
 }
 
@@ -1131,7 +1167,7 @@ async function carregarUnidades() {
 async function carregarArtigos() {
     // Buscar artigos directamente + movimentos de stock para calcular stock actual
     const [{ data, error }, { data: movs }] = await Promise.all([
-        SB.from("artigos").select("id, codigo, descricao, tipo_artigo, preco_atual, stock_inicial, local_armazenamento, ativo").order("descricao"),
+        SB.from("artigos").select("id, codigo, descricao, tipo_artigo, preco_atual, stock_inicial, local_armazenamento, ativo, stock_minimo").order("descricao"),
         SB.from("movimentos_stock").select("artigo_id, tipo_movimento, quantidade")
     ]);
 
@@ -1169,12 +1205,16 @@ async function carregarArtigos() {
     }
     _data.forEach(a => {
         const tr = document.createElement("tr");
+        const stockBaixo = a.stock_minimo && a.quantidade < a.stock_minimo;
         tr.innerHTML = `
             <td>${a.codigo || ""}</td>
             <td>${a.descricao || ""}</td>
             <td>${a.tipo_artigo || ""}</td>
             <td>${Number(a.preco_atual || 0).toFixed(2)} €</td>
-            <td>${a.quantidade ?? 0}</td>
+            <td style="color:${stockBaixo ? "#f97316" : "inherit"};font-weight:${stockBaixo ? "700" : "400"}">
+                ${a.quantidade ?? 0}${stockBaixo ? " ⚠️" : ""}
+                ${a.stock_minimo ? `<span style="font-size:10px;opacity:.5;margin-left:4px">(mín: ${a.stock_minimo})</span>` : ""}
+            </td>
             <td>${a.local_armazenamento || ""}</td>
             <td class="acoes-td">
                 <button class="btn-acao" title="Editar">✏️</button>
@@ -1209,6 +1249,7 @@ async function abrirModalArtigo(artigo = null) {
     document.getElementById("artTipo").value           = d?.tipo_artigo || "consumivel";
     document.getElementById("artLocal").value          = d?.local_armazenamento || "";
     document.getElementById("artQtdInicial").value     = "";
+    document.getElementById("artStockMin").value       = d?.stock_minimo ?? "";
 
     const selUnidade = document.getElementById("artUnidade");
     if (selUnidade && d?.unidade_id) selUnidade.value = d.unidade_id;
@@ -1849,6 +1890,32 @@ async function carregarObrasFluxo() {
     });
 }
 
+let _todosMovimentos = []; // cache para filtros rápidos
+
+function filtrarPorEstado(estado) {
+    const tbody = document.querySelector("#tabelaMovimentos tbody");
+    if (!tbody) return;
+    const lista = estado === "" ? _todosMovimentos :
+                  estado === "atrasado"
+                      ? _todosMovimentos.filter(m => m.estado_pagamento === "por_pagar" && m.data_documento < new Date().toISOString().split("T")[0])
+                      : _todosMovimentos.filter(m => m.estado_pagamento === estado);
+
+    // Actualizar KPIs
+    const entradas = lista.filter(m => m.tipo === "entrada").reduce((s,m) => s + Number(m.valor_total), 0);
+    const saidas   = lista.filter(m => m.tipo === "saida").reduce((s,m) => s + Number(m.valor_total), 0);
+    document.getElementById("totalEntradas").textContent = entradas.toFixed(2) + " €";
+    document.getElementById("totalSaidas").textContent   = saidas.toFixed(2) + " €";
+    const saldo = entradas - saidas;
+    const sEl = document.getElementById("saldoFluxo");
+    sEl.textContent = saldo.toFixed(2) + " €";
+    sEl.style.color = saldo >= 0 ? "#5ad65a" : "#ff7a7a";
+
+    // Re-renderizar com lista filtrada
+    movimentos = lista;
+    renderMovimentos();
+    renderTotais();
+}
+
 async function carregarMovimentos() {
     const obra       = document.getElementById("filtroObra")?.value || "";
     const categoria  = document.getElementById("filtroCategoria")?.value || "";
@@ -1872,6 +1939,7 @@ async function carregarMovimentos() {
     const { data, error } = await query;
     if (error) { console.error(error); return; }
     movimentos = data || [];
+    _todosMovimentos = data || []; // guardar cache para filtros rápidos
     renderMovimentos();
     renderTotais();
 }
@@ -2085,6 +2153,22 @@ function ligarEventosGlobais() {
 
     // Fluxo — modal
     document.getElementById("btnNovoMovimento")?.addEventListener("click", () => abrirModalMovimento());
+
+    // Filtros rápidos de estado (Fluxo de Caixa)
+    document.querySelectorAll(".btn-filtro-estado").forEach(btn => {
+        btn.addEventListener("click", () => {
+            document.querySelectorAll(".btn-filtro-estado").forEach(b => {
+                b.style.background = "rgba(255,255,255,.06)";
+                b.style.color = "var(--text-muted)";
+                b.style.borderColor = "rgba(255,255,255,.1)";
+            });
+            btn.style.background = "rgba(244,185,66,.15)";
+            btn.style.color = "var(--primary)";
+            btn.style.borderColor = "rgba(244,185,66,.4)";
+            const estado = btn.dataset.estado;
+            filtrarPorEstado(estado);
+        });
+    });
     document.getElementById("btnScanQR")?.addEventListener("click", iniciarScanQR);
     document.getElementById("btnGuardarMov")?.addEventListener("click", guardarMovimento);
     document.getElementById("fecharModalMovBtn")?.addEventListener("click", fecharModalMovimento);
@@ -3212,6 +3296,113 @@ async function carregarOrcadoReal() {
             <td style="padding:8px;font-size:13px;text-align:right;opacity:.6">${totalReal>0?(val/totalReal*100).toFixed(1):0}%</td>
         </tr>`).join("") || `<tr><td colspan="3" style="padding:20px;text-align:center;opacity:.4">Sem gastos registados</td></tr>`;
 }
+
+// =======================================================
+// NOTIFICAÇÕES — Alertas de pagamentos em atraso + stock baixo
+// =======================================================
+async function carregarNotificacoes() {
+    const hoje = new Date().toISOString().split("T")[0];
+
+    const [atrasadosRes, stockRes] = await Promise.all([
+        SB.from("movimentos_financeiros")
+            .select("id, tipo, valor_total, data_documento, fornecedores(nome), obras(nome), observacoes")
+            .eq("estado_pagamento", "por_pagar")
+            .eq("ativo", true)
+            .lt("data_documento", hoje)
+            .order("data_documento"),
+        SB.from("artigos")
+            .select("id, descricao, stock_minimo, stock_inicial")
+            .not("stock_minimo", "is", null)
+            .gt("stock_minimo", 0)
+    ]);
+
+    const atrasados = atrasadosRes.data || [];
+    const artigos   = stockRes.data    || [];
+
+    // Calcular stock actual para artigos com mínimo
+    let stockAlertas = [];
+    if (artigos.length > 0) {
+        const { data: movs } = await SB.from("movimentos_stock")
+            .select("artigo_id, tipo_movimento, quantidade")
+            .in("artigo_id", artigos.map(a => a.id));
+        const stockPor = {};
+        (movs || []).forEach(m => {
+            if (!stockPor[m.artigo_id]) stockPor[m.artigo_id] = 0;
+            if (m.tipo_movimento === "entrada" || m.tipo_movimento === "ajuste_entrada")
+                stockPor[m.artigo_id] += Number(m.quantidade);
+            else stockPor[m.artigo_id] -= Number(m.quantidade);
+        });
+        stockAlertas = artigos.filter(a => {
+            const actual = (a.stock_inicial || 0) + (stockPor[a.id] || 0);
+            return actual < (a.stock_minimo || 0);
+        });
+    }
+
+    const total = atrasados.length + stockAlertas.length;
+    const badge = document.getElementById("notifBadge");
+    const painel = document.getElementById("notifPainel");
+    if (!badge || !painel) return;
+
+    if (total === 0) {
+        badge.style.display = "none";
+        painel.innerHTML = `<div style="padding:20px;text-align:center;opacity:.5;font-size:13px">Sem alertas 👍</div>`;
+        return;
+    }
+
+    badge.style.display = "flex";
+    badge.textContent   = total > 9 ? "9+" : total;
+
+    let html = "";
+
+    if (atrasados.length > 0) {
+        const totalAtr = atrasados.reduce((s,m) => s + Number(m.valor_total), 0);
+        html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:700;letter-spacing:.05em;opacity:.5;text-transform:uppercase">
+            💸 ${atrasados.length} Pagamento(s) em Atraso — ${totalAtr.toFixed(2)} €</div>`;
+        atrasados.forEach(m => {
+            const desc = m.fornecedores?.nome || m.observacoes || "—";
+            const dias = Math.floor((new Date() - new Date(m.data_documento)) / 86400000);
+            html += `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:background .1s"
+                onmouseenter="this.style.background='rgba(0,0,0,.04)'" onmouseleave="this.style.background=''"
+                onclick="activarTab('fluxo')">
+                <div>
+                    <div style="font-size:13px;font-weight:500;color:#1a1a1a">${desc}</div>
+                    <div style="font-size:11px;color:#e05c5c;margin-top:2px">${m.data_documento} · ${dias} dia(s) atraso</div>
+                </div>
+                <div style="font-size:13px;font-weight:700;color:#e05c5c;white-space:nowrap;margin-left:12px">–${Number(m.valor_total).toFixed(2)} €</div>
+            </div>`;
+        });
+    }
+
+    if (stockAlertas.length > 0) {
+        html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:700;letter-spacing:.05em;opacity:.5;text-transform:uppercase">
+            📦 ${stockAlertas.length} Artigo(s) com Stock Baixo</div>`;
+        stockAlertas.forEach(a => {
+            html += `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;cursor:pointer"
+                onclick="activarTab('inventario')">
+                <div style="font-size:13px;font-weight:500;color:#1a1a1a">${a.descricao}</div>
+                <div style="font-size:11px;color:#f97316;white-space:nowrap;margin-left:12px">Abaixo do mínimo (${a.stock_minimo})</div>
+            </div>`;
+        });
+    }
+
+    painel.innerHTML = html;
+}
+
+function toggleNotificacoes() {
+    const painel = document.getElementById("notifPainel");
+    if (!painel) return;
+    const visivel = painel.style.display !== "none" && painel.style.display !== "";
+    painel.style.display = visivel ? "none" : "block";
+}
+
+// Fechar painel ao clicar fora
+document.addEventListener("click", e => {
+    const wrap = document.getElementById("notifWrap");
+    if (wrap && !wrap.contains(e.target)) {
+        const painel = document.getElementById("notifPainel");
+        if (painel) painel.style.display = "none";
+    }
+});
 
 // =======================================================
 // autorizarTOC — versão definitiva (usa Edge Function para obter URL)
