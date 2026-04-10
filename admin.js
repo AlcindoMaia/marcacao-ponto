@@ -448,8 +448,7 @@ function exportarPontoExcel() {
         const fmt = v => v ? new Date(v).toLocaleTimeString("pt-PT",{hour:"2-digit",minute:"2-digit",timeZone:"Europe/Lisbon"}) : "";
         linhas.push(`"${r.funcionario}","${r.obra}","${r.dia}","${fmt(r.entrada)}","${fmt(r.saida)}","${r.horas||""}","${r.estado}"`);
     });
-    const blob = new Blob(["﻿" + linhas.join("
-")], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob(["\ufeff" + linhas.join("\n")], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = nomeFich; a.click();
     URL.revokeObjectURL(url);
