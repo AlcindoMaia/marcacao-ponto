@@ -145,21 +145,6 @@ body::after {
   text-transform: uppercase;
 }
 
-.btn-admin {
-  font-family: var(--font-title);
-  font-size: 12px;
-  letter-spacing: 1px;
-  padding: 6px 16px;
-  border-radius: 6px;
-  border: none;
-  background: var(--primary-dk);
-  color: white;
-  cursor: pointer;
-  text-transform: uppercase;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-}
 
 /* ============================================================
    SIDEBAR
@@ -173,7 +158,6 @@ body::after {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  height: 100%;
 }
 
 .sidebar-section {
@@ -715,7 +699,6 @@ body::after {
         </svg>
         <span id="userName">Admin</span>
       </div>
-      <a href="admin.html" class="btn-admin">Gestão</a>
       <button class="btn-sair" id="btnSair">Sair</button>
     </div>
   </header>
@@ -725,31 +708,29 @@ body::after {
 
     <div class="sidebar-section">
       <div class="sidebar-label">Visão Geral</div>
-      <button class="nav-btn active" data-view="visao">📊 Visão Geral</button>
+      <button class="nav-btn active" data-view="visao">Visão Geral</button>
     </div>
 
     <div class="sidebar-section">
       <div class="sidebar-label">Orçamentos</div>
-      <button class="nav-btn" data-view="orcamentos">📋 Nova Cotação Entregue</button>
+      <button class="nav-btn" data-view="orcamentos">Nova Cotação Entregue</button>
     </div>
 
     <div class="sidebar-section">
       <div class="sidebar-label">Fluxo de Caixa</div>
-      <button class="nav-btn" data-view="caixa">🔍 Consultar Caixa</button>
-      <button class="nav-btn" data-view="adiantamento">💰 Adiantamento de Cliente</button>
-      <button class="nav-btn" data-view="despesa-obra">🧾 Registar Despesa Obra</button>
-      <button class="nav-btn" data-view="despesa-pagar">📤 Despesa a Pagar</button>
+      <button class="nav-btn" data-view="caixa">Consultar Caixa</button>
+      <button class="nav-btn" data-view="adiantamento">Adiantamento de Cliente</button>
     </div>
 
     <div class="sidebar-section">
       <div class="sidebar-label">Colaboradores</div>
-      <button class="nav-btn" data-view="colaboradores">👥 Gestão de Equipa</button>
+      <button class="nav-btn" data-view="colaboradores">Gestão de Equipa</button>
     </div>
 
-    <div class="sidebar-section" style="margin-top:auto;padding-top:16px;border-top:1px solid rgba(0,0,0,.08)">
+    <div class="sidebar-section" style="margin-top:24px;padding-top:16px;border-top:1px solid rgba(0,0,0,.1)">
       <div class="sidebar-label">Atalhos</div>
-      <a href="admin.html" class="nav-btn" style="display:block;text-decoration:none;text-align:center">⚙️ Painel Admin</a>
-      <a href="registo-admin.html" class="nav-btn" style="display:block;text-decoration:none;text-align:center">📋 Registo Diário</a>
+      <a href="admin.html" class="nav-btn" style="display:block;text-decoration:none">⚙️ Painel Admin</a>
+      <a href="registo-admin.html" class="nav-btn" style="display:block;text-decoration:none">📋 Registo Diário</a>
     </div>
 
   </nav>
@@ -845,111 +826,46 @@ function navegarPara(view) {
 }
 
 // ============================================================
-// VISÃO GERAL — melhorada
+// VISÃO GERAL
 // ============================================================
 async function renderVisao() {
-  const hoje      = new Date();
-  const hojeStr   = hoje.toISOString().split("T")[0];
-  const GERAL_ID  = "42f02f7c-9a03-43b5-8e03-a4b46bad3aad";
-
-  // Calcular início/fim do mês actual
-  const anoAtual  = hoje.getFullYear();
-  const mesAtual  = hoje.getMonth();
-  const inicioMes = new Date(anoAtual, mesAtual, 1).toISOString().split("T")[0];
-  const fimMes    = new Date(anoAtual, mesAtual + 1, 0).toISOString().split("T")[0];
-  const trintaDiasAtras = new Date(hoje - 30 * 86400000).toISOString().split("T")[0];
-
-  // Buscar tudo em paralelo
-  const [movRes, obrasRes, funcRes, registosHojeRes, registosMesRes, artRes] = await Promise.all([
-    SB.from("movimentos_financeiros")
-      .select("tipo, valor_total, estado_pagamento, data_documento, fornecedores(nome), obras(nome), observacoes")
-      .eq("ativo", true),
-    SB.from("obras").select("id, nome, estado, percentagem_conclusao, data_conclusao_prevista"),
-    SB.from("funcionarios").select("id, nome, valor_dia").eq("ativo", true),
-    SB.from("vw_registos_ponto").select("funcionario, obra, horas").eq("dia", hojeStr),
-    SB.from("vw_registos_ponto").select("funcionario, horas, dia").gte("dia", inicioMes).lte("dia", fimMes),
-    SB.from("artigos").select("id, descricao, stock_inicial, stock_minimo").not("stock_minimo","is",null).gt("stock_minimo",0),
+  const [movRes, obrasRes, funcRes, registosRes] = await Promise.all([
+    SB.from("movimentos_financeiros").select("tipo, valor_total, estado_pagamento, data_documento, obras(nome)").eq("ativo", true),
+    SB.from("obras").select("id, nome"),
+    SB.from("funcionarios").select("id, nome").eq("ativo", true),
+    SB.from("vw_registos_ponto").select("funcionario, horas").gte("dia", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0]),
   ]);
 
-  const movs        = movRes.data || [];
-  const obras       = (obrasRes.data || []).filter(o => (!o.estado || o.estado === "ativa") && o.id !== GERAL_ID);
-  const funcs       = funcRes.data || [];
-  const emObraHoje  = registosHojeRes.data || [];
-  const registosMes = registosMesRes.data || [];
+  const movs = movRes.data || [];
+  const hoje = new Date();
+  const trintaDiasAtras = new Date(hoje - 30 * 86400000).toISOString().split("T")[0];
 
-  // KPIs acumulados totais
-  const totalEntradas = movs.filter(m => m.tipo==="entrada").reduce((s,m)=>s+Number(m.valor_total),0);
-  const totalSaidas   = movs.filter(m => m.tipo==="saida").reduce((s,m)=>s+Number(m.valor_total),0);
+  const movsRecentes = movs.filter(m => m.data_documento >= trintaDiasAtras);
+  const totalEntradas = movs.filter(m => m.tipo === "entrada").reduce((s,m) => s + Number(m.valor_total), 0);
+  const totalSaidas   = movs.filter(m => m.tipo === "saida").reduce((s,m) => s + Number(m.valor_total), 0);
   const saldo         = totalEntradas - totalSaidas;
 
-  // KPIs do mês actual
-  const movsMes       = movs.filter(m => m.data_documento >= inicioMes && m.data_documento <= fimMes);
-  const entradasMes   = movsMes.filter(m=>m.tipo==="entrada").reduce((s,m)=>s+Number(m.valor_total),0);
-  const saidasMes     = movsMes.filter(m=>m.tipo==="saida").reduce((s,m)=>s+Number(m.valor_total),0);
-  const saldoMes      = entradasMes - saidasMes;
+  const porPagar = movs.filter(m => m.estado_pagamento === "por_pagar" && m.tipo === "saida");
 
-  // Movimentos recentes para gráfico
-  const movsRecentes = movs.filter(m => m.data_documento >= trintaDiasAtras);
-
-  // Pagamentos em atraso
-  const atrasados = movs.filter(m => m.estado_pagamento==="por_pagar" && m.tipo==="saida" && m.data_documento < hojeStr)
-    .sort((a,b)=>a.data_documento.localeCompare(b.data_documento));
-  const proximos7 = movs.filter(m => m.estado_pagamento==="por_pagar" && m.tipo==="saida" && m.data_documento>=hojeStr)
-    .sort((a,b)=>a.data_documento.localeCompare(b.data_documento)).slice(0,6);
-  const totalAtrasado = atrasados.reduce((s,m)=>s+Number(m.valor_total),0);
-
-  // Colaboradores em obra hoje — únicos
-  const uniqueHoje = [...new Map(emObraHoje.map(r=>[r.funcionario,r])).values()];
-
-  // Stock alertas
-  let stockAlertas = [];
-  if (artRes.data?.length) {
-    const { data: movStock } = await SB.from("movimentos_stock").select("artigo_id,tipo_movimento,quantidade")
-      .in("artigo_id", artRes.data.map(a=>a.id));
-    const stockPor = {};
-    (movStock||[]).forEach(m=>{
-      if(!stockPor[m.artigo_id]) stockPor[m.artigo_id]=0;
-      if(m.tipo_movimento==="entrada"||m.tipo_movimento==="ajuste_entrada") stockPor[m.artigo_id]+=Number(m.quantidade);
-      else stockPor[m.artigo_id]-=Number(m.quantidade);
-    });
-    stockAlertas = artRes.data.filter(a=>(a.stock_inicial||0)+(stockPor[a.id]||0) < a.stock_minimo);
-  }
-
-  // Horas do mês por funcionário (para custo estimado)
-  const horasMes = {};
-  const diasMes  = {};
-  registosMes.forEach(r=>{
-    if(!r.funcionario) return;
-    let h=0;
-    if(typeof r.horas==="string"&&r.horas.includes(":")){const[hh,mm]=r.horas.split(":").map(Number);h=hh+mm/60;}
-    else h=Number(r.horas)||0;
-    horasMes[r.funcionario]=(horasMes[r.funcionario]||0)+h;
-    if(!diasMes[r.funcionario]) diasMes[r.funcionario]=new Set();
-    diasMes[r.funcionario].add(r.dia);
+  // Horas mês por funcionário
+  const horasPorFunc = {};
+  (registosRes.data || []).forEach(r => {
+    if (!r.funcionario || !r.horas) return;
+    let h = 0;
+    if (typeof r.horas === "string" && r.horas.includes(":")) {
+      const [hh,mm] = r.horas.split(":").map(Number);
+      h = hh + mm/60;
+    } else h = Number(r.horas) || 0;
+    horasPorFunc[r.funcionario] = (horasPorFunc[r.funcionario] || 0) + h;
   });
-  const custoMes = funcs.reduce((s,f)=>{
-    const dias = diasMes[f.nome]?.size||0;
-    return s + (f.valor_dia ? dias*f.valor_dia : 0);
-  },0);
-
-  // Calcular gastos reais por obra
-  const gastosPorObra = {};
-  movs.filter(m=>m.tipo==="saida").forEach(m=>{
-    const nomeObra = m.obras?.nome;
-    if(nomeObra && nomeObra!=="GERAL / EMPRESA") gastosPorObra[nomeObra]=(gastosPorObra[nomeObra]||0)+Number(m.valor_total);
-  });
-
-  const totalAlertas = atrasados.length + stockAlertas.length;
-
-  const mesLabel = hoje.toLocaleString("pt-PT",{month:"long",year:"numeric"});
 
   const main = document.getElementById("mainContent");
   main.innerHTML = `
 
-    <!-- KPIs ACUMULADOS + MÊS -->
+    <!-- KPIs -->
     <div class="painel">
       <div class="painel-title">Resumo Financeiro</div>
-      <div class="visao-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px">
+      <div class="visao-grid">
         <div class="kpi-card">
           <div class="kpi-label">Caixa (entradas)</div>
           <div class="kpi-value verde">${fmtEur(totalEntradas)}</div>
@@ -959,153 +875,55 @@ async function renderVisao() {
           <div class="kpi-value vermelho">${fmtEur(totalSaidas)}</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">Saldo acumulado</div>
-          <div class="kpi-value ${saldo>=0?"verde":"vermelho"}">${fmtEur(saldo)}</div>
-        </div>
-      </div>
-      <!-- KPIs do mês -->
-      <div style="font-family:var(--font-title);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;opacity:.7">
-        Este mês — ${mesLabel}
-      </div>
-      <div class="visao-grid" style="grid-template-columns:repeat(6,1fr)">
-        <div class="kpi-card" style="border-left:3px solid #2a8a2a">
-          <div class="kpi-label">Entradas</div>
-          <div class="kpi-value verde" style="font-size:18px">${fmtEur(entradasMes)}</div>
-        </div>
-        <div class="kpi-card" style="border-left:3px solid #c0392b">
-          <div class="kpi-label">Saídas</div>
-          <div class="kpi-value vermelho" style="font-size:18px">${fmtEur(saidasMes)}</div>
-        </div>
-        <div class="kpi-card" style="border-left:3px solid var(--primary-dk)">
-          <div class="kpi-label">Saldo mês</div>
-          <div class="kpi-value ${saldoMes>=0?"verde":"vermelho"}" style="font-size:18px">${fmtEur(saldoMes)}</div>
+          <div class="kpi-label">Saldo</div>
+          <div class="kpi-value ${saldo >= 0 ? "verde" : "vermelho"}">${fmtEur(saldo)}</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Obras ativas</div>
-          <div class="kpi-value neutro" style="font-size:18px">${obras.length}</div>
+          <div class="kpi-value neutro">${(obrasRes.data || []).length}</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">Colaboradores</div>
-          <div class="kpi-value neutro" style="font-size:18px">${funcs.length}</div>
+          <div class="kpi-label">Colaboradores ativos</div>
+          <div class="kpi-value neutro">${(funcRes.data || []).length}</div>
         </div>
-        <div class="kpi-card" ${atrasados.length>0?'style="border-left:3px solid #e05c5c"':''}>
-          <div class="kpi-label">Custo mão obra</div>
-          <div class="kpi-value vermelho" style="font-size:18px">${fmtEur(custoMes)}</div>
+        <div class="kpi-card">
+          <div class="kpi-label">Movimentos (30 dias)</div>
+          <div class="kpi-value neutro">${movsRecentes.length}</div>
         </div>
       </div>
     </div>
 
-    <!-- Fila 2: Alertas + Em obra hoje -->
+    <!-- Fila 2: Despesas previstas + Clientes em aberto -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
 
-      <!-- ALERTAS -->
       <div class="painel">
-        <div class="painel-title" style="display:flex;align-items:center;justify-content:space-between">
-          <span>⚠️ Atenção</span>
-          ${totalAlertas>0?`<span style="background:#e05c5c;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">${totalAlertas}</span>`:''}
-        </div>
-        ${totalAlertas===0
-          ? `<div style="opacity:.5;font-size:13px;padding:12px 0;text-align:center">✅ Sem alertas activos</div>`
-          : `
-          ${atrasados.length>0?`
-          <div style="font-family:var(--font-title);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#c0392b;margin-bottom:6px;opacity:.8">
-            💸 ${atrasados.length} pagamento(s) em atraso — ${fmtEur(totalAtrasado)}
-          </div>
-          ${atrasados.slice(0,4).map(m=>{
-            const dias=Math.floor((hoje-new Date(m.data_documento))/86400000);
-            const desc=m.fornecedores?.nome||m.observacoes||"—";
-            return`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:rgba(192,57,43,.07);border-radius:6px;margin-bottom:4px;font-size:13px">
-              <div>
-                <div style="font-weight:500">${desc}</div>
-                <div style="font-size:11px;color:#c0392b">${m.data_documento} · ${dias} dia(s)</div>
-              </div>
-              <div style="font-weight:700;color:#c0392b;font-size:13px">-${fmtEur(Number(m.valor_total))}</div>
-            </div>`;
-          }).join("")}
-          `:""}
-          ${stockAlertas.length>0?`
-          <div style="font-family:var(--font-title);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#d97706;margin:8px 0 6px;opacity:.8">
-            📦 ${stockAlertas.length} artigo(s) abaixo do mínimo
-          </div>
-          ${stockAlertas.slice(0,3).map(a=>`
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:rgba(217,119,6,.07);border-radius:6px;margin-bottom:4px;font-size:13px">
-              <span style="font-weight:500">${a.descricao}</span>
-              <span style="color:#d97706;font-size:11px">Mín: ${a.stock_minimo}</span>
-            </div>`).join("")}
-          `:""}
-          `}
-      </div>
-
-      <!-- EM OBRA HOJE -->
-      <div class="painel">
-        <div class="painel-title">👷 Em Obra Hoje</div>
-        ${uniqueHoje.length===0
-          ? `<div style="opacity:.5;font-size:13px;padding:12px 0;text-align:center">Sem registos de ponto hoje</div>`
-          : uniqueHoje.map(r=>`
-            <div class="cliente-item">
-              <div class="cliente-avatar">${(r.funcionario||"?").charAt(0).toUpperCase()}</div>
-              <div class="cliente-info">
-                <div class="cliente-nome">${r.funcionario||"—"}</div>
-                <div class="cliente-sub">${r.obra||"—"}</div>
-              </div>
-              ${r.horas?`<div style="font-family:var(--font-title);font-size:13px;color:var(--primary-dk)">${r.horas}</div>`:""}
-            </div>`).join("")}
-      </div>
-
-    </div>
-
-    <!-- Fila 3: Obras em aberto + Despesas próximos 7 dias -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-
-      <!-- OBRAS COM PROGRESSO -->
-      <div class="painel">
-        <div class="painel-title">🏗️ Obras em Curso</div>
-        ${obras.length===0
-          ? `<div style="opacity:.5;font-size:13px;text-align:center;padding:12px 0">Sem obras activas</div>`
-          : obras.slice(0,6).map(o=>{
-            const pct = o.percentagem_conclusao ?? null;
-            const gasto = gastosPorObra[o.nome] || 0;
-            const vencida = o.data_conclusao_prevista && o.data_conclusao_prevista < hojeStr;
-            const barColor = pct!=null ? (pct>=100?"#2a8a2a":pct>=75?"var(--primary-dk)":"#c8a882") : "#ccc";
-            return`<div class="cliente-item">
-              <div class="cliente-avatar">${o.nome.charAt(0).toUpperCase()}</div>
-              <div class="cliente-info" style="flex:1">
-                <div class="cliente-nome">${o.nome}</div>
-                <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
-                  ${pct!=null?`
-                  <div style="flex:1;background:rgba(0,0,0,.1);border-radius:3px;height:4px">
-                    <div style="width:${Math.min(pct,100)}%;height:100%;background:${barColor};border-radius:3px"></div>
-                  </div>
-                  <span style="font-size:10px;color:var(--text-muted);white-space:nowrap">${pct}%</span>
-                  `:""
-                  }
-                  ${gasto>0?`<span style="font-size:10px;color:#c0392b;white-space:nowrap">${fmtEur(gasto)}</span>`:""}
+        <div class="painel-title">Despesas Previstas</div>
+        <div class="despesas-lista" id="despesasPrevistas">
+          ${porPagar.length === 0
+            ? '<div style="opacity:.5;font-size:13px;padding:8px 0">Sem despesas por pagar</div>'
+            : porPagar.slice(0,6).map(m => `
+              <div class="despesa-item">
+                <div>
+                  <div class="despesa-valor">${fmtEur(Number(m.valor_total))}</div>
+                  <div class="despesa-obra">${m.obras?.nome || "—"}</div>
                 </div>
-                ${o.data_conclusao_prevista?`<div style="font-size:10px;${vencida?"color:#c0392b;font-weight:600":"color:var(--text-muted)"}">📅 ${o.data_conclusao_prevista}</div>`:""}
-              </div>
-            </div>`;
-          }).join("")}
+                <div class="despesa-data">${m.data_documento || ""}</div>
+              </div>`).join("")}
+        </div>
       </div>
 
-      <!-- DESPESAS PREVISTAS (próximos 7 dias + atrasadas) -->
       <div class="painel">
-        <div class="painel-title">📅 Pagamentos Pendentes</div>
-        ${[...atrasados, ...proximos7].length===0
-          ? `<div style="opacity:.5;font-size:13px;text-align:center;padding:12px 0">Sem pagamentos pendentes</div>`
-          : [...atrasados.slice(0,3), ...proximos7.slice(0,5)].map(m=>{
-            const atraso = m.data_documento < hojeStr;
-            const desc = m.fornecedores?.nome || m.observacoes || "—";
-            return`<div class="despesa-item" style="${atraso?"border-left:3px solid #c0392b;padding-left:8px":""}">
-              <div style="flex:1">
-                <div class="despesa-valor" style="font-size:13px">${desc}</div>
-                <div class="despesa-obra">${m.obras?.nome||""}</div>
+        <div class="painel-title">Obras em Aberto</div>
+        <div class="clientes-lista">
+          ${(obrasRes.data || []).slice(0,6).map(o => `
+            <div class="cliente-item">
+              <div class="cliente-avatar">${o.nome.charAt(0).toUpperCase()}</div>
+              <div class="cliente-info">
+                <div class="cliente-nome">${o.nome}</div>
+                <div class="cliente-sub">Em curso</div>
               </div>
-              <div style="text-align:right">
-                <div style="color:#c0392b;font-weight:600;font-size:13px">-${fmtEur(Number(m.valor_total))}</div>
-                <div class="despesa-data">${atraso?`<span style="color:#c0392b">⚠ ${m.data_documento}</span>`:m.data_documento}</div>
-              </div>
-            </div>`;
-          }).join("")}
+            </div>`).join("")}
+        </div>
       </div>
 
     </div>
@@ -1119,31 +937,31 @@ async function renderVisao() {
     </div>
   `;
 
-  // Gráfico barras (mais legível que linhas quando entradas ≈ 0)
+  // Gráfico últimos 30 dias
   const labels = [];
   const entData = []; const saiData = [];
   for (let i = 29; i >= 0; i--) {
-    const d  = new Date(hoje - i * 86400000);
+    const d = new Date(hoje - i * 86400000);
     const ds = d.toISOString().split("T")[0];
     labels.push(d.toLocaleDateString("pt-PT", { day:"2-digit", month:"2-digit" }));
-    entData.push(movsRecentes.filter(m=>m.data_documento===ds&&m.tipo==="entrada").reduce((s,m)=>s+Number(m.valor_total),0));
-    saiData.push(movsRecentes.filter(m=>m.data_documento===ds&&m.tipo==="saida").reduce((s,m)=>s+Number(m.valor_total),0));
+    entData.push(movsRecentes.filter(m => m.data_documento === ds && m.tipo === "entrada").reduce((s,m) => s + Number(m.valor_total), 0));
+    saiData.push(movsRecentes.filter(m => m.data_documento === ds && m.tipo === "saida").reduce((s,m) => s + Number(m.valor_total), 0));
   }
 
   new Chart(document.getElementById("chartVisao"), {
-    type: "bar",
+    type: "line",
     data: {
       labels,
       datasets: [
-        { label:"Entradas", data: entData, backgroundColor:"rgba(42,138,42,.7)",  borderRadius:3 },
-        { label:"Saídas",   data: saiData, backgroundColor:"rgba(192,57,43,.65)", borderRadius:3 }
+        { label:"Entradas", data: entData, borderColor:"#2a8a2a", backgroundColor:"rgba(42,138,42,.08)", tension:.4, fill:true, pointRadius:2 },
+        { label:"Saídas",   data: saiData, borderColor:"#c0392b", backgroundColor:"rgba(192,57,43,.06)", tension:.4, fill:true, pointRadius:2 }
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { labels: { color:"#555", font:{ size:12 } } } },
       scales: {
-        x: { ticks:{ color:"#888", font:{size:10}, maxTicksLimit:10 }, grid:{ color:"rgba(0,0,0,.05)" }, stacked: false },
+        x: { ticks:{ color:"#888", font:{size:10}, maxTicksLimit:10 }, grid:{ color:"rgba(0,0,0,.05)" } },
         y: { ticks:{ color:"#888", font:{size:11}, callback: v => v+"€" }, grid:{ color:"rgba(0,0,0,.05)" } }
       }
     }
