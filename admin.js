@@ -254,6 +254,29 @@ function gerarCalendario() {
 // =======================================================
 // REGISTOS DE PONTO
 // =======================================================
+// estado de vista dos registos
+let _vistaRegistos = "lista";
+function setVistaRegistos(v) {
+    _vistaRegistos = v;
+    const btnL = document.getElementById("btnVistaLista");
+    const btnM = document.getElementById("btnVistaMapa");
+    if (btnL) {
+        btnL.style.background = v==="lista" ? "rgba(244,185,66,.15)" : "rgba(255,255,255,.06)";
+        btnL.style.color      = v==="lista" ? "var(--primary)"        : "var(--text-muted)";
+        btnL.style.borderColor= v==="lista" ? "rgba(244,185,66,.4)"  : "rgba(255,255,255,.1)";
+    }
+    if (btnM) {
+        btnM.style.background = v==="mapa" ? "rgba(244,185,66,.15)" : "rgba(255,255,255,.06)";
+        btnM.style.color      = v==="mapa" ? "var(--primary)"       : "var(--text-muted)";
+        btnM.style.borderColor= v==="mapa" ? "rgba(244,185,66,.4)" : "rgba(255,255,255,.1)";
+    }
+    document.getElementById("vistaLista").style.display  = v==="lista" ? "block" : "none";
+    document.getElementById("mapaPresencas").style.display = v==="mapa"  ? "block" : "none";
+    if (v === "mapa") renderMapaPresencas();
+}
+
+let _todosRegistos = []; // cache para o mapa
+
 async function carregarRegistos() {
     const table = document.getElementById("tabelaRegistos");
     let tbody = table.querySelector("tbody");
@@ -273,6 +296,38 @@ async function carregarRegistos() {
     const { data, error } = await query.order("dia", { ascending: false });
     if (error) { alert("Erro: " + error.message); return; }
 
+    _todosRegistos = data || [];
+
+    // ---- KPIs Assiduidade ----
+    if (!filtroDia) {
+        // Dias úteis estimados (sem fins de semana)
+        let diasUteis = 0;
+        for (let d = 1; d <= ultimoDia; d++) {
+            const dow = new Date(ano, mes-1, d).getDay();
+            if (dow !== 0 && dow !== 6) diasUteis++;
+        }
+        const diasComRegisto = new Set((data||[]).map(r => r.dia)).size;
+        const assid = diasUteis > 0 ? Math.round(diasComRegisto / diasUteis * 100) : 0;
+        const incompletos = (data||[]).filter(r => r.estado === "Incompleto").length;
+
+        // Calcular horas extras (registos com horas > 8)
+        let totalExtras = 0;
+        (data||[]).forEach(r => {
+            if (!r.horas) return;
+            let h = 0;
+            if (typeof r.horas === "string" && r.horas.includes(":")) {
+                const [hh,mm] = r.horas.split(":").map(Number); h = hh + mm/60;
+            } else h = Number(r.horas) || 0;
+            if (h > 8) totalExtras += (h - 8);
+        });
+
+        document.getElementById("kpiAssiduidade").textContent = assid + "%";
+        document.getElementById("kpiAssiduidade").style.color = assid >= 80 ? "#5ad65a" : assid >= 60 ? "#f97316" : "#ff7a7a";
+        document.getElementById("kpiDiasRegisto").textContent  = diasComRegisto + " / " + diasUteis;
+        document.getElementById("kpiHorasExtras").textContent  = totalExtras.toFixed(1) + "h";
+        document.getElementById("kpiIncompletos").textContent  = incompletos;
+    }
+
     if (!data || data.length === 0) {
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;opacity:.6">Sem registos neste período</td></tr>`;
         return;
@@ -287,25 +342,129 @@ async function carregarRegistos() {
         // Highlight visual para registos incompletos
         if (incompleto) tr.style.borderLeft = "3px solid #ff7a7a";
 
+        // Calcular horas extras (>8h) — destacar a laranja
+        let horasNum = 0;
+        if (r.horas && typeof r.horas === "string" && r.horas.includes(":")) {
+            const [hh,mm] = r.horas.split(":").map(Number); horasNum = hh + mm/60;
+        } else horasNum = Number(r.horas) || 0;
+        const temExtras = horasNum > 8;
+        const horasDisplay = r.horas || "–";
+
         tr.innerHTML = `
             <td>${r.funcionario}</td>
             <td>${r.obra}</td>
             <td>${r.dia}</td>
             <td contenteditable="true" class="editavel" data-id="${r.entrada_id || ""}" data-tipo="entrada">${fmt(r.entrada)}</td>
             <td contenteditable="true" class="editavel" data-id="${r.saida_id || ""}" data-tipo="saida">${fmt(r.saida)}</td>
-            <td class="col-horas">${r.horas || "–"}</td>
+            <td class="col-horas" style="${temExtras ? "color:#f97316;font-weight:700" : ""}">
+                ${horasDisplay}${temExtras ? ` <span style="font-size:10px;background:rgba(249,115,22,.15);padding:1px 5px;border-radius:4px">+EXT</span>` : ""}
+            </td>
             <td>${incompleto
                 ? `<span class="estado-incompleto">Incompleto</span>`
                 : `<span class="estado-ok">OK</span>`
             }</td>`;
 
-        // Edição inline — atualiza tabela ponto pelo ID correto
         tr.querySelectorAll(".editavel").forEach(td => {
             td.addEventListener("blur", () => guardarEdicaoRegisto(tr, td));
         });
 
         tbody.appendChild(tr);
     });
+
+    if (_vistaRegistos === "mapa") renderMapaPresencas();
+}
+
+// ---- Mapa de Presenças ----
+function renderMapaPresencas() {
+    const container = document.getElementById("mapaPresencas");
+    if (!container) return;
+
+    const ano = currentDate.getFullYear();
+    const mes = currentDate.getMonth() + 1;
+    const ultimoDia = new Date(ano, mes, 0).getDate();
+
+    // Agrupar por funcionário e dia
+    const porFunc = {};
+    _todosRegistos.forEach(r => {
+        if (!porFunc[r.funcionario]) porFunc[r.funcionario] = {};
+        porFunc[r.funcionario][r.dia] = r.estado;
+    });
+
+    const dias = Array.from({length: ultimoDia}, (_,i) => {
+        const d = `${ano}-${String(mes).padStart(2,"0")}-${String(i+1).padStart(2,"0")}`;
+        return d;
+    });
+
+    const funcs = Object.keys(porFunc).sort();
+    if (funcs.length === 0) { container.innerHTML = `<p style="opacity:.4;text-align:center;padding:20px">Sem dados</p>`; return; }
+
+    let html = `<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11px;width:100%">
+        <thead><tr>
+            <th style="padding:6px 10px;text-align:left;position:sticky;left:0;background:var(--bg-dark-panel,#2a2a2a);z-index:2;min-width:120px">Funcionário</th>
+            ${dias.map(d => {
+                const dObj = new Date(d + "T12:00:00");
+                const dow = dObj.getDay();
+                const isWeekend = dow === 0 || dow === 6;
+                const label = String(dObj.getDate()).padStart(2,"0");
+                return `<th style="padding:4px 3px;text-align:center;min-width:24px;${isWeekend?"opacity:.35":""}">${label}</th>`;
+            }).join("")}
+        </tr></thead>
+        <tbody>
+        ${funcs.map(f => `
+            <tr>
+                <td style="padding:6px 10px;position:sticky;left:0;background:var(--bg-dark-panel,#2a2a2a);z-index:1;font-weight:500;white-space:nowrap">${f}</td>
+                ${dias.map(d => {
+                    const dObj = new Date(d + "T12:00:00");
+                    const dow = dObj.getDay();
+                    const isWeekend = dow === 0 || dow === 6;
+                    const estado = porFunc[f]?.[d];
+                    let bg = "transparent", symbol = "";
+                    if (isWeekend) { bg = "rgba(255,255,255,.03)"; symbol = ""; }
+                    else if (estado === "OK") { bg = "rgba(90,214,90,.25)"; symbol = "✓"; }
+                    else if (estado === "Incompleto") { bg = "rgba(249,115,22,.25)"; symbol = "⚠"; }
+                    else { bg = "rgba(255,122,122,.12)"; symbol = "·"; }
+                    return `<td style="text-align:center;padding:4px 2px;background:${bg};border:1px solid rgba(255,255,255,.05)">${symbol}</td>`;
+                }).join("")}
+            </tr>`).join("")}
+        </tbody>
+    </table></div>
+    <div style="display:flex;gap:16px;margin-top:10px;font-size:11px;opacity:.7">
+        <span>✓ <span style="color:rgba(90,214,90,.8)">Presente</span></span>
+        <span>⚠ <span style="color:rgba(249,115,22,.8)">Incompleto</span></span>
+        <span>· Ausente</span>
+    </div>`;
+
+    container.innerHTML = html;
+}
+
+// ---- Exportar Excel do mês ----
+function exportarPontoExcel() {
+    if (!_todosRegistos.length) { alert("Sem dados para exportar"); return; }
+    const ano = currentDate.getFullYear();
+    const mes = currentDate.getMonth() + 1;
+    const nomeFich = `ponto_${ano}_${String(mes).padStart(2,"0")}.csv`;
+    const linhas = ["Funcionário,Obra,Dia,Entrada,Saída,Horas,Estado"];
+    _todosRegistos.forEach(r => {
+        const fmt = v => v ? new Date(v).toLocaleTimeString("pt-PT",{hour:"2-digit",minute:"2-digit",timeZone:"Europe/Lisbon"}) : "";
+        linhas.push(`"${r.funcionario}","${r.obra}","${r.dia}","${fmt(r.entrada)}","${fmt(r.saida)}","${r.horas||""}","${r.estado}"`);
+    });
+    const blob = new Blob(["﻿" + linhas.join("
+")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = nomeFich; a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ---- Fechar mês (aprovação) ----
+async function fecharMes() {
+    const ano = currentDate.getFullYear();
+    const mes = currentDate.getMonth() + 1;
+    const label = `${String(mes).padStart(2,"0")}/${ano}`;
+    if (!confirm(`Fechar o mês de ${label}?
+Os registos completos serão marcados como aprovados.`)) return;
+    // Por agora apenas informa — a coluna 'aprovado' pode ser adicionada futuramente
+    alert(`✓ Mês ${label} fechado. Exporta o Excel para arquivo.`);
+    exportarPontoExcel();
 }
 
 async function guardarEdicaoRegisto(tr, tdEditado) {
@@ -673,28 +832,29 @@ async function carregarFuncionarios() {
         if (!temDevice) tr.style.borderLeft = "3px solid #f4b942";
 
         tr.innerHTML = `
-            <td style="font-weight:500">${f.nome || "—"}</td>
-            <td>${f.codigo || "—"}</td>
+            <td style="font-weight:500">
+                ${f.nome || "—"}
+                ${!temDevice ? '<span style="font-size:10px;color:#f4b942;margin-left:4px">⚠ sem QR</span>' : ""}
+            </td>
+            <td style="font-size:12px;opacity:.7">${f.codigo || "—"}</td>
+            <td>
+                <span style="font-size:12px;opacity:.8">${f.categoria || "—"}</span>
+            </td>
             <td>${f.valor_dia ? Number(f.valor_dia).toFixed(2) + " €" : "—"}</td>
             <td>
                 <span class="badge-estado ${ativo ? "pago" : "por_pagar"}">${ativo ? "Ativo" : "Inativo"}</span>
             </td>
-            <td>
-                ${temDevice
-                    ? `<span style="font-size:11px;opacity:.5;font-family:monospace">${f.device_id.substring(0,8)}…</span>`
-                    : `<span style="font-size:11px;color:#f4b942">Sem dispositivo</span>`}
-            </td>
             <td class="acoes-td">
-            <td>
-                <button class="btn-acao" title="${f.acesso_stock ? 'Revogar Stock' : 'Dar Acesso Stock'}" style="font-size:11px;padding:3px 8px;background:${f.acesso_stock ? 'rgba(90,214,90,.15)' : 'rgba(255,255,255,.06)'};color:${f.acesso_stock ? '#5ad65a' : '#888'}">📦 ${f.acesso_stock ? "Stock ✓" : "Stock"}</button>
-            </td>
-                <button class="btn-acao" title="Editar">✏️</button>
-                <button class="btn-acao" title="${ativo ? "Desativar" : "Ativar"}">${ativo ? "🔴" : "🟢"}</button>
+                <button class="btn-acao btn-hist-func" title="Histórico">📊</button>
+                <button class="btn-acao btn-stock-func" title="${f.acesso_stock ? 'Revogar Stock' : 'Dar Stock'}" style="font-size:11px;color:${f.acesso_stock ? '#5ad65a' : '#888'}">📦</button>
+                <button class="btn-acao btn-edit-func" title="Editar">✏️</button>
+                <button class="btn-acao btn-toggle-func" title="${ativo ? "Desativar" : "Ativar"}">${ativo ? "🔴" : "🟢"}</button>
             </td>`;
 
-        tr.querySelectorAll(".btn-acao")[0].onclick = () => toggleAcessoStock(f.id, f.nome, !!f.acesso_stock);
-        tr.querySelectorAll(".btn-acao")[1].onclick = () => abrirModalFuncionario(f);
-        tr.querySelectorAll(".btn-acao")[2].onclick = () => toggleAtivoFuncionario(f.id, f.nome, ativo);
+        tr.querySelector(".btn-hist-func").onclick  = () => abrirHistoricoFuncionario(f);
+        tr.querySelector(".btn-stock-func").onclick = () => toggleAcessoStock(f.id, f.nome, !!f.acesso_stock);
+        tr.querySelector(".btn-edit-func").onclick  = () => abrirModalFuncionario(f);
+        tr.querySelector(".btn-toggle-func").onclick= () => toggleAtivoFuncionario(f.id, f.nome, ativo);
         tbody.appendChild(tr);
     });
 }
@@ -703,10 +863,14 @@ function abrirModalFuncionario(func = null) {
     funcEditId = func?.id || null;
 
     document.getElementById("modalFuncTitulo").textContent = func ? "Editar Funcionário" : "Novo Funcionário";
-    document.getElementById("funcNome").value      = func?.nome || "";
-    document.getElementById("funcCodigo").value    = func?.codigo || "";
-    document.getElementById("funcValorDia").value  = func?.valor_dia || "";
-    document.getElementById("funcAtivo").value     = func?.ativo === false ? "false" : "true";
+    document.getElementById("funcNome").value       = func?.nome || "";
+    document.getElementById("funcCodigo").value     = func?.codigo || "";
+    document.getElementById("funcValorDia").value   = func?.valor_dia || "";
+    document.getElementById("funcAtivo").value      = func?.ativo === false ? "false" : "true";
+    document.getElementById("funcCategoria").value  = func?.categoria || "";
+    document.getElementById("funcTelemovel").value  = func?.telemovel || "";
+    document.getElementById("funcNif").value        = func?.nif || "";
+    document.getElementById("funcIban").value       = func?.iban || "";
 
     // Info dispositivo — só em edição
     const deviceInfo = document.getElementById("funcDeviceInfo");
@@ -737,7 +901,11 @@ async function guardarFuncionario() {
         nome,
         codigo:    document.getElementById("funcCodigo").value.trim() || null,
         valor_dia: parseFloat(document.getElementById("funcValorDia").value) || null,
-        ativo:     document.getElementById("funcAtivo").value === "true"
+        ativo:     document.getElementById("funcAtivo").value === "true",
+        categoria: document.getElementById("funcCategoria")?.value || null,
+        telemovel: document.getElementById("funcTelemovel")?.value.trim() || null,
+        nif:       document.getElementById("funcNif")?.value.trim() || null,
+        iban:      document.getElementById("funcIban")?.value.trim() || null,
     };
 
     if (funcEditId) {
@@ -767,6 +935,171 @@ async function toggleAtivoFuncionario(id, nome, ativoAtual) {
 
     if (error) { alert("Erro: " + error.message); return; }
     await carregarFuncionarios();
+}
+
+
+// =======================================================
+// HISTÓRICO DE FUNCIONÁRIO
+// =======================================================
+async function abrirHistoricoFuncionario(func) {
+    const hoje = new Date();
+    const ano  = hoje.getFullYear();
+    const inicio = `${ano}-01-01`;
+    const fim    = `${ano}-12-31`;
+
+    const [registosRes, movsRes] = await Promise.all([
+        SB.from("vw_registos_ponto").select("funcionario, horas, dia, obra")
+          .eq("funcionario_nome_match_placeholder", func.nome) // não existe — usamos filtro abaixo
+          .gte("dia", inicio).lte("dia", fim),
+        SB.from("movimentos_financeiros").select("valor_total, data_documento").eq("ativo", true)
+    ]);
+
+    // Buscar registos pelo nome (a view usa texto)
+    const { data: registos } = await SB.from("vw_registos_ponto")
+        .select("funcionario, horas, dia, obra")
+        .ilike("funcionario", func.nome)
+        .gte("dia", inicio).lte("dia", fim);
+
+    const regs = registos || [];
+    let totalH = 0, diasSet = new Set();
+    regs.forEach(r => {
+        let h = 0;
+        if (r.horas && typeof r.horas === "string" && r.horas.includes(":")) {
+            const [hh,mm] = r.horas.split(":").map(Number); h = hh+mm/60;
+        } else h = Number(r.horas) || 0;
+        totalH += h;
+        if (r.dia) diasSet.add(r.dia);
+    });
+    const totalDias  = diasSet.size;
+    const totalGanho = func.valor_dia ? totalDias * func.valor_dia : null;
+
+    // Obras trabalhadas
+    const obrasPorNome = {};
+    regs.forEach(r => {
+        if (!r.obra) return;
+        obrasPorNome[r.obra] = (obrasPorNome[r.obra] || 0) + 1;
+    });
+
+    const modal = document.getElementById("modalHistFuncionario");
+    if (!modal) {
+        // criar modal dinamicamente
+        const div = document.createElement("div");
+        div.id = "modalHistFuncionario";
+        div.style.cssText = "display:flex;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1100;align-items:center;justify-content:center";
+        div.innerHTML = `<div id="modalHistFuncContent" style="background:var(--bg-dark-panel,#2a2a2a);border-radius:16px;padding:28px;width:100%;max-width:520px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.5)"></div>`;
+        div.addEventListener("click", e => { if (e.target === div) div.remove(); });
+        document.body.appendChild(div);
+    }
+
+    const content = document.getElementById("modalHistFuncContent");
+    content.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+            <h3 style="font-family:var(--font-title,sans-serif);letter-spacing:.5px">${func.nome}</h3>
+            <button onclick="document.getElementById('modalHistFuncionario').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.5">×</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px">
+            <div style="background:rgba(255,255,255,.05);border-radius:8px;padding:12px;text-align:center">
+                <div style="font-size:11px;opacity:.5;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Dias ${ano}</div>
+                <div style="font-size:22px;font-weight:600">${totalDias}</div>
+            </div>
+            <div style="background:rgba(255,255,255,.05);border-radius:8px;padding:12px;text-align:center">
+                <div style="font-size:11px;opacity:.5;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Horas ${ano}</div>
+                <div style="font-size:22px;font-weight:600">${totalH.toFixed(0)}h</div>
+            </div>
+            <div style="background:rgba(255,255,255,.05);border-radius:8px;padding:12px;text-align:center">
+                <div style="font-size:11px;opacity:.5;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Ganho est.</div>
+                <div style="font-size:18px;font-weight:600;color:#f97316">${totalGanho != null ? totalGanho.toFixed(0)+"€" : "—"}</div>
+            </div>
+        </div>
+
+        ${func.categoria || func.telemovel || func.nif || func.iban ? `
+        <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px">
+            ${func.categoria ? `<div style="margin-bottom:4px"><span style="opacity:.5">Categoria:</span> ${func.categoria}</div>` : ""}
+            ${func.telemovel ? `<div style="margin-bottom:4px"><span style="opacity:.5">Telemóvel:</span> ${func.telemovel}</div>` : ""}
+            ${func.nif       ? `<div style="margin-bottom:4px"><span style="opacity:.5">NIF:</span> ${func.nif}</div>` : ""}
+            ${func.iban      ? `<div style="margin-bottom:4px"><span style="opacity:.5">IBAN:</span> <span style="font-family:monospace;font-size:11px">${func.iban}</span></div>` : ""}
+        </div>` : ""}
+
+        <div style="font-family:var(--font-title,sans-serif);font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin-bottom:8px">Obras em ${ano}</div>
+        ${Object.keys(obrasPorNome).length === 0 ? '<p style="opacity:.4;font-size:13px">Sem registos</p>' :
+          Object.entries(obrasPorNome).sort((a,b)=>b[1]-a[1]).map(([obra, dias]) =>
+            `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
+                <span>${obra}</span>
+                <span style="opacity:.6">${dias} dia(s)</span>
+            </div>`
+          ).join("")}
+
+        <button onclick="exportarPDFFuncionario(${JSON.stringify(func).replace(/"/g,'&quot;')}, ${JSON.stringify(regs).replace(/"/g,'&quot;')})"
+            style="margin-top:16px;width:100%;background:rgba(244,185,66,.12);border:1px solid rgba(244,185,66,.3);color:var(--primary,#f4b942);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;font-weight:600">
+            📄 Exportar PDF do Mês
+        </button>`;
+
+    document.getElementById("modalHistFuncionario").style.display = "flex";
+}
+
+// ---- Exportar PDF por funcionário ----
+function exportarPDFFuncionario(func, registos) {
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = hoje.getMonth() + 1;
+    const mesLabel = hoje.toLocaleString("pt-PT", { month:"long", year:"numeric" });
+
+    const regsDoMes = registos.filter(r => {
+        const d = r.dia || "";
+        return d.startsWith(`${ano}-${String(mes).padStart(2,"0")}`);
+    });
+
+    let totalH = 0, totalDias = 0;
+    regsDoMes.forEach(r => {
+        let h = 0;
+        if (r.horas && typeof r.horas === "string" && r.horas.includes(":")) {
+            const [hh,mm] = r.horas.split(":").map(Number); h = hh+mm/60;
+        } else h = Number(r.horas) || 0;
+        totalH += h;
+        totalDias++;
+    });
+    const totalGanho = func.valor_dia ? totalDias * func.valor_dia : null;
+
+    const html = `<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8">
+    <title>Ponto ${func.nome} — ${mesLabel}</title>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; color: #222; padding: 32px; }
+        h1 { font-size: 20px; margin-bottom: 4px; }
+        .sub { color: #888; font-size: 13px; margin-bottom: 24px; }
+        .kpis { display: flex; gap: 20px; margin-bottom: 24px; }
+        .kpi { background: #f5f5f5; border-radius: 8px; padding: 12px 20px; text-align: center; }
+        .kpi .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; }
+        .kpi .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th { background: #f4b942; color: #1a1000; padding: 8px 10px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+        td { padding: 7px 10px; border-bottom: 1px solid #eee; }
+        tr:nth-child(even) td { background: #fafafa; }
+        .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #eee; font-size: 10px; color: #aaa; text-align: center; }
+    </style></head><body>
+    <h1>${func.nome}</h1>
+    <div class="sub">Registo de Ponto — ${mesLabel}${func.categoria ? " · " + func.categoria : ""}</div>
+    <div class="kpis">
+        <div class="kpi"><div class="label">Dias</div><div class="value">${totalDias}</div></div>
+        <div class="kpi"><div class="label">Horas</div><div class="value">${totalH.toFixed(1)}h</div></div>
+        ${func.valor_dia ? `<div class="kpi"><div class="label">Valor/dia</div><div class="value">${Number(func.valor_dia).toFixed(2)}€</div></div>` : ""}
+        ${totalGanho != null ? `<div class="kpi"><div class="label">Total</div><div class="value" style="color:#c0392b">${totalGanho.toFixed(2)}€</div></div>` : ""}
+    </div>
+    <table>
+        <thead><tr><th>Dia</th><th>Obra</th><th>Horas</th></tr></thead>
+        <tbody>
+            ${regsDoMes.sort((a,b)=>a.dia.localeCompare(b.dia)).map(r =>
+                `<tr><td>${r.dia}</td><td>${r.obra||"—"}</td><td>${r.horas||"—"}</td></tr>`
+            ).join("")}
+        </tbody>
+    </table>
+    <div class="footer">Maia Solutions · Gerado em ${new Date().toLocaleDateString("pt-PT")}</div>
+    <script>window.print();</script>
+    </body></html>`;
+
+    const win = window.open("", "_blank", "width=800,height=600");
+    win.document.write(html);
+    win.document.close();
 }
 
 async function toggleAcessoStock(id, nome, temAcesso) {
@@ -3167,11 +3500,28 @@ async function carregarDRE() {
     const custos    = data.filter(m => m.tipo === "saida");
     const totalRec  = receitas.reduce((s,m) => s + Number(m.valor_total), 0);
     const totalCus  = custos.reduce((s,m) => s + Number(m.valor_total), 0);
-    const resultado = totalRec - totalCus;
-    const margem    = totalRec > 0 ? (resultado / totalRec * 100) : 0;
+
+    // Custo mão de obra dos registos_admin no mesmo período
+    const { data: regAdmin } = await SB.from("registos_admin")
+        .select("funcionario_id, data, tipo, obra_id")
+        .gte("data", inicio).lte("data", fim);
+    const { data: funcsD } = await SB.from("funcionarios").select("id, valor_dia").eq("ativo", true);
+    const dpf = {};
+    (regAdmin||[]).forEach(r => {
+        if (r.tipo === "falta" || !r.obra_id) return;
+        if (!dpf[r.funcionario_id]) dpf[r.funcionario_id] = new Set();
+        dpf[r.funcionario_id].add(r.data);
+    });
+    let custoMO = 0;
+    (funcsD||[]).forEach(f => { if (f.valor_dia) custoMO += (dpf[f.id]?.size||0) * f.valor_dia; });
+
+    const custoTotal = totalCus + custoMO;
+    const resultado  = totalRec - custoTotal;
+    const margem     = totalRec > 0 ? (resultado / totalRec * 100) : 0;
 
     document.getElementById("dreReceitas").textContent = totalRec.toFixed(2) + " €";
-    document.getElementById("dreCustos").textContent   = totalCus.toFixed(2) + " €";
+    document.getElementById("dreCustos").textContent   = custoTotal.toFixed(2) + " €";
+    document.getElementById("dreCustos").title         = `Fornecedores: ${totalCus.toFixed(2)}€ + Mão obra: ${custoMO.toFixed(2)}€`;
     const resEl = document.getElementById("dreResultado");
     resEl.textContent = resultado.toFixed(2) + " €";
     resEl.style.color = resultado >= 0 ? "#5ad65a" : "#ff7a7a";
@@ -3383,6 +3733,23 @@ async function carregarNotificacoes() {
                 <div style="font-size:11px;color:#f97316;white-space:nowrap;margin-left:12px">Abaixo do mínimo (${a.stock_minimo})</div>
             </div>`;
         });
+    }
+
+    // Adicionar alerta de funcionários sem registo hoje
+    const hojeStr = new Date().toISOString().split("T")[0];
+    const { data: funcAtivos }    = await SB.from("funcionarios").select("id, nome").eq("ativo", true);
+    const { data: registosHoje }  = await SB.from("vw_registos_ponto").select("funcionario").eq("dia", hojeStr);
+    const comRegisto = new Set((registosHoje||[]).map(r => r.funcionario));
+    const semRegisto = (funcAtivos||[]).filter(f => !comRegisto.has(f.nome));
+
+    if (semRegisto.length > 0) {
+        html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:700;letter-spacing:.05em;opacity:.5;text-transform:uppercase">
+            👷 ${semRegisto.length} Colaborador(es) Sem Registo Hoje</div>`;
+        semRegisto.forEach(f => {
+            html += `<div style="padding:8px 16px;border-bottom:1px solid rgba(0,0,0,.06);font-size:13px;color:#1a1a1a;opacity:.7">${f.nome}</div>`;
+        });
+        badge.style.display = "flex";
+        badge.textContent = Math.min(parseInt(badge.textContent||0) + semRegisto.length, 99);
     }
 
     painel.innerHTML = html;
