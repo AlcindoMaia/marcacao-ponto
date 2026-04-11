@@ -1249,7 +1249,7 @@ async function editarObra(obra) {
     document.getElementById("editObraRaio").value     = obra.raio || 120;
     document.getElementById("editObraPercent").value  = obra.percentagem_conclusao ?? "";
     document.getElementById("editObraData").value     = obra.data_conclusao_prevista || "";
-    modal.classList.remove("hidden");
+    modal.style.display = "flex";
 }
 
 async function guardarEditObra() {
@@ -1267,7 +1267,7 @@ async function guardarEditObra() {
     };
     const { error } = await SB.from("obras").update(payload).eq("id", id);
     if (error) { alert("Erro: " + error.message); return; }
-    document.getElementById("modalEditarObra").classList.add("hidden");
+    document.getElementById("modalEditarObra").style.display = "none";
     await carregarObras();
 }
 
