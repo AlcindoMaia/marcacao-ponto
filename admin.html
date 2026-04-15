@@ -803,17 +803,60 @@
             </div>
         </div>
 
-        <!-- Leitor QR de fatura (oculto por defeito) -->
-        <div id="qrReaderWrap" style="display:none;margin-bottom:16px;border-radius:10px;overflow:hidden;position:relative;background:#000">
-            <video id="qrVideo" style="width:100%;max-height:220px;object-fit:cover" playsinline autoplay muted></video>
+        <!-- ════ SCANNER QR — ecrã completo, sem zoom ════ -->
+        <div id="qrReaderWrap" style="display:none;position:fixed;inset:0;z-index:2000;background:#000;flex-direction:column">
+
+            <!-- Vídeo a ocupar todo o ecrã -->
+            <video id="qrVideo" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" playsinline autoplay muted></video>
             <canvas id="qrCanvas" style="display:none"></canvas>
-            <div style="position:absolute;top:8px;right:8px">
-                <button onclick="fecharScanQR()" style="background:rgba(0,0,0,.6);border:none;color:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px">✕ Fechar</button>
+
+            <!-- Overlay escuro com janela de leitura -->
+            <div style="position:absolute;inset:0;pointer-events:none">
+                <!-- Zona escura top -->
+                <div style="position:absolute;top:0;left:0;right:0;height:calc(50% - 130px);background:rgba(0,0,0,.55)"></div>
+                <!-- Zona escura bottom -->
+                <div style="position:absolute;bottom:0;left:0;right:0;height:calc(50% - 130px);background:rgba(0,0,0,.55)"></div>
+                <!-- Zona escura left -->
+                <div style="position:absolute;top:calc(50% - 130px);bottom:calc(50% - 130px);left:0;width:calc(50% - 130px);background:rgba(0,0,0,.55)"></div>
+                <!-- Zona escura right -->
+                <div style="position:absolute;top:calc(50% - 130px);bottom:calc(50% - 130px);right:0;width:calc(50% - 130px);background:rgba(0,0,0,.55)"></div>
+
+                <!-- Moldura da janela com cantos animados -->
+                <div id="qrMoldura" style="position:absolute;top:calc(50% - 130px);left:calc(50% - 130px);width:260px;height:260px">
+                    <!-- Cantos -->
+                    <div style="position:absolute;top:0;left:0;width:36px;height:36px;border-top:3px solid var(--primary,#f4b942);border-left:3px solid var(--primary,#f4b942);border-radius:2px 0 0 0"></div>
+                    <div style="position:absolute;top:0;right:0;width:36px;height:36px;border-top:3px solid var(--primary,#f4b942);border-right:3px solid var(--primary,#f4b942);border-radius:0 2px 0 0"></div>
+                    <div style="position:absolute;bottom:0;left:0;width:36px;height:36px;border-bottom:3px solid var(--primary,#f4b942);border-left:3px solid var(--primary,#f4b942);border-radius:0 0 0 2px"></div>
+                    <div style="position:absolute;bottom:0;right:0;width:36px;height:36px;border-bottom:3px solid var(--primary,#f4b942);border-right:3px solid var(--primary,#f4b942);border-radius:0 0 2px 0"></div>
+                    <!-- Linha de scan animada -->
+                    <div id="qrScanLine" style="position:absolute;left:4px;right:4px;height:2px;background:linear-gradient(90deg,transparent,var(--primary,#f4b942),transparent);animation:scanLine 2s ease-in-out infinite;top:50%"></div>
+                </div>
             </div>
-            <div id="qrStatus" style="position:absolute;bottom:8px;left:0;right:0;text-align:center;color:#fff;font-size:12px;font-family:var(--font-body);background:rgba(0,0,0,.5);padding:4px">
-                A aguardar QR Code da fatura...
+
+            <!-- Status + instruções -->
+            <div style="position:absolute;top:0;left:0;right:0;padding:env(safe-area-inset-top,16px) 16px 16px;background:linear-gradient(to bottom,rgba(0,0,0,.7),transparent)">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                    <span style="font-family:var(--font-title,'Oswald');font-size:14px;letter-spacing:1.5px;text-transform:uppercase;color:#fff">Ler QR de Fatura</span>
+                    <button onclick="fecharScanQR()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;backdrop-filter:blur(4px)">✕ Fechar</button>
+                </div>
+            </div>
+
+            <div id="qrStatus" style="position:absolute;bottom:0;left:0;right:0;padding:16px 16px env(safe-area-inset-bottom,16px);background:linear-gradient(to top,rgba(0,0,0,.8),transparent);text-align:center">
+                <div style="color:#fff;font-size:14px;margin-bottom:8px" id="qrStatusText">Aponte o QR Code da fatura para a moldura</div>
+                <div style="display:flex;gap:8px;justify-content:center">
+                    <button id="btnTorch" onclick="toggleTorch()" style="display:none;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;backdrop-filter:blur(4px)">🔦 Lanterna</button>
+                    <button onclick="colarQRManual()" style="background:rgba(244,185,66,.2);border:1px solid rgba(244,185,66,.4);color:var(--primary,#f4b942);border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;backdrop-filter:blur(4px)">✏️ Introduzir manual</button>
+                </div>
             </div>
         </div>
+        <style>
+        @keyframes scanLine {
+            0%   { top: 4px;   opacity: 0; }
+            10%  { opacity: 1; }
+            90%  { opacity: 1; }
+            100% { top: calc(100% - 6px); opacity: 0; }
+        }
+        </style>
 
         <div class="form-row">
             <div class="form-group">

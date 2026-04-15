@@ -1314,43 +1314,97 @@ async function eliminarObra(id, nome) {
 // =======================================================
 // SCANNER QR DE FATURAS PORTUGUESAS
 // =======================================================
-let qrStream = null;
+let qrStream    = null;
 let qrAnimFrame = null;
+let qrTorchOn   = false;
 
 async function iniciarScanQR() {
-    const wrap  = document.getElementById("qrReaderWrap");
-    const video = document.getElementById("qrVideo");
-    const status = document.getElementById("qrStatus");
-    wrap.style.display = "block";
+    const wrap   = document.getElementById("qrReaderWrap");
+    const video  = document.getElementById("qrVideo");
+    const status = document.getElementById("qrStatusText");
+    wrap.style.display = "flex";
+
+    // Bloquear scroll do body enquanto scanner está aberto
+    document.body.style.overflow = "hidden";
 
     try {
-        qrStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "environment" }
-        });
+        // Pedir resolução alta e câmara traseira com foco contínuo
+        const constraints = {
+            video: {
+                facingMode:  { ideal: "environment" },
+                width:       { ideal: 1920, min: 640 },
+                height:      { ideal: 1080, min: 480 },
+                focusMode:   { ideal: "continuous" },
+                advanced: [{ focusMode: "continuous" }]
+            }
+        };
+
+        qrStream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = qrStream;
         await video.play();
-        status.textContent = "Aponte para o QR Code da fatura...";
-        scanFrame();
+
+        // Aplicar foco contínuo via applyConstraints (para suporte mais alargado)
+        const track = qrStream.getVideoTracks()[0];
+        if (track?.getCapabilities) {
+            const caps = track.getCapabilities();
+            // Foco contínuo se suportado
+            if (caps.focusMode?.includes("continuous")) {
+                try { await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }); } catch(_) {}
+            }
+            // Mostrar botão da lanterna se suportado
+            if (caps.torch) {
+                document.getElementById("btnTorch").style.display = "inline-flex";
+            }
+        }
+
+        if (status) status.textContent = "Aponte o QR Code da fatura para a moldura";
+        qrAnimFrame = requestAnimationFrame(scanFrame);
+
     } catch(e) {
-        status.textContent = "Câmara não disponível. Cole o código manualmente.";
+        if (status) status.textContent = "Câmara não disponível. Use 'Introduzir manual'.";
+        console.warn("Câmara:", e);
     }
 }
 
 function scanFrame() {
     const video  = document.getElementById("qrVideo");
     const canvas = document.getElementById("qrCanvas");
-    if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
+    if (!video || video.readyState < video.HAVE_ENOUGH_DATA) {
         qrAnimFrame = requestAnimationFrame(scanFrame);
         return;
     }
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) { qrAnimFrame = requestAnimationFrame(scanFrame); return; }
+
+    // Calcular a zona central correspondente à moldura (260×260 no ecrã)
+    // A moldura ocupa aprox 260/min(screenW,screenH) da imagem
+    const screenMin = Math.min(window.innerWidth, window.innerHeight);
+    const ratio     = Math.min(vw, vh) / screenMin;
+    const cropSize  = Math.round(260 * ratio * 1.1); // +10% margem
+    const cropX     = Math.round((vw - cropSize) / 2);
+    const cropY     = Math.round((vh - cropSize) / 2);
+
+    // Só recortar a zona da moldura (melhora velocidade e precisão em QR pequenos)
+    canvas.width  = cropSize;
+    canvas.height = cropSize;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(video, cropX, cropY, cropSize, cropSize, 0, 0, cropSize, cropSize);
+
+    const imgData = ctx.getImageData(0, 0, cropSize, cropSize);
+    const code    = jsQR(imgData.data, cropSize, cropSize, {
+        inversionAttempts: "attemptBoth"  // tenta QR normal e invertido
+    });
 
     if (code) {
+        // Flash verde na moldura para feedback visual
+        const moldura = document.getElementById("qrMoldura");
+        if (moldura) {
+            moldura.style.transition = "opacity .15s";
+            moldura.style.opacity    = "0";
+            setTimeout(() => { if(moldura) moldura.style.opacity="1"; }, 150);
+        }
         parsearQRFatura(code.data);
         fecharScanQR();
         return;
@@ -1361,13 +1415,35 @@ function scanFrame() {
 function fecharScanQR() {
     if (qrStream) { qrStream.getTracks().forEach(t => t.stop()); qrStream = null; }
     if (qrAnimFrame) { cancelAnimationFrame(qrAnimFrame); qrAnimFrame = null; }
+    qrTorchOn = false;
+    document.body.style.overflow = "";
     const wrap = document.getElementById("qrReaderWrap");
     if (wrap) wrap.style.display = "none";
 }
 
+async function toggleTorch() {
+    if (!qrStream) return;
+    const track = qrStream.getVideoTracks()[0];
+    if (!track) return;
+    qrTorchOn = !qrTorchOn;
+    try {
+        await track.applyConstraints({ advanced: [{ torch: qrTorchOn }] });
+        const btn = document.getElementById("btnTorch");
+        if (btn) btn.style.background = qrTorchOn
+            ? "rgba(244,185,66,.4)"
+            : "rgba(255,255,255,.15)";
+    } catch(e) { console.warn("Torch:", e); }
+}
+
+function colarQRManual() {
+    fecharScanQR();
+    const texto = prompt("Cole aqui o conteúdo do QR Code da fatura:");
+    if (texto?.trim()) parsearQRFatura(texto.trim());
+}
+
 function parsearQRFatura(texto) {
     // Formato AT: A:NIF_EMITENTE*B:NIF_ADQUIRENTE*C:PAIS*D:TIPO*E:ESTADO*F:DATA*G:ATCUD*H:REF*I1:BASE*I2:IVA%*N:IVA_TOTAL*O:TOTAL_IVA*P:DESCONTO*Q:HASH*R:NUM_CERT
-    const status = document.getElementById("qrStatus");
+    const status = document.getElementById("qrStatusText");
 
     try {
         // Tentar parsing do formato AT
