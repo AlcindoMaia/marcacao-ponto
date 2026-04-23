@@ -2,474 +2,685 @@
 <html lang="pt">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#1a1a1a">
-<title>Maia Solutions — Marcação de Ponto</title>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f0f0f">
+<title>Maia — Ponto</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600&display=swap" rel="stylesheet">
 <style>
-/* ============================================================
+/* ═══════════════════════════════════════════
    TOKENS
-============================================================ */
+═══════════════════════════════════════════ */
 :root {
-  --gold:       #f4b942;
-  --gold-dk:    #d29d36;
-  --gold-glow:  rgba(244,185,66,.3);
-  --bg:         #111;
-  --bg2:        #1a1a1a;
-  --bg3:        #222;
+  --bg:         #0f0f0f;
+  --surface:    #181818;
+  --surface2:   #202020;
   --border:     rgba(255,255,255,.07);
-  --text:       #f0f0f0;
-  --muted:      rgba(255,255,255,.4);
-  --green:      #4caf7d;
-  --green-bg:   rgba(76,175,125,.12);
-  --red:        #e05c5c;
-  --red-bg:     rgba(224,92,92,.1);
-  --radius:     18px;
-  --radius-sm:  12px;
-  --font-h:     'Oswald', sans-serif;
-  --font-b:     'Inter', sans-serif;
+  --primary:    #f4b942;
+  --primary-dk: #c8901e;
+  --text:       #f0ece4;
+  --muted:      rgba(240,236,228,.4);
+  --green:      #4ade80;
+  --red:        #f87171;
+  --orange:     #fb923c;
+  --font-t:     'Oswald', sans-serif;
+  --font-b:     'DM Sans', sans-serif;
+  --safe-t:     env(safe-area-inset-top,    0px);
   --safe-b:     env(safe-area-inset-bottom, 0px);
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-html { height: 100%; }
-
-body {
-  min-height: 100dvh;
+/* ═══════════════════════════════════════════
+   BASE
+═══════════════════════════════════════════ */
+*, *::before, *::after {
+  box-sizing: border-box; margin: 0; padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+html, body {
+  height: 100%;
+  font-family: var(--font-b);
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font-b);
+  overflow: hidden;
   -webkit-font-smoothing: antialiased;
-  overscroll-behavior: none;
-  overflow-x: hidden;
 }
 
-/* ============================================================
-   LOADING
-============================================================ */
-.ecrã-loading {
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 24px;
-  background: var(--bg);
+/* ═══════════════════════════════════════════
+   ECRÃ — base
+═══════════════════════════════════════════ */
+.ecra {
+  position: fixed; inset: 0;
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
 }
+
+/* ═══════════════════════════════════════════
+   LOADING
+═══════════════════════════════════════════ */
+#ecrãLoading { background: var(--bg); gap: 18px; }
 
 .loading-logo {
-  height: 64px;
-  width: auto;
-  animation: pulse 1.8s ease-in-out infinite;
+  font-family: var(--font-t);
+  font-size: 26px; letter-spacing: 5px;
+  text-transform: uppercase; color: var(--primary);
+  font-weight: 400;
 }
-
-.loading-txt {
-  font-family: var(--font-h);
-  font-size: 11px;
-  letter-spacing: 2.5px;
-  text-transform: uppercase;
-  color: var(--muted);
+.loading-sub {
+  font-size: 11px; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--muted);
 }
-
-@keyframes pulse {
-  0%, 100% { opacity: .3; transform: scale(.97); }
-  50%       { opacity: .8; transform: scale(1); }
-}
-
-/* ============================================================
-   BLOQUEIO
-============================================================ */
-.ecrã-bloqueio {
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 28px;
-  text-align: center;
-  gap: 14px;
-  background: var(--bg);
-}
-
-.bloqueio-icon { font-size: 56px; margin-bottom: 4px; }
-
-.bloqueio-titulo {
-  font-family: var(--font-h);
-  font-size: 20px;
-  font-weight: 500;
-  letter-spacing: .8px;
-  color: var(--text);
-}
-
-.bloqueio-msg {
-  font-size: 14px;
-  color: var(--muted);
-  line-height: 1.7;
-  max-width: 280px;
-}
-
-/* ============================================================
-   ECRÃ PRINCIPAL
-============================================================ */
-.screen {
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  padding-bottom: calc(28px + var(--safe-b));
-}
-
-/* ── Header ── */
-.header {
-  padding: 20px 20px 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.logo { height: 44px; width: auto; }
-
-.header-obra {
-  text-align: right;
-  font-family: var(--font-h);
-  font-size: 11px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--muted);
-  line-height: 1.4;
-}
-
-.header-obra span {
-  display: block;
-  font-size: 13px;
-  color: var(--gold);
-  font-weight: 500;
-}
-
-/* ── Hero ── */
-.hero {
-  padding: 24px 20px 0;
-}
-
-.hero-greeting {
-  font-family: var(--font-h);
-  font-size: 12px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 4px;
-}
-
-.hero-name {
-  font-family: var(--font-h);
-  font-size: 28px;
-  font-weight: 500;
-  letter-spacing: .5px;
-  line-height: 1.1;
-}
-
-/* ── Barra de estado ── */
-.estado-bar {
-  margin: 16px 20px 0;
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.estado-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.estado-dot {
-  width: 9px; height: 9px;
+.spinner {
+  width: 32px; height: 32px;
+  border: 2px solid rgba(244,185,66,.15);
+  border-top-color: var(--primary);
   border-radius: 50%;
-  background: var(--muted);
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ═══════════════════════════════════════════
+   BLOQUEIO
+═══════════════════════════════════════════ */
+#ecrãBloqueio {
+  background: var(--bg); gap: 14px;
+  text-align: center; padding: 40px 32px;
+  max-width: 380px; margin: 0 auto;
+}
+.bloq-icon { font-size: 48px; margin-bottom: 6px; }
+#bloqueioTitulo {
+  font-family: var(--font-t);
+  font-size: 20px; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--primary);
+  font-weight: 500;
+}
+#bloqueioMsg {
+  font-size: 14px; line-height: 1.65; color: var(--muted);
+}
+
+/* ═══════════════════════════════════════════
+   PRINCIPAL
+═══════════════════════════════════════════ */
+#ecrãPrincipal {
+  background: var(--bg);
+  justify-content: flex-start;
+  overflow: hidden;
+}
+
+/* ── TOP BAR ── */
+.topbar {
+  width: 100%;
   flex-shrink: 0;
+  padding: calc(var(--safe-t) + 12px) 20px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  justify-content: space-between;
+}
+.topbar-logo {
+  font-family: var(--font-t);
+  font-size: 14px; letter-spacing: 3px;
+  text-transform: uppercase; color: var(--primary);
+  font-weight: 400;
+}
+.topbar-clock {
+  font-family: var(--font-t);
+  font-size: 16px; letter-spacing: 1px;
+  color: var(--text); font-weight: 300;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── SCROLLABLE BODY ── */
+.app-body {
+  width: 100%; flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex; flex-direction: column;
+}
+
+/* ── ID CARD ── */
+.id-card {
+  flex-shrink: 0;
+  background: linear-gradient(160deg, var(--surface) 0%, #161410 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 20px;
+  display: flex; align-items: center; gap: 14px;
+}
+.id-avatar {
+  width: 42px; height: 42px; border-radius: 50%;
+  background: var(--primary); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-t); font-size: 17px; font-weight: 600;
+  color: #1a1000; letter-spacing: 0;
+}
+.id-info { flex: 1; min-width: 0; }
+.id-nome {
+  font-size: 15px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  line-height: 1.2;
+}
+.id-obra {
+  font-size: 12px; color: var(--muted);
+  margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.estado-wrap {
+  flex-shrink: 0; display: flex; flex-direction: column;
+  align-items: flex-end; gap: 3px;
+}
+.estado-pill {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 20px; padding: 5px 11px;
+}
+.estado-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--muted); flex-shrink: 0;
   transition: background .3s, box-shadow .3s;
 }
-
 .estado-dot.entrada {
   background: var(--green);
-  box-shadow: 0 0 0 3px rgba(76,175,125,.2), 0 0 8px rgba(76,175,125,.4);
-  animation: ping 2s ease infinite;
+  box-shadow: 0 0 0 3px rgba(74,222,128,.15);
 }
+.estado-dot.saida { background: var(--orange); }
+.estado-label { font-size: 11px; font-weight: 500; color: var(--text); }
+#estadoHora { font-size: 10px; color: var(--muted); }
 
-.estado-dot.saida {
-  background: var(--red);
-  box-shadow: 0 0 6px rgba(224,92,92,.4);
-}
-
-@keyframes ping {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(76,175,125,.2), 0 0 8px rgba(76,175,125,.4); }
-  50%       { box-shadow: 0 0 0 6px rgba(76,175,125,.05), 0 0 12px rgba(76,175,125,.5); }
-}
-
-.estado-label {
-  font-family: var(--font-h);
-  font-size: 13px;
-  letter-spacing: .5px;
-  text-transform: uppercase;
-  color: var(--text);
-}
-
-.estado-hora {
-  font-family: var(--font-h);
-  font-size: 13px;
-  color: var(--muted);
-}
-
-/* ── Botão principal ── */
-.btn-wrap {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 32px 20px 24px;
-  gap: 16px;
+/* ── BOTÃO CENTRAL ── */
+.btn-zone {
+  flex-shrink: 0;
+  padding: 28px 20px 22px;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 14px;
 }
 
 .btn-marcacao {
-  width: 188px;
-  height: 188px;
-  border-radius: 50%;
-  border: none;
+  position: relative;
+  width: 172px; height: 172px;
+  border-radius: 50%; border: none;
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  position: relative;
-  outline: none;
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
-  transition: transform .15s cubic-bezier(.34,1.56,.64,1), box-shadow .2s;
-  background: radial-gradient(circle at 38% 32%, #ffe08a, var(--gold) 45%, var(--gold-dk));
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 5px;
+  background: conic-gradient(from 200deg at 40% 60%, #f4b942, #e0942a, #f4b942);
   box-shadow:
-    0 0 0 14px rgba(244,185,66,.07),
-    0 0 0 28px rgba(244,185,66,.03),
-    0 24px 64px rgba(244,185,66,.22),
-    0 8px 24px rgba(0,0,0,.5);
+    0 0 0 8px  rgba(244,185,66,.07),
+    0 0 0 16px rgba(244,185,66,.035),
+    0 10px 40px rgba(0,0,0,.6);
+  transition: transform .12s ease, box-shadow .12s ease;
+  overflow: hidden;
 }
-
+.btn-marcacao::after {
+  content: '';
+  position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(255,255,255,.18), transparent 60%);
+  pointer-events: none;
+}
 .btn-marcacao:active {
-  transform: scale(.94);
+  transform: scale(.93);
   box-shadow:
-    0 0 0 6px rgba(244,185,66,.1),
-    0 8px 24px rgba(244,185,66,.15),
-    0 4px 12px rgba(0,0,0,.4);
+    0 0 0 4px  rgba(244,185,66,.04),
+    0 4px 20px rgba(0,0,0,.6);
+}
+.btn-marcacao.disabled { opacity: .45; pointer-events: none; }
+
+#btnIcon   { font-size: 36px; line-height: 1; position: relative; z-index: 1; }
+#btnLabel  {
+  font-family: var(--font-t); font-size: 19px;
+  letter-spacing: 3.5px; font-weight: 500;
+  color: #1a1000; text-transform: uppercase;
+  position: relative; z-index: 1;
+}
+#btnSublabel {
+  font-size: 10px; color: rgba(26,16,0,.6);
+  text-align: center; max-width: 110px; line-height: 1.3;
+  position: relative; z-index: 1;
 }
 
-.btn-marcacao.disabled {
-  background: var(--bg3);
-  box-shadow: none;
-  cursor: default;
-  opacity: .5;
-  transform: none;
-}
-
-.btn-icon {
-  font-size: 48px;
-  line-height: 1;
-  position: relative;
-  z-index: 1;
-}
-
-.btn-label {
-  font-family: var(--font-h);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 2.5px;
-  text-transform: uppercase;
-  color: #1a1000;
-  position: relative;
-  z-index: 1;
-}
-
-.btn-sublabel {
-  font-size: 10px;
-  color: rgba(0,0,0,.45);
-  letter-spacing: .5px;
-  margin-top: -4px;
-  position: relative;
-  z-index: 1;
-}
-
-/* Hora actual abaixo do botão */
-.hora-actual {
-  font-family: var(--font-h);
-  font-size: 32px;
-  font-weight: 300;
-  letter-spacing: 3px;
-  color: var(--text);
-  opacity: .7;
-}
-
-/* ── Feedback ── */
+/* ── FEEDBACK ── */
 .feedback {
-  margin: 0 20px;
-  padding: 12px 18px;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-h);
-  font-size: 13px;
-  letter-spacing: .5px;
-  text-align: center;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: opacity .3s;
+  font-size: 13px; font-weight: 500;
+  text-align: center; min-height: 18px;
+  color: transparent; transition: color .2s;
+}
+.feedback.ok   { color: var(--green); }
+.feedback.erro { color: var(--red); }
+.feedback.info { color: var(--muted); }
+
+/* ── DIVIDER ── */
+.divider {
+  flex-shrink: 0;
+  height: 1px; background: var(--border);
+  margin: 0 20px 0;
 }
 
-.feedback:empty { opacity: 0; }
-.feedback.ok   { background: var(--green-bg); color: var(--green); border: 1px solid rgba(76,175,125,.2); }
-.feedback.erro { background: var(--red-bg);   color: var(--red);   border: 1px solid rgba(224,92,92,.2); }
-.feedback.info { background: rgba(244,185,66,.08); color: var(--gold); border: 1px solid rgba(244,185,66,.2); }
-
-/* ── Histórico ── */
-.historico {
-  margin: 20px 20px 0;
+/* ── HISTÓRICO ── */
+.hist-section {
+  flex: 1;
+  padding: 16px 20px calc(var(--safe-b) + 20px);
+  min-height: 0;
 }
-
-.historico-titulo {
-  font-family: var(--font-h);
-  font-size: 10px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--muted);
+.hist-label {
+  font-family: var(--font-t);
+  font-size: 10px; letter-spacing: 2.5px;
+  text-transform: uppercase; color: var(--muted);
   margin-bottom: 10px;
-  padding-left: 2px;
 }
-
-.hist-lista {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+.hist-lista { display: flex; flex-direction: column; gap: 3px; }
 
 .hist-item {
-  background: var(--bg2);
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  align-items: center; gap: 11px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border-radius: 10px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 11px 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  transition: background .15s;
+}
+.hist-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--muted); flex-shrink: 0;
+}
+.hist-dot.entrada { background: var(--green); }
+.hist-dot.saida   { background: var(--orange); }
+
+.hist-mid {}
+.hist-dia  { font-size: 13px; font-weight: 500; }
+.hist-horas-line {
+  font-size: 11px; color: var(--muted);
+  font-variant-numeric: tabular-nums; margin-top: 1px;
+}
+.hist-total {
+  font-family: var(--font-t);
+  font-size: 13px; letter-spacing: .5px;
+  color: var(--primary);
+  min-width: 38px; text-align: right;
 }
 
-.hist-item:active { background: var(--bg3); }
-
-.hist-tipo {
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.hist-tipo.entrada { background: var(--green); }
-.hist-tipo.saida   { background: var(--red); }
-
-.hist-texto {
-  flex: 1;
-  font-size: 13px;
-  color: var(--text);
-  font-weight: 500;
-}
-
-.hist-data {
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.hist-hora {
-  font-family: var(--font-h);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text);
-  letter-spacing: .3px;
+.hist-vazio {
+  padding: 20px 0;
+  font-size: 13px; color: var(--muted); text-align: center;
 }
 </style>
 </head>
 <body>
 
-<!-- ECRÃ DE LOADING INICIAL -->
-<div id="ecrãLoading" class="ecrã-loading">
-  <img src="Logo.png" class="loading-logo" alt="Maia Solutions">
-  <div class="loading-txt">A verificar dispositivo…</div>
+<!-- ════════════════ LOADING ════════════════ -->
+<div id="ecrãLoading" class="ecra" style="display:flex">
+  <div class="loading-logo">MAIA</div>
+  <div class="loading-sub">Soluções</div>
+  <div class="spinner"></div>
 </div>
 
-<!-- ECRÃ DE BLOQUEIO -->
-<div id="ecrãBloqueio" class="ecrã-bloqueio" style="display:none">
-  <div class="bloqueio-icon">🔒</div>
-  <div class="bloqueio-titulo" id="bloqueioTitulo">Dispositivo não autorizado</div>
-  <div class="bloqueio-msg" id="bloqueioMsg">
-    Este dispositivo não está registado no sistema.<br>Contacte o administrador.
-  </div>
+<!-- ════════════════ BLOQUEIO ════════════════ -->
+<div id="ecrãBloqueio" class="ecra">
+  <div class="bloq-icon">🔒</div>
+  <div id="bloqueioTitulo"></div>
+  <div id="bloqueioMsg"></div>
 </div>
 
-<!-- ECRÃ PRINCIPAL -->
-<div id="ecrãPrincipal" class="screen" style="display:none">
+<!-- ════════════════ PRINCIPAL ════════════════ -->
+<div id="ecrãPrincipal" class="ecra">
 
-  <!-- Header -->
-  <div class="header">
-    <img src="Logo.png" class="logo" alt="Maia Solutions">
-    <div class="header-obra">
-      Obra
-      <span id="obraNome">—</span>
+  <div class="topbar">
+    <span class="topbar-logo">Maia Solutions</span>
+    <span class="topbar-clock" id="horaActual">--:--:--</span>
+  </div>
+
+  <div class="app-body">
+
+    <!-- Identidade -->
+    <div class="id-card">
+      <div class="id-avatar" id="funcAvatar">?</div>
+      <div class="id-info">
+        <div class="id-nome" id="funcNome">—</div>
+        <div class="id-obra" id="obraNome">—</div>
+      </div>
+      <div class="estado-wrap">
+        <div class="estado-pill">
+          <div class="estado-dot" id="estadoDot"></div>
+          <div class="estado-label" id="estadoLabel">—</div>
+        </div>
+        <div id="estadoHora"></div>
+      </div>
     </div>
-  </div>
 
-  <!-- Hero -->
-  <div class="hero">
-    <div class="hero-greeting">Olá,</div>
-    <div class="hero-name" id="funcNome">—</div>
-  </div>
-
-  <!-- Estado actual -->
-  <div class="estado-bar">
-    <div class="estado-info">
-      <div class="estado-dot" id="estadoDot"></div>
-      <div class="estado-label" id="estadoLabel">Sem registos hoje</div>
+    <!-- Botão -->
+    <div class="btn-zone">
+      <button class="btn-marcacao" id="btnMarcacao">
+        <span id="btnIcon">▶</span>
+        <span id="btnLabel">ENTRADA</span>
+        <span id="btnSublabel">Toca para registar entrada</span>
+      </button>
+      <div class="feedback" id="feedback"></div>
     </div>
-    <div class="estado-hora" id="estadoHora"></div>
-  </div>
 
-  <!-- Botão principal -->
-  <div class="btn-wrap">
-    <button class="btn-marcacao" id="btnMarcacao">
-      <div class="btn-icon" id="btnIcon">▶</div>
-      <div class="btn-label" id="btnLabel">Entrada</div>
-      <div class="btn-sublabel" id="btnSublabel">Toca para registar</div>
-    </button>
-    <div class="hora-actual" id="horaActual">--:--</div>
-  </div>
+    <div class="divider"></div>
 
-  <!-- Feedback -->
-  <div class="feedback" id="feedback"></div>
-
-  <!-- Histórico semanal -->
-  <div class="historico">
-    <div class="historico-titulo">Esta semana</div>
-    <div class="hist-lista" id="histLista">
-      <div style="padding:10px 0;font-size:13px;color:var(--text-muted);text-align:center">A carregar…</div>
+    <!-- Histórico -->
+    <div class="hist-section">
+      <div class="hist-label">Esta semana</div>
+      <div class="hist-lista" id="histLista">
+        <div class="hist-vazio">A carregar…</div>
+      </div>
     </div>
-  </div>
 
-</div>
+  </div><!-- /app-body -->
+</div><!-- /ecrãPrincipal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="app.js"></script>
+<script>
+// =======================================================
+// SUPABASE — vem de config.js (SB já está disponível)
+// =======================================================
+
+function getDeviceId() {
+  let id = localStorage.getItem("deviceId");
+  if (!id) { id = crypto.randomUUID(); localStorage.setItem("deviceId", id); }
+  return id;
+}
+
+function haversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371e3, toRad = d => d * Math.PI / 180;
+  const φ1 = toRad(lat1), φ2 = toRad(lat2);
+  const Δφ = toRad(lat2-lat1), Δλ = toRad(lon2-lon1);
+  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+async function getObra(id) {
+  const { data } = await SB.from("obras").select("*").eq("id", id).maybeSingle();
+  return data;
+}
+
+async function getFuncionario(deviceId) {
+  const { data } = await SB.from("funcionarios").select("*").eq("device_id", deviceId).maybeSingle();
+  return data;
+}
+
+// =======================================================
+// FUSO HORÁRIO — todas as datas em Europe/Lisbon
+// =======================================================
+const TZ = "Europe/Lisbon";
+
+const fmtHora = iso => new Date(iso).toLocaleTimeString("pt-PT", {
+  hour: "2-digit", minute: "2-digit", timeZone: TZ
+});
+
+const fmtDia = iso => new Date(iso).toLocaleDateString("pt-PT", {
+  weekday: "short", day: "2-digit", month: "2-digit", timeZone: TZ
+});
+
+function diaLocal(iso) {
+  return new Date(iso).toLocaleDateString("sv-SE", { timeZone: TZ });
+}
+
+function startOfWeek() {
+  const agora = new Date();
+  const dataLocal = new Date(agora.toLocaleDateString("sv-SE", { timeZone: TZ }));
+  dataLocal.setDate(dataLocal.getDate() - ((dataLocal.getDay() + 6) % 7));
+  return dataLocal;
+}
+
+function calcHoras(entIso, saiIso) {
+  const diff = new Date(saiIso) - new Date(entIso);
+  if (diff <= 0) return null;
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  return `${h}h${m > 0 ? String(m).padStart(2, "0") : ""}`;
+}
+
+// =======================================================
+// UI
+// =======================================================
+function mostrarEcrã(id) {
+  ["ecrãLoading","ecrãBloqueio","ecrãPrincipal"].forEach(e => {
+    const el = document.getElementById(e);
+    if (el) el.style.display = e === id ? "flex" : "none";
+  });
+}
+
+function mostrarBloqueio(titulo, msg) {
+  document.getElementById("bloqueioTitulo").textContent = titulo;
+  document.getElementById("bloqueioMsg").innerHTML = msg;
+  mostrarEcrã("ecrãBloqueio");
+}
+
+function mostrarFeedback(msg, tipo = "info") {
+  const el = document.getElementById("feedback");
+  el.textContent = msg;
+  el.className = "feedback " + tipo;
+  if (tipo === "ok") setTimeout(() => { el.textContent=""; el.className="feedback"; }, 3000);
+}
+
+function actualizarBotao(ultimoTipo) {
+  const icon     = document.getElementById("btnIcon");
+  const label    = document.getElementById("btnLabel");
+  const sublabel = document.getElementById("btnSublabel");
+  const btn      = document.getElementById("btnMarcacao");
+  if (ultimoTipo === "entrada") {
+    icon.textContent     = "⏹";
+    label.textContent    = "SAÍDA";
+    sublabel.textContent = "Toca para registar saída";
+    btn.style.background = "conic-gradient(from 200deg at 40% 60%, #f87171, #c0392b, #f87171)";
+  } else {
+    icon.textContent     = "▶";
+    label.textContent    = "ENTRADA";
+    sublabel.textContent = "Toca para registar entrada";
+    btn.style.background = "conic-gradient(from 200deg at 40% 60%, #f4b942, #e0942a, #f4b942)";
+  }
+}
+
+function actualizarEstado(registos) {
+  const dot   = document.getElementById("estadoDot");
+  const label = document.getElementById("estadoLabel");
+  const hora  = document.getElementById("estadoHora");
+  if (!registos || registos.length === 0) {
+    dot.className = "estado-dot";
+    label.textContent = "Sem registos hoje";
+    hora.textContent  = "";
+    return;
+  }
+  const u = registos[0];
+  dot.className     = "estado-dot " + u.tipo;
+  label.textContent = u.tipo === "entrada" ? "Em obra" : "Fora de obra";
+  hora.textContent  = "desde " + fmtHora(u.datahora);
+}
+
+// =======================================================
+// HISTÓRICO
+// =======================================================
+async function carregarHistorico(funcId) {
+  const inicio = startOfWeek();
+  const { data } = await SB.from("ponto").select("*")
+    .eq("funcionario_id", funcId)
+    .gte("datahora", inicio.toISOString())
+    .order("datahora", { ascending: false })
+    .limit(12);
+
+  const hoje     = diaLocal(new Date().toISOString());
+  const hojeRegs = (data||[]).filter(r => diaLocal(r.datahora) === hoje);
+  actualizarEstado(hojeRegs);
+  actualizarBotao(data?.[0]?.tipo ?? null);
+
+  const lista = document.getElementById("histLista");
+  if (!data || data.length === 0) {
+    lista.innerHTML = `<div class="hist-vazio">Sem registos esta semana</div>`;
+    return;
+  }
+
+  const porDia = {};
+  data.forEach(r => {
+    const dia = diaLocal(r.datahora);
+    if (!porDia[dia]) porDia[dia] = [];
+    porDia[dia].push(r);
+  });
+
+  const diasOrdenados = Object.keys(porDia).sort().reverse();
+  const dOntem = diaLocal(new Date(Date.now() - 86400000).toISOString());
+
+  lista.innerHTML = diasOrdenados.map(dia => {
+    const registosDia = porDia[dia];
+    const diaLabel    = dia === hoje ? "Hoje" : dia === dOntem ? "Ontem" : fmtDia(registosDia[0].datahora);
+    const entrada     = registosDia.find(r => r.tipo === "entrada");
+    const saida       = registosDia.find(r => r.tipo === "saida");
+    const horas       = (entrada && saida) ? calcHoras(entrada.datahora, saida.datahora) : null;
+    const dotClass    = entrada ? "entrada" : "saida";
+    const horasLine   = `${entrada ? fmtHora(entrada.datahora) : "—"} → ${saida ? fmtHora(saida.datahora) : "—"}`;
+
+    return `<div class="hist-item">
+      <div class="hist-dot ${dotClass}"></div>
+      <div class="hist-mid">
+        <div class="hist-dia">${diaLabel}</div>
+        <div class="hist-horas-line">${horasLine}</div>
+      </div>
+      <div class="hist-total">${horas || ""}</div>
+    </div>`;
+  }).join("");
+}
+
+// =======================================================
+// MARCAÇÃO
+// =======================================================
+async function confirmarMarcacao() {
+  if (!navigator.geolocation) { mostrarFeedback("GPS não disponível.", "erro"); return; }
+  const btn = document.getElementById("btnMarcacao");
+  btn.classList.add("disabled");
+  document.getElementById("btnLabel").textContent    = "A localizar…";
+  document.getElementById("btnSublabel").textContent = "";
+  mostrarFeedback("A verificar localização…", "info");
+
+  navigator.geolocation.getCurrentPosition(
+    async pos => {
+      try {
+        const { latitude: lat, longitude: lon } = pos.coords;
+        const dist = haversineDistance(lat, lon, obra.latitude, obra.longitude);
+        const raio = obra.raio || 120;
+        if (dist > raio) {
+          mostrarFeedback(`Fora do perímetro. ${Math.round(dist)}m (máx. ${raio}m)`, "erro");
+          return;
+        }
+        const { data: ult } = await SB.from("ponto").select("tipo")
+          .eq("funcionario_id", funcionario.id)
+          .order("datahora", { ascending: false }).limit(1).maybeSingle();
+        const tipo = ult?.tipo === "entrada" ? "saida" : "entrada";
+        const { error } = await SB.from("ponto").insert({
+          funcionario_id: funcionario.id,
+          obra_id:        obraID,
+          datahora:       new Date().toISOString(),
+          latitude:       lat,
+          longitude:      lon,
+          tipo
+        });
+        if (error) { mostrarFeedback("Erro ao registar. Tente novamente.", "erro"); return; }
+        if (tipo === "saida") {
+            mostrarFeedback("✓ Saída registada!", "ok");
+            await carregarHistorico(funcionario.id);
+            setTimeout(() => mostrarModalParecer(), 700);
+        } else {
+            mostrarFeedback("✓ Entrada registada!", "ok");
+            await carregarHistorico(funcionario.id);
+        }
+      } finally {
+        btn.classList.remove("disabled");
+      }
+    },
+    () => {
+      mostrarFeedback("Não foi possível obter a localização. Verifique o GPS.", "erro");
+      btn.classList.remove("disabled");
+      actualizarBotao(null);
+    },
+    { enableHighAccuracy: true, timeout: 15000 }
+  );
+}
+
+// =======================================================
+// INIT
+// =======================================================
+const urlParams  = new URLSearchParams(window.location.search);
+const obraID     = urlParams.get("obra");
+let funcionario  = null;
+let obra         = null;
+
+document.addEventListener("DOMContentLoaded", async () => {
+  mostrarEcrã("ecrãLoading");
+
+  if (!obraID) {
+    mostrarBloqueio("QR inválido", "Este QR não contém uma referência de obra válida.<br>Peça ao responsável um novo QR Code.");
+    return;
+  }
+
+  funcionario = await getFuncionario(getDeviceId());
+  if (!funcionario) {
+    mostrarBloqueio("Dispositivo não autorizado", "Este dispositivo não está registado no sistema.<br><br>Contacte o administrador.");
+    return;
+  }
+
+  obra = await getObra(obraID);
+  if (!obra) {
+    mostrarBloqueio("Obra não encontrada", "Este QR Code é inválido ou a obra foi removida.");
+    return;
+  }
+
+  mostrarEcrã("ecrãPrincipal");
+
+  // Avatar com inicial
+  const av = document.getElementById("funcAvatar");
+  if (av) av.textContent = (funcionario.nome || "?").charAt(0).toUpperCase();
+
+  document.getElementById("funcNome").textContent = funcionario.nome;
+  document.getElementById("obraNome").textContent = obra.nome;
+  document.getElementById("btnMarcacao").addEventListener("click", confirmarMarcacao);
+  await carregarHistorico(funcionario.id);
+
+  // Relógio em tempo real — hora de Lisboa
+  function actualizarRelogio() {
+    const el = document.getElementById("horaActual");
+    if (el) el.textContent = new Date().toLocaleTimeString("pt-PT", {
+      hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: TZ
+    });
+  }
+  actualizarRelogio();
+  setInterval(actualizarRelogio, 1000);
+});
+</script>
+
+<!-- Modal parecer saída -->
+<div id="modalParecer" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:3000;align-items:flex-end;justify-content:center;padding:0">
+    <div style="background:#1a1a1a;border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:24px 24px calc(env(safe-area-inset-bottom,0px) + 24px)">
+        <div style="font-family:'Oswald',sans-serif;font-size:16px;letter-spacing:1px;margin-bottom:6px;color:#f4b942">Como correu o dia?</div>
+        <div style="font-size:13px;color:rgba(255,255,255,.4);margin-bottom:16px">Opcional — o teu parecer ajuda a acompanhar o progresso da obra.</div>
+        <textarea id="parecerTexto" rows="3" placeholder="Ex: Concluímos a primeira camada do capoto…"
+            style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:12px;color:#fff;font-size:14px;font-family:'DM Sans',sans-serif;resize:none;outline:none"></textarea>
+        <div style="display:flex;gap:10px;margin-top:14px">
+            <button onclick="submeterParecer(false)" style="flex:1;background:rgba(255,255,255,.08);border:none;border-radius:10px;padding:12px;color:rgba(255,255,255,.6);font-size:14px;cursor:pointer">Ignorar</button>
+            <button onclick="submeterParecer(true)" style="flex:1;background:#f4b942;border:none;border-radius:10px;padding:12px;color:#1a1000;font-size:14px;font-weight:700;cursor:pointer">Confirmar ✓</button>
+        </div>
+    </div>
+</div>
+// Parecer na saída
+let _ultimoRegistoId = null;
+
+function mostrarModalParecer() {
+    const modal = document.getElementById("modalParecer");
+    if (modal) { modal.style.display = "flex"; document.getElementById("parecerTexto").value = ""; }
+}
+
+async function submeterParecer(guardar) {
+    const modal = document.getElementById("modalParecer");
+    if (modal) modal.style.display = "none";
+    if (!guardar) return;
+    const texto = document.getElementById("parecerTexto")?.value?.trim();
+    if (!texto) return;
+    // Buscar o último registo de ponto deste funcionário para guardar o parecer
+    await SB.from("ponto").update({ parecer_saida: texto })
+        .eq("funcionario_id", funcionario.id)
+        .eq("tipo", "saida")
+        .order("datahora", { ascending: false })
+        .limit(1);
+}
+
 </body>
 </html>

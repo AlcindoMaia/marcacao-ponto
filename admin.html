@@ -925,6 +925,11 @@
             <input id="movObs" placeholder="Opcional">
         </div>
 
+        <!-- Imputação a serviços da obra (aparece quando obra tem serviços) -->
+        <div id="imputacaoServicosWrap" style="display:none;margin-top:4px;padding:12px;background:rgba(244,185,66,.05);border:1px solid rgba(244,185,66,.15);border-radius:8px">
+            <div id="imputacaoLinhas"></div>
+        </div>
+
         <div class="modal-actions">
             <button class="btn-secondary" id="fecharModalMovBtnAlt" onclick="fecharModalMovimento()">Cancelar</button>
             <button class="btn-primary" id="btnGuardarMov">Guardar</button>
@@ -1266,39 +1271,145 @@
 </div> <!-- FECHA adminArea -->
 
 <!-- ===== MODAL EDITAR OBRA ===== -->
-<div id="modalEditarObra" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1100;align-items:center;justify-content:center">
-    <div style="background:var(--bg-dark-panel,#2a2a2a);border-radius:16px;padding:28px;width:100%;max-width:460px;box-shadow:0 8px 40px rgba(0,0,0,.5)">
-        <h3 style="margin-bottom:18px;font-family:var(--font-title,sans-serif);letter-spacing:.5px;color:var(--text-light,#fff)">✏️ Editar Obra</h3>
-        <input type="hidden" id="editObraId">
-        <div class="form-row">
-            <div class="form-group">
-                <label>Nome</label>
-                <input type="text" id="editObraNome" placeholder="Nome da obra">
-            </div>
+<div id="modalEditarObra" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1100;align-items:center;justify-content:center;padding:16px">
+    <div style="background:var(--bg-dark-panel,#2a2a2a);border-radius:16px;width:100%;max-width:640px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.5)">
+
+        <!-- Header -->
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:22px 24px 0">
+            <h3 id="editObraTitulo" style="font-family:var(--font-title,sans-serif);letter-spacing:.5px;color:var(--text-light,#fff)">✏️ Editar Obra</h3>
+            <button onclick="document.getElementById('modalEditarObra').style.display='none'" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;opacity:.5">×</button>
         </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label>Morada</label>
-                <input type="text" id="editObraMorada" placeholder="Morada">
-            </div>
-            <div class="form-group input-sm">
-                <label>Raio GPS (m)</label>
-                <input type="number" id="editObraRaio" placeholder="120" min="50" max="5000">
-            </div>
+
+        <!-- Tabs -->
+        <div style="display:flex;gap:4px;padding:16px 24px 0;border-bottom:1px solid rgba(255,255,255,.08);margin:0 0 0">
+            <button class="obra-tab-btn active" id="obraTab-detalhes" onclick="switchObraTab('detalhes')"
+                style="background:rgba(244,185,66,.15);color:var(--primary,#f4b942);border:none;border-bottom:2px solid var(--primary,#f4b942);padding:7px 16px;font-size:13px;cursor:pointer;font-weight:600;border-radius:4px 4px 0 0">
+                🏗️ Detalhes
+            </button>
+            <button class="obra-tab-btn" id="obraTab-servicos" onclick="switchObraTab('servicos')"
+                style="background:none;color:rgba(255,255,255,.5);border:none;border-bottom:2px solid transparent;padding:7px 16px;font-size:13px;cursor:pointer;font-weight:600;border-radius:4px 4px 0 0">
+                📋 Serviços
+            </button>
         </div>
-        <div class="form-row">
-            <div class="form-group input-sm">
-                <label>% Conclusão</label>
-                <input type="number" id="editObraPercent" placeholder="0" min="0" max="100" step="5">
+
+        <!-- Corpo com scroll -->
+        <div style="overflow-y:auto;flex:1;padding:20px 24px">
+
+            <!-- TAB DETALHES -->
+            <div id="obraTabContent-detalhes">
+                <input type="hidden" id="editObraId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nome</label>
+                        <input type="text" id="editObraNome" placeholder="Nome da obra">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Morada</label>
+                        <input type="text" id="editObraMorada" placeholder="Morada">
+                    </div>
+                    <div class="form-group input-sm">
+                        <label>Raio GPS (m)</label>
+                        <input type="number" id="editObraRaio" placeholder="120" min="50" max="5000">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group input-sm">
+                        <label>% Conclusão</label>
+                        <input type="number" id="editObraPercent" placeholder="0" min="0" max="100" step="5">
+                    </div>
+                    <div class="form-group">
+                        <label>Data Prevista Conclusão</label>
+                        <input type="date" id="editObraData">
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:8px;justify-content:flex-end">
+                    <button class="btn-secondary" onclick="document.getElementById('modalEditarObra').style.display='none'">Cancelar</button>
+                    <button class="btn-primary" onclick="guardarEditObra()">💾 Guardar Detalhes</button>
+                </div>
             </div>
-            <div class="form-group">
-                <label>Data Prevista Conclusão</label>
-                <input type="date" id="editObraData">
+
+            <!-- TAB SERVIÇOS -->
+            <div id="obraTabContent-servicos" style="display:none">
+
+                <!-- Adicionar serviço -->
+                <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:14px;margin-bottom:16px">
+                    <div style="font-family:var(--font-title,sans-serif);font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin-bottom:10px">
+                        Adicionar Serviço
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 90px 100px auto;gap:8px;align-items:end">
+                        <div>
+                            <label style="font-size:11px;opacity:.6;display:block;margin-bottom:4px">Nome do serviço</label>
+                            <input id="novoServNome" placeholder="Ex: Capoto, Pichelaria…"
+                                style="width:100%;padding:7px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
+                        </div>
+                        <div>
+                            <label style="font-size:11px;opacity:.6;display:block;margin-bottom:4px">H. Orç.</label>
+                            <input id="novoServHoras" type="number" step="0.5" min="0" placeholder="0"
+                                style="width:100%;padding:7px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
+                        </div>
+                        <div>
+                            <label style="font-size:11px;opacity:.6;display:block;margin-bottom:4px">€ Orç.</label>
+                            <input id="novoServValor" type="number" step="10" min="0" placeholder="0"
+                                style="width:100%;padding:7px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
+                        </div>
+                        <button onclick="adicionarServico()" 
+                            style="background:var(--primary,#f4b942);color:#1a1000;border:none;border-radius:7px;padding:8px 14px;cursor:pointer;font-weight:700;font-size:16px;white-space:nowrap">+</button>
+                    </div>
+                    <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:rgba(255,255,255,.5);cursor:pointer">
+                        <input type="checkbox" id="novoServExtra"> Serviço extra (não orçamentado)
+                    </label>
+                </div>
+
+                <!-- Lista de serviços -->
+                <div id="listaServicos" style="display:flex;flex-direction:column;gap:4px">
+                    <div style="opacity:.4;font-size:13px;text-align:center;padding:20px">A carregar…</div>
+                </div>
             </div>
+
         </div>
-        <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">
-            <button class="btn-secondary" onclick="document.getElementById('modalEditarObra').style.display='none'">Cancelar</button>
-            <button class="btn-primary" onclick="guardarEditObra()">💾 Guardar</button>
+    </div>
+</div>
+
+<!-- MODAL PAINEL DE OBRA -->
+<div id="modalPainelObra" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:1100;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto">
+    <div style="background:var(--bg-dark-panel,#2a2a2a);border-radius:16px;width:100%;max-width:760px;margin:auto;box-shadow:0 8px 40px rgba(0,0,0,.6)">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:22px 24px 16px;border-bottom:1px solid rgba(255,255,255,.08)">
+            <div>
+                <div id="painelObraNome" style="font-family:var(--font-title,sans-serif);font-size:18px;letter-spacing:.5px;color:#fff"></div>
+                <div id="painelObraMeta" style="font-size:12px;opacity:.5;margin-top:2px"></div>
+            </div>
+            <button onclick="document.getElementById('modalPainelObra').style.display='none'" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;opacity:.5">×</button>
+        </div>
+
+        <!-- KPIs rápidos -->
+        <div id="painelObraKpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(255,255,255,.06)">
+            <!-- preenchido por JS -->
+        </div>
+
+        <!-- Tabela de serviços -->
+        <div style="padding:20px 24px">
+            <div style="font-family:var(--font-title,sans-serif);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;opacity:.5;margin-bottom:12px">Serviços da Obra</div>
+            <div id="painelServicosTabela" style="overflow-x:auto">
+                <table style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead>
+                        <tr style="opacity:.5;font-size:11px;text-transform:uppercase;letter-spacing:.5px">
+                            <th style="text-align:left;padding:6px 10px">Serviço</th>
+                            <th style="text-align:right;padding:6px 10px">H.Orç</th>
+                            <th style="text-align:right;padding:6px 10px">H.Real</th>
+                            <th style="text-align:right;padding:6px 10px">€ MO Real</th>
+                            <th style="text-align:right;padding:6px 10px">€ Mat. Real</th>
+                            <th style="text-align:right;padding:6px 10px">€ Orç.</th>
+                            <th style="text-align:right;padding:6px 10px">Desvio</th>
+                            <th style="text-align:center;padding:6px 10px">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="painelServicosTbody">
+                        <tr><td colspan="8" style="text-align:center;padding:20px;opacity:.4">A carregar…</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>

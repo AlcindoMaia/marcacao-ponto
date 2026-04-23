@@ -1228,47 +1228,217 @@ function fecharModalQR() {
     document.getElementById("modalQR").classList.add("hidden");
 }
 
+// ═══════════════════════════════════════════════════════
+// MODAL OBRA — tabs Detalhes + Serviços
+// ═══════════════════════════════════════════════════════
+function switchObraTab(tab) {
+    ["detalhes","servicos"].forEach(t => {
+        const btn  = document.getElementById(`obraTab-${t}`);
+        const cont = document.getElementById(`obraTabContent-${t}`);
+        const active = t === tab;
+        if (btn) {
+            btn.style.background   = active ? "rgba(244,185,66,.15)" : "none";
+            btn.style.color        = active ? "var(--primary,#f4b942)" : "rgba(255,255,255,.5)";
+            btn.style.borderBottom = active ? "2px solid var(--primary,#f4b942)" : "2px solid transparent";
+        }
+        if (cont) cont.style.display = active ? "block" : "none";
+    });
+    if (tab === "servicos") carregarServicosModal();
+}
+
 async function editarObra(obra) {
-    // Usar modal de edição de obra (ver admin.html #modalEditarObra)
-    const modal = document.getElementById("modalEditarObra");
-    if (!modal) {
-        // Fallback: prompts simples
-        const nome   = prompt("Nome da obra:", obra.nome);
-        if (nome === null) return;
-        const morada = prompt("Morada:", obra.morada || "");
-        if (morada === null) return;
-        const raio   = prompt("Raio GPS (metros):", obra.raio || 120);
-        if (raio === null) return;
-        await SB.from("obras").update({ nome: nome.trim(), morada: morada.trim(), raio: parseInt(raio) || 120 }).eq("id", obra.id);
-        await carregarObras(); return;
+    if (!obra) {
+        document.getElementById("editObraId").value      = "";
+        document.getElementById("editObraNome").value    = "";
+        document.getElementById("editObraMorada").value  = "";
+        document.getElementById("editObraRaio").value    = "";
+        document.getElementById("editObraPercent").value = "";
+        document.getElementById("editObraData").value    = "";
+        document.getElementById("editObraTitulo").textContent = "✏️ Nova Obra";
+        switchObraTab("detalhes");
+        document.getElementById("modalEditarObra").style.display = "flex";
+        return;
     }
-    // Preencher modal
-    document.getElementById("editObraId").value       = obra.id;
-    document.getElementById("editObraNome").value     = obra.nome || "";
-    document.getElementById("editObraMorada").value   = obra.morada || "";
-    document.getElementById("editObraRaio").value     = obra.raio || 120;
-    document.getElementById("editObraPercent").value  = obra.percentagem_conclusao ?? "";
-    document.getElementById("editObraData").value     = obra.data_conclusao_prevista || "";
-    modal.style.display = "flex";
+    document.getElementById("editObraId").value      = obra.id;
+    document.getElementById("editObraNome").value    = obra.nome || "";
+    document.getElementById("editObraMorada").value  = obra.morada || "";
+    document.getElementById("editObraRaio").value    = obra.raio || "";
+    document.getElementById("editObraPercent").value = obra.percentagem_conclusao ?? "";
+    document.getElementById("editObraData").value    = obra.data_conclusao_prevista || "";
+    document.getElementById("editObraTitulo").textContent = `✏️ ${obra.nome || "Editar Obra"}`;
+    switchObraTab("detalhes");
+    document.getElementById("modalEditarObra").style.display = "flex";
 }
 
 async function guardarEditObra() {
-    const id      = document.getElementById("editObraId").value;
-    const nome    = document.getElementById("editObraNome").value.trim();
-    const morada  = document.getElementById("editObraMorada").value.trim();
-    const raio    = parseInt(document.getElementById("editObraRaio").value) || 120;
-    const percent = document.getElementById("editObraPercent").value;
-    const dataC   = document.getElementById("editObraData").value;
+    const id   = document.getElementById("editObraId").value;
+    const nome = document.getElementById("editObraNome").value.trim();
     if (!nome) { alert("Nome obrigatório"); return; }
     const payload = {
-        nome, morada, raio,
-        percentagem_conclusao:   percent !== "" ? parseInt(percent) : null,
-        data_conclusao_prevista: dataC || null
+        nome,
+        morada:                  document.getElementById("editObraMorada").value.trim() || null,
+        raio:                    parseInt(document.getElementById("editObraRaio").value) || 120,
+        percentagem_conclusao:   parseInt(document.getElementById("editObraPercent").value) || null,
+        data_conclusao_prevista: document.getElementById("editObraData").value || null,
     };
-    const { error } = await SB.from("obras").update(payload).eq("id", id);
-    if (error) { alert("Erro: " + error.message); return; }
+    if (id) {
+        const { error } = await SB.from("obras").update(payload).eq("id", id);
+        if (error) { alert("Erro: " + error.message); return; }
+    } else {
+        const { error } = await SB.from("obras").insert(payload);
+        if (error) { alert("Erro: " + error.message); return; }
+    }
     document.getElementById("modalEditarObra").style.display = "none";
     await carregarObras();
+}
+
+// ═══════════════════════════════════════════════════════
+// SERVIÇOS DA OBRA
+// ═══════════════════════════════════════════════════════
+async function carregarServicosModal() {
+    const obraId = document.getElementById("editObraId").value;
+    if (!obraId) {
+        document.getElementById("listaServicos").innerHTML =
+            `<div style="opacity:.4;font-size:13px;text-align:center;padding:16px">Guarda a obra primeiro para adicionar serviços.</div>`;
+        return;
+    }
+    const { data } = await SB.from("obra_servicos")
+        .select("*").eq("obra_id", obraId).order("ordem").order("created_at");
+
+    // Buscar horas e materiais em paralelo
+    const ids = (data||[]).map(s=>s.id);
+    const [regRes, movRes] = ids.length ? await Promise.all([
+        SB.from("registo_servicos").select("obra_servico_id, horas").in("obra_servico_id", ids),
+        SB.from("movimento_servicos").select("obra_servico_id, valor").in("obra_servico_id", ids),
+    ]) : [{data:[]},{data:[]}];
+
+    const horasP = {}, matP = {};
+    (regRes.data||[]).forEach(r => horasP[r.obra_servico_id] = (horasP[r.obra_servico_id]||0)+Number(r.horas||0));
+    (movRes.data||[]).forEach(r => matP[r.obra_servico_id]   = (matP[r.obra_servico_id]||0)+Number(r.valor||0));
+
+    const lista = document.getElementById("listaServicos");
+    if (!data?.length) {
+        lista.innerHTML = `<div style="opacity:.4;font-size:13px;text-align:center;padding:16px">Sem serviços. Adicione o primeiro acima.</div>`;
+        return;
+    }
+    lista.innerHTML = data.map(s => {
+        const hR  = horasP[s.id]||0;
+        const mR  = matP[s.id]||0;
+        const pct = s.horas_orcamento > 0 ? Math.min(Math.round(hR/s.horas_orcamento*100),100) : null;
+        const barCol = s.concluido ? "#4ade80" : pct>=75 ? "#fb923c" : "var(--primary,#f4b942)";
+        return `<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;border:1px solid ${s.concluido?"rgba(74,222,128,.2)":"rgba(255,255,255,.06)"}">
+            <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+                    <span style="font-size:13px;font-weight:600">${s.nome}</span>
+                    ${s.extra?`<span style="font-size:10px;background:rgba(251,146,60,.15);color:#fb923c;padding:1px 6px;border-radius:10px">Extra</span>`:""}
+                    ${s.concluido?`<span style="font-size:10px;background:rgba(74,222,128,.15);color:#4ade80;padding:1px 6px;border-radius:10px">✓ Concluído</span>`:""}
+                </div>
+                <div style="display:flex;gap:14px;font-size:11px;opacity:.6">
+                    <span>🕐 ${hR.toFixed(1)}h${s.horas_orcamento?` / ${s.horas_orcamento}h`:""}</span>
+                    <span>💶 ${mR.toFixed(0)}€ mat${s.valor_orcamento?` / ${s.valor_orcamento}€`:""}</span>
+                </div>
+                ${pct!==null?`<div style="margin-top:6px;background:rgba(255,255,255,.1);border-radius:3px;height:3px"><div style="width:${pct}%;height:100%;background:${barCol};border-radius:3px"></div></div>`:""}
+            </div>
+            <div style="display:flex;gap:4px;flex-shrink:0">
+                <button onclick="toggleServicoConcluido('${s.id}',${s.concluido})" style="background:${s.concluido?"rgba(74,222,128,.15)":"rgba(255,255,255,.07)"};border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px" title="${s.concluido?"Reabrir":"Concluir"}">${s.concluido?"↩":"✓"}</button>
+                <button onclick="eliminarServico('${s.id}','${s.nome.replace(/'/g,"")}')" style="background:rgba(248,113,113,.1);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;opacity:.6">🗑</button>
+            </div>
+        </div>`;
+    }).join("");
+}
+
+async function adicionarServico() {
+    const obraId = document.getElementById("editObraId").value;
+    if (!obraId) { alert("Guarda a obra primeiro."); return; }
+    const nome = document.getElementById("novoServNome").value.trim();
+    if (!nome) { alert("Nome do serviço obrigatório."); return; }
+    const horas = parseFloat(document.getElementById("novoServHoras").value) || null;
+    const valor = parseFloat(document.getElementById("novoServValor").value) || null;
+    const extra = document.getElementById("novoServExtra").checked;
+    const { error } = await SB.from("obra_servicos").insert({ obra_id: obraId, nome, horas_orcamento: horas, valor_orcamento: valor, extra });
+    if (error) { alert("Erro: " + error.message); return; }
+    document.getElementById("novoServNome").value  = "";
+    document.getElementById("novoServHoras").value = "";
+    document.getElementById("novoServValor").value = "";
+    document.getElementById("novoServExtra").checked = false;
+    await carregarServicosModal();
+}
+
+async function toggleServicoConcluido(id, concluido) {
+    await SB.from("obra_servicos").update({ concluido: !concluido }).eq("id", id);
+    await carregarServicosModal();
+}
+
+async function eliminarServico(id, nome) {
+    if (!confirm(`Eliminar serviço "${nome}"?\nAs imputações associadas também serão removidas.`)) return;
+    await SB.from("obra_servicos").delete().eq("id", id);
+    await carregarServicosModal();
+}
+
+// ═══════════════════════════════════════════════════════
+// PAINEL DE OBRA — orçamentado vs real
+// ═══════════════════════════════════════════════════════
+async function abrirPainelObra(obra) {
+    document.getElementById("painelObraNome").textContent = obra.nome;
+    document.getElementById("painelObraMeta").textContent = obra.data_conclusao_prevista ? `Data prevista: ${obra.data_conclusao_prevista}` : "";
+    document.getElementById("modalPainelObra").style.display = "flex";
+
+    const { data: servicos } = await SB.from("obra_servicos").select("*").eq("obra_id", obra.id).order("ordem").order("created_at");
+    const ids = (servicos||[]).map(s=>s.id);
+    const [regRes, movRes] = ids.length ? await Promise.all([
+        SB.from("registo_servicos").select("obra_servico_id, horas, registos_admin(funcionario_id, funcionarios(valor_dia))").in("obra_servico_id", ids),
+        SB.from("movimento_servicos").select("obra_servico_id, valor").in("obra_servico_id", ids),
+    ]) : [{data:[]},{data:[]}];
+
+    const horasP = {}, moP = {}, matP = {};
+    (regRes.data||[]).forEach(r => {
+        const sid = r.obra_servico_id;
+        horasP[sid] = (horasP[sid]||0) + Number(r.horas||0);
+        const vd = r.registos_admin?.funcionarios?.valor_dia;
+        if (vd) moP[sid] = (moP[sid]||0) + Number(r.horas) * (vd/8);
+    });
+    (movRes.data||[]).forEach(r => { matP[r.obra_servico_id] = (matP[r.obra_servico_id]||0)+Number(r.valor||0); });
+
+    const totHOrç = (servicos||[]).reduce((s,v)=>s+(v.horas_orcamento||0),0);
+    const totHReal= Object.values(horasP).reduce((s,v)=>s+v,0);
+    const totVOrç = (servicos||[]).reduce((s,v)=>s+(v.valor_orcamento||0),0);
+    const totMO   = Object.values(moP).reduce((s,v)=>s+v,0);
+    const totMat  = Object.values(matP).reduce((s,v)=>s+v,0);
+    const totReal = totMO + totMat;
+
+    document.getElementById("painelObraKpis").innerHTML = [
+        {label:"Horas Orçadas", val:totHOrç.toFixed(0)+"h", cor:""},
+        {label:"Horas Reais",   val:totHReal.toFixed(1)+"h", cor:totHReal>totHOrç?"#fb923c":"#4ade80"},
+        {label:"Orçamento",     val:totVOrç.toFixed(0)+"€", cor:""},
+        {label:"Custo Real",    val:totReal.toFixed(0)+"€", cor:totReal>totVOrç?"#f87171":"#4ade80"},
+    ].map(k=>`<div style="padding:16px;text-align:center;background:rgba(255,255,255,.03)">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;opacity:.45;margin-bottom:4px">${k.label}</div>
+        <div style="font-family:var(--font-title,sans-serif);font-size:20px;font-weight:500;color:${k.cor||"#fff"}">${k.val}</div>
+    </div>`).join("");
+
+    const tbody = document.getElementById("painelServicosTbody");
+    if (!(servicos||[]).length) { tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:20px;opacity:.4">Sem serviços. Edita a obra para adicionar.</td></tr>`; return; }
+
+    tbody.innerHTML = (servicos||[]).map(s => {
+        const hR = horasP[s.id]||0, moR = moP[s.id]||0, matR = matP[s.id]||0;
+        const totR = moR+matR;
+        const desvio = s.valor_orcamento ? totR-s.valor_orcamento : null;
+        const pct = s.horas_orcamento>0 ? Math.round(hR/s.horas_orcamento*100) : null;
+        const barCol = s.concluido?"#4ade80":pct>=100?"#f87171":pct>=75?"#fb923c":"var(--primary,#f4b942)";
+        return `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+            <td style="padding:10px">
+                <div style="font-weight:500">${s.nome}${s.extra?` <span style="font-size:9px;color:#fb923c">[Extra]</span>`:""}</div>
+                ${pct!==null?`<div style="margin-top:4px;background:rgba(255,255,255,.08);border-radius:3px;height:3px;width:100px"><div style="width:${Math.min(pct,100)}%;height:100%;background:${barCol};border-radius:3px"></div></div>`:""}
+            </td>
+            <td style="text-align:right;padding:10px;opacity:.7">${s.horas_orcamento||"—"}</td>
+            <td style="text-align:right;padding:10px;color:${hR>(s.horas_orcamento||9999)?"#fb923c":"#fff"}">${hR.toFixed(1)}</td>
+            <td style="text-align:right;padding:10px;color:#f87171">${moR>0?moR.toFixed(0)+"€":"—"}</td>
+            <td style="text-align:right;padding:10px;color:#f87171">${matR>0?matR.toFixed(0)+"€":"—"}</td>
+            <td style="text-align:right;padding:10px;opacity:.7">${s.valor_orcamento?s.valor_orcamento.toFixed(0)+"€":"—"}</td>
+            <td style="text-align:right;padding:10px;font-weight:600;color:${desvio===null?"#fff":desvio>0?"#f87171":"#4ade80"}">${desvio===null?"—":(desvio>0?"+":"")+desvio.toFixed(0)+"€"}</td>
+            <td style="text-align:center;padding:10px">${s.concluido?`<span style="color:#4ade80;font-size:12px">✓ Feito</span>`:`<span style="opacity:.4;font-size:12px">Em curso</span>`}</td>
+        </tr>`;
+    }).join("");
 }
 
 async function toggleEstadoObra(id, nome, estadoAtual) {
@@ -2422,10 +2592,59 @@ function abrirModalMovimento(mov = null) {
     // Preencher selects de obra e categoria com os IDs correctos
     const selObra = document.getElementById("movObra");
     const selCat  = document.getElementById("movCategoria");
-    if (selObra) selObra.value  = mov?.obra_id       || "";
+    if (selObra) {
+        selObra.value = mov?.obra_id || "";
+        // Listener para carregar serviços quando obra muda
+        selObra.onchange = () => carregarServicosImputacao(selObra.value);
+        // Carregar serviços da obra actual
+        carregarServicosImputacao(selObra.value);
+    }
     if (selCat)  selCat.value   = mov?.categoria_id  || "";
 
     document.getElementById("modalMovimento").classList.remove("hidden");
+}
+
+// Carrega os serviços da obra e mostra UI de imputação no modal de movimento
+async function carregarServicosImputacao(obraId) {
+    let wrap = document.getElementById("imputacaoServicosWrap");
+    if (!wrap) return;
+    if (!obraId) { wrap.style.display = "none"; return; }
+
+    const { data: servs } = await SB.from("obra_servicos")
+        .select("id, nome, extra").eq("obra_id", obraId).order("ordem").order("created_at");
+
+    if (!servs?.length) { wrap.style.display = "none"; return; }
+
+    wrap.style.display = "block";
+    const linhasDiv = document.getElementById("imputacaoLinhas");
+    if (linhasDiv) linhasDiv.innerHTML = `
+        <div style="font-size:11px;letter-spacing:.5px;opacity:.5;text-transform:uppercase;margin-bottom:8px">
+            Imputar material a serviço(s) desta obra
+        </div>
+        <div id="imputLinhasInner"></div>
+        <button type="button" onclick="adicionarLinhaImput(${JSON.stringify(servs).replace(/"/g,'&quot;')})"
+            style="background:rgba(244,185,66,.1);border:1px solid rgba(244,185,66,.2);color:var(--primary,#f4b942);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;margin-top:6px">
+            + Adicionar serviço
+        </button>`;
+    // Adicionar uma linha por defeito
+    adicionarLinhaImput(servs);
+}
+
+function adicionarLinhaImput(servs) {
+    const inner = document.getElementById("imputLinhasInner");
+    if (!inner) return;
+    const opts = servs.map(s => `<option value="${s.id}">${s.nome}${s.extra?" [Extra]":""}</option>`).join("");
+    const div = document.createElement("div");
+    div.className = "linha-imput-serv";
+    div.style.cssText = "display:flex;gap:8px;align-items:center;margin-bottom:6px";
+    div.innerHTML = `
+        <select class="imput-serv-sel" style="flex:1;padding:6px 8px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;font-size:13px">
+            <option value="">— Serviço —</option>${opts}
+        </select>
+        <input class="imput-serv-val" type="number" step="0.01" min="0" placeholder="€"
+            style="width:80px;padding:6px 8px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;font-size:13px">
+        <button type="button" onclick="this.parentElement.remove()" style="background:rgba(248,113,113,.1);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>`;
+    inner.appendChild(div);
 }
 
 function fecharModalMovimento() {
@@ -2473,11 +2692,26 @@ async function guardarMovimento() {
         observacoes:      document.getElementById("movObs")?.value?.trim() || null
     };
 
-    const { error } = movEditId
-        ? await SB.from("movimentos_financeiros").update(payload).eq("id", movEditId)
-        : await SB.from("movimentos_financeiros").insert(payload);
+    const { data: movSalvo, error } = movEditId
+        ? await SB.from("movimentos_financeiros").update(payload).eq("id", movEditId).select("id").single()
+        : await SB.from("movimentos_financeiros").insert(payload).select("id").single();
 
     if (error) { movMsg.textContent = "Erro: " + error.message; return; }
+
+    // Imputar a serviços se existirem linhas de imputação
+    const movId = movSalvo?.id || movEditId;
+    const linhasImput = document.querySelectorAll(".linha-imput-serv");
+    if (movId && linhasImput.length) {
+        // Remover imputações anteriores se for edição
+        if (movEditId) await SB.from("movimento_servicos").delete().eq("movimento_id", movEditId);
+        const imputacoes = [];
+        linhasImput.forEach(linha => {
+            const sid = linha.querySelector(".imput-serv-sel")?.value;
+            const val = parseFloat(linha.querySelector(".imput-serv-val")?.value);
+            if (sid && val > 0) imputacoes.push({ movimento_id: movId, obra_servico_id: sid, valor: val });
+        });
+        if (imputacoes.length) await SB.from("movimento_servicos").insert(imputacoes);
+    }
 
     fecharModalMovimento();
     await carregarMovimentos();
