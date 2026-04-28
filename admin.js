@@ -1385,19 +1385,45 @@ async function abrirPainelObra(obra) {
 
     const { data: servicos } = await SB.from("obra_servicos").select("*").eq("obra_id", obra.id).order("ordem").order("created_at");
     const ids = (servicos||[]).map(s=>s.id);
-    const [regRes, movRes] = ids.length ? await Promise.all([
-        SB.from("registo_servicos").select("obra_servico_id, horas, registos_admin(funcionario_id, funcionarios(valor_dia))").in("obra_servico_id", ids),
-        SB.from("movimento_servicos").select("obra_servico_id, valor").in("obra_servico_id", ids),
-    ]) : [{data:[]},{data:[]}];
+
+    if (!ids.length) {
+        document.getElementById("painelObraKpis").innerHTML = "";
+        document.getElementById("painelServicosTbody").innerHTML =
+            `<tr><td colspan="8" style="text-align:center;padding:20px;opacity:.4">Sem serviços. Edita a obra para adicionar.</td></tr>`;
+        return;
+    }
+
+    // Buscar horas imputadas por serviço
+    const { data: regServs } = await SB.from("registo_servicos")
+        .select("obra_servico_id, horas, registo_id")
+        .in("obra_servico_id", ids);
+
+    // Buscar valor_dia dos funcionários via registos_admin
+    const registoIds = [...new Set((regServs||[]).map(r=>r.registo_id).filter(Boolean))];
+    let valorDiaPorRegisto = {};
+    if (registoIds.length) {
+        const { data: regsAdmin } = await SB.from("registos_admin")
+            .select("id, funcionario_id, funcionarios(valor_dia)")
+            .in("id", registoIds);
+        (regsAdmin||[]).forEach(r => {
+            valorDiaPorRegisto[r.id] = r.funcionarios?.valor_dia || 0;
+        });
+    }
+
+    // Buscar materiais imputados
+    const { data: movServs } = await SB.from("movimento_servicos")
+        .select("obra_servico_id, valor")
+        .in("obra_servico_id", ids);
 
     const horasP = {}, moP = {}, matP = {};
-    (regRes.data||[]).forEach(r => {
+    (regServs||[]).forEach(r => {
         const sid = r.obra_servico_id;
-        horasP[sid] = (horasP[sid]||0) + Number(r.horas||0);
-        const vd = r.registos_admin?.funcionarios?.valor_dia;
-        if (vd) moP[sid] = (moP[sid]||0) + Number(r.horas) * (vd/8);
+        const h   = Number(r.horas||0);
+        horasP[sid] = (horasP[sid]||0) + h;
+        const vd = valorDiaPorRegisto[r.registo_id] || 0;
+        if (vd) moP[sid] = (moP[sid]||0) + h * (vd/8);
     });
-    (movRes.data||[]).forEach(r => { matP[r.obra_servico_id] = (matP[r.obra_servico_id]||0)+Number(r.valor||0); });
+    (movServs||[]).forEach(r => { matP[r.obra_servico_id] = (matP[r.obra_servico_id]||0)+Number(r.valor||0); });
 
     const totHOrç = (servicos||[]).reduce((s,v)=>s+(v.horas_orcamento||0),0);
     const totHReal= Object.values(horasP).reduce((s,v)=>s+v,0);
