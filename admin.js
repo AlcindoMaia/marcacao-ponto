@@ -2269,17 +2269,6 @@ async function apagarArtigo(id, nome) {
 // =======================================================
 let _painelObraActual = null;
 
-async function abrirPainelObra(obra) {
-    _painelObraActual = obra;
-    document.getElementById("painelObraNome").textContent   = obra.nome;
-    document.getElementById("painelObraCodigo").textContent = obra.codigo || "—";
-    const estadoEl = document.getElementById("painelObraEstado");
-    estadoEl.textContent = obra.estado === "ativa" ? "Ativa" : "Concluída";
-    estadoEl.className   = "badge-estado " + (obra.estado === "ativa" ? "pago" : "por_pagar");
-    document.getElementById("painelObraMorada").textContent = obra.morada || "";
-    document.getElementById("modalPainelObra").classList.remove("hidden");
-    abrirPainelTab("resumo");
-}
 
 function fecharPainelObra() {
     document.getElementById("modalPainelObra").classList.add("hidden");
