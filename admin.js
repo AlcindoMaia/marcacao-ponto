@@ -3127,38 +3127,32 @@ function fecharModalOrcamento() {
 function adicionarCategoria(nome = '', linhas = [], catDbId = null) {
     const cid = ++_catCounter;
     const container = document.getElementById('orcCategorias');
-
     const div = document.createElement('div');
     div.className = 'orc-categoria';
     div.dataset.cid = cid;
     if (catDbId) div.dataset.dbId = catDbId;
     div.style.cssText = 'border:1px solid rgba(0,0,0,.1);border-radius:var(--radius-sm);margin-bottom:12px;overflow:hidden';
 
-    div.innerHTML = `
-        <div style="background:rgba(244,185,66,.12);padding:10px 14px;display:flex;align-items:center;gap:10px">
-            <input value="${nome}" placeholder="Nome da categoria" data-cid="${cid}"
-                style="flex:1;border:none;background:transparent;font-family:var(--font-title);font-size:13px;font-weight:500;letter-spacing:.5px;text-transform:uppercase;outline:none;color:var(--text-dark)">
-            <button onclick="adicionarLinha(${cid},'mao_obra')" class="btn-secondary" style="font-size:11px;padding:4px 10px">+ M.O.</button>
-            <button onclick="adicionarLinha(${cid},'material')" class="btn-secondary" style="font-size:11px;padding:4px 10px">+ Mat.</button>
-            <button onclick="adicionarLinha(${cid},'outro')" class="btn-secondary" style="font-size:11px;padding:4px 10px">+ Outro</button>
-            <button onclick="this.closest('.orc-categoria').remove();actualizarTotaisOrc()" style="background:none;border:none;cursor:pointer;opacity:.4;font-size:18px;padding:0 4px">×</button>
-        </div>
-        <div class="orc-linhas" data-cid="${cid}" style="padding:0">
-            <div style="display:grid;grid-template-columns:24px 120px 1fr 70px 90px 90px 32px;gap:0;background:rgba(244,185,66,.25);font-family:var(--font-title);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);padding:5px 14px">
-                <span></span><span>Tipo</span><span>Descrição</span><span>Un</span><span style="text-align:right">Qtd</span><span style="text-align:right">Preço Un.</span><span></span>
-            </div>
-        </div>`;
+    const nomeEsc = nome.replace(/"/g, '&quot;');
+    div.innerHTML =
+        '<div style="background:rgba(244,185,66,.12);padding:10px 14px;display:flex;align-items:center;gap:10px">' +
+            '<input value="' + nomeEsc + '" placeholder="Nome da categoria" data-cid="' + cid + '" ' +
+                'style="flex:1;border:none;background:transparent;font-family:var(--font-title);font-size:13px;font-weight:500;letter-spacing:.5px;text-transform:uppercase;outline:none;color:var(--text-dark)">' +
+            '<span class="cat-subtotal" style="font-family:var(--font-title);font-size:13px;font-weight:600;color:var(--primary-dk,#c8901e);white-space:nowrap;min-width:80px;text-align:right"></span>' +
+            '<button onclick="adicionarLinha(' + cid + ',\'mao_obra\')" class="btn-secondary" style="font-size:11px;padding:4px 10px">+ M.O.</button>' +
+            '<button onclick="adicionarLinha(' + cid + ',\'material\')" class="btn-secondary" style="font-size:11px;padding:4px 10px">+ Mat.</button>' +
+            '<button onclick="adicionarLinha(' + cid + ',\'outro\')" class="btn-secondary" style="font-size:11px;padding:4px 10px">+ Outro</button>' +
+            '<button onclick="this.closest(\'.orc-categoria\').remove();actualizarTotaisOrc()" style="background:none;border:none;cursor:pointer;opacity:.4;font-size:18px;padding:0 4px">×</button>' +
+        '</div>' +
+        '<div class="orc-linhas" data-cid="' + cid + '" style="padding:0"></div>';
 
     container.appendChild(div);
-
-    // Adicionar linhas existentes
     linhas.forEach(l => adicionarLinha(cid, l.tipo, l));
     if (linhas.length === 0) {
         adicionarLinha(cid, 'mao_obra');
         adicionarLinha(cid, 'material');
     }
 }
-
 let _linhaCounter = 0;
 
 function adicionarLinha(cid, tipo = 'material', dados = null) {
@@ -3166,33 +3160,111 @@ function adicionarLinha(cid, tipo = 'material', dados = null) {
     if (!linhasDiv) return;
     const lid = ++_linhaCounter;
 
-    const tipoLabel  = { mao_obra:'Mão Obra', material:'Material', outro:'Outro' };
-    const tipoCor    = { mao_obra:'rgba(42,138,42,.15)', material:'rgba(74,144,226,.12)', outro:'rgba(244,185,66,.12)' };
+    const tipoCor = {
+        mao_obra: 'rgba(42,138,42,.07)',
+        material: 'rgba(74,144,226,.07)',
+        outro:    'rgba(244,185,66,.07)'
+    };
+    const tipoBadge = {
+        mao_obra: { label:'Mão Obra', cor:'#4ade80' },
+        material: { label:'Material', cor:'#60a5fa' },
+        outro:    { label:'Outro',    cor:'#f4b942' }
+    };
 
     const div = document.createElement('div');
     div.className = 'orc-linha';
-    div.dataset.lid = lid;
+    div.dataset.lid  = lid;
     div.dataset.tipo = tipo;
     if (dados?.id) div.dataset.dbId = dados.id;
-    div.style.cssText = `display:grid;grid-template-columns:24px 120px 1fr 70px 90px 90px 32px;gap:0;align-items:center;padding:5px 14px;border-bottom:1px solid rgba(0,0,0,.04);background:${tipoCor[tipo]||''}`;
 
-    div.innerHTML = `
-        <span style="font-size:10px;opacity:.4">${lid}</span>
-        <span style="font-family:var(--font-title);font-size:10px;letter-spacing:.5px;color:var(--text-muted)">${tipoLabel[tipo]}</span>
-        <input value="${dados?.descricao||''}" placeholder="Descrição do trabalho / artigo" data-field="descricao"
-            style="border:none;background:transparent;font-size:13px;padding:3px 6px;outline:none;border-radius:4px">
-        <input value="${dados?.unidade||'vg'}" data-field="unidade"
-            style="border:none;background:transparent;font-size:12px;padding:3px 4px;text-align:center;outline:none;width:100%;border-radius:4px">
-        <input value="${dados?.quantidade||1}" type="number" min="0" step="0.01" data-field="quantidade"
-            style="border:none;background:transparent;font-size:12px;padding:3px 6px;text-align:right;outline:none;border-radius:4px"
-            oninput="actualizarTotaisOrc()">
-        <input value="${dados?.preco_unitario||''}" type="number" min="0" step="0.01" placeholder="0.00" data-field="preco_unitario"
-            style="border:none;background:transparent;font-size:12px;padding:3px 6px;text-align:right;outline:none;border-radius:4px"
-            oninput="actualizarTotaisOrc()">
-        <button onclick="this.closest('.orc-linha').remove();actualizarTotaisOrc()"
-            style="background:none;border:none;cursor:pointer;opacity:.3;font-size:16px;padding:0;text-align:center">×</button>`;
+    if (tipo === 'mao_obra') {
+        // MO: Descrição | Nº Pessoas | Horas | €/hora | = Subtotal linha
+        const nPessoas = dados?.n_pessoas || 1;
+        const horas    = dados?.horas     || (dados?.quantidade || 1);
+        const vHora    = dados?.preco_unitario || '';
+        div.style.cssText = `background:${tipoCor.mao_obra};border-bottom:1px solid rgba(0,0,0,.04)`;
+        div.innerHTML = `
+        <div style="display:grid;grid-template-columns:24px 1fr 70px 70px 90px 100px 28px;gap:0;align-items:center;padding:5px 14px">
+            <span style="font-size:10px;opacity:.3">${lid}</span>
+            <input value="${dados?.descricao||''}" placeholder="Descrição do trabalho" data-field="descricao"
+                style="border:none;background:transparent;font-size:13px;padding:3px 6px;outline:none">
+            <input value="${nPessoas}" type="number" min="1" step="1" data-field="n_pessoas" placeholder="Pess."
+                style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:3px 5px;text-align:center;outline:none;width:100%"
+                oninput="calcLinhaMO(this)" title="Nº de pessoas">
+            <input value="${horas}" type="number" min="0" step="0.5" data-field="quantidade" placeholder="Horas"
+                style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:3px 5px;text-align:center;outline:none;width:100%"
+                oninput="calcLinhaMO(this)" title="Nº de horas">
+            <input value="${vHora}" type="number" min="0" step="0.01" data-field="preco_unitario" placeholder="€/hora"
+                style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:3px 5px;text-align:right;outline:none;width:100%"
+                oninput="calcLinhaMO(this)" title="Valor por hora">
+            <div data-subtotal class="linha-subtotal"
+                style="font-family:var(--font-title);font-size:13px;font-weight:500;text-align:right;padding:3px 6px;color:var(--primary-dk,#c8901e)">
+                ${nPessoas && horas && vHora ? (nPessoas*horas*vHora).toFixed(2)+' €' : '—'}
+            </div>
+            <button onclick="this.closest('.orc-linha').remove();actualizarTotaisOrc()"
+                style="background:none;border:none;cursor:pointer;opacity:.25;font-size:16px;padding:0;text-align:center">×</button>
+        </div>
+        <div style="padding:1px 14px 4px 48px;display:flex;gap:6px;align-items:center">
+            <span style="font-size:10px;background:rgba(74,222,128,.15);color:#4ade80;padding:1px 7px;border-radius:6px;font-weight:600;letter-spacing:.3px">MO</span>
+            <span style="font-size:10px;color:rgba(0,0,0,.3)">Pessoas × Horas × €/hora</span>
+        </div>`;
+    } else {
+        // Material / Outro: Descrição | Unidade | Qtd | €/un | = Subtotal linha
+        const qtd = dados?.quantidade || 1;
+        const pu  = dados?.preco_unitario || '';
+        const sub = qtd && pu ? (qtd * pu).toFixed(2)+' €' : '—';
+        const badge = tipoBadge[tipo];
+        div.style.cssText = `background:${tipoCor[tipo]||''};border-bottom:1px solid rgba(0,0,0,.04)`;
+        div.innerHTML = `
+        <div style="display:grid;grid-template-columns:24px 1fr 60px 80px 90px 100px 28px;gap:0;align-items:center;padding:5px 14px">
+            <span style="font-size:10px;opacity:.3">${lid}</span>
+            <input value="${dados?.descricao||''}" placeholder="Descrição do artigo / trabalho" data-field="descricao"
+                style="border:none;background:transparent;font-size:13px;padding:3px 6px;outline:none">
+            <input value="${dados?.unidade||'un'}" data-field="unidade"
+                style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:3px 4px;text-align:center;outline:none;width:100%">
+            <input value="${qtd}" type="number" min="0" step="0.01" data-field="quantidade"
+                style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:3px 6px;text-align:right;outline:none;width:100%"
+                oninput="calcLinhaMatOuOutro(this)">
+            <input value="${pu}" type="number" min="0" step="0.01" placeholder="0.00" data-field="preco_unitario"
+                style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:3px 6px;text-align:right;outline:none;width:100%"
+                oninput="calcLinhaMatOuOutro(this)">
+            <div data-subtotal class="linha-subtotal"
+                style="font-family:var(--font-title);font-size:13px;font-weight:500;text-align:right;padding:3px 6px;color:var(--primary-dk,#c8901e)">
+                ${sub}
+            </div>
+            <button onclick="this.closest('.orc-linha').remove();actualizarTotaisOrc()"
+                style="background:none;border:none;cursor:pointer;opacity:.25;font-size:16px;padding:0;text-align:center">×</button>
+        </div>
+        <div style="padding:1px 14px 4px 48px">
+            <span style="font-size:10px;background:rgba(${tipo==='material'?'74,144,226':'244,185,66'},.15);color:${badge.cor};padding:1px 7px;border-radius:6px;font-weight:600;letter-spacing:.3px">${badge.label.toUpperCase()}</span>
+        </div>`;
+    }
 
     linhasDiv.appendChild(div);
+    actualizarTotaisOrc();
+}
+
+// Calcular subtotal linha Mão de Obra
+function calcLinhaMO(input) {
+    const linha = input.closest('.orc-linha');
+    if (!linha) return;
+    const n = parseFloat(linha.querySelector('[data-field="n_pessoas"]')?.value) || 0;
+    const h = parseFloat(linha.querySelector('[data-field="quantidade"]')?.value) || 0;
+    const v = parseFloat(linha.querySelector('[data-field="preco_unitario"]')?.value) || 0;
+    const sub = linha.querySelector('[data-subtotal]');
+    if (sub) sub.textContent = (n > 0 && h > 0 && v > 0) ? (n*h*v).toFixed(2)+' €' : '—';
+    actualizarTotaisOrc();
+}
+
+// Calcular subtotal linha Material/Outro
+function calcLinhaMatOuOutro(input) {
+    const linha = input.closest('.orc-linha');
+    if (!linha) return;
+    const q = parseFloat(linha.querySelector('[data-field="quantidade"]')?.value) || 0;
+    const p = parseFloat(linha.querySelector('[data-field="preco_unitario"]')?.value) || 0;
+    const sub = linha.querySelector('[data-subtotal]');
+    if (sub) sub.textContent = (q > 0 && p > 0) ? (q*p).toFixed(2)+' €' : '—';
+    actualizarTotaisOrc();
 }
 
 // ── Totais ──────────────────────────────────────────────────
@@ -3200,12 +3272,19 @@ function actualizarTotaisOrc() {
     let maoObra = 0, materiais = 0, outros = 0;
 
     document.querySelectorAll('.orc-linha').forEach(linha => {
-        const qtd   = parseFloat(linha.querySelector('[data-field="quantidade"]')?.value) || 0;
-        const preco = parseFloat(linha.querySelector('[data-field="preco_unitario"]')?.value) || 0;
-        const total = qtd * preco;
-        const tipo  = linha.dataset.tipo;
-        if (tipo === 'mao_obra')  maoObra   += total;
-        else if (tipo === 'material') materiais += total;
+        let total = 0;
+        if (linha.dataset.tipo === 'mao_obra') {
+            const n = parseFloat(linha.querySelector('[data-field="n_pessoas"]')?.value) || 0;
+            const h = parseFloat(linha.querySelector('[data-field="quantidade"]')?.value) || 0;
+            const v = parseFloat(linha.querySelector('[data-field="preco_unitario"]')?.value) || 0;
+            total = n * h * v;
+        } else {
+            const qtd   = parseFloat(linha.querySelector('[data-field="quantidade"]')?.value) || 0;
+            const preco = parseFloat(linha.querySelector('[data-field="preco_unitario"]')?.value) || 0;
+            total = qtd * preco;
+        }
+        if (linha.dataset.tipo === 'mao_obra')  maoObra   += total;
+        else if (linha.dataset.tipo === 'material') materiais += total;
         else outros += total;
     });
 
@@ -3214,12 +3293,31 @@ function actualizarTotaisOrc() {
     const comIva  = semIva + iva;
 
     const fmt = v => v.toFixed(2) + ' €';
-    document.getElementById('totalMaoObra').textContent  = fmt(maoObra);
-    document.getElementById('totalMateriais').textContent= fmt(materiais);
-    document.getElementById('totalOutros').textContent   = fmt(outros);
-    document.getElementById('totalSemIva').textContent   = fmt(semIva);
-    document.getElementById('totalIva').textContent      = fmt(iva);
-    document.getElementById('totalComIva').textContent   = fmt(comIva);
+    document.getElementById('totalMaoObra').textContent   = fmt(maoObra);
+    document.getElementById('totalMateriais').textContent = fmt(materiais);
+    document.getElementById('totalOutros').textContent    = fmt(outros);
+    document.getElementById('totalSemIva').textContent    = fmt(semIva);
+    document.getElementById('totalIva').textContent       = fmt(iva);
+    document.getElementById('totalComIva').textContent    = fmt(comIva);
+
+    // Subtotal por categoria
+    document.querySelectorAll('.orc-categoria').forEach(cat => {
+        let subCat = 0;
+        cat.querySelectorAll('.orc-linha').forEach(linha => {
+            if (linha.dataset.tipo === 'mao_obra') {
+                const n = parseFloat(linha.querySelector('[data-field="n_pessoas"]')?.value) || 0;
+                const h = parseFloat(linha.querySelector('[data-field="quantidade"]')?.value) || 0;
+                const v = parseFloat(linha.querySelector('[data-field="preco_unitario"]')?.value) || 0;
+                subCat += n * h * v;
+            } else {
+                const q = parseFloat(linha.querySelector('[data-field="quantidade"]')?.value) || 0;
+                const p = parseFloat(linha.querySelector('[data-field="preco_unitario"]')?.value) || 0;
+                subCat += q * p;
+            }
+        });
+        const el = cat.querySelector('.cat-subtotal');
+        if (el) el.textContent = subCat > 0 ? subCat.toFixed(2) + ' €' : '';
+    });
 }
 
 document.getElementById('orcIva')?.addEventListener('input', actualizarTotaisOrc);
@@ -3312,11 +3410,13 @@ async function guardarOrcamento(estado = 'rascunho') {
             const desc = l.querySelector('[data-field="descricao"]')?.value.trim();
             const qtd  = parseFloat(l.querySelector('[data-field="quantidade"]')?.value)||1;
             const pu   = parseFloat(l.querySelector('[data-field="preco_unitario"]')?.value)||0;
+            const nPes = parseInt(l.querySelector('[data-field="n_pessoas"]')?.value)||1;
             if (!desc) continue;
             linhasPayload.push({
                 orcamento_id: orcId, categoria_id: catId,
                 tipo: l.dataset.tipo, descricao: desc,
-                unidade: l.querySelector('[data-field="unidade"]')?.value || 'vg',
+                unidade: l.querySelector('[data-field="unidade"]')?.value || 'un',
+                n_pessoas: nPes,
                 quantidade: qtd, preco_unitario: pu, ordem: j
             });
         }
@@ -3325,12 +3425,9 @@ async function guardarOrcamento(estado = 'rascunho') {
 
     msg.textContent = '✓ Orçamento guardado!'; msg.style.color='var(--color-ok)';
     await carregarOrcamentos();
-
-    if (estado === 'enviado') {
-        setTimeout(() => exportarPDFOrcamento(orcId), 500);
-    } else {
-        setTimeout(fecharModalOrcamento, 1200);
-    }
+    // Não fechar — o utilizador permanece no orçamento para continuar a editar
+    // Actualizar número se foi criado agora
+    if (!_orcEditId && orcId) _orcEditId = orcId;
 }
 
 // ── Duplicar ────────────────────────────────────────────────
