@@ -2591,6 +2591,14 @@ async function carregarMovimentos() {
     const tipo       = document.getElementById("filtroTipo")?.value || "";
     const dataInicio = document.getElementById("filtroDataInicio")?.value || "";
     const dataFim    = document.getElementById("filtroDataFim")?.value || "";
+    const anoFiltro  = document.getElementById("filtroAnoFluxo")?.value || "";
+
+    let dInicio = dataInicio;
+    let dFim    = dataFim;
+    if (!dInicio && !dFim && anoFiltro) {
+        dInicio = `${anoFiltro}-01-01`;
+        dFim    = `${anoFiltro}-12-31`;
+    }
 
     let query = SB.from("movimentos_financeiros")
         .select(`id, referencia, data_documento, tipo,
@@ -2599,19 +2607,34 @@ async function carregarMovimentos() {
                  fornecedores(id, nome, nif), categorias_financeiras(id, nome), obras(id, nome)`)
         .order("data_documento", { ascending: false });
 
-    if (obra)        query = query.eq("obra_id", obra);
-    if (categoria)   query = query.eq("categoria_id", categoria);
-    if (tipo)        query = query.eq("tipo", tipo);
-    if (dataInicio)  query = query.gte("data_documento", dataInicio);
-    if (dataFim)     query = query.lte("data_documento", dataFim);
+    if (obra)      query = query.eq("obra_id", obra);
+    if (categoria) query = query.eq("categoria_id", categoria);
+    if (tipo)      query = query.eq("tipo", tipo);
+    if (dInicio)   query = query.gte("data_documento", dInicio);
+    if (dFim)      query = query.lte("data_documento", dFim);
 
     const { data, error } = await query;
     if (error) { console.error(error); return; }
     movimentos = data || [];
-    _todosMovimentos = data || []; // guardar cache para filtros rápidos
+    _todosMovimentos = data || [];
     renderMovimentos();
     renderTotais();
 }
+
+function ligarFiltrosFluxo() {
+    ["filtroObra","filtroCategoria","filtroTipo","filtroDataInicio","filtroDataFim","filtroAnoFluxo"].forEach(id => {
+        document.getElementById(id)?.addEventListener("change", carregarMovimentos);
+        document.getElementById(id)?.addEventListener("input",  carregarMovimentos);
+    });
+    document.getElementById("btnLimparFiltros")?.addEventListener("click", () => {
+        ["filtroObra","filtroCategoria","filtroTipo","filtroDataInicio","filtroDataFim"]
+            .forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+        const anoEl = document.getElementById("filtroAnoFluxo");
+        if (anoEl) anoEl.value = new Date().getFullYear().toString();
+        carregarMovimentos();
+    });
+}
+
 
 function renderMovimentos() {
     const tbody = document.querySelector("#tabelaMovimentos tbody");
@@ -3011,38 +3034,59 @@ function renderTabelaOrc(lista) {
     tbody.innerHTML = '';
 
     if (!lista.length) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;opacity:.5">Sem orçamentos. Clique + para criar.</td></tr>`;
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;opacity:.4"><div style="font-size:28px;margin-bottom:8px">\u{1F4CB}</div><div>Sem orçamentos. Clique + para criar.</div></td></tr>';
         return;
     }
 
-    const estadoCores = { rascunho:'por_pagar', enviado:'por_pagar', aceite:'pago', recusado:'vencido', cancelado:'vencido' };
-    const estadoLabels = { rascunho:'Rascunho', enviado:'Enviado', aceite:'Aceite', recusado:'Recusado', cancelado:'Cancelado' };
+    const estadoStyle = {
+        rascunho: { bg:'rgba(180,180,180,.12)', cor:'#999',    label:'Rascunho' },
+        enviado:  { bg:'rgba(244,185,66,.15)',  cor:'#c8901e', label:'Enviado'  },
+        aceite:   { bg:'rgba(42,138,42,.12)',   cor:'#2a8a2a', label:'Aceite'   },
+        recusado: { bg:'rgba(229,92,92,.12)',   cor:'#c0392b', label:'Recusado' },
+        cancelado:{ bg:'rgba(229,92,92,.08)',   cor:'#999',    label:'Cancelado'},
+    };
 
     lista.forEach(o => {
+        const hoje    = new Date().toISOString().split('T')[0];
+        const vencido = o.validade && o.validade < hoje && o.estado === 'enviado';
+        const est     = estadoStyle[o.estado] || estadoStyle.rascunho;
+        const total   = Number(o.total_com_iva||0);
+        const nomeObra= o.obras?.nome || o.obra_descricao || '';
+        const dataFmt = d => d ? d.split('-').reverse().join('/') : '\u2014';
+
         const tr = document.createElement('tr');
-        const vencido = o.validade && o.validade < new Date().toISOString().split('T')[0] && o.estado === 'enviado';
-        tr.innerHTML = `
-            <td style="font-family:monospace;font-size:12px;font-weight:600">${o.numero || '—'}</td>
-            <td>${o.data || '—'}</td>
-            <td style="font-weight:500">${o.cliente_nome || '—'}</td>
-            <td style="font-size:12px;opacity:.7">${o.obras?.nome || o.obra_descricao || '—'}</td>
-            <td style="text-align:right;font-weight:600">${Number(o.total_com_iva||0).toFixed(2)} €</td>
-            <td><span class="badge-estado ${estadoCores[o.estado]||'por_pagar'}">${estadoLabels[o.estado]||o.estado}</span></td>
-            <td style="font-size:12px;${vencido?'color:var(--color-err)':''}">${o.validade||'—'}</td>
-            <td class="acoes-td">
-                <button class="btn-acao" title="Editar">✏️</button>
-                <button class="btn-acao" title="Duplicar">📋</button>
-                <button class="btn-acao" title="PDF">📄</button>
-                <button class="btn-acao" title="Apagar">🗑️</button>
-            </td>`;
-        tr.querySelector("[title='Editar']").onclick  = () => abrirModalOrcamento(o.id);
-        tr.querySelector("[title='Duplicar']").onclick= () => duplicarOrcamento(o.id);
-        tr.querySelector("[title='PDF']").onclick     = () => exportarPDFOrcamento(o.id);
-        tr.querySelector("[title='Apagar']").onclick  = () => apagarOrcamento(o.id, o.numero);
+        tr.style.cursor = 'pointer';
+        tr.onmouseenter = () => tr.style.background = 'rgba(244,185,66,.04)';
+        tr.onmouseleave = () => tr.style.background = '';
+        tr.innerHTML =
+            '<td style="font-family:monospace;font-size:11px;color:var(--text-muted);font-weight:500;white-space:nowrap">' + (o.numero||'\u2014') + '</td>' +
+            '<td style="font-size:12px;white-space:nowrap">' + dataFmt(o.data) + '</td>' +
+            '<td>' +
+                '<div style="font-weight:600;font-size:13px">' + (o.cliente_nome||'\u2014') + '</div>' +
+                (nomeObra ? '<div style="font-size:11px;opacity:.5;margin-top:1px">' + nomeObra + '</div>' : '') +
+            '</td>' +
+            '<td style="text-align:right;font-family:var(--font-title);font-size:15px;font-weight:500;white-space:nowrap">' +
+                (total > 0 ? total.toLocaleString('pt-PT',{minimumFractionDigits:2}) + ' \u20AC' : '\u2014') +
+            '</td>' +
+            '<td>' +
+                '<span style="background:' + est.bg + ';color:' + est.cor + ';padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;letter-spacing:.3px;white-space:nowrap">' + est.label + '</span>' +
+                (vencido ? '<div style="font-size:10px;color:var(--color-err);margin-top:2px">\u26A0 Vencido</div>' : '') +
+            '</td>' +
+            '<td style="font-size:12px;' + (vencido ? 'color:var(--color-err)' : 'opacity:.5') + '">' + dataFmt(o.validade) + '</td>' +
+            '<td class="acoes-td">' +
+                '<button class="btn-acao btn-e" title="Editar">\u270F\uFE0F</button>' +
+                '<button class="btn-acao btn-d" title="Duplicar">\u{1F4CB}</button>' +
+                '<button class="btn-acao btn-p" title="PDF">\u{1F4C4}</button>' +
+                '<button class="btn-acao btn-x" title="Apagar" style="opacity:.5">\u{1F5D1}\uFE0F</button>' +
+            '</td>';
+        tr.querySelector('.btn-e').onclick = e => { e.stopPropagation(); abrirModalOrcamento(o.id); };
+        tr.querySelector('.btn-d').onclick = e => { e.stopPropagation(); duplicarOrcamento(o.id); };
+        tr.querySelector('.btn-p').onclick = e => { e.stopPropagation(); exportarPDFOrcamento(o.id); };
+        tr.querySelector('.btn-x').onclick = e => { e.stopPropagation(); apagarOrcamento(o.id, o.numero); };
+        tr.ondblclick = () => abrirModalOrcamento(o.id);
         tbody.appendChild(tr);
     });
 }
-
 function filtrarTabelaOrc() {
     const q      = document.getElementById('pesquisaOrcamentos')?.value.toLowerCase() || '';
     const estado = document.getElementById('filtroEstadoOrc')?.value || '';
