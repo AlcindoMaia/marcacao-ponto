@@ -1379,17 +1379,35 @@ async function eliminarServico(id, nome) {
 // PAINEL DE OBRA — orçamentado vs real
 // ═══════════════════════════════════════════════════════
 async function abrirPainelObra(obra) {
+    const modal = document.getElementById("modalPainelObra");
     document.getElementById("painelObraNome").textContent = obra.nome;
-    document.getElementById("painelObraMeta").textContent = obra.data_conclusao_prevista ? `Data prevista: ${obra.data_conclusao_prevista}` : "";
-    document.getElementById("modalPainelObra").style.display = "flex";
+
+    // Meta: data prevista + estado
+    const metaEl = document.getElementById("painelObraMeta");
+    const estadoBadge = obra.estado === "concluida"
+        ? `<span style="background:rgba(74,222,128,.15);color:#4ade80;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600">✓ Concluída</span>`
+        : `<span style="background:rgba(244,185,66,.12);color:var(--primary,#f4b942);padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600">Em curso</span>`;
+    metaEl.innerHTML = `${estadoBadge}${obra.data_conclusao_prevista
+        ? `<span style="color:rgba(255,255,255,.35)">📅 ${obra.data_conclusao_prevista}</span>` : ""}`;
+
+    // Estado vazio enquanto carrega
+    document.getElementById("painelObraKpis").innerHTML = "";
+    document.getElementById("painelServicosTbody").innerHTML =
+        `<div style="padding:40px;text-align:center;color:rgba(255,255,255,.25);font-size:13px">A carregar…</div>`;
+    modal.style.display = "flex";
 
     const { data: servicos } = await SB.from("obra_servicos").select("*").eq("obra_id", obra.id).order("ordem").order("created_at");
     const ids = (servicos||[]).map(s=>s.id);
 
     if (!ids.length) {
+        // Estado vazio elegante
         document.getElementById("painelObraKpis").innerHTML = "";
-        document.getElementById("painelServicosTbody").innerHTML =
-            `<tr><td colspan="8" style="text-align:center;padding:20px;opacity:.4">Sem serviços. Edita a obra para adicionar.</td></tr>`;
+        document.getElementById("painelServicosTbody").innerHTML = `
+            <div style="padding:48px 24px;text-align:center">
+                <div style="font-size:36px;margin-bottom:12px;opacity:.3">📋</div>
+                <div style="font-family:var(--font-title,'Oswald',sans-serif);font-size:14px;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:8px">Sem serviços definidos</div>
+                <div style="font-size:12px;color:rgba(255,255,255,.2)">Edita a obra e vai ao separador Serviços para começar</div>
+            </div>`;
         return;
     }
 
@@ -1398,19 +1416,17 @@ async function abrirPainelObra(obra) {
         .select("obra_servico_id, horas, registo_id")
         .in("obra_servico_id", ids);
 
-    // Buscar valor_dia dos funcionários via registos_admin
+    // Buscar valor_dia via registos_admin
     const registoIds = [...new Set((regServs||[]).map(r=>r.registo_id).filter(Boolean))];
     let valorDiaPorRegisto = {};
     if (registoIds.length) {
         const { data: regsAdmin } = await SB.from("registos_admin")
-            .select("id, funcionario_id, funcionarios(valor_dia)")
+            .select("id, funcionarios(valor_dia)")
             .in("id", registoIds);
-        (regsAdmin||[]).forEach(r => {
-            valorDiaPorRegisto[r.id] = r.funcionarios?.valor_dia || 0;
-        });
+        (regsAdmin||[]).forEach(r => { valorDiaPorRegisto[r.id] = r.funcionarios?.valor_dia || 0; });
     }
 
-    // Buscar materiais imputados
+    // Buscar materiais
     const { data: movServs } = await SB.from("movimento_servicos")
         .select("obra_servico_id, valor")
         .in("obra_servico_id", ids);
@@ -1425,45 +1441,105 @@ async function abrirPainelObra(obra) {
     });
     (movServs||[]).forEach(r => { matP[r.obra_servico_id] = (matP[r.obra_servico_id]||0)+Number(r.valor||0); });
 
-    const totHOrç = (servicos||[]).reduce((s,v)=>s+(v.horas_orcamento||0),0);
-    const totHReal= Object.values(horasP).reduce((s,v)=>s+v,0);
-    const totVOrç = (servicos||[]).reduce((s,v)=>s+(v.valor_orcamento||0),0);
-    const totMO   = Object.values(moP).reduce((s,v)=>s+v,0);
-    const totMat  = Object.values(matP).reduce((s,v)=>s+v,0);
-    const totReal = totMO + totMat;
+    const totHOrç  = (servicos||[]).reduce((s,v)=>s+(v.horas_orcamento||0),0);
+    const totHReal = Object.values(horasP).reduce((s,v)=>s+v,0);
+    const totVOrç  = (servicos||[]).reduce((s,v)=>s+(v.valor_orcamento||0),0);
+    const totMO    = Object.values(moP).reduce((s,v)=>s+v,0);
+    const totMat   = Object.values(matP).reduce((s,v)=>s+v,0);
+    const totReal  = totMO + totMat;
+    const totDesvio = totVOrç > 0 ? totReal - totVOrç : null;
+    const concluidosCount = (servicos||[]).filter(s=>s.concluido).length;
 
-    document.getElementById("painelObraKpis").innerHTML = [
-        {label:"Horas Orçadas", val:totHOrç.toFixed(0)+"h", cor:""},
-        {label:"Horas Reais",   val:totHReal.toFixed(1)+"h", cor:totHReal>totHOrç?"#fb923c":"#4ade80"},
-        {label:"Orçamento",     val:totVOrç.toFixed(0)+"€", cor:""},
-        {label:"Custo Real",    val:totReal.toFixed(0)+"€", cor:totReal>totVOrç?"#f87171":"#4ade80"},
-    ].map(k=>`<div style="padding:16px;text-align:center;background:rgba(255,255,255,.03)">
-        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;opacity:.45;margin-bottom:4px">${k.label}</div>
-        <div style="font-family:var(--font-title,sans-serif);font-size:20px;font-weight:500;color:${k.cor||"#fff"}">${k.val}</div>
-    </div>`).join("");
+    // KPIs redesenhados
+    const kpis = [
+        {
+            label: "Horas Orçadas",
+            val: totHOrç > 0 ? totHOrç.toFixed(0)+"h" : "—",
+            sub: totHReal > 0 ? `${totHReal.toFixed(1)}h realizadas` : "Sem registos",
+            cor: totHReal > totHOrç && totHOrç > 0 ? "#fb923c" : totHReal > 0 ? "#4ade80" : "rgba(255,255,255,.6)",
+            accent: "#f4b942"
+        },
+        {
+            label: "Custo Mão de Obra",
+            val: totMO > 0 ? totMO.toFixed(0)+"€" : "—",
+            sub: totMat > 0 ? `+${totMat.toFixed(0)}€ material` : "Sem material",
+            cor: "#f87171",
+            accent: "#f87171"
+        },
+        {
+            label: "Orçamento Total",
+            val: totVOrç > 0 ? totVOrç.toFixed(0)+"€" : "—",
+            sub: totDesvio !== null ? (totDesvio > 0 ? `▲ +${totDesvio.toFixed(0)}€ desvio` : `▼ ${totDesvio.toFixed(0)}€ dentro`) : "Sem orçamento",
+            cor: totDesvio > 0 ? "#f87171" : "#4ade80",
+            accent: "#a78bfa"
+        },
+        {
+            label: "Serviços",
+            val: `${concluidosCount}/${(servicos||[]).length}`,
+            sub: "concluídos",
+            cor: concluidosCount === (servicos||[]).length ? "#4ade80" : "rgba(255,255,255,.7)",
+            accent: "#4ade80"
+        },
+    ];
 
+    document.getElementById("painelObraKpis").innerHTML = kpis.map((k,i) => `
+        <div class="painel-kpi" style="border-top:3px solid ${k.accent}">
+            <div class="kpi-label">${k.label}</div>
+            <div class="kpi-val" style="color:${k.cor}">${k.val}</div>
+            <div class="kpi-sub">${k.sub}</div>
+        </div>`).join("");
+
+    // Progresso geral
+    const progEl = document.getElementById("painelObraProgresso");
+    if (progEl) {
+        const pctGeral = totHOrç > 0 ? Math.min(Math.round(totHReal/totHOrç*100),100) : null;
+        progEl.innerHTML = pctGeral !== null
+            ? `<span style="color:rgba(255,255,255,.5)">Progresso geral:</span> <span style="color:var(--primary,#f4b942);font-weight:600">${pctGeral}%</span>`
+            : "";
+    }
+
+    // Linhas de serviços
     const tbody = document.getElementById("painelServicosTbody");
-    if (!(servicos||[]).length) { tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:20px;opacity:.4">Sem serviços. Edita a obra para adicionar.</td></tr>`; return; }
-
     tbody.innerHTML = (servicos||[]).map(s => {
-        const hR = horasP[s.id]||0, moR = moP[s.id]||0, matR = matP[s.id]||0;
-        const totR = moR+matR;
-        const desvio = s.valor_orcamento ? totR-s.valor_orcamento : null;
-        const pct = s.horas_orcamento>0 ? Math.round(hR/s.horas_orcamento*100) : null;
-        const barCol = s.concluido?"#4ade80":pct>=100?"#f87171":pct>=75?"#fb923c":"var(--primary,#f4b942)";
-        return `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
-            <td style="padding:10px">
-                <div style="font-weight:500">${s.nome}${s.extra?` <span style="font-size:9px;color:#fb923c">[Extra]</span>`:""}</div>
-                ${pct!==null?`<div style="margin-top:4px;background:rgba(255,255,255,.08);border-radius:3px;height:3px;width:100px"><div style="width:${Math.min(pct,100)}%;height:100%;background:${barCol};border-radius:3px"></div></div>`:""}
-            </td>
-            <td style="text-align:right;padding:10px;opacity:.7">${s.horas_orcamento||"—"}</td>
-            <td style="text-align:right;padding:10px;color:${hR>(s.horas_orcamento||9999)?"#fb923c":"#fff"}">${hR.toFixed(1)}</td>
-            <td style="text-align:right;padding:10px;color:#f87171">${moR>0?moR.toFixed(0)+"€":"—"}</td>
-            <td style="text-align:right;padding:10px;color:#f87171">${matR>0?matR.toFixed(0)+"€":"—"}</td>
-            <td style="text-align:right;padding:10px;opacity:.7">${s.valor_orcamento?s.valor_orcamento.toFixed(0)+"€":"—"}</td>
-            <td style="text-align:right;padding:10px;font-weight:600;color:${desvio===null?"#fff":desvio>0?"#f87171":"#4ade80"}">${desvio===null?"—":(desvio>0?"+":"")+desvio.toFixed(0)+"€"}</td>
-            <td style="text-align:center;padding:10px">${s.concluido?`<span style="color:#4ade80;font-size:12px">✓ Feito</span>`:`<span style="opacity:.4;font-size:12px">Em curso</span>`}</td>
-        </tr>`;
+        const hR    = horasP[s.id]||0;
+        const moR   = moP[s.id]||0;
+        const matR  = matP[s.id]||0;
+        const totR  = moR + matR;
+        const desvio= s.valor_orcamento ? totR - s.valor_orcamento : null;
+        const pct   = s.horas_orcamento > 0 ? Math.round(hR/s.horas_orcamento*100) : null;
+        const barCol= s.concluido ? "#4ade80" : pct>=100 ? "#f87171" : pct>=75 ? "#fb923c" : "var(--primary,#f4b942)";
+
+        const estadoBadge = s.concluido
+            ? `<span style="background:rgba(74,222,128,.15);color:#4ade80;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap">✓ Feito</span>`
+            : `<span style="background:rgba(255,255,255,.07);color:rgba(255,255,255,.4);padding:2px 9px;border-radius:10px;font-size:10px;white-space:nowrap">Em curso</span>`;
+
+        const extraBadge = s.extra
+            ? `<span style="background:rgba(251,146,60,.15);color:#fb923c;padding:1px 6px;border-radius:6px;font-size:9px;font-weight:600;margin-left:4px">Extra</span>`
+            : "";
+
+        return `<div class="serv-row">
+            <div>
+                <div style="font-weight:500;font-size:13px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">
+                    ${s.nome}${extraBadge}
+                </div>
+                ${pct !== null ? `
+                <div style="display:flex;align-items:center;gap:6px;margin-top:5px">
+                    <div style="flex:1;max-width:100px;background:rgba(255,255,255,.08);border-radius:3px;height:3px">
+                        <div style="width:${Math.min(pct,100)}%;height:100%;background:${barCol};border-radius:3px"></div>
+                    </div>
+                    <span style="font-size:10px;color:rgba(255,255,255,.35)">${pct}%</span>
+                </div>` : ""}
+            </div>
+            <div style="color:rgba(255,255,255,.45);font-size:12px">${s.horas_orcamento ? s.horas_orcamento+"h" : "—"}</div>
+            <div style="color:${hR>(s.horas_orcamento||9999)?"#fb923c":"rgba(255,255,255,.85)"};font-size:13px">${hR>0?hR.toFixed(1)+"h":"—"}</div>
+            <div style="color:#f87171;font-size:13px">${moR>0?moR.toFixed(0)+"€":"—"}</div>
+            <div style="color:#f87171;font-size:13px">${matR>0?matR.toFixed(0)+"€":"—"}</div>
+            <div style="color:rgba(255,255,255,.45);font-size:12px">${s.valor_orcamento?s.valor_orcamento.toFixed(0)+"€":"—"}</div>
+            <div style="font-weight:600;font-size:13px;color:${desvio===null?"rgba(255,255,255,.3)":desvio>0?"#f87171":"#4ade80"}">
+                ${desvio===null?"—":(desvio>0?"+":"")+desvio.toFixed(0)+"€"}
+            </div>
+            <div style="text-align:center">${estadoBadge}</div>
+        </div>`;
     }).join("");
 }
 
