@@ -2559,30 +2559,32 @@ async function carregarObrasFluxo() {
     });
 }
 
-let _todosMovimentos = []; // cache para filtros rápidos
+let _todosMovimentos = []; // cache dos movimentos já filtrados (por ano/datas/obra/etc)
 
 function filtrarPorEstado(estado) {
-    const tbody = document.querySelector("#tabelaMovimentos tbody");
-    if (!tbody) return;
-    const lista = estado === "" ? _todosMovimentos :
-                  estado === "atrasado"
-                      ? _todosMovimentos.filter(m => m.estado_pagamento === "por_pagar" && m.data_documento < new Date().toISOString().split("T")[0])
-                      : _todosMovimentos.filter(m => m.estado_pagamento === estado);
+    const hoje  = new Date().toISOString().split("T")[0];
+    const lista = estado === ""
+        ? _todosMovimentos
+        : estado === "atrasado"
+            ? _todosMovimentos.filter(m => m.estado_pagamento === "por_pagar" && m.data_documento < hoje)
+            : _todosMovimentos.filter(m => m.estado_pagamento === estado);
 
-    // Actualizar KPIs
-    const entradas = lista.filter(m => m.tipo === "entrada").reduce((s,m) => s + Number(m.valor_total), 0);
-    const saidas   = lista.filter(m => m.tipo === "saida").reduce((s,m) => s + Number(m.valor_total), 0);
-    document.getElementById("totalEntradas").textContent = entradas.toFixed(2) + " €";
-    document.getElementById("totalSaidas").textContent   = saidas.toFixed(2) + " €";
-    const saldo = entradas - saidas;
-    const sEl = document.getElementById("saldoFluxo");
-    sEl.textContent = saldo.toFixed(2) + " €";
-    sEl.style.color = saldo >= 0 ? "#5ad65a" : "#ff7a7a";
+    // Actualizar KPIs com base na lista filtrada
+    actualizarKpisFluxo(lista);
 
-    // Re-renderizar com lista filtrada
+    // Re-renderizar tabela
     movimentos = lista;
     renderMovimentos();
-    renderTotais();
+}
+
+function actualizarKpisFluxo(lista) {
+    const entradas = lista.filter(m => m.tipo === "entrada").reduce((s,m) => s + Number(m.valor_total), 0);
+    const saidas   = lista.filter(m => m.tipo === "saida").reduce((s,m)   => s + Number(m.valor_total), 0);
+    const saldo    = entradas - saidas;
+    document.getElementById("totalEntradas").textContent = entradas.toFixed(2) + " €";
+    document.getElementById("totalSaidas").textContent   = saidas.toFixed(2) + " €";
+    const sEl = document.getElementById("saldoFluxo");
+    if (sEl) { sEl.textContent = saldo.toFixed(2) + " €"; sEl.style.color = saldo >= 0 ? "#5ad65a" : "#ff7a7a"; }
 }
 
 async function carregarMovimentos() {
@@ -2616,9 +2618,9 @@ async function carregarMovimentos() {
     const { data, error } = await query;
     if (error) { console.error(error); return; }
     movimentos = data || [];
-    _todosMovimentos = data || [];
+    _todosMovimentos = data || []; // cache = resultado já filtrado por ano/datas/obra
+    actualizarKpisFluxo(movimentos);
     renderMovimentos();
-    renderTotais();
 }
 
 function ligarFiltrosFluxo() {
@@ -2667,58 +2669,10 @@ function renderMovimentos() {
 }
 
 function renderTotais() {
-    const entradas = movimentos.filter(m => m.tipo === "entrada").reduce((s, m) => s + Number(m.valor_total), 0);
-    const saidas   = movimentos.filter(m => m.tipo === "saida").reduce((s, m) => s + Number(m.valor_total), 0);
-    const saldo    = entradas - saidas;
-    document.getElementById("totalEntradas").textContent = entradas.toFixed(2) + " €";
-    document.getElementById("totalSaidas").textContent   = saidas.toFixed(2) + " €";
-    const saldoEl = document.getElementById("saldoFluxo");
-    saldoEl.textContent  = saldo.toFixed(2) + " €";
-    saldoEl.style.color  = saldo >= 0 ? "#5ad65a" : "#ff7a7a";
+    actualizarKpisFluxo(movimentos);
 }
 
-function ligarFiltrosFluxo() {
-    ["filtroObra","filtroCategoria","filtroTipo","filtroDataInicio","filtroDataFim"].forEach(id => {
-        document.getElementById(id)?.addEventListener("change", carregarMovimentos);
-    });
-    document.getElementById("btnLimparFiltros")?.addEventListener("click", () => {
-        ["filtroObra","filtroCategoria","filtroTipo","filtroDataInicio","filtroDataFim"]
-            .forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
-        carregarMovimentos();
-    });
-}
 
-function abrirModalMovimento(mov = null) {
-    movEditId = mov?.id || null;
-    document.getElementById("modalMovTitulo").textContent = mov ? "Editar Movimento" : "Novo Movimento";
-    document.getElementById("movReferencia").value = mov?.referencia || "";
-    document.getElementById("movData").value       = mov?.data_documento || new Date().toISOString().split("T")[0];
-    document.getElementById("movTipo").value       = mov?.tipo || "saida";
-    document.getElementById("movBase").value       = mov?.valor_base || "";
-    document.getElementById("movIva").value        = mov?.iva ?? "";
-    document.getElementById("movTotal").value      = mov?.valor_total || "";
-    document.getElementById("movEstado").value     = mov?.estado_pagamento || "por_pagar";
-    document.getElementById("movObs").value        = mov?.observacoes || "";
-    document.getElementById("movNif").value        = mov?.fornecedores?.nif || "";
-    document.getElementById("movFornecedor").value = mov?.fornecedores?.nome || "";
-    document.getElementById("movMsg").textContent  = "";
-
-    // Preencher selects de obra e categoria com os IDs correctos
-    const selObra = document.getElementById("movObra");
-    const selCat  = document.getElementById("movCategoria");
-    if (selObra) {
-        selObra.value = mov?.obra_id || "";
-        // Listener para carregar serviços quando obra muda
-        selObra.onchange = () => carregarServicosImputacao(selObra.value);
-        // Carregar serviços da obra actual
-        carregarServicosImputacao(selObra.value);
-    }
-    if (selCat)  selCat.value   = mov?.categoria_id  || "";
-
-    document.getElementById("modalMovimento").classList.remove("hidden");
-}
-
-// Carrega os serviços da obra e mostra UI de imputação no modal de movimento
 async function carregarServicosImputacao(obraId) {
     let wrap = document.getElementById("imputacaoServicosWrap");
     if (!wrap) return;
