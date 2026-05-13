@@ -544,8 +544,9 @@ body {
 
   <!-- Filtro de data -->
   <div class="filtro-data">
+    <button onclick="navegarDia(-1)" style="background:var(--primary);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:16px;font-weight:700">‹</button>
     <input type="date" id="dataRegisto">
-    <button class="btn-carregar" onclick="carregarParaData()">Carregar</button>
+    <button onclick="navegarDia(1)" style="background:var(--primary);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:16px;font-weight:700">›</button>
   </div>
 
   <!-- Lista de funcionários -->

@@ -240,6 +240,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("funcNome").textContent = funcionario.nome;
   document.getElementById("obraNome").textContent = obra.nome;
   document.getElementById("btnMarcacao").addEventListener("click", confirmarMarcacao);
+  // Botão de carga — pré-preenche a obra como origem
+  const btnCarga = document.getElementById("btnCarga");
+  if (btnCarga) btnCarga.href = "carga.html?origem=" + obraID;
   await carregarHistorico(funcionario.id);
 
   // Relógio em tempo real — hora de Lisboa
