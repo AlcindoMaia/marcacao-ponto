@@ -162,6 +162,21 @@
 <!-- ================= TAB REGISTOS ================= -->
 <div class="tab-content" id="tab-registos">
 
+    <!-- SUB-TABS -->
+    <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:0">
+        <button class="reg-subtab active" id="regTab-ponto" onclick="switchRegTab('ponto')"
+            style="background:rgba(244,185,66,.15);color:var(--primary);border:none;border-bottom:2px solid var(--primary);padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600;border-radius:4px 4px 0 0">
+            📍 Ponto QR
+        </button>
+        <button class="reg-subtab" id="regTab-admin" onclick="switchRegTab('admin')"
+            style="background:none;color:var(--text-muted);border:none;border-bottom:2px solid transparent;padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600;border-radius:4px 4px 0 0">
+            📋 Registos Admin
+        </button>
+    </div>
+
+    <!-- ═══ SUB-TAB: PONTO QR ═══ -->
+    <div id="regTabContent-ponto" style="display:block">
+
     <!-- KPIs Assiduidade -->
     <div class="grid-cards" style="margin-bottom:16px" id="registosKpis">
         <div class="card metric" style="border-left:3px solid #5ad65a">
@@ -202,46 +217,71 @@
         </button>
     </div>
 
-    <!-- Mapa de Presenças (inicialmente escondido) -->
     <div id="mapaPresencas" class="card" style="display:none;overflow-x:auto;margin-bottom:16px"></div>
 
-    <!-- Calendário compacto centrado -->
     <div id="vistaLista" style="display:block">
     <div style="display:flex;justify-content:center;margin-bottom:20px">
         <div class="card" style="width:320px;padding:14px">
-
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
                 <button id="prevMonth" style="background:var(--primary);border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700">‹</button>
                 <div id="calendarTitle" style="font-weight:600;font-size:14px;cursor:pointer;text-transform:capitalize"></div>
                 <button id="nextMonth" style="background:var(--primary);border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700">›</button>
             </div>
-
             <div id="calendarGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px"></div>
-
         </div>
     </div>
-
-    <!-- Tabela registos -->
     <div class="card">
-<div style="overflow-x:auto"><table id="tabelaRegistos">
+        <div style="overflow-x:auto"><table id="tabelaRegistos">
             <thead>
                 <tr>
-                    <th>Funcionário</th>
-                    <th>Obra</th>
-                    <th>Dia</th>
-                    <th>Entrada</th>
-                    <th>Saída</th>
-                    <th>Horas</th>
-                    <th>Estado</th>
+                    <th>Funcionário</th><th>Obra</th><th>Dia</th>
+                    <th>Entrada</th><th>Saída</th><th>Horas</th><th>Estado</th>
                 </tr>
             </thead>
             <tbody></tbody>
-        </table>
-</div>
+        </table></div>
     </div>
     </div><!-- fim vistaLista -->
 
-</div>
+    </div><!-- fim regTabContent-ponto -->
+
+    <!-- ═══ SUB-TAB: REGISTOS ADMIN ═══ -->
+    <div id="regTabContent-admin" style="display:none">
+
+        <!-- Filtros -->
+        <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap">
+            <div>
+                <label style="font-size:11px;opacity:.6;display:block;margin-bottom:3px">Mês</label>
+                <input type="month" id="raFiltroMes" style="padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:var(--bg-dark-panel);color:var(--text-light);font-size:13px">
+            </div>
+            <div>
+                <label style="font-size:11px;opacity:.6;display:block;margin-bottom:3px">Vista</label>
+                <select id="raFiltroVista" onchange="carregarRegistosAdmin()"
+                    style="padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:var(--bg-dark-panel);color:var(--text-light);font-size:13px">
+                    <option value="func">Por Funcionário</option>
+                    <option value="obra">Por Obra</option>
+                    <option value="detalhe">Detalhe completo</option>
+                </select>
+            </div>
+            <button onclick="carregarRegistosAdmin()"
+                style="background:var(--primary);border:none;border-radius:6px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;color:#1a1000">
+                🔄 Actualizar
+            </button>
+            <button onclick="exportarRegistosAdminExcel()"
+                style="background:rgba(90,214,90,.12);color:#5ad65a;border:1px solid rgba(90,214,90,.3);border-radius:6px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;margin-left:auto">
+                📥 Excel
+            </button>
+        </div>
+
+        <!-- KPIs rápidos do mês -->
+        <div id="raKpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px"></div>
+
+        <!-- Mapa / tabela -->
+        <div id="raConteudo" class="card" style="overflow-x:auto;padding:0">
+            <div style="padding:32px;text-align:center;opacity:.4">Seleciona um mês e clica Actualizar</div>
+        </div>
+
+    </div><!-- fim regTabContent-admin -->
   
     <!-- ================= TAB FINANCEIRO ================= -->
     <div class="tab-content" id="tab-financeiro">
@@ -1217,28 +1257,139 @@
 
 <!-- ================= TAB CONFIG ================= -->
 <div class="tab-content" id="tab-config">
-    <div id="configTOCArea"></div>
 
-    <div class="card" style="margin-bottom:16px">
-        <h2>Sincronização TOC Online</h2>
-        <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">
-            Importa faturas de venda e despesas directamente do TOC Online para o Fluxo de Caixa.
-            Documentos com referência duplicada são ignorados automaticamente.
-        </p>
-        <div class="form-row" style="align-items:flex-end">
-            <div class="form-group">
-                <label>De</label>
-                <input type="date" id="tocSyncInicio">
+    <!-- Sub-tabs Config -->
+    <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:0">
+        <button class="cfg-subtab active" id="cfgTab-toc" onclick="switchCfgTab('toc')"
+            style="background:rgba(244,185,66,.15);color:var(--primary);border:none;border-bottom:2px solid var(--primary);padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600;border-radius:4px 4px 0 0">
+            ⚡ TOC Online
+        </button>
+        <button class="cfg-subtab" id="cfgTab-biblioteca" onclick="switchCfgTab('biblioteca')"
+            style="background:none;color:var(--text-muted);border:none;border-bottom:2px solid transparent;padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600;border-radius:4px 4px 0 0">
+            🔧 Biblioteca de Serviços
+        </button>
+    </div>
+
+    <!-- SUB-TAB: TOC Online -->
+    <div id="cfgTabContent-toc">
+        <div id="configTOCArea"></div>
+        <div class="card" style="margin-bottom:16px">
+            <h2>Sincronização TOC Online</h2>
+            <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">
+                Importa faturas de venda e despesas directamente do TOC Online para o Fluxo de Caixa.
+                Documentos com referência duplicada são ignorados automaticamente.
+            </p>
+            <div class="form-row" style="align-items:flex-end">
+                <div class="form-group">
+                    <label>De</label>
+                    <input type="date" id="tocSyncInicio">
+                </div>
+                <div class="form-group">
+                    <label>Até</label>
+                    <input type="date" id="tocSyncFim">
+                </div>
+                <div>
+                    <button class="btn-primary" onclick="executarSyncTOC()">⚡ Sincronizar</button>
+                </div>
             </div>
-            <div class="form-group">
-                <label>Até</label>
-                <input type="date" id="tocSyncFim">
-            </div>
+            <div id="tocSyncStatusConfig" style="font-size:13px;margin-top:10px;min-height:16px"></div>
+        </div>
+    </div>
+
+    <!-- SUB-TAB: BIBLIOTECA DE SERVIÇOS -->
+    <div id="cfgTabContent-biblioteca" style="display:none">
+
+        <!-- Barra de acções -->
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
             <div>
-                <button class="btn-primary" onclick="executarSyncTOC()">⚡ Sincronizar</button>
+                <label style="font-size:11px;opacity:.6;display:block;margin-bottom:3px">Filtrar categoria</label>
+                <select id="bibFiltroCategoria" onchange="renderBiblioteca()"
+                    style="padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:var(--bg-dark-panel);color:var(--text-light);font-size:13px">
+                    <option value="">— Todas —</option>
+                </select>
+            </div>
+            <div style="margin-left:auto;display:flex;gap:8px;align-items:flex-end">
+                <button onclick="abrirModalBibServico(null)"
+                    style="background:var(--primary);border:none;border-radius:6px;padding:7px 16px;font-size:13px;font-weight:700;cursor:pointer;color:#1a1000">
+                    + Novo Serviço
+                </button>
             </div>
         </div>
-        <div id="tocSyncStatusConfig" style="font-size:13px;margin-top:10px;min-height:16px"></div>
+
+        <!-- Lista de serviços agrupada por categoria -->
+        <div id="bibLista"></div>
+    </div>
+</div>
+
+<!-- MODAL EDITAR SERVIÇO DA BIBLIOTECA -->
+<div id="modalBibServico" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1200;align-items:center;justify-content:center;padding:16px">
+    <div style="background:var(--bg-dark-panel,#2a2a2a);border-radius:16px;width:100%;max-width:620px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.6)">
+
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 24px 0">
+            <h3 id="modalBibTitulo" style="font-family:var(--font-title);letter-spacing:.5px;color:#fff">Novo Serviço</h3>
+            <button onclick="fecharModalBibServico()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;opacity:.5">×</button>
+        </div>
+
+        <div style="overflow-y:auto;flex:1;padding:20px 24px">
+            <input type="hidden" id="bibServId">
+
+            <!-- Dados do serviço -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+                <div style="grid-column:1/-1">
+                    <label style="font-size:11px;opacity:.6;display:block;margin-bottom:4px">Nome do serviço *</label>
+                    <input id="bibServNome" placeholder="Ex: Capoto ETICS"
+                        style="width:100%;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
+                </div>
+                <div>
+                    <label style="font-size:11px;opacity:.6;display:block;margin-bottom:4px">Categoria *</label>
+                    <input id="bibServCategoria" placeholder="Ex: Impermeabilização" list="bibCatList"
+                        style="width:100%;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
+                    <datalist id="bibCatList"></datalist>
+                </div>
+                <div>
+                    <label style="font-size:11px;opacity:.6;display:block;margin-bottom:4px">Unidade do serviço *</label>
+                    <select id="bibServUnidade"
+                        style="width:100%;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
+                        <option value="m²">m²</option>
+                        <option value="ml">ml</option>
+                        <option value="un">un</option>
+                        <option value="m³">m³</option>
+                        <option value="vg">vg</option>
+                        <option value="kg">kg</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:11px;opacity:.6;display:block;margin-bottom:4px">Rendimento MO (un/dia por operário)</label>
+                    <input id="bibServRendimento" type="number" step="0.5" min="0" placeholder="Ex: 8"
+                        style="width:100%;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
+                </div>
+            </div>
+
+            <!-- Materiais -->
+            <div style="font-family:var(--font-title);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;opacity:.5;margin-bottom:10px">
+                Materiais (coeficientes por unidade)
+            </div>
+
+            <!-- Cabeçalho -->
+            <div style="display:grid;grid-template-columns:1fr 80px 70px 28px;gap:6px;padding:0 4px;margin-bottom:4px">
+                <span style="font-size:10px;opacity:.4;text-transform:uppercase;letter-spacing:.5px">Material</span>
+                <span style="font-size:10px;opacity:.4;text-align:right">Qtd/unidade</span>
+                <span style="font-size:10px;opacity:.4;text-align:center">Unidade</span>
+                <span></span>
+            </div>
+
+            <div id="bibMatLinhas" style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px"></div>
+
+            <button onclick="adicionarLinhaBibMat()"
+                style="background:rgba(244,185,66,.1);border:1px solid rgba(244,185,66,.2);color:var(--primary,#f4b942);border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px">
+                + Adicionar material
+            </button>
+        </div>
+
+        <div style="padding:16px 24px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:flex-end;gap:10px">
+            <button onclick="fecharModalBibServico()" class="btn-secondary">Cancelar</button>
+            <button onclick="guardarBibServico()" class="btn-primary">💾 Guardar</button>
+        </div>
     </div>
 </div>
 

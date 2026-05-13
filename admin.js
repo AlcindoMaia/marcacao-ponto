@@ -254,8 +254,279 @@ function gerarCalendario() {
 // =======================================================
 // REGISTOS DE PONTO
 // =======================================================
-// estado de vista dos registos
-let _vistaRegistos = "lista";
+// ═══════════════════════════════════════════════════════
+// SUB-TABS REGISTOS
+// ═══════════════════════════════════════════════════════
+function switchRegTab(tab) {
+    ["ponto","admin"].forEach(t => {
+        const btn  = document.getElementById(`regTab-${t}`);
+        const cont = document.getElementById(`regTabContent-${t}`);
+        const active = t === tab;
+        if (btn) {
+            btn.style.background   = active ? "rgba(244,185,66,.15)" : "none";
+            btn.style.color        = active ? "var(--primary)" : "var(--text-muted)";
+            btn.style.borderBottom = active ? "2px solid var(--primary)" : "2px solid transparent";
+        }
+        if (cont) cont.style.display = active ? "block" : "none";
+    });
+    if (tab === "admin") {
+        // Inicializar mês actual se não estiver definido
+        const el = document.getElementById("raFiltroMes");
+        if (el && !el.value) {
+            const hoje = new Date();
+            el.value = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,"0")}`;
+        }
+        carregarRegistosAdmin();
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// REGISTOS ADMIN — mapa por funcionário e por obra
+// ═══════════════════════════════════════════════════════
+let _raCache = [];
+
+async function carregarRegistosAdmin() {
+    const mesEl  = document.getElementById("raFiltroMes");
+    const vista  = document.getElementById("raFiltroVista")?.value || "func";
+    if (!mesEl?.value) return;
+
+    const [ano, mes] = mesEl.value.split("-");
+    const inicio = `${ano}-${mes}-01`;
+    const fim    = `${ano}-${mes}-${new Date(ano, mes, 0).getDate()}`;
+
+    const raConteudo = document.getElementById("raConteudo");
+    raConteudo.innerHTML = `<div style="padding:24px;text-align:center;opacity:.4">A carregar…</div>`;
+
+    const { data, error } = await SB.from("registos_admin")
+        .select("id, data, tipo, horas, obra_id, observacoes, funcionarios(id, nome, valor_dia), obras(id, nome)")
+        .gte("data", inicio).lte("data", fim)
+        .order("data").order("funcionarios(nome)");
+
+    if (error) { raConteudo.innerHTML = `<div style="padding:24px;color:#f87171">Erro: ${error.message}</div>`; return; }
+    _raCache = data || [];
+
+    // KPIs
+    const presMes   = _raCache.filter(r => r.tipo === "presenca");
+    const faltasMes = _raCache.filter(r => r.tipo === "falta");
+    const totalH    = presMes.reduce((s,r) => s + Number(r.horas||0), 0);
+    const funcsUniq = new Set(presMes.map(r => r.funcionarios?.nome)).size;
+    const obrasUniq = new Set(presMes.filter(r => r.obras?.nome).map(r => r.obras?.nome)).size;
+
+    document.getElementById("raKpis").innerHTML = [
+        { label:"Dias com registo", val: new Set(presMes.map(r=>r.data)).size, cor:"" },
+        { label:"Total horas", val: totalH.toFixed(0)+"h", cor:"" },
+        { label:"Faltas registadas", val: faltasMes.length, cor:"#f87171" },
+        { label:"Obras activas", val: obrasUniq, cor:"" },
+    ].map(k => `<div style="background:var(--bg-dark-panel,#2a2a2a);border-radius:10px;padding:14px 18px;border:1px solid rgba(255,255,255,.07)">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;opacity:.45;margin-bottom:4px">${k.label}</div>
+        <div style="font-family:var(--font-title,sans-serif);font-size:22px;font-weight:500;color:${k.cor||"#fff"}">${k.val}</div>
+    </div>`).join("");
+
+    if (vista === "func") renderRaMapaFuncionario(ano, mes);
+    else if (vista === "obra") renderRaMapaObra(ano, mes);
+    else renderRaDetalhe();
+}
+
+function renderRaMapaFuncionario(ano, mes) {
+    const ultimoDia = new Date(ano, mes, 0).getDate();
+    const dias = Array.from({length: ultimoDia}, (_,i) => {
+        const d = String(i+1).padStart(2,"0");
+        return `${ano}-${String(mes).padStart(2,"0")}-${d}`;
+    });
+
+    // Agrupar por funcionário
+    const porFunc = {};
+    _raCache.forEach(r => {
+        const nome = r.funcionarios?.nome || "—";
+        if (!porFunc[nome]) porFunc[nome] = { vd: r.funcionarios?.valor_dia, dias: {}, totalH: 0, totalDias: 0 };
+        porFunc[nome].dias[r.data] = { tipo: r.tipo, horas: Number(r.horas||0), obra: r.obras?.nome||"" };
+        if (r.tipo === "presenca") {
+            porFunc[nome].totalH += Number(r.horas||0);
+            porFunc[nome].totalDias++;
+        }
+    });
+
+    const funcs = Object.keys(porFunc).sort();
+    const raConteudo = document.getElementById("raConteudo");
+
+    let html = `<table style="border-collapse:collapse;font-size:12px;width:100%">
+    <thead>
+        <tr style="background:rgba(244,185,66,.1)">
+            <th style="padding:8px 12px;text-align:left;position:sticky;left:0;background:var(--bg-dark-panel,#2a2a2a);z-index:2;min-width:140px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Funcionário</th>
+            ${dias.map(d => {
+                const dObj = new Date(d+"T12:00:00");
+                const dow  = dObj.getDay();
+                const isWE = dow===0||dow===6;
+                return `<th style="padding:4px 2px;text-align:center;min-width:28px;font-size:10px;font-weight:500;${isWE?"opacity:.3":""}">${String(dObj.getDate()).padStart(2,"0")}</th>`;
+            }).join("")}
+            <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Dias</th>
+            <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Horas</th>
+            <th style="padding:8px 10px;text-align:right;min-width:70px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Valor €</th>
+        </tr>
+    </thead>
+    <tbody>`;
+
+    funcs.forEach((func, fi) => {
+        const fd  = porFunc[func];
+        const bg  = fi%2===1 ? "rgba(255,255,255,.02)" : "transparent";
+        const vd  = fd.vd ? Number(fd.vd) : null;
+        const val = vd ? (fd.totalDias * vd).toFixed(2)+"€" : "—";
+
+        html += `<tr style="background:${bg};border-bottom:1px solid rgba(255,255,255,.05)">
+            <td style="padding:7px 12px;position:sticky;left:0;background:var(--bg-dark-panel,#2a2a2a);z-index:1;font-weight:500;white-space:nowrap;border-right:1px solid rgba(255,255,255,.07)">${func}</td>
+            ${dias.map(d => {
+                const dObj = new Date(d+"T12:00:00");
+                const dow  = dObj.getDay();
+                const isWE = dow===0||dow===6;
+                const reg  = fd.dias[d];
+                let bg2 = "transparent", sym = "", title = "";
+                if (isWE) { bg2="rgba(255,255,255,.02)"; sym=""; }
+                else if (!reg) { sym=""; }
+                else if (reg.tipo === "falta") { bg2="rgba(248,113,113,.15)"; sym="✕"; title=reg.obra||"Falta"; }
+                else if (reg.horas > 0) {
+                    bg2="rgba(74,222,128,.15)"; sym=reg.horas<8?"½":"✓";
+                    title = `${reg.obra||""} ${reg.horas}h`;
+                }
+                return `<td style="text-align:center;padding:3px 2px;background:${bg2};border:1px solid rgba(255,255,255,.04);font-size:11px" title="${title}">${sym}</td>`;
+            }).join("")}
+            <td style="padding:7px 10px;text-align:right;font-weight:600">${fd.totalDias}</td>
+            <td style="padding:7px 10px;text-align:right">${fd.totalH.toFixed(1)}h</td>
+            <td style="padding:7px 10px;text-align:right;color:#4ade80;font-weight:600">${val}</td>
+        </tr>`;
+    });
+
+    html += "</tbody></table>";
+    raConteudo.innerHTML = html;
+}
+
+function renderRaMapaObra(ano, mes) {
+    const ultimoDia = new Date(ano, mes, 0).getDate();
+    const dias = Array.from({length: ultimoDia}, (_,i) => {
+        const d = String(i+1).padStart(2,"0");
+        return `${ano}-${String(mes).padStart(2,"0")}-${d}`;
+    });
+
+    // Agrupar por obra
+    const porObra = {};
+    _raCache.filter(r => r.tipo==="presenca" && r.obras?.nome).forEach(r => {
+        const nome = r.obras.nome;
+        const func = r.funcionarios?.nome || "—";
+        if (!porObra[nome]) porObra[nome] = { dias: {}, totalH: 0, funcs: new Set() };
+        if (!porObra[nome].dias[r.data]) porObra[nome].dias[r.data] = {};
+        porObra[nome].dias[r.data][func] = (porObra[nome].dias[r.data][func]||0) + Number(r.horas||0);
+        porObra[nome].totalH += Number(r.horas||0);
+        porObra[nome].funcs.add(func);
+    });
+
+    const obras = Object.keys(porObra).sort();
+    const raConteudo = document.getElementById("raConteudo");
+
+    let html = `<table style="border-collapse:collapse;font-size:12px;width:100%">
+    <thead>
+        <tr style="background:rgba(244,185,66,.1)">
+            <th style="padding:8px 12px;text-align:left;position:sticky;left:0;background:var(--bg-dark-panel,#2a2a2a);z-index:2;min-width:160px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Obra</th>
+            ${dias.map(d => {
+                const dObj = new Date(d+"T12:00:00");
+                const dow  = dObj.getDay();
+                const isWE = dow===0||dow===6;
+                return `<th style="padding:4px 2px;text-align:center;min-width:28px;font-size:10px;font-weight:500;${isWE?"opacity:.3":""}">${String(dObj.getDate()).padStart(2,"0")}</th>`;
+            }).join("")}
+            <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Horas</th>
+            <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Colabs.</th>
+        </tr>
+    </thead>
+    <tbody>`;
+
+    obras.forEach((obra, oi) => {
+        const od  = porObra[obra];
+        const bg  = oi%2===1 ? "rgba(255,255,255,.02)" : "transparent";
+
+        html += `<tr style="background:${bg};border-bottom:1px solid rgba(255,255,255,.05)">
+            <td style="padding:7px 12px;position:sticky;left:0;background:var(--bg-dark-panel,#2a2a2a);z-index:1;font-weight:500;white-space:nowrap;border-right:1px solid rgba(255,255,255,.07)">${obra}</td>
+            ${dias.map(d => {
+                const dObj = new Date(d+"T12:00:00");
+                const dow  = dObj.getDay();
+                const isWE = dow===0||dow===6;
+                const reg  = od.dias[d];
+                let bg2 = "transparent", sym = "", title = "";
+                if (isWE) { bg2="rgba(255,255,255,.02)"; }
+                else if (reg) {
+                    const nFunc = Object.keys(reg).length;
+                    const totalH = Object.values(reg).reduce((s,v)=>s+v,0);
+                    bg2 = `rgba(74,222,128,.${Math.min(10+nFunc*6,30)})`;
+                    sym = nFunc.toString();
+                    title = Object.entries(reg).map(([f,h])=>`${f}: ${h}h`).join(", ");
+                }
+                return `<td style="text-align:center;padding:3px 2px;background:${bg2};border:1px solid rgba(255,255,255,.04);font-size:11px;font-weight:${reg?"600":"400"}" title="${title}">${sym}</td>`;
+            }).join("")}
+            <td style="padding:7px 10px;text-align:right;font-weight:600">${od.totalH.toFixed(1)}h</td>
+            <td style="padding:7px 10px;text-align:right;opacity:.7">${od.funcs.size}</td>
+        </tr>`;
+    });
+
+    html += "</tbody></table>";
+    raConteudo.innerHTML = html;
+}
+
+function renderRaDetalhe() {
+    const raConteudo = document.getElementById("raConteudo");
+    const presencas = _raCache.filter(r => r.tipo === "presenca");
+    const faltas    = _raCache.filter(r => r.tipo === "falta");
+
+    let html = `<table style="border-collapse:collapse;font-size:13px;width:100%">
+    <thead style="background:rgba(244,185,66,.1)">
+        <tr>
+            <th style="padding:8px 12px;text-align:left">Data</th>
+            <th style="padding:8px 12px;text-align:left">Funcionário</th>
+            <th style="padding:8px 12px;text-align:left">Obra</th>
+            <th style="padding:8px 12px;text-align:center">Tipo</th>
+            <th style="padding:8px 12px;text-align:right">Horas</th>
+            <th style="padding:8px 12px;text-align:right">Valor</th>
+        </tr>
+    </thead><tbody>`;
+
+    _raCache.forEach((r, i) => {
+        const vd  = r.funcionarios?.valor_dia ? Number(r.funcionarios.valor_dia) : null;
+        const val = (r.tipo==="presenca" && vd && r.horas) ? (Number(r.horas)/8*vd).toFixed(2)+"€" : "—";
+        const bg  = i%2===1 ? "rgba(255,255,255,.02)" : "transparent";
+        const dataFmt = r.data ? r.data.split("-").reverse().join("/") : "—";
+
+        html += `<tr style="background:${bg};border-bottom:1px solid rgba(255,255,255,.04)">
+            <td style="padding:7px 12px;font-variant-numeric:tabular-nums">${dataFmt}</td>
+            <td style="padding:7px 12px;font-weight:500">${r.funcionarios?.nome||"—"}</td>
+            <td style="padding:7px 12px;opacity:.7">${r.obras?.nome||"—"}</td>
+            <td style="padding:7px 12px;text-align:center">
+                ${r.tipo==="presenca"
+                    ? `<span style="background:rgba(74,222,128,.15);color:#4ade80;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">Presente</span>`
+                    : `<span style="background:rgba(248,113,113,.15);color:#f87171;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">Falta</span>`}
+            </td>
+            <td style="padding:7px 12px;text-align:right">${r.tipo==="presenca"?Number(r.horas||0).toFixed(1)+"h":"—"}</td>
+            <td style="padding:7px 12px;text-align:right;color:#4ade80">${val}</td>
+        </tr>`;
+    });
+
+    html += "</tbody></table>";
+    raConteudo.innerHTML = html;
+}
+
+async function exportarRegistosAdminExcel() {
+    if (!_raCache.length) { alert("Sem dados para exportar. Carrega primeiro."); return; }
+    const mesEl = document.getElementById("raFiltroMes");
+    const [ano, mes] = (mesEl?.value || "").split("-");
+    const linhas = ["Data,Funcionário,Obra,Tipo,Horas,Valor/dia,Valor estimado"];
+    _raCache.forEach(r => {
+        const vd  = r.funcionarios?.valor_dia ? Number(r.funcionarios.valor_dia) : "";
+        const val = (r.tipo==="presenca" && vd && r.horas) ? (Number(r.horas)/8*vd).toFixed(2) : "";
+        linhas.push(`"${r.data}","${r.funcionarios?.nome||""}","${r.obras?.nome||""}","${r.tipo}","${r.horas||0}","${vd}","${val}"`);
+    });
+    const blob = new Blob(["\ufeff"+linhas.join("\n")], {type:"text/csv;charset=utf-8;"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `registos_admin_${ano}_${mes}.csv`;
+    a.click();
+}
+
+// =======================================================
 function setVistaRegistos(v) {
     _vistaRegistos = v;
     const btnL = document.getElementById("btnVistaLista");
@@ -3239,6 +3510,9 @@ function adicionarLinha(cid, tipo = 'material', dados = null) {
     }
 
     linhasDiv.appendChild(div);
+    // Ligar autocomplete da biblioteca ao input de descrição
+    const descInput = div.querySelector('[data-field="descricao"]');
+    if (descInput) ligarAutocompleteBiblioteca(descInput, cid);
     actualizarTotaisOrc();
 }
 
@@ -4287,3 +4561,240 @@ function autorizarTOC() {
         if (msg) { msg.textContent = '✗ ' + e.message; msg.style.color = 'var(--color-err)'; }
     });
 }
+
+// =======================================================
+// CONFIG — sub-tabs
+// =======================================================
+function switchCfgTab(tab) {
+    ["toc","biblioteca"].forEach(t => {
+        const btn  = document.getElementById(`cfgTab-${t}`);
+        const cont = document.getElementById(`cfgTabContent-${t}`);
+        const active = t === tab;
+        if (btn) {
+            btn.style.background   = active ? "rgba(244,185,66,.15)" : "none";
+            btn.style.color        = active ? "var(--primary)" : "var(--text-muted)";
+            btn.style.borderBottom = active ? "2px solid var(--primary)" : "2px solid transparent";
+        }
+        if (cont) cont.style.display = active ? "block" : "none";
+    });
+    if (tab === "biblioteca") initBiblioteca();
+}
+
+// =======================================================
+// BIBLIOTECA DE SERVIÇOS
+// =======================================================
+let _bibServicos = [];
+let _bibMateriais = {};
+
+async function initBiblioteca() {
+    if (_bibServicos.length) { renderBiblioteca(); return; }
+    await carregarBiblioteca();
+}
+
+async function carregarBiblioteca() {
+    const [sRes, mRes] = await Promise.all([
+        SB.from("biblioteca_servicos").select("*").order("categoria").order("ordem").order("nome"),
+        SB.from("biblioteca_materiais").select("*").order("ordem")
+    ]);
+    _bibServicos = sRes.data || [];
+    _bibMateriais = {};
+    (mRes.data||[]).forEach(m => {
+        if (!_bibMateriais[m.servico_id]) _bibMateriais[m.servico_id] = [];
+        _bibMateriais[m.servico_id].push(m);
+    });
+    const cats = [...new Set(_bibServicos.map(s => s.categoria))].sort();
+    const sel  = document.getElementById("bibFiltroCategoria");
+    if (sel) {
+        const atual = sel.value;
+        sel.innerHTML = '<option value="">— Todas —</option>' +
+            cats.map(c => `<option value="${c}" ${c===atual?'selected':''}>${c}</option>`).join("");
+    }
+    renderBiblioteca();
+}
+
+function renderBiblioteca() {
+    const filtro = document.getElementById("bibFiltroCategoria")?.value || "";
+    const lista  = filtro ? _bibServicos.filter(s => s.categoria === filtro) : _bibServicos;
+    const porCat = {};
+    lista.forEach(s => { if (!porCat[s.categoria]) porCat[s.categoria] = []; porCat[s.categoria].push(s); });
+    const div = document.getElementById("bibLista");
+    if (!div) return;
+    if (!lista.length) { div.innerHTML = `<div style="padding:32px;text-align:center;opacity:.4">Sem serviços.</div>`; return; }
+    div.innerHTML = Object.entries(porCat).map(([cat, servs]) => `
+        <div style="margin-bottom:20px">
+            <div style="font-family:var(--font-title);font-size:11px;letter-spacing:2px;text-transform:uppercase;opacity:.5;margin-bottom:8px;padding-left:4px">${cat}</div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+                ${servs.map(s => {
+                    const mats = _bibMateriais[s.id] || [];
+                    const op   = !s.ativo ? 'opacity:.4;' : '';
+                    return `<div style="${op}background:var(--bg-dark-panel,#2a2a2a);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px">
+                        <div style="flex:1;min-width:0">
+                            <div style="font-weight:600;font-size:13px;margin-bottom:4px;display:flex;align-items:center;gap:8px">
+                                ${s.nome}
+                                <span style="font-size:10px;background:rgba(255,255,255,.08);padding:1px 7px;border-radius:8px;color:rgba(255,255,255,.5);font-weight:400">${s.unidade}</span>
+                                ${!s.ativo ? '<span style="font-size:10px;color:#f87171;background:rgba(248,113,113,.1);padding:1px 7px;border-radius:8px">Inactivo</span>' : ''}
+                            </div>
+                            <div style="font-size:11px;opacity:.5">
+                                ${s.rendimento_mo ? `⚡ ${s.rendimento_mo} ${s.unidade}/dia · ` : ''}
+                                ${mats.length ? mats.slice(0,3).map(m=>`${m.descricao} ${m.quantidade}${m.unidade}`).join(' · ')+(mats.length>3?'…':'') : 'Sem materiais'}
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:4px;flex-shrink:0">
+                            <button onclick="abrirModalBibServico('${s.id}')" style="background:rgba(255,255,255,.08);border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px">✏️</button>
+                            <button onclick="toggleBibAtivo('${s.id}',${s.ativo})" style="background:rgba(255,255,255,.05);border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;opacity:.6" title="${s.ativo?'Desactivar':'Activar'}">${s.ativo?'🔕':'🔔'}</button>
+                        </div>
+                    </div>`;
+                }).join("")}
+            </div>
+        </div>`).join("");
+}
+
+function abrirModalBibServico(id) {
+    const modal = document.getElementById("modalBibServico");
+    const s = id ? _bibServicos.find(s => s.id === id) : null;
+    document.getElementById("bibServId").value         = s?.id || "";
+    document.getElementById("bibServNome").value       = s?.nome || "";
+    document.getElementById("bibServCategoria").value  = s?.categoria || "";
+    document.getElementById("bibServUnidade").value    = s?.unidade || "m²";
+    document.getElementById("bibServRendimento").value = s?.rendimento_mo || "";
+    document.getElementById("modalBibTitulo").textContent = s ? `✏️ ${s.nome}` : "Novo Serviço";
+    const cats = [...new Set(_bibServicos.map(s => s.categoria))].sort();
+    const dl = document.getElementById("bibCatList");
+    if (dl) dl.innerHTML = cats.map(c => `<option value="${c}">`).join("");
+    const mats = s ? (_bibMateriais[s.id] || []) : [];
+    document.getElementById("bibMatLinhas").innerHTML = "";
+    if (mats.length) mats.forEach(m => adicionarLinhaBibMat(m));
+    else adicionarLinhaBibMat();
+    modal.style.display = "flex";
+}
+
+function fecharModalBibServico() {
+    document.getElementById("modalBibServico").style.display = "none";
+}
+
+function adicionarLinhaBibMat(mat = null) {
+    const cont = document.getElementById("bibMatLinhas");
+    const div  = document.createElement("div");
+    div.className = "bib-mat-linha";
+    div.style.cssText = "display:grid;grid-template-columns:1fr 80px 70px 28px;gap:6px;align-items:center";
+    if (mat?.id) div.dataset.id = mat.id;
+    div.innerHTML = `
+        <input value="${mat?.descricao||''}" placeholder="Nome do material" data-field="descricao"
+            style="padding:6px 8px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;font-size:12px;outline:none">
+        <input value="${mat?.quantidade||''}" type="number" step="0.001" min="0" placeholder="Qtd" data-field="quantidade"
+            style="padding:6px 8px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;font-size:12px;text-align:right;outline:none">
+        <select data-field="unidade"
+            style="padding:6px 4px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;font-size:12px">
+            ${["kg","L","m²","ml","m³","un","saco","rolo","cx"].map(u=>`<option ${u===(mat?.unidade||'un')?'selected':''}>${u}</option>`).join("")}
+        </select>
+        <button onclick="this.closest('.bib-mat-linha').remove()" style="background:rgba(248,113,113,.1);border:none;border-radius:6px;padding:5px;cursor:pointer;font-size:14px;opacity:.7">×</button>`;
+    cont.appendChild(div);
+}
+
+async function guardarBibServico() {
+    const id        = document.getElementById("bibServId").value;
+    const nome      = document.getElementById("bibServNome").value.trim();
+    const categoria = document.getElementById("bibServCategoria").value.trim();
+    const unidade   = document.getElementById("bibServUnidade").value;
+    const rend      = parseFloat(document.getElementById("bibServRendimento").value) || null;
+    if (!nome || !categoria) { alert("Nome e categoria são obrigatórios."); return; }
+    const payload = { nome, categoria, unidade, rendimento_mo: rend };
+    let servId = id;
+    if (id) {
+        await SB.from("biblioteca_servicos").update(payload).eq("id", id);
+    } else {
+        const { data } = await SB.from("biblioteca_servicos").insert(payload).select("id").single();
+        servId = data?.id;
+    }
+    if (!servId) { alert("Erro ao guardar."); return; }
+    await SB.from("biblioteca_materiais").delete().eq("servico_id", servId);
+    const mats = [];
+    let ordem = 1;
+    document.querySelectorAll(".bib-mat-linha").forEach(l => {
+        const desc = l.querySelector('[data-field="descricao"]')?.value?.trim();
+        const qtd  = parseFloat(l.querySelector('[data-field="quantidade"]')?.value);
+        const un   = l.querySelector('[data-field="unidade"]')?.value;
+        if (desc && qtd > 0) mats.push({ servico_id: servId, descricao: desc, quantidade: qtd, unidade: un, ordem: ordem++ });
+    });
+    if (mats.length) await SB.from("biblioteca_materiais").insert(mats);
+    fecharModalBibServico();
+    _bibServicos = [];
+    await carregarBiblioteca();
+}
+
+async function toggleBibAtivo(id, ativo) {
+    await SB.from("biblioteca_servicos").update({ ativo: !ativo }).eq("id", id);
+    _bibServicos = [];
+    await carregarBiblioteca();
+}
+
+// =======================================================
+// INTEGRAÇÃO NO ORÇAMENTO — autocomplete biblioteca
+// =======================================================
+async function garantirBibliotecaCarregada() {
+    if (_bibServicos.length) return;
+    const [sRes, mRes] = await Promise.all([
+        SB.from("biblioteca_servicos").select("*").eq("ativo", true).order("categoria").order("ordem"),
+        SB.from("biblioteca_materiais").select("*").order("ordem")
+    ]);
+    _bibServicos = sRes.data || [];
+    _bibMateriais = {};
+    (mRes.data||[]).forEach(m => {
+        if (!_bibMateriais[m.servico_id]) _bibMateriais[m.servico_id] = [];
+        _bibMateriais[m.servico_id].push(m);
+    });
+}
+
+function ligarAutocompleteBiblioteca(inputEl, cid) {
+    let popup = null;
+    const removePopup = () => { if (popup) { popup.remove(); popup = null; } };
+
+    inputEl.addEventListener("input", async () => {
+        const q = inputEl.value.trim().toLowerCase();
+        if (q.length < 2) { removePopup(); return; }
+        await garantirBibliotecaCarregada();
+        const matches = _bibServicos.filter(s => s.ativo && (s.nome.toLowerCase().includes(q) || s.categoria.toLowerCase().includes(q))).slice(0, 8);
+        if (!matches.length) { removePopup(); return; }
+        removePopup();
+        popup = document.createElement("div");
+        popup.style.cssText = "position:fixed;z-index:9999;background:#1e1e1e;border:1px solid rgba(255,255,255,.12);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.6);min-width:320px;max-width:420px;overflow:hidden";
+        const rect = inputEl.getBoundingClientRect();
+        popup.style.top  = (rect.bottom + 4) + "px";
+        popup.style.left = rect.left + "px";
+        popup.innerHTML =
+            '<div style="padding:6px 12px;font-size:10px;letter-spacing:1px;text-transform:uppercase;opacity:.4;border-bottom:1px solid rgba(255,255,255,.06)">🔧 Biblioteca</div>' +
+            matches.map(s => `<div class="bib-pp" data-id="${s.id}" style="padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.04)" onmouseenter="this.style.background='rgba(244,185,66,.1)'" onmouseleave="this.style.background=''"><div><div style="font-size:13px;font-weight:500">${s.nome}</div><div style="font-size:11px;opacity:.4">${s.categoria}${s.rendimento_mo?' · '+s.rendimento_mo+' '+s.unidade+'/dia':''}</div></div><span style="font-size:10px;background:rgba(255,255,255,.08);padding:2px 8px;border-radius:8px;color:rgba(255,255,255,.5);margin-left:8px;flex-shrink:0">${s.unidade}</span></div>`).join("");
+        document.body.appendChild(popup);
+        popup.querySelectorAll(".bib-pp").forEach(el => {
+            el.addEventListener("mousedown", e => {
+                e.preventDefault();
+                aplicarServicoBiblioteca(el.dataset.id, inputEl, cid);
+                removePopup();
+            });
+        });
+    });
+    inputEl.addEventListener("blur", () => setTimeout(removePopup, 200));
+}
+
+async function aplicarServicoBiblioteca(servicoId, inputDescricao, cid) {
+    await garantirBibliotecaCarregada();
+    const serv = _bibServicos.find(s => s.id === servicoId);
+    if (!serv) return;
+    inputDescricao.value = serv.nome;
+    const linha = inputDescricao.closest(".orc-linha");
+    if (linha) {
+        const unInput = linha.querySelector('[data-field="unidade"]');
+        if (unInput) unInput.value = serv.unidade;
+    }
+    const mats = _bibMateriais[servicoId] || [];
+    if (!mats.length) return;
+    const linhasDiv = document.querySelector(`.orc-linhas[data-cid="${cid}"]`);
+    if (!linhasDiv) return;
+    mats.forEach(m => adicionarLinha(cid, "material", { descricao: `${m.descricao}  [${m.quantidade} ${m.unidade}/un]`, unidade: m.unidade, quantidade: 1, preco_unitario: "" }));
+    const info = document.createElement("div");
+    info.style.cssText = "background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);border-radius:8px;padding:8px 14px;font-size:12px;color:#4ade80;margin:6px 0";
+    info.innerHTML = `✓ <strong>${mats.length} material${mats.length>1?'is':''}</strong> adicionado${mats.length>1?'s':''} da biblioteca. Ajusta a quantidade total do serviço.`;
+    linhasDiv.insertBefore(info, linhasDiv.firstChild);
+    setTimeout(() => info.remove(), 5000);
+}
+
