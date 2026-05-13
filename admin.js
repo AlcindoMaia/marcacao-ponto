@@ -2849,6 +2849,7 @@ function filtrarPorEstado(estado) {
 }
 
 function actualizarKpisFluxo(lista) {
+    lista = lista || movimentos || [];
     const entradas = lista.filter(m => m.tipo === "entrada").reduce((s,m) => s + Number(m.valor_total), 0);
     const saidas   = lista.filter(m => m.tipo === "saida").reduce((s,m)   => s + Number(m.valor_total), 0);
     const saldo    = entradas - saidas;
