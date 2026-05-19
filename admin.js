@@ -38,6 +38,8 @@ let funcEditId    = null;
 let chartLinhas   = null;
 let chartObras    = null;
 let chartFuncs    = null;
+let _paginaFluxo  = 0;
+const _PAGINA_FLUXO_TAM = 50;
 
 // =======================================================
 // AUTH — Login com Supabase Auth (email + password)
@@ -2890,8 +2892,9 @@ async function carregarMovimentos() {
     const { data, error } = await query;
     if (error) { console.error(error); return; }
     movimentos = data || [];
-    _todosMovimentos = data || []; // cache = resultado já filtrado por ano/datas/obra
+    _todosMovimentos = data || [];
     actualizarKpisFluxo(movimentos);
+    _paginaFluxo = 0;
     renderMovimentos();
 }
 
@@ -2918,7 +2921,11 @@ function renderMovimentos() {
         tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:20px;opacity:.6">Sem movimentos com estes filtros.</td></tr>`;
         return;
     }
-    movimentos.forEach(m => {
+    // Paginação — max 50 registos por página
+    const fim = (_paginaFluxo + 1) * _PAGINA_FLUXO_TAM;
+    const visiveis = movimentos.slice(0, fim);
+    const temMais = movimentos.length > fim;
+    visiveis.forEach(m => {
         const ent = m.tipo === "entrada";
         const tr  = document.createElement("tr");
         tr.innerHTML = `
@@ -2938,6 +2945,24 @@ function renderMovimentos() {
         tr.querySelectorAll(".btn-acao")[1].onclick = () => apagarMovimento(m.id, m.referencia);
         tbody.appendChild(tr);
     });
+    // Botão "Ver mais" se houver mais registos
+    if (temMais) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="9" style="text-align:center;padding:12px">
+            <button onclick="_paginaFluxo++;renderMovimentos()" 
+                style="background:rgba(244,185,66,.15);color:var(--primary,#b8860b);border:1px solid rgba(244,185,66,.3);
+                       border-radius:20px;padding:7px 20px;cursor:pointer;font-size:13px;font-weight:600">
+                Ver mais (${movimentos.length - fim} restantes)
+            </button>
+        </td>`;
+        tbody.appendChild(tr);
+    } else if (movimentos.length > _PAGINA_FLUXO_TAM) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="9" style="text-align:center;padding:8px;opacity:.4;font-size:12px">
+            ${movimentos.length} registos carregados
+        </td>`;
+        tbody.appendChild(tr);
+    }
 }
 
 function renderTotais() {
