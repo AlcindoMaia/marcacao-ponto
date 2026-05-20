@@ -288,19 +288,19 @@
 
         <!-- SUB-TABS FINANCEIRO -->
         <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:0">
-            <button class="fin-subtab active" data-fintab="ordenados"
+            <button class="fin-subtab active" onclick="switchFinTab('ordenados')" data-fintab="ordenados"
                 style="background:none;border:none;border-bottom:2px solid var(--primary);color:var(--primary);padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;font-family:var(--font-title);letter-spacing:.5px">
                 👥 ORDENADOS
             </button>
-            <button class="fin-subtab" data-fintab="dre"
+            <button class="fin-subtab" onclick="switchFinTab('dre')" data-fintab="dre"
                 style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;font-family:var(--font-title);letter-spacing:.5px">
                 📊 DRE
             </button>
-            <button class="fin-subtab" data-fintab="fluxo"
+            <button class="fin-subtab" onclick="switchFinTab('fluxo')" data-fintab="fluxo"
                 style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;font-family:var(--font-title);letter-spacing:.5px">
                 📈 FLUXO DE CAIXA
             </button>
-            <button class="fin-subtab" data-fintab="orcado"
+            <button class="fin-subtab" onclick="switchFinTab('orcado')" data-fintab="orcado"
                 style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;font-family:var(--font-title);letter-spacing:.5px">
                 🎯 ORÇADO VS. REAL
             </button>
@@ -992,12 +992,34 @@
 
     <!-- ================= TAB Gerar QR ================= -->
     <div class="tab-content" id="tab-gerarqr">
-    <div class="card" style="text-align:center">
-        <h2>Gerar QR de Obra</h2>
-        <p style="margin-bottom:20px">Criar nova obra e gerar QR Code</p>
-        <a href="qr.html" class="btn-primary" target="_blank">
-            Abrir Gerador de QR
-        </a>
+    <div class="card" style="max-width:500px;margin:0 auto">
+        <h2 style="margin-bottom:4px">Gerar QR de Obra</h2>
+        <p style="font-size:13px;opacity:.6;margin-bottom:20px">Gerar QR Code para marcação de ponto numa obra</p>
+
+        <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px">
+            <div>
+                <label style="font-size:11px;opacity:.6;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Obra</label>
+                <select id="selectObraQrTab" onchange="gerarQrTab()"
+                    style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:var(--bg-dark-panel);color:var(--text-light);font-size:13px">
+                    <option value="">— Seleccionar obra —</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="qrTabOutput" style="text-align:center;min-height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px">
+            <div style="opacity:.3;font-size:13px">Selecciona uma obra para gerar o QR</div>
+        </div>
+
+        <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.08);padding-top:16px;display:flex;gap:8px;justify-content:center">
+            <button onclick="imprimirQrTab()" id="btnImprimirQrTab" disabled
+                style="background:rgba(244,185,66,.15);color:var(--primary);border:1px solid rgba(244,185,66,.3);border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600">
+                🖨️ Imprimir
+            </button>
+            <a href="qr.html" target="_blank"
+                style="background:rgba(255,255,255,.08);color:var(--text-light);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;text-decoration:none">
+                🔲 Gerador avançado
+            </a>
+        </div>
     </div>
 </div>
 

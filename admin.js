@@ -140,11 +140,187 @@ function abrirTab(nome) {
     if (nome === "obras")        initObras();
     if (nome === "orcamentos")    initOrcamentos();
     if (nome === "config")        initConfig();
+    if (nome === "gerarqr")       initGerarQr();
 }
 
 // =======================================================
 // FINANCEIRO
 // =======================================================
+
+// =======================================================
+// FINANCEIRO — sub-tabs switch + DRE + Fluxo + Orçado Real
+// =======================================================
+function switchFinTab(tab) {
+    document.querySelectorAll(".fin-subtab").forEach(btn => {
+        const active = btn.dataset.fintab === tab;
+        btn.style.background   = active ? "rgba(244,185,66,.15)" : "none";
+        btn.style.color        = active ? "var(--primary)" : "var(--text-muted)";
+        btn.style.borderBottom = active ? "2px solid var(--primary)" : "2px solid transparent";
+    });
+    document.querySelectorAll(".fin-subtab-content").forEach(c => c.style.display = "none");
+    const el = document.getElementById("finTab-" + tab);
+    if (el) el.style.display = "block";
+    if (tab === "ordenados")  carregarFinanceiro();
+    if (tab === "dre")        carregarDRE();
+    if (tab === "fluxo")      carregarFluxo();
+    if (tab === "orcado")     carregarOrcadoReal();
+}
+
+async function carregarDRE() {
+    const periodo = document.getElementById("drePeriodo")?.value || "ano";
+    const obraId  = document.getElementById("dreObra")?.value || "";
+
+    // Calcular datas
+    const hoje = new Date();
+    let dInicio, dFim;
+    if (periodo === "mes") {
+        dInicio = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,"0")}-01`;
+        dFim    = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,"0")}-${new Date(hoje.getFullYear(), hoje.getMonth()+1, 0).getDate()}`;
+    } else if (periodo === "trimestre") {
+        const q = Math.floor(hoje.getMonth() / 3);
+        dInicio = `${hoje.getFullYear()}-${String(q*3+1).padStart(2,"0")}-01`;
+        dFim    = `${hoje.getFullYear()}-${String(q*3+3).padStart(2,"0")}-${new Date(hoje.getFullYear(), q*3+3, 0).getDate()}`;
+    } else if (periodo === "ano") {
+        dInicio = `${hoje.getFullYear()}-01-01`;
+        dFim    = `${hoje.getFullYear()}-12-31`;
+    } else {
+        dInicio = "2000-01-01"; dFim = "2099-12-31";
+    }
+
+    let q = SB.from("movimentos_financeiros")
+        .select("tipo, valor_total, categorias_financeiras(nome)")
+        .gte("data_documento", dInicio).lte("data_documento", dFim);
+    if (obraId) q = q.eq("obra_id", obraId);
+    const { data } = await q;
+    if (!data) return;
+
+    const receitas = data.filter(m => m.tipo === "entrada");
+    const custos   = data.filter(m => m.tipo === "saida");
+    const totRec   = receitas.reduce((s,m) => s+Number(m.valor_total||0), 0);
+    const totCust  = custos.reduce((s,m)   => s+Number(m.valor_total||0), 0);
+    const resultado = totRec - totCust;
+    const margem    = totRec > 0 ? (resultado / totRec * 100) : 0;
+
+    const fmt = v => v.toLocaleString("pt-PT", {minimumFractionDigits:2, maximumFractionDigits:2}) + " €";
+    document.getElementById("dreReceitas").textContent  = fmt(totRec);
+    document.getElementById("dreCustos").textContent    = fmt(totCust);
+    document.getElementById("dreResultado").textContent = fmt(resultado);
+    document.getElementById("dreResultado").style.color = resultado >= 0 ? "#5ad65a" : "#ff7a7a";
+    document.getElementById("dreMargem").textContent    = margem.toFixed(1) + "%";
+
+    // Detalhes por categoria
+    const porCat = {};
+    data.forEach(m => {
+        const cat = m.categorias_financeiras?.nome || "Sem categoria";
+        if (!porCat[cat]) porCat[cat] = { entrada:0, saida:0 };
+        porCat[cat][m.tipo] += Number(m.valor_total||0);
+    });
+
+    document.getElementById("dreDetalheReceitas").innerHTML = Object.entries(porCat)
+        .filter(([,v]) => v.entrada > 0).sort(([,a],[,b]) => b.entrada-a.entrada)
+        .map(([cat,v]) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
+            <span style="opacity:.8">${cat}</span><span style="color:#5ad65a">${fmt(v.entrada)}</span>
+        </div>`).join("") || '<div style="opacity:.4;font-size:13px">Sem receitas</div>';
+
+    document.getElementById("dreDetalheCustos").innerHTML = Object.entries(porCat)
+        .filter(([,v]) => v.saida > 0).sort(([,a],[,b]) => b.saida-a.saida)
+        .map(([cat,v]) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
+            <span style="opacity:.8">${cat}</span><span style="color:#ff7a7a">${fmt(v.saida)}</span>
+        </div>`).join("") || '<div style="opacity:.4;font-size:13px">Sem custos</div>';
+
+    // Preencher select de obras se vazio
+    const dreObraEl = document.getElementById("dreObra");
+    if (dreObraEl && dreObraEl.options.length <= 1) {
+        const { data: obras } = await SB.from("obras").select("id,nome").order("nome");
+        (obras||[]).forEach(o => {
+            const opt = document.createElement("option");
+            opt.value = o.id; opt.textContent = o.nome;
+            dreObraEl.appendChild(opt);
+        });
+    }
+}
+
+async function carregarFluxo() {
+    const horizonte = parseInt(document.getElementById("fluxoHorizonte")?.value || "60");
+    const hoje = new Date();
+    const fim  = new Date(hoje); fim.setDate(fim.getDate() + horizonte);
+    const dHoje = hoje.toISOString().split("T")[0];
+    const dFim  = fim.toISOString().split("T")[0];
+
+    const { data } = await SB.from("movimentos_financeiros")
+        .select("tipo, valor_total, estado_pagamento, data_documento")
+        .gte("data_documento", dHoje).lte("data_documento", dFim)
+        .order("data_documento");
+    if (!data) return;
+
+    const fmt = v => v.toLocaleString("pt-PT", {minimumFractionDigits:2}) + " €";
+    const entradas  = data.filter(m => m.tipo==="entrada").reduce((s,m)=>s+Number(m.valor_total||0),0);
+    const saidas    = data.filter(m => m.tipo==="saida").reduce((s,m)=>s+Number(m.valor_total||0),0);
+    const saldo     = entradas - saidas;
+    const atraso    = data.filter(m => m.estado_pagamento==="por_pagar" && m.data_documento < dHoje);
+    const totAtraso = atraso.reduce((s,m)=>s+Number(m.valor_total||0),0);
+
+    document.getElementById("fluxoEntradas").textContent = fmt(entradas);
+    document.getElementById("fluxoSaidas").textContent   = fmt(saidas);
+    document.getElementById("fluxoSaldo").textContent    = fmt(saldo);
+    document.getElementById("fluxoSaldo").style.color    = saldo >= 0 ? "#5ad65a" : "#ff7a7a";
+    document.getElementById("fluxoAtraso").textContent   = fmt(totAtraso);
+
+    const tabela = document.getElementById("fluxoTabela");
+    if (tabela) {
+        tabela.innerHTML = data.slice(0,30).map(m => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
+                <span style="opacity:.6;min-width:90px">${m.data_documento}</span>
+                <span style="flex:1;opacity:.8">${m.tipo==="entrada"?"Entrada":"Saída"}</span>
+                <span style="color:${m.tipo==="entrada"?"#5ad65a":"#ff7a7a"};font-weight:500">${fmt(Number(m.valor_total||0))}</span>
+                <span style="margin-left:8px;font-size:10px;opacity:.5">${m.estado_pagamento==="pago"?"✓":"⏳"}</span>
+            </div>`).join("") || '<div style="opacity:.4;padding:20px;text-align:center">Sem movimentos no período</div>';
+    }
+}
+
+async function carregarOrcadoReal() {
+    const obraId = document.getElementById("orcadoObra")?.value || "";
+    const fmt = v => v.toLocaleString("pt-PT", {minimumFractionDigits:2}) + " €";
+
+    // Orçamento aprovado
+    let qOrc = SB.from("orcamentos").select("valor_total").in("estado", ["aceite","enviado"]);
+    if (obraId) qOrc = qOrc.eq("obra_id", obraId);
+    const { data: orcs } = await qOrc;
+    const totalOrcado = (orcs||[]).reduce((s,o)=>s+Number(o.valor_total||0),0);
+
+    // Custos reais
+    let qCusto = SB.from("movimentos_financeiros").select("valor_total").eq("tipo","saida");
+    if (obraId) qCusto = qCusto.eq("obra_id", obraId);
+    const { data: custos } = await qCusto;
+    const totalReal = (custos||[]).reduce((s,m)=>s+Number(m.valor_total||0),0);
+
+    const desvio = totalOrcado - totalReal;
+    const pct    = totalOrcado > 0 ? (totalReal/totalOrcado*100) : 0;
+
+    document.getElementById("orcadoTotal").textContent   = fmt(totalOrcado);
+    document.getElementById("orcadoReal").textContent    = fmt(totalReal);
+    document.getElementById("orcadoDesvio").textContent  = fmt(desvio);
+    document.getElementById("orcadoDesvio").style.color  = desvio >= 0 ? "#5ad65a" : "#ff7a7a";
+    document.getElementById("orcadoPercent").textContent = pct.toFixed(1) + "%";
+
+    const bar = document.getElementById("orcadoBar");
+    const barLabel = document.getElementById("orcadoBarLabel");
+    if (bar) bar.style.width = Math.min(pct, 100) + "%";
+    if (bar) bar.style.background = pct > 100 ? "#ff7a7a" : pct > 80 ? "#f97316" : "#5ad65a";
+    if (barLabel) barLabel.textContent = pct.toFixed(0) + "% do orçamento consumido";
+
+    // Preencher select obras
+    const orcObraEl = document.getElementById("orcadoObra");
+    if (orcObraEl && orcObraEl.options.length <= 1) {
+        const { data: obras } = await SB.from("obras").select("id,nome").order("nome");
+        (obras||[]).forEach(o => {
+            const opt = document.createElement("option");
+            opt.value = o.id; opt.textContent = o.nome;
+            orcObraEl.appendChild(opt);
+        });
+    }
+}
+
 async function carregarFinanceiro() {
     // Determinar mês a consultar
     const filtroEl = document.getElementById("filtroMesFinanceiro");
@@ -3970,6 +4146,69 @@ async function exportarPDFOrcamento(id) {
 // =======================================================
 // CONFIG TAB
 // =======================================================
+
+// =======================================================
+// GERAR QR — inicializar select de obras
+// =======================================================
+
+function gerarQrTab() {
+    const sel = document.getElementById("selectObraQrTab");
+    const obraId = sel?.value;
+    const obraNome = sel?.options[sel.selectedIndex]?.text || "";
+    const output = document.getElementById("qrTabOutput");
+    const btnImprimir = document.getElementById("btnImprimirQrTab");
+    if (!obraId || !output) return;
+
+    output.innerHTML = "";
+    const canvas = document.createElement("canvas");
+    canvas.id = "qrTabCanvas";
+    canvas.style.cssText = "border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.3)";
+    output.appendChild(canvas);
+
+    const label = document.createElement("div");
+    label.style.cssText = "font-size:14px;font-weight:600;opacity:.8;margin-top:8px";
+    label.textContent = obraNome;
+    output.appendChild(label);
+
+    try {
+        new QRious({
+            element: canvas,
+            value: obraId,
+            size: 200,
+            background: "#ffffff",
+            foreground: "#1a1a1a",
+            padding: 10
+        });
+        if (btnImprimir) btnImprimir.disabled = false;
+    } catch(e) {
+        output.innerHTML = '<div style="color:#f87171;font-size:13px">Erro ao gerar QR. Tenta o gerador avançado.</div>';
+    }
+}
+
+function imprimirQrTab() {
+    const canvas = document.getElementById("qrTabCanvas");
+    const sel = document.getElementById("selectObraQrTab");
+    if (!canvas || !sel) return;
+    const nome = sel.options[sel.selectedIndex]?.text || "QR";
+    const win = window.open("", "_blank");
+    win.document.write(`<html><head><title>QR — ${nome}</title>
+        <style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;gap:16px}
+        h2{font-size:18px;font-weight:600}@media print{button{display:none}}</style></head>
+        <body><h2>${nome}</h2><img src="${canvas.toDataURL()}" style="width:250px;height:250px">
+        <button onclick="window.print()">🖨️ Imprimir</button></body></html>`);
+    win.document.close();
+}
+
+async function initGerarQr() {
+    // Preencher select de obras no tab gerar QR (se existir)
+    const sel = document.getElementById("selectObraQrTab");
+    if (!sel || sel.dataset.loaded) return;
+    const { data } = await SB.from("obras").select("id,nome,codigo").eq("estado","ativa").order("nome");
+    sel.innerHTML = '<option value="">— Seleccionar obra —</option>' +
+        (data||[]).map(o => `<option value="${o.id}" data-codigo="${o.codigo||''}">${o.codigo ? o.codigo+' — ' : ''}${o.nome}</option>`).join("");
+    sel.dataset.loaded = "1";
+}
+
 function initConfig() {
     const area = document.getElementById('configTOCArea');
     if (area) area.innerHTML = renderPainelTOC();
