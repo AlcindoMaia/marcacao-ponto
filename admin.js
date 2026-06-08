@@ -3193,6 +3193,173 @@ function fecharModalMovimento() {
     movEditId = null;
 }
 
+
+// =======================================================
+// MODAL MOVIMENTOS FINANCEIROS
+// =======================================================
+
+let _barcodeBuffer = "";
+let _barcodeTimer  = null;
+
+async function abrirModalMovimento(mov = null) {
+    const modal = document.getElementById("modalMovimento");
+    if (!modal) return;
+
+    movEditId = mov?.id || null;
+
+    // Título
+    const titulo = modal.querySelector("h2, .modal-title, [id*='titulo'], [id*='Titulo']");
+    if (titulo) titulo.textContent = mov ? "✏️ Editar Movimento" : "＋ Novo Movimento";
+
+    // Reset dos campos
+    const campos = ["movReferencia","movData","movNif","movFornecedor","movTotal","movIva","movBase","movObs"];
+    campos.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+    });
+    const movMsg = document.getElementById("movMsg");
+    if (movMsg) movMsg.textContent = "";
+
+    // Defaults para novo
+    if (!mov) {
+        const hoje = new Date().toISOString().split("T")[0];
+        const dataEl = document.getElementById("movData");
+        if (dataEl) dataEl.value = hoje;
+        const tipoEl = document.getElementById("movTipo");
+        if (tipoEl) tipoEl.value = "saida";
+        const ivaEl = document.getElementById("movIva");
+        if (ivaEl) ivaEl.value = "23";
+        const estadoEl = document.getElementById("movEstado");
+        if (estadoEl) estadoEl.value = "pago";
+    } else {
+        // Modo edição — preencher campos
+        const set = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
+        set("movReferencia", mov.referencia);
+        set("movData",       mov.data_documento);
+        set("movTipo",       mov.tipo);
+        set("movTotal",      mov.valor_total);
+        set("movIva",        mov.iva);
+        set("movBase",       mov.valor_base);
+        set("movEstado",     mov.estado_pagamento);
+        set("movCategoria",  mov.categoria_id);
+        set("movObra",       mov.obra_id);
+        set("movObs",        mov.observacoes);
+
+        // Preencher fornecedor
+        if (mov.fornecedor_id) {
+            const { data: forn } = await SB.from("fornecedores").select("nif, nome").eq("id", mov.fornecedor_id).maybeSingle();
+            if (forn) {
+                set("movNif",        forn.nif || "");
+                set("movFornecedor", forn.nome || "");
+            }
+        }
+
+        // Carregar imputações de serviços
+        const contImput = document.getElementById("imputacaoServicosContainer");
+        if (contImput && mov.obra_id) {
+            await carregarServicosImputacao(mov.obra_id, mov.id);
+        }
+    }
+
+    // Mostrar modal
+    modal.style.display = "flex";
+    modal.classList.remove("hidden");
+
+    // Focar referência para o leitor de barras
+    setTimeout(() => {
+        const refEl = document.getElementById("movReferencia");
+        if (refEl) {
+            refEl.focus();
+            refEl.select();
+        }
+    }, 100);
+
+    // ── Leitor de código de barras (USB/Bluetooth — funciona como teclado) ──
+    // O leitor escreve os caracteres muito rápido e faz Enter no fim
+    // Detectamos isso pelo intervalo entre keystrokes (< 50ms = leitor, > 100ms = humano)
+    activarLeituraBarcode();
+}
+
+function activarLeituraBarcode() {
+    // Limpar listener anterior se existir
+    if (window._barcodeListener) {
+        document.removeEventListener("keydown", window._barcodeListener);
+    }
+
+    const THRESHOLD_MS = 80; // keystroke mais rápido que isto = leitor
+
+    window._barcodeListener = function(e) {
+        // Só activo quando o modal está aberto
+        const modal = document.getElementById("modalMovimento");
+        if (!modal || modal.style.display === "none" || modal.classList.contains("hidden")) {
+            document.removeEventListener("keydown", window._barcodeListener);
+            window._barcodeListener = null;
+            return;
+        }
+
+        // Ignorar se o foco está num input que não é a referência
+        const active = document.activeElement;
+        const isRefInput = active?.id === "movReferencia";
+
+        // Enter = possível fim de scan
+        if (e.key === "Enter" && _barcodeBuffer.length > 3) {
+            e.preventDefault();
+            const codigo = _barcodeBuffer.trim();
+            _barcodeBuffer = "";
+
+            // Preencher o campo referência
+            const refEl = document.getElementById("movReferencia");
+            if (refEl) {
+                refEl.value = codigo;
+                refEl.style.background = "rgba(74,222,128,.1)";
+                refEl.style.borderColor = "rgba(74,222,128,.4)";
+                setTimeout(() => {
+                    refEl.style.background = "";
+                    refEl.style.borderColor = "";
+                }, 1500);
+            }
+
+            // Mover foco para o NIF (próximo campo lógico)
+            setTimeout(() => document.getElementById("movNif")?.focus(), 50);
+            return;
+        }
+
+        // Acumular caracteres com timing rápido
+        if (_barcodeTimer) clearTimeout(_barcodeTimer);
+
+        if (e.key.length === 1 || e.key === "Shift") {
+            if (e.key !== "Shift") _barcodeBuffer += e.key;
+            _barcodeTimer = setTimeout(() => {
+                // Se passou tempo suficiente sem novo caractere, era digitação humana
+                _barcodeBuffer = "";
+            }, THRESHOLD_MS * 3);
+        } else if (e.key !== "Enter") {
+            // Tecla especial que não é Enter — reset
+            _barcodeBuffer = "";
+        }
+    };
+
+    document.addEventListener("keydown", window._barcodeListener);
+}
+
+// Badge visual no campo referência para indicar que aceita barcode
+function mostrarBadgeBarcode() {
+    const refEl = document.getElementById("movReferencia");
+    if (!refEl) return;
+    const wrap = refEl.parentElement;
+    if (!wrap || wrap.querySelector(".barcode-badge")) return;
+
+    const badge = document.createElement("div");
+    badge.className = "barcode-badge";
+    badge.style.cssText = "font-size:11px;color:var(--text-muted,#888);margin-top:3px;display:flex;align-items:center;gap:4px";
+    badge.innerHTML = `<span style="font-size:14px">📷</span> Aponta o leitor de barras para preencher automaticamente`;
+    wrap.appendChild(badge);
+}
+
+// Chamar mostrarBadgeBarcode sempre que o modal abre (patch no abrirModalMovimento)
+const _abrirModalMovOrig = abrirModalMovimento;
+
+// =======================================================
 async function guardarMovimento() {
     const dataDoc    = document.getElementById("movData")?.value;
     const valor_total = Number(document.getElementById("movTotal")?.value);
