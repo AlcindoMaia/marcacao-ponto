@@ -659,8 +659,11 @@
 
         <div class="form-row">
             <div class="form-group">
-                <label>Referência</label>
-                <input id="movReferencia" placeholder="Ex: FT 2024/001">
+                <label>Referência <span style="font-size:10px;opacity:.5;font-weight:400">— ou usa o leitor de barras</span></label>
+                <div style="position:relative;display:flex;gap:6px;align-items:center">
+                    <input id="movReferencia" placeholder="Ex: FT 2024/001 — aponta o leitor aqui" style="flex:1">
+                    <span style="position:absolute;right:8px;font-size:16px;opacity:.35;pointer-events:none" title="Compatível com leitor de código de barras USB/Bluetooth">📊</span>
+                </div>
             </div>
             <div class="form-group input-sm">
                 <label>Data</label>

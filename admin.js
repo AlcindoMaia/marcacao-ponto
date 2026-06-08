@@ -2163,80 +2163,137 @@ function colarQRManual() {
 }
 
 function parsearQRFatura(texto) {
-    // Formato AT: A:NIF_EMITENTE*B:NIF_ADQUIRENTE*C:PAIS*D:TIPO*E:ESTADO*F:DATA*G:ATCUD*H:REF*I1:BASE*I2:IVA%*N:IVA_TOTAL*O:TOTAL_IVA*P:DESCONTO*Q:HASH*R:NUM_CERT
-    const status = document.getElementById("qrStatusText");
+    // ── Parser AT (Autoridade Tributária) ─────────────────
+    // Formato: A:NIF_emit*B:NIF_adq*C:país*D:tipo*E:estado
+    //          *F:YYYYMMDD*G:referência*H:ATCUD
+    //          *I1:país_taxa*I7:base*I8:iva_valor
+    //          *N:total_iva*O:total_doc*Q:hash*R:cert
+
+    const isFormatoAT = texto.includes('*') && texto.includes(':') &&
+                        (texto.includes('*A:') || texto.startsWith('A:'));
+
+    if (!isFormatoAT) {
+        // Formato não reconhecido — colocar no campo referência
+        const refEl = document.getElementById("movReferencia");
+        if (refEl) { refEl.value = texto.substring(0, 100); refEl.focus(); }
+        mostrarFeedbackQR("⚠️ Formato não AT — texto colocado na referência", "warn");
+        return;
+    }
 
     try {
-        // Tentar parsing do formato AT
-        const campos = {};
+        const c = {};
         texto.split("*").forEach(par => {
             const sep = par.indexOf(":");
-            if (sep > 0) {
-                campos[par.substring(0, sep)] = par.substring(sep + 1);
-            }
+            if (sep > 0) c[par.substring(0, sep)] = par.substring(sep + 1);
         });
 
-        let preenchido = 0;
-
-        // NIF fornecedor (campo A)
-        if (campos["A"]) {
-            document.getElementById("movNif").value = campos["A"];
-            preenchido++;
-        }
-
-        // Data (campo F — formato YYYYMMDD)
-        if (campos["F"] && campos["F"].length === 8) {
-            const ano = campos["F"].substring(0,4);
-            const mes = campos["F"].substring(4,6);
-            const dia = campos["F"].substring(6,8);
-            document.getElementById("movData").value = `${ano}-${mes}-${dia}`;
-            preenchido++;
-        }
-
-        // Referência (campo G = ATCUD ou H)
-        const ref = campos["G"] || campos["H"] || "";
+        // ── Referência (G = número doc, H = ATCUD) ──
+        const ref = (c["G"] || "").trim();
+        const atcud = (c["H"] || "").trim();
         if (ref) {
-            document.getElementById("movReferencia").value = ref.substring(0, 50);
-            preenchido++;
+            document.getElementById("movReferencia").value = ref.substring(0, 80);
         }
 
-        // Total com IVA (campo O)
-        if (campos["O"]) {
-            const total = parseFloat(campos["O"].replace(",", "."));
-            if (!isNaN(total)) {
-                document.getElementById("movTotal").value = total.toFixed(2);
-                // IVA % (campo I2 se existir)
-                if (campos["I2"]) {
-                    document.getElementById("movIva").value = campos["I2"];
-                    const base = total / (1 + parseFloat(campos["I2"]) / 100);
-                    document.getElementById("movBase").value = base.toFixed(2);
-                } else {
-                    // Tentar calcular pelo campo N (total IVA)
-                    if (campos["N"]) {
-                        const ivaVal = parseFloat(campos["N"].replace(",", "."));
-                        const base = total - ivaVal;
-                        const pct  = Math.round((ivaVal / base) * 100);
-                        document.getElementById("movIva").value   = pct;
-                        document.getElementById("movBase").value  = base.toFixed(2);
-                    }
-                }
-                preenchido++;
+        // ── Data (F = YYYYMMDD → YYYY-MM-DD) ──
+        const f = c["F"] || "";
+        if (f.length === 8) {
+            document.getElementById("movData").value =
+                `${f.substring(0,4)}-${f.substring(4,6)}-${f.substring(6,8)}`;
+        }
+
+        // ── Tipo de documento → tipo do movimento ──
+        const tipoDoc = c["D"] || "";
+        const tipoMov = ["NC","ND"].includes(tipoDoc) ? "entrada" : "saida";
+        const tipoEl = document.getElementById("movTipo");
+        if (tipoEl) tipoEl.value = tipoMov;
+
+        // ── Valores ──
+        // I7 = base tributável, I8 = valor de IVA, O = total c/IVA
+        const base  = parseFloat((c["I7"] || "0").replace(",", ".")) || 0;
+        const ivaV  = parseFloat((c["I8"] || c["N"] || "0").replace(",", ".")) || 0;
+        const total = parseFloat((c["O"]  || "0").replace(",", ".")) || 0;
+
+        if (total > 0) {
+            document.getElementById("movTotal").value = total.toFixed(2);
+
+            if (base > 0 && ivaV > 0) {
+                document.getElementById("movBase").value = base.toFixed(2);
+                const pct = Math.round((ivaV / base) * 100);
+                document.getElementById("movIva").value = pct;
+            } else if (ivaV > 0) {
+                // Calcular base a partir do total e IVA
+                const baseCalc = total - ivaV;
+                document.getElementById("movBase").value = baseCalc.toFixed(2);
+                const pct = Math.round((ivaV / baseCalc) * 100);
+                document.getElementById("movIva").value = pct;
             }
         }
 
-        if (preenchido > 0) {
-            alert(`✓ QR lido com sucesso! ${preenchido} campo(s) preenchido(s).
-Completa a obra, categoria e estado manualmente.`);
-        } else {
-            // Tentar formato simples (texto livre)
-            alert("QR lido mas formato não reconhecido como fatura AT. Conteúdo: " + texto.substring(0, 100));
+        // ── NIF do emitente + busca automática do fornecedor ──
+        const nifEmit = (c["A"] || "").trim();
+        if (nifEmit) {
+            document.getElementById("movNif").value = nifEmit;
+            // Buscar nome do fornecedor na BD
+            SB.from("fornecedores").select("nome").eq("nif", nifEmit).maybeSingle()
+                .then(({ data: forn }) => {
+                    if (forn?.nome) {
+                        document.getElementById("movFornecedor").value = forn.nome;
+                    }
+                });
         }
 
+        // ── Observações: guardar ATCUD para referência futura ──
+        const obsEl = document.getElementById("movObs");
+        if (obsEl && atcud) {
+            obsEl.value = `ATCUD: ${atcud}`;
+        }
+
+        // ── Feedback visual (sem alert) ──
+        const camposPreench = [ref, f, total>0, nifEmit].filter(Boolean).length;
+        mostrarFeedbackQR(
+            `✅ Fatura lida — ${ref || atcud} · ${total.toFixed(2)}€ · NIF ${nifEmit}`,
+            "ok"
+        );
+
+        // Focar no campo Obra para o utilizador completar
+        setTimeout(() => document.getElementById("movObra")?.focus(), 200);
+
     } catch(e) {
-        console.error("Erro a parsear QR:", e);
-        alert("Erro ao ler o QR. Verifique se é um QR de fatura portuguesa.");
+        console.error("Erro parsearQRFatura:", e);
+        mostrarFeedbackQR("❌ Erro ao ler QR: " + e.message, "err");
     }
 }
+
+function mostrarFeedbackQR(msg, tipo) {
+    // Feedback visual no modal — sem alert()
+    let el = document.getElementById("qrFeedbackBar");
+    if (!el) {
+        el = document.createElement("div");
+        el.id = "qrFeedbackBar";
+        el.style.cssText = "border-radius:8px;padding:10px 14px;font-size:13px;font-weight:500;margin-bottom:12px;transition:opacity .3s;display:flex;align-items:center;gap:8px";
+        // Inserir no início do modal, depois do título
+        const modal = document.getElementById("modalMovimento");
+        const conteudo = modal?.querySelector(".modal-content, .modal-body") || modal;
+        conteudo?.insertBefore(el, conteudo.firstChild);
+    }
+    const cores = {
+        ok:   { bg: "rgba(74,222,128,.15)",  border: "rgba(74,222,128,.3)",  color: "#4ade80" },
+        warn: { bg: "rgba(251,146,60,.15)",   border: "rgba(251,146,60,.3)",  color: "#fb923c" },
+        err:  { bg: "rgba(248,113,113,.15)",  border: "rgba(248,113,113,.3)", color: "#f87171" },
+    };
+    const c = cores[tipo] || cores.warn;
+    el.style.background   = c.bg;
+    el.style.border       = `1px solid ${c.border}`;
+    el.style.color        = c.color;
+    el.style.opacity      = "1";
+    el.textContent        = msg;
+    el.style.display      = "flex";
+    // Auto-esconder após 6s
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => { el.style.opacity = "0"; setTimeout(() => el.style.display="none", 300); }, 6000);
+}
+
+
 
 // =======================================================
 // INVENTÁRIO — CRUD COMPLETO
@@ -3307,20 +3364,24 @@ function activarLeituraBarcode() {
             const codigo = _barcodeBuffer.trim();
             _barcodeBuffer = "";
 
-            // Preencher o campo referência
-            const refEl = document.getElementById("movReferencia");
-            if (refEl) {
-                refEl.value = codigo;
-                refEl.style.background = "rgba(74,222,128,.1)";
-                refEl.style.borderColor = "rgba(74,222,128,.4)";
-                setTimeout(() => {
-                    refEl.style.background = "";
-                    refEl.style.borderColor = "";
-                }, 1500);
-            }
+            // Detectar se é um QR AT de fatura (tem * e : no formato AT)
+            const isQrAT = codigo.includes('*') && codigo.includes(':') &&
+                           (codigo.startsWith('A:') || codigo.includes('*A:'));
 
-            // Mover foco para o NIF (próximo campo lógico)
-            setTimeout(() => document.getElementById("movNif")?.focus(), 50);
+            if (isQrAT) {
+                // Parser completo AT — preenche todos os campos
+                parsearQRFatura(codigo);
+            } else {
+                // Código simples (barras 1D, EAN, etc.) — vai para referência
+                const refEl = document.getElementById("movReferencia");
+                if (refEl) {
+                    refEl.value = codigo;
+                    refEl.style.background = "rgba(74,222,128,.1)";
+                    refEl.style.borderColor = "rgba(74,222,128,.4)";
+                    setTimeout(() => { refEl.style.background = ""; refEl.style.borderColor = ""; }, 1500);
+                }
+                setTimeout(() => document.getElementById("movNif")?.focus(), 50);
+            }
             return;
         }
 
