@@ -346,11 +346,10 @@ async function carregarFinanceiro() {
     const registos = registosRes.data || [];
     const funcs    = funcsRes.data    || [];
 
-    // Agrupar por funcionário — excluir faltas e registos sem obra
+    // Agrupar por funcionário — excluir só faltas
     const porFunc = {};
     registos.forEach(r => {
         if (r.tipo === "falta") return;     // faltas não contam
-        if (!r.obra_id) return;             // sem obra não conta
         const fid = r.funcionario_id;
         if (!porFunc[fid]) porFunc[fid] = { horas: 0, dias: new Set() };
         porFunc[fid].horas += Number(r.horas) || 0;
@@ -1252,6 +1251,7 @@ async function carregarFuncionarios() {
     if (!tbody) return;
 
     if (error) {
+        console.error("carregarArtigos error:", error);
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#ff7a7a">Erro: ${error.message}</td></tr>`;
         return;
     }
@@ -2242,7 +2242,7 @@ Completa a obra, categoria e estado manualmente.`);
 // INVENTÁRIO — CRUD COMPLETO
 // =======================================================
 async function initInventario() {
-    await carregarUnidades();
+    try { await carregarUnidades(); } catch(e) { console.warn("carregarUnidades:", e); }
     // Sub-tabs do inventário
     document.querySelectorAll(".inv-subtab").forEach(btn => {
         btn.onclick = async () => {
@@ -4209,40 +4209,14 @@ async function initGerarQr() {
     sel.dataset.loaded = "1";
 }
 
-function initConfig() {
-    const area = document.getElementById('configTOCArea');
-    if (area) area.innerHTML = renderPainelTOC();
 
-    // Definir datas default do sync (mês actual)
-    const hoje = new Date();
-    const inicio = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-01`;
-    const fim    = hoje.toISOString().split('T')[0];
-    const elI = document.getElementById('tocSyncInicio');
-    const elF = document.getElementById('tocSyncFim');
-    if (elI && !elI.value) elI.value = inicio;
-    if (elF && !elF.value) elF.value = fim;
-}
 
 function abrirSyncTOC() {
     // Atalho — vai para a tab config
     abrirTab('config');
 }
 
-async function executarSyncTOC() {
-    const inicio = document.getElementById('tocSyncInicio')?.value;
-    const fim    = document.getElementById('tocSyncFim')?.value;
-    const status = document.getElementById('tocSyncStatusConfig');
-    if (!inicio || !fim) {
-        if (status) { status.textContent = 'Define as datas antes de sincronizar.'; status.style.color = 'var(--color-err)'; }
-        return;
-    }
-    if (status) status.textContent = '';
-    // Usar o status do fluxo de caixa durante o sync
-    const tocStatus = document.getElementById('tocSyncStatus');
-    await tocSincronizarFluxo(inicio, fim);
-    // Copiar resultado para o status local
-    if (status && tocStatus) { status.textContent = tocStatus.textContent; status.style.color = tocStatus.style.color; }
-}
+
 
 // Auto-complete nos orçamentos: activar quando o modal abre
 const _origAbrirModal = abrirModalOrcamento;
@@ -4252,240 +4226,13 @@ abrirModalOrcamento = async function(id) {
 };
 
 // =======================================================
-// INTEGRAÇÃO TOC ONLINE — UI do admin
-// =======================================================
 
-function abrirSettingsTOC() {
-    // Pré-preencher com valores guardados
-    const cfg = JSON.parse(localStorage.getItem('toc_config') || '{}');
-    document.getElementById('tocClientId').value     = cfg.clientId  || '';
-    document.getElementById('tocClientSecret').value = cfg.clientSecret || '';
-    document.getElementById('tocOauthUrl').value     = cfg.oauthUrl  || 'https://app35.toconline.pt/oauth';
-    document.getElementById('tocApiBase').value      = cfg.apiBase   || 'https://api35.toconline.pt';
-
-    // Mês actual
-    const agora = new Date();
-    document.getElementById('tocSincMes').value =
-        `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}`;
-
-    document.getElementById('tocMsg').textContent     = '';
-    document.getElementById('tocSincMsg').textContent = '';
-    document.getElementById('modalTOC').classList.remove('hidden');
-}
-
-function fecharModalTOC() {
-    document.getElementById('modalTOC').classList.add('hidden');
-    document.getElementById('tocMsg').textContent     = '';
-    document.getElementById('tocSincMsg').textContent = '';
-}
-
-function guardarConfigTOC() {
-    const cfg = {
-        clientId:     document.getElementById('tocClientId').value.trim(),
-        clientSecret: document.getElementById('tocClientSecret').value.trim(),
-        oauthUrl:     document.getElementById('tocOauthUrl').value.trim(),
-        apiBase:      document.getElementById('tocApiBase').value.trim(),
-    };
-    TOC.guardarConfig(cfg);
-    const msg = document.getElementById('tocMsg');
-    msg.textContent = '✓ Configuração guardada.';
-    msg.style.color = 'var(--color-ok)';
-    actualizarEstadoTOC();
-}
-
-function actualizarEstadoTOC() {
-    const dot = document.getElementById('tocStatusDot');
-    if (!dot) return;
-    dot.style.background = TOC.estaConfigurado() ? '#4caf7d' : '#ccc';
-}
-
-async function testarConexaoTOC() {
-    const msg = document.getElementById('tocMsg');
-    msg.textContent = 'A testar…'; msg.style.color = '';
-    try {
-        const clientes = await TOC.listarClientes();
-        msg.textContent = `✓ Ligação OK — ${clientes.length} clientes encontrados.`;
-        msg.style.color = 'var(--color-ok)';
-        actualizarEstadoTOC();
-    } catch(e) {
-        if (e.message.includes('fetch') || e.message.includes('CORS')) {
-            msg.textContent = '✗ CORS: a API do TOC Online não permite pedidos directos do browser. Necessário proxy ou integração server-side.';
-        } else {
-            msg.textContent = '✗ Erro: ' + e.message;
-        }
-        msg.style.color = 'var(--color-err)';
-    }
-}
-
-async function sincronizarTOC() {
-    const msg = document.getElementById('tocSincMsg');
-    const mesVal = document.getElementById('tocSincMes').value;
-    if (!mesVal) { msg.textContent = 'Selecciona um mês.'; return; }
-    const [ano, mes] = mesVal.split('-').map(Number);
-    msg.textContent = `A importar ${mes}/${ano}…`; msg.style.color = '';
-    try {
-        const r = await TOC.sincronizarMes(ano, mes);
-        msg.textContent = `✓ ${r.importados} movimentos importados (${r.entradas} entradas, ${r.saidas} saídas).`;
-        msg.style.color = 'var(--color-ok)';
-        // Actualizar fluxo de caixa se estiver na tab
-        if (document.getElementById('tab-fluxo')?.classList.contains('active')) initFluxo();
-    } catch(e) {
-        msg.textContent = '✗ ' + e.message;
-        msg.style.color = 'var(--color-err)';
-    }
-}
-
-async function importarClientesTOC() {
-    const msg = document.getElementById('tocSincMsg');
-    msg.textContent = 'A importar clientes…'; msg.style.color = '';
-    try {
-        const clientes = await TOC.listarClientes();
-        // Guardar na tabela clientes_toc do Supabase (ou usar como cache local)
-        localStorage.setItem('toc_clientes', JSON.stringify(clientes));
-        msg.textContent = `✓ ${clientes.length} clientes importados e disponíveis nos orçamentos.`;
-        msg.style.color = 'var(--color-ok)';
-    } catch(e) {
-        msg.textContent = '✗ ' + e.message;
-        msg.style.color = 'var(--color-err)';
-    }
-}
 
 async function importarFornecedoresTOC() {
     const msg = document.getElementById('tocSincMsg');
     msg.textContent = 'A importar fornecedores…'; msg.style.color = '';
     try {
-        const forns = await TOC.listarFornecedores();
-        // Actualizar tabela fornecedores no Supabase
-        for (const f of forns) {
-            await SB.from('fornecedores').upsert(
-                { nome: f.nome, nif: f.nif || null },
-                { onConflict: 'nome' }
-            );
-        }
-        msg.textContent = `✓ ${forns.length} fornecedores sincronizados.`;
-        msg.style.color = 'var(--color-ok)';
-    } catch(e) {
-        msg.textContent = '✗ ' + e.message;
-        msg.style.color = 'var(--color-err)';
-    }
-}
-
-// Actualizar estado do botão TOC ao carregar
-window.addEventListener("load", () => {
-    setTimeout(actualizarEstadoTOC, 500);
-});
-
-
-
-// =======================================================
-// INTEGRAÇÃO TOC ONLINE — UI do admin (fluxo OAuth2 correcto)
-// =======================================================
-
-function actualizarEstadoTOC() {
-    const dot = document.getElementById('tocStatusDot');
-    if (!dot) return;
-    // Verde se autenticado, amarelo se configurado mas não autenticado, cinzento se não configurado
-    if (TOC.estaAutenticado()) {
-        dot.style.background = '#4caf7d';
-        dot.title = 'TOC Online ligado';
-    } else {
-        dot.style.background = '#f4b942';
-        dot.title = 'TOC Online não autenticado';
-    }
-}
-
-function abrirSettingsTOC() {
-    // Pré-preencher credenciais guardadas
-    const cfg = JSON.parse(localStorage.getItem('toc_config') || '{}');
-    const elId = document.getElementById('tocClientId');
-    const elOu = document.getElementById('tocOauthUrl');
-    if (elId) elId.value = cfg.clientId  || '';
-    if (elOu) elOu.value = cfg.oauthUrl  || 'https://app35.toconline.pt/oauth';
-
-    const agora = new Date();
-    document.getElementById('tocSincMes').value =
-        `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}`;
-    document.getElementById('tocMsg').textContent     = '';
-    document.getElementById('tocSincMsg').textContent = '';
-    actualizarEstadoTOC();
-    document.getElementById('modalTOC').classList.remove('hidden');
-}
-
-function guardarConfigTOC() {
-    const cfg = {
-        clientId: (document.getElementById('tocClientId')?.value || '').trim(),
-        oauthUrl: (document.getElementById('tocOauthUrl')?.value || 'https://app35.toconline.pt/oauth').trim(),
-    };
-    localStorage.setItem('toc_config', JSON.stringify(cfg));
-    const msg = document.getElementById('tocMsg');
-    msg.textContent = '✓ Credenciais guardadas. Agora clica em "Autorizar TOC Online".';
-    msg.style.color = 'var(--color-ok)';
-}
-
-function fecharModalTOC() {
-    document.getElementById('modalTOC').classList.add('hidden');
-    document.getElementById('tocMsg').textContent     = '';
-    document.getElementById('tocSincMsg').textContent = '';
-}
-
-
-function desligarTOC() {
-    TOC.desligar();
-    actualizarEstadoTOC();
-    const msg = document.getElementById('tocMsg');
-    msg.textContent = 'Desligado do TOC Online.'; msg.style.color = 'var(--text-muted)';
-}
-
-async function testarConexaoTOC() {
-    const msg = document.getElementById('tocMsg');
-    msg.textContent = 'A testar…'; msg.style.color = '';
-    try {
-        const clientes = await TOC.listarClientes();
-        msg.textContent = `✓ Ligação OK — ${clientes.length} clientes encontrados.`;
-        msg.style.color = 'var(--color-ok)';
-        actualizarEstadoTOC();
-    } catch(e) {
-        msg.textContent = '✗ ' + e.message;
-        msg.style.color = 'var(--color-err)';
-    }
-}
-
-async function sincronizarTOC() {
-    const msg = document.getElementById('tocSincMsg');
-    const mesVal = document.getElementById('tocSincMes').value;
-    if (!mesVal) { msg.textContent = 'Selecciona um mês.'; return; }
-    const [ano, mes] = mesVal.split('-').map(Number);
-    msg.textContent = `A importar ${mes}/${ano}…`; msg.style.color = '';
-    try {
-        const r = await TOC.sincronizarMes(ano, mes);
-        msg.textContent = `✓ ${r.importados} movimentos importados (${r.entradas} entradas, ${r.saidas} saídas).`;
-        msg.style.color = 'var(--color-ok)';
-        if (document.getElementById('tab-fluxo')?.classList.contains('active')) initFluxo();
-    } catch(e) {
-        msg.textContent = '✗ ' + e.message;
-        msg.style.color = 'var(--color-err)';
-    }
-}
-
-async function importarClientesTOC() {
-    const msg = document.getElementById('tocSincMsg');
-    msg.textContent = 'A importar clientes…'; msg.style.color = '';
-    try {
-        const clientes = await TOC.listarClientes();
-        localStorage.setItem('toc_clientes', JSON.stringify(clientes));
-        msg.textContent = `✓ ${clientes.length} clientes importados.`;
-        msg.style.color = 'var(--color-ok)';
-    } catch(e) {
-        msg.textContent = '✗ ' + e.message;
-        msg.style.color = 'var(--color-err)';
-    }
-}
-
-async function importarFornecedoresTOC() {
-    const msg = document.getElementById('tocSincMsg');
-    msg.textContent = 'A importar fornecedores…'; msg.style.color = '';
-    try {
-        const forns = await TOC.listarFornecedores();
+        const forns = await null // TOConline_removido removido();
         for (const f of forns) {
             await SB.from('fornecedores').upsert(
                 { nome: f.nome, nif: f.nif || null },
@@ -4808,28 +4555,19 @@ document.addEventListener("click", e => {
 // =======================================================
 // autorizarTOC — versão definitiva (usa Edge Function para obter URL)
 // =======================================================
-function autorizarTOC() {
-    const msg = document.getElementById('tocMsg');
-    if (msg) { msg.textContent = 'A conectar ao TOC Online…'; msg.style.color = ''; }
 
-    fetch('https://npyosbigynxmxdakcymg.supabase.co/functions/v1/toc-proxy?action=auth_url')
-    .then(r => r.json())
-    .then(d => {
-        if (d.auth_url) {
-            sessionStorage.setItem('toc_return_url', window.location.href.split('#')[0]);
-            window.location.href = d.auth_url;
-        } else {
-            if (msg) { msg.textContent = '✗ Erro: ' + JSON.stringify(d); msg.style.color = 'var(--color-err)'; }
-        }
-    })
-    .catch(e => {
-        if (msg) { msg.textContent = '✗ ' + e.message; msg.style.color = 'var(--color-err)'; }
-    });
-}
 
 // =======================================================
 // CONFIG — sub-tabs
 // =======================================================
+
+// =======================================================
+// CONFIG
+// =======================================================
+function initConfig() {
+    initBiblioteca();
+}
+
 function switchCfgTab(tab) {
     ["toc","biblioteca"].forEach(t => {
         const btn  = document.getElementById(`cfgTab-${t}`);
