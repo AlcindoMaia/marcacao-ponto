@@ -459,7 +459,7 @@
 
             <div class="modal-header">
                 <h2 id="modalTitulo">Novo Artigo</h2>
-                <button id="fecharModalBtn" class="modal-close">×</button>
+                <button id="fecharModalBtn" class="modal-close" onclick="fecharModalArtigo()">×</button>
             </div>
 
             <!-- Linha 1 -->
@@ -549,7 +549,7 @@
             <!-- Ações -->
             <div class="modal-actions" style="margin-top:16px">
                 <button class="btn-secondary" onclick="fecharModalArtigo()">Cancelar</button>
-                <button class="btn-primary" id="guardarArtigoBtn">Guardar</button>
+                <button class="btn-primary" id="guardarArtigoBtn" onclick="guardarArtigo()">Guardar</button>
             </div>
             <div id="modalArtigoMsg" style="margin-top:8px;font-size:13px;color:#ff7a7a"></div>
 
@@ -637,11 +637,11 @@
         <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center">
             <h2 id="modalMovTitulo">Novo Movimento</h2>
             <div style="display:flex;gap:8px;align-items:center">
-                <button id="btnScanQR" title="Ler QR de fatura"
+                <button id="btnScanQR" onclick="iniciarScanQR()" title="Ler QR de fatura"
                     style="background:var(--primary);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">
                     📷 Ler QR Fatura
                 </button>
-                <button id="fecharModalMovBtn" class="modal-close" style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.5">×</button>
+                <button id="fecharModalMovBtn" onclick="fecharModalMovimento()" class="modal-close" style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.5">×</button>
             </div>
         </div>
 
@@ -729,7 +729,7 @@
 
         <div class="modal-actions">
             <button class="btn-secondary" id="fecharModalMovBtnAlt" onclick="fecharModalMovimento()">Cancelar</button>
-            <button class="btn-primary" id="btnGuardarMov">Guardar</button>
+            <button class="btn-primary" id="btnGuardarMov" onclick="guardarMovimento()">Guardar</button>
         </div>
         <div id="movMsg" style="margin-top:8px;font-size:13px;color:#ff7a7a"></div>
     </div>
@@ -1114,7 +1114,7 @@
 
         <div class="modal-actions" style="margin-top:20px">
             <button class="btn-secondary" onclick="fecharModalFuncionario()">Cancelar</button>
-            <button class="btn-primary" id="guardarFuncionarioBtn">Guardar</button>
+            <button class="btn-primary" id="guardarFuncionarioBtn" onclick="guardarFuncionario()">Guardar</button>
         </div>
         <div id="modalFuncMsg" style="margin-top:8px;font-size:13px;color:#ff7a7a"></div>
 
