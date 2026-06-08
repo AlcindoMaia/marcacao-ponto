@@ -3246,8 +3246,17 @@ function adicionarLinhaImput(servs) {
 }
 
 function fecharModalMovimento() {
-    document.getElementById("modalMovimento").classList.add("hidden");
+    const modal = document.getElementById("modalMovimento");
+    if (modal) {
+        modal.style.display = "none";
+        modal.classList.add("hidden");
+    }
     movEditId = null;
+    // Remover listener de barcode
+    if (window._barcodeListener) {
+        document.removeEventListener("keydown", window._barcodeListener);
+        window._barcodeListener = null;
+    }
 }
 
 
@@ -3318,8 +3327,7 @@ async function abrirModalMovimento(mov = null) {
         }
     }
 
-    // Mostrar modal
-    modal.style.display = "flex";
+    // Mostrar modal — igual ao padrão dos outros modais
     modal.classList.remove("hidden");
 
     // Focar referência para o leitor de barras
