@@ -126,7 +126,7 @@ async function carregarParaData() {
 
     // Buscar registos já existentes para esta data
     const { data: existentes } = await SB.from("registos_admin")
-        .select("id, funcionario_id, obra_id, horas, observacoes")
+        .select("id, funcionario_id, obra_id, horas, observacoes, tipo")
         .eq("data", data);
 
     renderFuncionarios(existentes || []);
@@ -265,6 +265,13 @@ async function toggleFalta(event, funcId) {
         });
         if (!error) {
             feedback('Falta registada', 'ok');
+            // Actualizar card visualmente sem recarregar
+            const avatar = card.querySelector('.func-avatar');
+            const resumoEl = card.querySelector('.func-resumo');
+            const btnF = card.querySelector('.btn-falta');
+            if (avatar) { avatar.classList.add('avatar-falta'); }
+            if (resumoEl) { resumoEl.textContent = '✕ Falta'; resumoEl.classList.add('resumo-falta'); }
+            if (btnF) { btnF.classList.add('btn-falta-activo'); btnF.textContent = '✕ Falta'; }
         }
     } else {
         // Remover falta — voltar a presença
@@ -278,6 +285,13 @@ async function toggleFalta(event, funcId) {
         const linhasDiv = document.getElementById(`linhas-${funcId}`);
         if (linhasDiv) adicionarLinha(linhasDiv, funcId);
         feedback('Falta removida', 'ok');
+        // Actualizar card visualmente
+        const avatar2 = card.querySelector('.func-avatar');
+        const resumoEl2 = card.querySelector('.func-resumo');
+        const btnF2 = card.querySelector('.btn-falta');
+        if (avatar2) { avatar2.classList.remove('avatar-falta'); }
+        if (resumoEl2) { resumoEl2.textContent = 'Sem registo'; resumoEl2.classList.remove('resumo-falta'); }
+        if (btnF2) { btnF2.classList.remove('btn-falta-activo'); }
     }
 
     // Re-renderizar o card para reflectir o estado
@@ -334,6 +348,9 @@ async function guardarTudo() {
 
     for (const linha of linhas) {
         const funcId = linha.dataset.funcId;
+        // Ignorar linhas de funcionários com falta marcada (já guardada pelo toggleFalta)
+        const cardFalta = document.querySelector(`.func-card[data-func-id="${funcId}"]`);
+        if (cardFalta?.dataset?.falta === '1') continue;
         const obraId = linha.querySelector('select').value || null;
         const horas  = parseFloat(linha.querySelector('input[type="number"], input:not([class])').value);
         if (!horas || horas <= 0) continue;
