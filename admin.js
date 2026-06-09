@@ -1283,6 +1283,7 @@ async function carregarFuncionarios() {
             <td style="font-weight:500">
                 ${f.nome || "—"}
                 ${!temDevice ? '<span style="font-size:10px;color:#f4b942;margin-left:4px">⚠ sem QR</span>' : ""}
+                ${f.tipo_contrato === 'temporario' ? '<span style="font-size:9px;font-weight:700;background:rgba(244,185,66,.15);color:#c8901e;padding:1px 6px;border-radius:8px;margin-left:4px">TEMP</span>' : ""}
             </td>
             <td style="font-size:12px;opacity:.7">${f.codigo || "—"}</td>
             <td>
@@ -1315,6 +1316,8 @@ function abrirModalFuncionario(func = null) {
     document.getElementById("funcCodigo").value     = func?.codigo || "";
     document.getElementById("funcValorDia").value   = func?.valor_dia || "";
     document.getElementById("funcAtivo").value      = func?.ativo === false ? "false" : "true";
+    const tipoContEl = document.getElementById("funcTipoContrato");
+    if (tipoContEl) tipoContEl.value = func?.tipo_contrato || "fixo";
     document.getElementById("funcCategoria").value  = func?.categoria || "";
     document.getElementById("funcTelemovel").value  = func?.telemovel || "";
     document.getElementById("funcNif").value        = func?.nif || "";
@@ -1350,6 +1353,7 @@ async function guardarFuncionario() {
         codigo:    document.getElementById("funcCodigo").value.trim() || null,
         valor_dia: parseFloat(document.getElementById("funcValorDia").value) || null,
         ativo:     document.getElementById("funcAtivo").value === "true",
+        tipo_contrato: document.getElementById("funcTipoContrato")?.value || "fixo",
         categoria: document.getElementById("funcCategoria")?.value || null,
         telemovel: document.getElementById("funcTelemovel")?.value.trim() || null,
         nif:       document.getElementById("funcNif")?.value.trim() || null,

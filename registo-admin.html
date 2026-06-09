@@ -521,6 +521,8 @@ body {
         border-color: #f87171 !important;
     }
     .avatar-falta { background: rgba(248,113,113,.3) !important; color: #f87171 !important; }
+    .avatar-temp  { background: rgba(244,185,66,.25) !important; color: #c8901e !important; }
+    .func-card-temp-fixed { border-left: 2px solid rgba(244,185,66,.4); }
     .resumo-falta { color: #f87171 !important; }
     .func-card-temp { border: 1px dashed rgba(244,185,66,.4) !important; }
 
@@ -535,6 +537,25 @@ body {
         --border: rgba(0,0,0,.1);
         background: #f5f2ed;
         color: #1a1a1a;
+    }
+    /* Header mantém-se escuro em modo claro */
+    body.tema-claro header {
+        background: #1a1a1a !important;
+        color: #fff !important;
+    }
+    body.tema-claro header button,
+    body.tema-claro header a {
+        color: rgba(255,255,255,0.85) !important;
+    }
+    body.tema-claro header button:hover {
+        color: #fff !important;
+        background: rgba(255,255,255,0.1) !important;
+    }
+    /* Botões de tema e Temp adaptam-se */
+    body.tema-claro #btnTemaRegisto {
+        background: rgba(255,255,255,0.12) !important;
+        border-color: rgba(255,255,255,0.25) !important;
+        color: #fff !important;
     }
     body.tema-claro .func-card {
         background: #fff;

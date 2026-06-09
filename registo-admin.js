@@ -79,7 +79,7 @@ async function iniciarApp() {
     // Carregar dados base
     const [obrasRes, funcsRes] = await Promise.all([
         SB.from("obras").select("id, nome").order("nome"),
-        SB.from("funcionarios").select("id, nome, valor_dia").eq("ativo", true).order("nome")
+        SB.from("funcionarios").select("id, nome, valor_dia, tipo_contrato").eq("ativo", true).order("nome")
     ]);
 
     _obras = obrasRes.data || [];
@@ -157,11 +157,15 @@ function renderFuncionarios(existentes) {
         const isFalta = registosFunc.some(r => r.tipo === 'falta') && registosFunc.length === 1;
         card.dataset.falta = isFalta ? '1' : '0';
 
+        const isTemp = f.tipo_contrato === 'temporario';
         card.innerHTML = `
             <div class="func-card-header">
-                <div class="func-avatar ${isFalta ? 'avatar-falta' : ''}">${f.nome.charAt(0).toUpperCase()}</div>
+                <div class="func-avatar ${isFalta ? 'avatar-falta' : isTemp ? 'avatar-temp' : ''}">${f.nome.charAt(0).toUpperCase()}</div>
                 <div class="func-info">
-                    <div class="func-nome">${f.nome}</div>
+                    <div class="func-nome">
+                        ${f.nome}
+                        ${isTemp ? '<span style="font-size:9px;font-weight:700;background:rgba(244,185,66,.2);color:var(--primary,#c8901e);padding:1px 6px;border-radius:8px;margin-left:5px;vertical-align:middle">TEMP</span>' : ''}
+                    </div>
                     <div class="func-resumo ${isFalta ? 'resumo-falta' : ''}">${isFalta ? '✕ Falta' : resumo}</div>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px">
