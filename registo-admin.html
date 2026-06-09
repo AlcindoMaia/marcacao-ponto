@@ -501,6 +501,57 @@ body {
   cursor: pointer;
 }
 .login-msg { font-size: 13px; color: var(--red); margin-top: 10px; min-height: 18px; font-family: var(--fh); }
+
+    /* Botão falta */
+    .btn-falta {
+        font-size: 11px;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 20px;
+        border: 1px solid rgba(248,113,113,.4);
+        background: rgba(248,113,113,.08);
+        color: #f87171;
+        cursor: pointer;
+        transition: all .2s;
+        white-space: nowrap;
+    }
+    .btn-falta:hover { background: rgba(248,113,113,.2); }
+    .btn-falta-activo {
+        background: rgba(248,113,113,.25) !important;
+        border-color: #f87171 !important;
+    }
+    .avatar-falta { background: rgba(248,113,113,.3) !important; color: #f87171 !important; }
+    .resumo-falta { color: #f87171 !important; }
+    .func-card-temp { border: 1px dashed rgba(244,185,66,.4) !important; }
+
+    /* MODO CLARO */
+    body.tema-claro {
+        --bg: #f5f2ed;
+        --bg-dark: #eae7e1;
+        --bg-dark-panel: #fff;
+        --text-light: #1a1a1a;
+        --text-dark: #1a1a1a;
+        --text-muted: #666;
+        --border: rgba(0,0,0,.1);
+        background: #f5f2ed;
+        color: #1a1a1a;
+    }
+    body.tema-claro .func-card {
+        background: #fff;
+        border-color: rgba(0,0,0,.1);
+        color: #1a1a1a;
+    }
+    body.tema-claro .func-card-header { background: rgba(0,0,0,.02); }
+    body.tema-claro .func-nome { color: #1a1a1a; }
+    body.tema-claro .func-resumo { color: #666; }
+    body.tema-claro select, body.tema-claro input {
+        background: #f5f2ed;
+        color: #1a1a1a;
+        border-color: rgba(0,0,0,.15);
+    }
+    body.tema-claro .filtro-data input { background: #fff; color: #1a1a1a; }
+    body.tema-claro .btn-guardar-tudo { background: var(--primary); }
+    body.tema-claro header { background: #1a1a1a; }
 </style>
 </head>
 <body>
@@ -544,6 +595,12 @@ body {
 
   <!-- Filtro de data -->
   <div class="filtro-data">
+    <button onclick="toggleTemaRegisto()" id="btnTemaRegisto" 
+        style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:16px"
+        title="Modo claro/escuro">🌙</button>
+    <button onclick="adicionarTrabalhadorTemp()"
+        style="background:rgba(244,185,66,.2);border:1px solid rgba(244,185,66,.4);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:600;color:var(--primary)"
+        title="Adicionar trabalhador temporário/esporádico">+ Temp</button>
     <button onclick="navegarDia(-1)" style="background:var(--primary);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:16px;font-weight:700">‹</button>
     <input type="date" id="dataRegisto">
     <button onclick="navegarDia(1)" style="background:var(--primary);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:16px;font-weight:700">›</button>

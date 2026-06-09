@@ -15,6 +15,36 @@
 <!-- DataTables -->
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 
+
+<style>
+/* Layout uniforme entre tabs */
+.tab-inner { max-width: 1100px; }
+
+/* Gerar QR e Config — compatíveis com modo claro */
+#tab-gerarqr select,
+#tab-config select,
+#tab-config input {
+    background: var(--bg-input, rgba(0,0,0,.05));
+    border-color: var(--border-input, rgba(0,0,0,.15));
+    color: var(--text-dark);
+}
+#tab-gerarqr .card,
+#tab-config .card {
+    background: var(--card-bg, rgba(255,255,255,.7));
+}
+/* Botão falta uniforme */
+.btn-falta-tab {
+    font-size: 12px; font-weight: 600;
+    padding: 5px 12px; border-radius: 20px;
+    border: 1px solid rgba(248,113,113,.4);
+    background: rgba(248,113,113,.08);
+    color: #dc2626; cursor: pointer;
+}
+.btn-falta-tab.activo {
+    background: rgba(248,113,113,.2);
+    border-color: #dc2626;
+}
+</style>
 </head>
 
 
@@ -737,41 +767,40 @@
 
     <!-- ================= TAB Gerar QR ================= -->
     <div class="tab-content" id="tab-gerarqr">
-    <div class="card" style="max-width:500px;margin:0 auto">
-        <h2 style="margin-bottom:4px">Gerar QR de Obra</h2>
-        <p style="font-size:13px;opacity:.6;margin-bottom:20px">Gerar QR Code para marcação de ponto</p>
-        <div style="margin-bottom:16px">
-            <label style="font-size:11px;opacity:.6;display:block;margin-bottom:4px">Obra</label>
-            <select id="selectObraQrTab" onchange="gerarQrTab()"
-                style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:var(--bg-dark-panel);color:var(--text-light);font-size:13px">
-                <option value="">— Seleccionar obra —</option>
-            </select>
+    <div style="max-width:520px;margin:0 auto">
+        <h2 style="font-family:var(--font-title);font-size:18px;font-weight:600;letter-spacing:.5px;margin-bottom:4px">Gerar QR de Obra</h2>
+        <p style="font-size:13px;opacity:.55;margin-bottom:24px">Cria um QR Code para marcação de ponto em obra</p>
+
+        <div class="card" style="margin-bottom:16px">
+            <div class="form-group">
+                <label>Seleccionar Obra</label>
+                <select id="selectObraQrTab" onchange="gerarQrTab()" style="width:100%">
+                    <option value="">— Escolhe uma obra —</option>
+                </select>
+            </div>
         </div>
-        <div id="qrTabOutput" style="text-align:center;min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px">
+
+        <div id="qrTabOutput" style="text-align:center;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px">
             <div style="opacity:.3;font-size:13px">Selecciona uma obra para gerar o QR</div>
         </div>
-        <div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08);display:flex;gap:8px;justify-content:center">
-            <button onclick="imprimirQrTab()" id="btnImprimirQrTab" disabled
-                style="background:rgba(244,185,66,.15);color:var(--primary);border:1px solid rgba(244,185,66,.3);border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600">
-                🖨️ Imprimir
-            </button>
-            <a href="qr.html" target="_blank"
-                style="background:rgba(255,255,255,.08);color:var(--text-light);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;text-decoration:none">
+
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:20px">
+            <button onclick="imprimirQrTab()" id="btnImprimirQrTab" disabled class="btn-secondary"
+                style="min-width:120px">🖨️ Imprimir</button>
+            <a href="qr.html" target="_blank" class="btn-secondary"
+                style="min-width:140px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px">
                 🔲 Gerador avançado
             </a>
         </div>
     </div>
 </div>
-</div>
-
-<!-- ================= TAB FUNCIONÁRIOS ================= -->
 <div class="tab-content" id="tab-funcionarios">
 
     <!-- Barra superior -->
     <div class="inventario-header">
         <input type="text" id="pesquisaFuncionarios"
                placeholder="Pesquisar por nome ou código">
-        <button id="btnNovoFuncionario" class="btn-primary btn-circular">+</button>
+        <button id="btnNovoFuncionario" class="btn-primary" onclick="abrirModalFuncionario()">+ Funcionário</button>
     </div>
 
     <!-- KPIs em cards -->
@@ -1020,35 +1049,23 @@
 
 <!-- ================= TAB CONFIG ================= -->
 <div class="tab-content" id="tab-config">
+    <div style="max-width:900px">
+        <h2 style="font-family:var(--font-title);font-size:18px;font-weight:600;letter-spacing:.5px;margin-bottom:4px">Biblioteca de Serviços</h2>
+        <p style="font-size:13px;opacity:.55;margin-bottom:20px">Serviços com coeficientes de material usados nos orçamentos</p>
 
-    <!-- Sub-tab única: Biblioteca de Serviços -->
-    <div id="cfgTabContent-biblioteca" style="display:block">
-
-        <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
-            <div>
-                <label style="font-size:11px;opacity:.6;display:block;margin-bottom:3px">Filtrar categoria</label>
-                <select id="bibFiltroCategoria" onchange="renderBiblioteca()"
-                    style="padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:var(--bg-dark-panel);color:var(--text-light);font-size:13px">
+        <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap">
+            <div class="form-group" style="margin:0;flex:1;min-width:180px">
+                <label>Filtrar categoria</label>
+                <select id="bibFiltroCategoria" onchange="renderBiblioteca()" style="width:100%">
                     <option value="">— Todas —</option>
                 </select>
             </div>
-            <div style="margin-left:auto">
-                <button onclick="abrirModalBibServico(null)"
-                    style="background:var(--primary);border:none;border-radius:6px;padding:7px 16px;font-size:13px;font-weight:700;cursor:pointer;color:#1a1000">
-                    + Novo Serviço
-                </button>
-            </div>
+            <button onclick="abrirModalBibServico(null)" class="btn-primary">+ Novo Serviço</button>
         </div>
 
         <div id="bibLista"></div>
     </div>
 </div>
-
-<!-- ═══════════════ MODAL TOC / SAF-T ═══════════════ -->
-
-
-</div> <!-- FECHA adminArea -->
-
 <!-- MODAL QR OBRA -->
 <div id="modalQR" class="modal hidden">
     <div class="modal-content" style="max-width:400px;text-align:center">

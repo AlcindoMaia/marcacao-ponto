@@ -154,14 +154,24 @@ function renderFuncionarios(existentes) {
             ? `${totalH.toFixed(1)}h · ${registosFunc.length} obra(s)`
             : "Sem registo";
 
+        const isFalta = registosFunc.some(r => r.tipo === 'falta') && registosFunc.length === 1;
+        card.dataset.falta = isFalta ? '1' : '0';
+
         card.innerHTML = `
             <div class="func-card-header">
-                <div class="func-avatar">${f.nome.charAt(0).toUpperCase()}</div>
+                <div class="func-avatar ${isFalta ? 'avatar-falta' : ''}">${f.nome.charAt(0).toUpperCase()}</div>
                 <div class="func-info">
                     <div class="func-nome">${f.nome}</div>
-                    <div class="func-resumo">${resumo}</div>
+                    <div class="func-resumo ${isFalta ? 'resumo-falta' : ''}">${isFalta ? '✕ Falta' : resumo}</div>
                 </div>
-                <div class="func-toggle">▼</div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <button class="btn-falta ${isFalta ? 'btn-falta-activo' : ''}"
+                        onclick="toggleFalta(event,'${f.id}')"
+                        title="${isFalta ? 'Remover falta' : 'Marcar falta'}">
+                        ${isFalta ? '✕ Falta' : '✕ Falta'}
+                    </button>
+                    <div class="func-toggle">▼</div>
+                </div>
             </div>
             <div class="func-linhas" id="linhas-${f.id}"></div>
         `;
@@ -189,6 +199,89 @@ function renderFuncionarios(existentes) {
         btnAdd.onclick = () => adicionarLinha(linhasDiv, f.id, null, btnAdd);
         linhasDiv.appendChild(btnAdd);
     });
+}
+
+
+// =======================================================
+// TOGGLE FALTA
+// =======================================================
+async 
+// =======================================================
+// TRABALHADOR TEMPORÁRIO
+// =======================================================
+function adicionarTrabalhadorTemp() {
+    const lista = document.getElementById("funcLista");
+    const tempId = "TEMP_" + Date.now();
+
+    const card = document.createElement("div");
+    card.className = "func-card func-card-temp aberto";
+    card.dataset.funcId = tempId;
+    card.dataset.temp = "1";
+    card.innerHTML = `
+        <div class="func-card-header" style="background:rgba(244,185,66,.08);border:1px solid rgba(244,185,66,.2)">
+            <div class="func-avatar" style="background:var(--primary);color:#000">T</div>
+            <div class="func-info" style="flex:1">
+                <input class="input-temp-nome" placeholder="Nome do trabalhador temporário"
+                    style="background:transparent;border:none;border-bottom:1px solid rgba(0,0,0,.2);font-size:14px;font-weight:600;width:100%;padding:2px 0;outline:none">
+                <div class="func-resumo" style="font-size:11px;opacity:.5">Trabalho esporádico — não gravado como funcionário</div>
+            </div>
+            <button onclick="this.closest('.func-card').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;opacity:.4">×</button>
+        </div>
+        <div class="func-linhas" id="linhas-${tempId}"></div>
+    `;
+
+    lista.appendChild(card);
+
+    const linhasDiv = document.getElementById(`linhas-${tempId}`);
+    adicionarLinha(linhasDiv, tempId);
+
+    // Focar no nome
+    setTimeout(() => card.querySelector('.input-temp-nome')?.focus(), 50);
+}
+
+async function toggleFalta(event, funcId) {
+    event.stopPropagation(); // não expandir o card
+    const card = document.querySelector(`.func-card[data-func-id="${funcId}"]`);
+    if (!card) return;
+
+    const isFalta = card.dataset.falta === '1';
+
+    if (!isFalta) {
+        // Marcar falta — remover linhas de presença e registar falta
+        const linhasDiv = document.getElementById(`linhas-${funcId}`);
+        if (linhasDiv) linhasDiv.innerHTML = '';
+        card.dataset.falta = '1';
+        card.classList.add('guardado');
+        // Guardar imediatamente
+        const data = _dataActual;
+        // Apagar registos existentes
+        await SB.from('registos_admin')
+            .delete()
+            .eq('funcionario_id', funcId)
+            .eq('data', data);
+        // Inserir falta
+        const { error } = await SB.from('registos_admin').insert({
+            data, funcionario_id: funcId, horas: 0, tipo: 'falta'
+        });
+        if (!error) {
+            feedback('Falta registada', 'ok');
+        }
+    } else {
+        // Remover falta — voltar a presença
+        card.dataset.falta = '0';
+        card.classList.remove('guardado');
+        const data = _dataActual;
+        await SB.from('registos_admin')
+            .delete()
+            .eq('funcionario_id', funcId)
+            .eq('data', data);
+        const linhasDiv = document.getElementById(`linhas-${funcId}`);
+        if (linhasDiv) adicionarLinha(linhasDiv, funcId);
+        feedback('Falta removida', 'ok');
+    }
+
+    // Re-renderizar o card para reflectir o estado
+    await carregarParaData();
 }
 
 function adicionarLinha(container, funcId, registo = null, btnAdd = null) {
@@ -241,14 +334,21 @@ async function guardarTudo() {
 
     for (const linha of linhas) {
         const funcId = linha.dataset.funcId;
-        const obraId = linha.querySelector("select").value || null;
-        const horas  = parseFloat(linha.querySelector("input").value);
-        if (!horas || horas <= 0) continue; // ignorar linhas sem horas
+        const obraId = linha.querySelector('select').value || null;
+        const horas  = parseFloat(linha.querySelector('input[type="number"], input:not([class])').value);
+        if (!horas || horas <= 0) continue;
+
+        // Temporário — guardar com nome nas observações, sem funcionario_id real
+        const card = document.querySelector(`.func-card[data-func-id="${funcId}"]`);
+        const isTemp = card?.dataset.temp === '1';
+        const nomeTemp = card?.querySelector('.input-temp-nome')?.value?.trim() || 'Temporário';
+
         registos.push({
             data,
-            funcionario_id: funcId,
+            funcionario_id: isTemp ? null : funcId,
             obra_id:        obraId,
-            horas:          horas
+            horas:          horas,
+            observacoes:    isTemp ? `[TEMP] ${nomeTemp}` : undefined
         });
     }
 
@@ -472,3 +572,25 @@ function agendarLembrete() {
 // ARRANQUE
 // =======================================================
 document.addEventListener("DOMContentLoaded", init);
+
+
+// =======================================================
+// TEMA CLARO / ESCURO
+// =======================================================
+function toggleTemaRegisto() {
+    const body = document.body;
+    const isClaro = body.classList.toggle('tema-claro');
+    const btn = document.getElementById('btnTemaRegisto');
+    if (btn) btn.textContent = isClaro ? '☀️' : '🌙';
+    localStorage.setItem('maia_registo_tema', isClaro ? 'claro' : 'escuro');
+}
+
+// Aplicar tema guardado
+(function() {
+    if (localStorage.getItem('maia_registo_tema') === 'claro') {
+        document.body.classList.add('tema-claro');
+        const btn = document.getElementById('btnTemaRegisto');
+        if (btn) btn.textContent = '☀️';
+    }
+})();
+

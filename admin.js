@@ -3328,6 +3328,8 @@ async function abrirModalMovimento(mov = null) {
     }
 
     // Mostrar modal — igual ao padrão dos outros modais
+    // Limpar display inline (pode ter ficado de um fechar anterior)
+    modal.style.display = "";
     modal.classList.remove("hidden");
 
     // Focar referência para o leitor de barras
@@ -3715,33 +3717,35 @@ function renderTabelaOrc(lista) {
         const est     = estadoStyle[o.estado] || estadoStyle.rascunho;
         const total   = Number(o.total_com_iva||0);
         const nomeObra= o.obras?.nome || o.obra_descricao || '';
-        const dataFmt = d => d ? d.split('-').reverse().join('/') : '\u2014';
+        const dataFmt = d => d ? d.split('-').reverse().join('/') : '—';
 
         const tr = document.createElement('tr');
         tr.style.cursor = 'pointer';
         tr.onmouseenter = () => tr.style.background = 'rgba(244,185,66,.04)';
         tr.onmouseleave = () => tr.style.background = '';
         tr.innerHTML =
-            '<td style="font-family:monospace;font-size:11px;color:var(--text-muted);font-weight:500;white-space:nowrap">' + (o.numero||'\u2014') + '</td>' +
-            '<td style="font-size:12px;white-space:nowrap">' + dataFmt(o.data) + '</td>' +
-            '<td>' +
-                '<div style="font-weight:600;font-size:13px">' + (o.cliente_nome||'\u2014') + '</div>' +
-                (nomeObra ? '<div style="font-size:11px;opacity:.5;margin-top:1px">' + nomeObra + '</div>' : '') +
-            '</td>' +
-            '<td style="text-align:right;font-family:var(--font-title);font-size:15px;font-weight:500;white-space:nowrap">' +
-                (total > 0 ? total.toLocaleString('pt-PT',{minimumFractionDigits:2}) + ' \u20AC' : '\u2014') +
-            '</td>' +
-            '<td>' +
-                '<span style="background:' + est.bg + ';color:' + est.cor + ';padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;letter-spacing:.3px;white-space:nowrap">' + est.label + '</span>' +
-                (vencido ? '<div style="font-size:10px;color:var(--color-err);margin-top:2px">\u26A0 Vencido</div>' : '') +
-            '</td>' +
-            '<td style="font-size:12px;' + (vencido ? 'color:var(--color-err)' : 'opacity:.5') + '">' + dataFmt(o.validade) + '</td>' +
-            '<td class="acoes-td">' +
-                '<button class="btn-acao btn-e" title="Editar">\u270F\uFE0F</button>' +
-                '<button class="btn-acao btn-d" title="Duplicar">\u{1F4CB}</button>' +
-                '<button class="btn-acao btn-p" title="PDF">\u{1F4C4}</button>' +
-                '<button class="btn-acao btn-x" title="Apagar" style="opacity:.5">\u{1F5D1}\uFE0F</button>' +
-            '</td>';
+            `<td style="font-family:monospace;font-size:12px;font-weight:600;white-space:nowrap;width:100px;padding:10px 12px">${o.numero || '—'}</td>` +
+            `<td style="font-size:12px;opacity:.65;white-space:nowrap;width:90px;padding:10px 12px">${dataFmt(o.data)}</td>` +
+            `<td style="padding:10px 12px">
+                <div style="font-weight:600;font-size:13px;margin-bottom:2px">${o.cliente_nome || '—'}</div>
+                ${nomeObra ? `<div style="font-size:11px;opacity:.45;margin-top:1px">🏗 ${nomeObra}</div>` : ''}
+            </td>` +
+            `<td style="text-align:right;font-weight:700;font-size:14px;white-space:nowrap;width:120px;padding:10px 12px">
+                ${total > 0 ? total.toLocaleString('pt-PT', {minimumFractionDigits:2}) + ' €' : '—'}
+            </td>` +
+            `<td style="width:120px;padding:10px 12px">
+                <span style="background:${est.bg};color:${est.cor};padding:3px 12px;border-radius:20px;font-size:11px;font-weight:600">${est.label}</span>
+                ${vencido ? '<div style="font-size:10px;color:#dc2626;margin-top:3px">⚠ Vencido</div>' : ''}
+            </td>` +
+            `<td style="font-size:12px;white-space:nowrap;width:90px;padding:10px 12px;${vencido ? 'color:#dc2626' : 'opacity:.5'}">${dataFmt(o.validade)}</td>` +
+            `<td style="white-space:nowrap;width:120px;padding:8px 12px">
+                <div style="display:flex;gap:4px;justify-content:flex-end">
+                    <button class="btn-acao btn-e" title="Editar">✏️</button>
+                    <button class="btn-acao btn-d" title="Duplicar">📋</button>
+                    <button class="btn-acao btn-p" title="PDF">📄</button>
+                    <button class="btn-acao btn-x" title="Apagar" style="opacity:.4">🗑️</button>
+                </div>
+            </td>`;
         tr.querySelector('.btn-e').onclick = e => { e.stopPropagation(); abrirModalOrcamento(o.id); };
         tr.querySelector('.btn-d').onclick = e => { e.stopPropagation(); duplicarOrcamento(o.id); };
         tr.querySelector('.btn-p').onclick = e => { e.stopPropagation(); exportarPDFOrcamento(o.id); };
@@ -3749,6 +3753,7 @@ function renderTabelaOrc(lista) {
         tr.ondblclick = () => abrirModalOrcamento(o.id);
         tbody.appendChild(tr);
     });
+;
 }
 function filtrarTabelaOrc() {
     const q      = document.getElementById('pesquisaOrcamentos')?.value.toLowerCase() || '';
