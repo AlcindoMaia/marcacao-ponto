@@ -1743,24 +1743,24 @@ async function editarObra(obra) {
     if (!obra) {
         document.getElementById("editObraId").value      = "";
         document.getElementById("editObraNome").value    = "";
-        document.getElementById("editObraMorada").value  = "";
-        document.getElementById("editObraRaio").value    = "";
-        document.getElementById("editObraPercent").value = "";
-        document.getElementById("editObraData").value    = "";
+        const _end0 = document.getElementById("editObraEndereco"); if (_end0) _end0.value = "";
+        const _rai0 = document.getElementById("editObraRaio"); if (_rai0) _rai0.value = "";
+        const _est0 = document.getElementById("editObraEstado"); if (_est0) _est0.value = "ativa";
+        const _cod0 = document.getElementById("editObraCodigo"); if (_cod0) _cod0.value = "";
         document.getElementById("editObraTitulo").textContent = "✏️ Nova Obra";
         switchObraTab("detalhes");
         const _mo = document.getElementById("modalEditarObra"); _mo.style.display = "flex"; _mo.classList.remove("hidden");
         return;
     }
-    document.getElementById("editObraId").value      = obra.id;
-    document.getElementById("editObraNome").value    = obra.nome || "";
-    document.getElementById("editObraMorada").value  = obra.morada || "";
-    document.getElementById("editObraRaio").value    = obra.raio || "";
-    document.getElementById("editObraPercent").value = obra.percentagem_conclusao ?? "";
-    document.getElementById("editObraData").value    = obra.data_conclusao_prevista || "";
+    document.getElementById("editObraId").value = obra.id;
+    document.getElementById("editObraNome").value = obra.nome || "";
+    const _endE = document.getElementById("editObraEndereco"); if (_endE) _endE.value = obra.endereco || obra.morada || "";
+    const _raiE = document.getElementById("editObraRaio"); if (_raiE) _raiE.value = obra.raio || "";
+    const _estE = document.getElementById("editObraEstado"); if (_estE) _estE.value = obra.estado || "ativa";
+    const _codE = document.getElementById("editObraCodigo"); if (_codE) _codE.value = obra.codigo || "";
     document.getElementById("editObraTitulo").textContent = `✏️ ${obra.nome || "Editar Obra"}`;
     switchObraTab("detalhes");
-    document.getElementById("modalEditarObra").style.display = "flex";
+    const _moE = document.getElementById("modalEditarObra"); _moE.style.display = "flex"; _moE.classList.remove("hidden");
 }
 
 async function guardarEditObra() {
@@ -2478,8 +2478,8 @@ async function abrirModalArtigo(artigo = null) {
     document.getElementById("artIva").value            = d?.taxa_iva ?? 23;
     document.getElementById("artTipo").value           = d?.tipo_artigo || "consumivel";
     document.getElementById("artLocal").value          = d?.local_armazenamento || "";
-    document.getElementById("artQtdInicial").value     = "";
-    document.getElementById("artStockMin").value       = d?.stock_minimo ?? "";
+    document.getElementById("artQtdInicial").value = "";
+    const _asm = document.getElementById("artStockMin"); if (_asm) _asm.value = d?.stock_minimo ?? "";
 
     const selUnidade = document.getElementById("artUnidade");
     if (selUnidade && d?.unidade_id) selUnidade.value = d.unidade_id;
