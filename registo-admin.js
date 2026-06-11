@@ -378,17 +378,22 @@ async function guardarTudo() {
         return;
     }
 
-    // Buscar IDs existentes para esta data e apagar individualmente
+    // Buscar IDs existentes para esta data — excluir faltas (já guardadas pelo toggleFalta)
     const { data: existentes } = await SB.from("registos_admin")
-        .select("id")
+        .select("id, tipo, funcionario_id")
         .eq("data", data);
 
+    // Só apagar os registos de presença (não as faltas)
     if (existentes && existentes.length > 0) {
-        const ids = existentes.map(r => r.id);
-        const { error: errDel } = await SB.from("registos_admin")
-            .delete()
-            .in("id", ids);
-        if (errDel) { feedback("Erro ao atualizar: " + errDel.message, "erro"); return; }
+        const ids = existentes
+            .filter(r => r.tipo !== 'falta')
+            .map(r => r.id);
+        if (ids.length > 0) {
+            const { error: errDel } = await SB.from("registos_admin")
+                .delete()
+                .in("id", ids);
+            if (errDel) { feedback("Erro ao atualizar: " + errDel.message, "erro"); return; }
+        }
     }
 
     const { error } = await SB.from("registos_admin").insert(registos);

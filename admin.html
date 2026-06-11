@@ -45,7 +45,7 @@
     border-color: #dc2626;
 }
 
-/* Todas as tabs dentro do container com padding correcto */
+/* Todas as tabs — padding e max-width uniformes */
 .tab-content.active {
     box-sizing: border-box;
     width: 100%;
@@ -54,6 +54,13 @@
     padding-left: 28px;
     padding-right: 28px;
     padding-bottom: 40px;
+}
+/* Tabs DENTRO do adminArea — já têm 28px do .container, não duplicar */
+#adminArea > .tab-content.active {
+    padding-left: 0;
+    padding-right: 0;
+    max-width: none;
+    margin: 0;
 }
 </style>
 </head>
@@ -443,7 +450,7 @@
                class="input-lg"
                placeholder="Pesquisar por código, descrição ou tipo">
 
-        <button id="btnNovoArtigo" class="btn-primary" style="width:42px;height:42px;font-size:22px;border-radius:50%;padding:0;flex-shrink:0">+</button>
+        <button id="btnNovoArtigo" class="btn-primary" onclick="abrirModalArtigo()" style="width:42px;height:42px;font-size:22px;border-radius:50%;padding:0;flex-shrink:0">+</button>
 
     </div>
 
@@ -673,6 +680,8 @@
     </div>
 
 </div>
+
+
 
 </div><!-- fim tabs-wrapper -->
 

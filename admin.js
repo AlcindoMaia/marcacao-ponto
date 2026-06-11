@@ -444,7 +444,11 @@ function switchRegTab(tab) {
             btn.style.color        = active ? "var(--primary)" : "var(--text-muted)";
             btn.style.borderBottom = active ? "2px solid var(--primary)" : "2px solid transparent";
         }
-        if (cont) cont.style.display = active ? "block" : "none";
+        if (cont) {
+            cont.style.display    = active ? "block" : "none";
+            cont.style.visibility = active ? "visible" : "hidden";
+            cont.style.overflow   = "hidden";
+        }
     });
     if (tab === "admin") {
         // Inicializar mês actual se não estiver definido
@@ -1318,10 +1322,11 @@ function abrirModalFuncionario(func = null) {
     document.getElementById("funcAtivo").value      = func?.ativo === false ? "false" : "true";
     const tipoContEl = document.getElementById("funcTipoContrato");
     if (tipoContEl) tipoContEl.value = func?.tipo_contrato || "fixo";
-    document.getElementById("funcCategoria").value  = func?.categoria || "";
-    document.getElementById("funcTelemovel").value  = func?.telemovel || "";
-    document.getElementById("funcNif").value        = func?.nif || "";
-    document.getElementById("funcIban").value       = func?.iban || "";
+    const setField = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ""; };
+    setField("funcCategoria",  func?.categoria);
+    setField("funcTelemovel",  func?.telemovel);
+    setField("funcNif",        func?.nif);
+    setField("funcIban",       func?.iban);
 
     // Info dispositivo — só em edição
     const deviceInfo = document.getElementById("funcDeviceInfo");
@@ -1334,11 +1339,14 @@ function abrirModalFuncionario(func = null) {
     }
 
     document.getElementById("modalFuncMsg").textContent = "";
-    document.getElementById("modalFuncionario").classList.remove("hidden");
+    const _mf = document.getElementById("modalFuncionario");
+    _mf.style.display = "";
+    _mf.classList.remove("hidden");
 }
 
 function fecharModalFuncionario() {
-    document.getElementById("modalFuncionario").classList.add("hidden");
+    const m = document.getElementById("modalFuncionario");
+    if (m) { m.style.display = "none"; m.classList.add("hidden"); }
     funcEditId = null;
 }
 
@@ -1699,6 +1707,38 @@ function switchObraTab(tab) {
     if (tab === "servicos") carregarServicosModal();
 }
 
+
+// =======================================================
+// OBRAS — guardarObra
+// =======================================================
+async function guardarObra() {
+    const id     = document.getElementById("editObraId")?.value;
+    const nome   = document.getElementById("editObraNome")?.value?.trim();
+    const codigo = document.getElementById("editObraCodigo")?.value?.trim();
+    const end    = document.getElementById("editObraEndereco")?.value?.trim();
+    const estado = document.getElementById("editObraEstado")?.value || "ativa";
+    const raio   = parseInt(document.getElementById("editObraRaio")?.value) || 120;
+
+    if (!nome) { alert("O nome da obra é obrigatório."); return; }
+
+    const payload = { nome, estado, raio };
+    if (codigo) payload.codigo = codigo;
+    if (end)    payload.endereco = end;
+
+    let err;
+    if (id) {
+        const { error } = await SB.from("obras").update(payload).eq("id", id);
+        err = error;
+    } else {
+        const { error } = await SB.from("obras").insert(payload);
+        err = error;
+    }
+
+    if (err) { alert("Erro: " + err.message); return; }
+    document.getElementById("modalEditarObra").style.display = "none";
+    await carregarObras();
+}
+
 async function editarObra(obra) {
     if (!obra) {
         document.getElementById("editObraId").value      = "";
@@ -1709,7 +1749,7 @@ async function editarObra(obra) {
         document.getElementById("editObraData").value    = "";
         document.getElementById("editObraTitulo").textContent = "✏️ Nova Obra";
         switchObraTab("detalhes");
-        document.getElementById("modalEditarObra").style.display = "flex";
+        const _mo = document.getElementById("modalEditarObra"); _mo.style.display = "flex"; _mo.classList.remove("hidden");
         return;
     }
     document.getElementById("editObraId").value      = obra.id;
@@ -2456,7 +2496,7 @@ async function abrirModalArtigo(artigo = null) {
     document.getElementById("artAjusteTipo").value   = "entrada";
 
     document.getElementById("modalArtigoMsg").textContent = "";
-    document.getElementById("modalArtigo").classList.remove("hidden");
+    const _ma = document.getElementById("modalArtigo"); _ma.style.display = ""; _ma.classList.remove("hidden");
 }
 
 // =======================================================
@@ -2513,7 +2553,8 @@ function fecharModalHistorico() {
 }
 
 function fecharModalArtigo() {
-    document.getElementById("modalArtigo").classList.add("hidden");
+    const m = document.getElementById("modalArtigo");
+    if (m) { m.style.display = "none"; m.classList.add("hidden"); }
     artigoEditId = null;
 }
 
