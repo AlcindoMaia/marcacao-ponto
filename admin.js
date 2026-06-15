@@ -4923,12 +4923,12 @@ function renderBiblioteca() {
                 ${servs.map(s => {
                     const mats = _bibMateriais[s.id] || [];
                     const op   = !s.ativo ? 'opacity:.4;' : '';
-                    return `<div style="${op}background:var(--bg-dark-panel,#2a2a2a);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px">
+                    return `<div style="${op}background:var(--panel);border:1px solid rgba(0,0,0,.08);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px">
                         <div style="flex:1;min-width:0">
                             <div style="font-weight:600;font-size:13px;margin-bottom:4px;display:flex;align-items:center;gap:8px">
                                 ${s.nome}
-                                <span style="font-size:10px;background:rgba(255,255,255,.08);padding:1px 7px;border-radius:8px;color:rgba(255,255,255,.5);font-weight:400">${s.unidade}</span>
-                                ${!s.ativo ? '<span style="font-size:10px;color:#f87171;background:rgba(248,113,113,.1);padding:1px 7px;border-radius:8px">Inactivo</span>' : ''}
+                                <span style="font-size:10px;background:rgba(0,0,0,.06);padding:1px 7px;border-radius:8px;color:var(--text-muted);font-weight:400">${s.unidade}</span>
+                                ${!s.ativo ? '<span style="font-size:10px;color:#dc2626;background:rgba(248,113,113,.1);padding:1px 7px;border-radius:8px">Inactivo</span>' : ''}
                             </div>
                             <div style="font-size:11px;opacity:.5">
                                 ${s.rendimento_mo ? `⚡ ${s.rendimento_mo} ${s.unidade}/dia · ` : ''}
@@ -4936,8 +4936,8 @@ function renderBiblioteca() {
                             </div>
                         </div>
                         <div style="display:flex;gap:4px;flex-shrink:0">
-                            <button onclick="abrirModalBibServico('${s.id}')" style="background:rgba(255,255,255,.08);border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px">✏️</button>
-                            <button onclick="toggleBibAtivo('${s.id}',${s.ativo})" style="background:rgba(255,255,255,.05);border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;opacity:.6" title="${s.ativo?'Desactivar':'Activar'}">${s.ativo?'🔕':'🔔'}</button>
+                            <button onclick="abrirModalBibServico('${s.id}')" style="background:rgba(0,0,0,.06);border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px">✏️</button>
+                            <button onclick="toggleBibAtivo('${s.id}',${s.ativo})" style="background:rgba(0,0,0,.05);border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;opacity:.6" title="${s.ativo?'Desactivar':'Activar'}">${s.ativo?'🔕':'🔔'}</button>
                         </div>
                     </div>`;
                 }).join("")}
@@ -4976,14 +4976,14 @@ function adicionarLinhaBibMat(mat = null) {
     if (mat?.id) div.dataset.id = mat.id;
     div.innerHTML = `
         <input value="${mat?.descricao||''}" placeholder="Nome do material" data-field="descricao"
-            style="padding:6px 8px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;font-size:12px;outline:none">
+            style="padding:6px 8px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:12px;outline:none">
         <input value="${mat?.quantidade||''}" type="number" step="0.001" min="0" placeholder="Qtd" data-field="quantidade"
-            style="padding:6px 8px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;font-size:12px;text-align:right;outline:none">
+            style="padding:6px 8px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:12px;text-align:right;outline:none">
         <select data-field="unidade"
-            style="padding:6px 4px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;font-size:12px">
+            style="padding:6px 4px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:12px">
             ${["kg","L","m²","ml","m³","un","saco","rolo","cx"].map(u=>`<option ${u===(mat?.unidade||'un')?'selected':''}>${u}</option>`).join("")}
         </select>
-        <button onclick="this.closest('.bib-mat-linha').remove()" style="background:rgba(248,113,113,.1);border:none;border-radius:6px;padding:5px;cursor:pointer;font-size:14px;opacity:.7">×</button>`;
+        <button onclick="this.closest('.bib-mat-linha').remove()" style="background:rgba(220,38,38,.1);border:none;border-radius:6px;padding:5px;cursor:pointer;font-size:14px;opacity:.7">×</button>`;
     cont.appendChild(div);
 }
 
