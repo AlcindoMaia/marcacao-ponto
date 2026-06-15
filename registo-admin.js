@@ -253,9 +253,8 @@ function adicionarTempExistente(funcId, nome, valorDia) {
     if (document.querySelector(`.func-card[data-func-id="${funcId}"]`)) return;
 
     const lista = document.getElementById('funcLista');
-    const existentes = [];
     const card = document.createElement('div');
-    card.className = 'func-card';
+    card.className = 'func-card aberto'; // aberto por defeito para mostrar as linhas
     card.dataset.funcId = funcId;
     card.dataset.falta = '0';
     card.innerHTML = `
@@ -277,11 +276,14 @@ function adicionarTempExistente(funcId, nome, valorDia) {
         <div class="func-linhas" id="linhas-${funcId}"></div>
     `;
     lista.appendChild(card);
-    const linhasDiv = document.getElementById(`linhas-${funcId}`);
-    adicionarLinha(linhasDiv, funcId);
+
+    // Adicionar linha de obra (aberta por defeito)
+    adicionarLinha(document.getElementById(`linhas-${funcId}`), funcId, null);
+
+    // Toggle ao clicar no header
     card.querySelector('.func-card-header').addEventListener('click', e => {
         if (e.target.closest('button')) return;
-        toggleCard(card);
+        card.classList.toggle('aberto');
     });
 }
 
@@ -294,8 +296,6 @@ function adicionarNovoTemp() {
     const tempId = 'TEMP_' + Date.now();
     const card = document.createElement('div');
     card.className = 'func-card func-card-temp aberto';
-    card.dataset.funcId = tempId;
-    card.dataset.temp = '1';
     card.innerHTML = `
         <div class="func-card-header" style="background:rgba(244,185,66,.06);border:1px dashed rgba(244,185,66,.3)">
             <div class="func-avatar avatar-temp">T</div>
