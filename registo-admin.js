@@ -204,6 +204,70 @@ function renderFuncionarios(existentes) {
         btnAdd.onclick = () => adicionarLinha(linhasDiv, f.id, null, btnAdd);
         linhasDiv.appendChild(btnAdd);
     });
+
+    // Reconstruir cartões de temporários (funcionario_id null, nome em observacoes "[TEMP] Nome")
+    const tempRegs = existentes.filter(r => !r.funcionario_id && r.tipo !== 'falta');
+    const porTemp = {};
+    tempRegs.forEach(r => {
+        const nome = extrairNomeTemp(r.observacoes);
+        (porTemp[nome] = porTemp[nome] || []).push(r);
+    });
+    Object.entries(porTemp).forEach(([nome, regs], idx) => {
+        reconstruirCartaoTemp(nome, regs, 'TEMPR_' + idx);
+    });
+}
+
+// Extrai o nome de um temporário a partir de observacoes "[TEMP] Nome"
+function extrairNomeTemp(obs) {
+    if (!obs) return 'Temporário';
+    const m = obs.match(/^\[TEMP\]\s*(.*)$/);
+    return (m && m[1].trim()) || 'Temporário';
+}
+
+// Recria o cartão de um temporário já guardado, com as suas linhas e estado verde
+function reconstruirCartaoTemp(nome, regs, syntheticId) {
+    const lista = document.getElementById('funcLista');
+    if (!lista) return;
+    const card = document.createElement('div');
+    card.className = 'func-card aberto guardado';
+    card.dataset.funcId = syntheticId;
+    card.dataset.temp = '1';
+    card.dataset.tempNome = nome;
+    card.dataset.falta = '0';
+
+    const totalH = regs.reduce((s, r) => s + Number(r.horas || 0), 0);
+    card.innerHTML = `
+        <div class="func-card-header">
+            <div class="func-avatar avatar-temp">${nome.charAt(0).toUpperCase()}</div>
+            <div class="func-info">
+                <div class="func-nome">
+                    ${nome}
+                    <span style="font-size:9px;font-weight:700;background:rgba(244,185,66,.2);color:#c8901e;padding:1px 6px;border-radius:8px;margin-left:5px">TEMP</span>
+                </div>
+                <div class="func-resumo">${totalH.toFixed(1)}h · ${regs.length} obra(s)</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+                <button onclick="this.closest('.func-card').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;opacity:.4;line-height:1">×</button>
+                <div class="func-toggle">▼</div>
+            </div>
+        </div>
+        <div class="func-linhas" id="linhas-${syntheticId}"></div>
+    `;
+    lista.appendChild(card);
+
+    const linhasDiv = document.getElementById(`linhas-${syntheticId}`);
+    regs.forEach(r => adicionarLinha(linhasDiv, syntheticId, r));
+
+    const btnAdd = document.createElement('button');
+    btnAdd.className = 'btn-add-linha';
+    btnAdd.textContent = '+ Adicionar outra obra';
+    btnAdd.onclick = () => adicionarLinha(linhasDiv, syntheticId, null, btnAdd);
+    linhasDiv.appendChild(btnAdd);
+
+    card.querySelector('.func-card-header').addEventListener('click', e => {
+        if (e.target.closest('button')) return;
+        card.classList.toggle('aberto');
+    });
 }
 
 
@@ -257,6 +321,8 @@ function adicionarTempExistente(funcId, nome, valorDia) {
     card.className = 'func-card aberto'; // aberto por defeito para mostrar as linhas
     card.dataset.funcId = funcId;
     card.dataset.falta = '0';
+    card.dataset.temp = '1';
+    card.dataset.tempNome = nome;
     card.innerHTML = `
         <div class="func-card-header">
             <div class="func-avatar avatar-temp">${nome.charAt(0).toUpperCase()}</div>
@@ -296,6 +362,9 @@ function adicionarNovoTemp() {
     const tempId = 'TEMP_' + Date.now();
     const card = document.createElement('div');
     card.className = 'func-card func-card-temp aberto';
+    card.dataset.funcId = tempId;
+    card.dataset.temp = '1';
+    card.dataset.falta = '0';
     card.innerHTML = `
         <div class="func-card-header" style="background:rgba(244,185,66,.06);border:1px dashed rgba(244,185,66,.3)">
             <div class="func-avatar avatar-temp">T</div>
@@ -432,7 +501,7 @@ async function guardarTudo() {
         // Temporário — guardar com nome nas observações, sem funcionario_id real
         const card = document.querySelector(`.func-card[data-func-id="${funcId}"]`);
         const isTemp = card?.dataset.temp === '1';
-        const nomeTemp = card?.querySelector('.input-temp-nome')?.value?.trim() || 'Temporário';
+        const nomeTemp = card?.querySelector('.input-temp-nome')?.value?.trim() || card?.dataset.tempNome || 'Temporário';
 
         registos.push({
             data,

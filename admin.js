@@ -473,6 +473,13 @@ function switchRegTab(tab) {
 // ═══════════════════════════════════════════════════════
 let _raCache = [];
 
+// Nome de um temporário (funcionario_id null) a partir de observacoes "[TEMP] Nome"
+function nomeTempRA(obs) {
+    if (!obs) return "Temporário";
+    const m = obs.match(/^\[TEMP\]\s*(.*)$/);
+    return (m && m[1].trim()) || "Temporário";
+}
+
 async function carregarRegistosAdmin() {
     const mesEl  = document.getElementById("raFiltroMes");
     const vista  = document.getElementById("raFiltroVista")?.value || "func";
@@ -486,7 +493,7 @@ async function carregarRegistosAdmin() {
     raConteudo.innerHTML = `<div style="padding:24px;text-align:center;opacity:.4">A carregar…</div>`;
 
     const { data, error } = await SB.from("registos_admin")
-        .select("id, data, tipo, horas, obra_id, observacoes, funcionarios(id, nome, valor_dia), obras(id, nome)")
+        .select("id, data, tipo, horas, funcionario_id, obra_id, observacoes, funcionarios(id, nome, valor_dia), obras(id, nome)")
         .gte("data", inicio).lte("data", fim)
         .order("data").order("funcionarios(nome)");
 
@@ -525,7 +532,7 @@ function renderRaMapaFuncionario(ano, mes) {
     // Agrupar por funcionário
     const porFunc = {};
     _raCache.forEach(r => {
-        const nome = r.funcionarios?.nome || "—";
+        const nome = r.funcionarios?.nome || (r.funcionario_id ? "—" : nomeTempRA(r.observacoes));
         if (!porFunc[nome]) porFunc[nome] = { vd: r.funcionarios?.valor_dia, dias: {}, totalH: 0, totalDias: 0 };
         porFunc[nome].dias[r.data] = { tipo: r.tipo, horas: Number(r.horas||0), obra: r.obras?.nome||"" };
         if (r.tipo === "presenca") {
@@ -598,7 +605,7 @@ function renderRaMapaObra(ano, mes) {
     const porObra = {};
     _raCache.filter(r => r.tipo==="presenca" && r.obras?.nome).forEach(r => {
         const nome = r.obras.nome;
-        const func = r.funcionarios?.nome || "—";
+        const func = r.funcionarios?.nome || (r.funcionario_id ? "—" : nomeTempRA(r.observacoes));
         if (!porObra[nome]) porObra[nome] = { dias: {}, totalH: 0, funcs: new Set() };
         if (!porObra[nome].dias[r.data]) porObra[nome].dias[r.data] = {};
         porObra[nome].dias[r.data][func] = (porObra[nome].dias[r.data][func]||0) + Number(r.horas||0);
@@ -681,7 +688,7 @@ function renderRaDetalhe() {
 
         html += `<tr style="background:${bg};border-bottom:1px solid rgba(0,0,0,.05)">
             <td style="padding:7px 12px;font-variant-numeric:tabular-nums">${dataFmt}</td>
-            <td style="padding:7px 12px;font-weight:500">${r.funcionarios?.nome||"—"}</td>
+            <td style="padding:7px 12px;font-weight:500">${r.funcionarios?.nome || (r.funcionario_id ? "—" : nomeTempRA(r.observacoes))}</td>
             <td style="padding:7px 12px;opacity:.7">${r.obras?.nome||"—"}</td>
             <td style="padding:7px 12px;text-align:center">
                 ${r.tipo==="presenca"
