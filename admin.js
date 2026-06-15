@@ -137,7 +137,7 @@ function abrirTab(nome) {
     if (nome === "fluxo")        initFluxo();
     if (nome === "financeiro")   { switchFinTab("ordenados"); }
     if (nome === "dashboard")    initDashboard();
-    if (nome === "registos")     { gerarCalendario(); carregarRegistos(); }
+    if (nome === "registos")     { switchRegTab("ponto"); }
     if (nome === "funcionarios") initFuncionarios();
     if (nome === "inventario")   initInventario();
     if (nome === "obras")        initObras();
@@ -453,6 +453,10 @@ function switchRegTab(tab) {
             cont.style.overflow   = "hidden";
         }
     });
+    if (tab === "ponto") {
+        gerarCalendario();
+        carregarRegistos();
+    }
     if (tab === "admin") {
         // Inicializar mês actual se não estiver definido
         const el = document.getElementById("raFiltroMes");
@@ -499,11 +503,11 @@ async function carregarRegistosAdmin() {
     document.getElementById("raKpis").innerHTML = [
         { label:"Dias com registo", val: new Set(presMes.map(r=>r.data)).size, cor:"" },
         { label:"Total horas", val: totalH.toFixed(0)+"h", cor:"" },
-        { label:"Faltas registadas", val: faltasMes.length, cor:"#f87171" },
+        { label:"Faltas registadas", val: faltasMes.length, cor:"#dc2626" },
         { label:"Obras activas", val: obrasUniq, cor:"" },
-    ].map(k => `<div style="background:var(--bg-dark-panel,#2a2a2a);border-radius:10px;padding:14px 18px;border:1px solid rgba(255,255,255,.07)">
-        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;opacity:.45;margin-bottom:4px">${k.label}</div>
-        <div style="font-family:var(--font-title,sans-serif);font-size:22px;font-weight:500;color:${k.cor||"#fff"}">${k.val}</div>
+    ].map(k => `<div class="card metric">
+        <h3>${k.label}</h3>
+        <div class="value"${k.cor?` style="color:${k.cor}"`:""}>${k.val}</div>
     </div>`).join("");
 
     if (vista === "func") renderRaMapaFuncionario(ano, mes);
@@ -535,8 +539,8 @@ function renderRaMapaFuncionario(ano, mes) {
 
     let html = `<table style="border-collapse:collapse;font-size:12px;width:100%">
     <thead>
-        <tr style="background:rgba(244,185,66,.1)">
-            <th style="padding:8px 12px;text-align:left;position:sticky;left:0;background:var(--bg-dark-panel,#2a2a2a);z-index:2;min-width:140px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Funcionário</th>
+        <tr style="background:var(--primary-lt)">
+            <th style="padding:8px 12px;text-align:left;position:sticky;left:0;background:var(--panel-solid);z-index:2;min-width:140px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Funcionário</th>
             ${dias.map(d => {
                 const dObj = new Date(d+"T12:00:00");
                 const dow  = dObj.getDay();
@@ -552,30 +556,30 @@ function renderRaMapaFuncionario(ano, mes) {
 
     funcs.forEach((func, fi) => {
         const fd  = porFunc[func];
-        const bg  = fi%2===1 ? "rgba(255,255,255,.02)" : "transparent";
+        const bg  = fi%2===1 ? "rgba(0,0,0,.03)" : "transparent";
         const vd  = fd.vd ? Number(fd.vd) : null;
         const val = vd ? (fd.totalDias * vd).toFixed(2)+"€" : "—";
 
-        html += `<tr style="background:${bg};border-bottom:1px solid rgba(255,255,255,.05)">
-            <td style="padding:7px 12px;position:sticky;left:0;background:var(--bg-dark-panel,#2a2a2a);z-index:1;font-weight:500;white-space:nowrap;border-right:1px solid rgba(255,255,255,.07)">${func}</td>
+        html += `<tr style="background:${bg};border-bottom:1px solid rgba(0,0,0,.07)">
+            <td style="padding:7px 12px;position:sticky;left:0;background:var(--panel-solid);z-index:1;font-weight:500;white-space:nowrap;border-right:1px solid rgba(0,0,0,.1)">${func}</td>
             ${dias.map(d => {
                 const dObj = new Date(d+"T12:00:00");
                 const dow  = dObj.getDay();
                 const isWE = dow===0||dow===6;
                 const reg  = fd.dias[d];
                 let bg2 = "transparent", sym = "", title = "";
-                if (isWE) { bg2="rgba(255,255,255,.02)"; sym=""; }
+                if (isWE) { bg2="rgba(0,0,0,.03)"; sym=""; }
                 else if (!reg) { sym=""; }
                 else if (reg.tipo === "falta") { bg2="rgba(248,113,113,.15)"; sym="✕"; title=reg.obra||"Falta"; }
                 else if (reg.horas > 0) {
                     bg2="rgba(74,222,128,.15)"; sym=reg.horas<8?"½":"✓";
                     title = `${reg.obra||""} ${reg.horas}h`;
                 }
-                return `<td style="text-align:center;padding:3px 2px;background:${bg2};border:1px solid rgba(255,255,255,.04);font-size:11px" title="${title}">${sym}</td>`;
+                return `<td style="text-align:center;padding:3px 2px;background:${bg2};border:1px solid rgba(0,0,0,.05);font-size:11px" title="${title}">${sym}</td>`;
             }).join("")}
             <td style="padding:7px 10px;text-align:right;font-weight:600">${fd.totalDias}</td>
             <td style="padding:7px 10px;text-align:right">${fd.totalH.toFixed(1)}h</td>
-            <td style="padding:7px 10px;text-align:right;color:#4ade80;font-weight:600">${val}</td>
+            <td style="padding:7px 10px;text-align:right;color:#16a34a;font-weight:600">${val}</td>
         </tr>`;
     });
 
@@ -607,8 +611,8 @@ function renderRaMapaObra(ano, mes) {
 
     let html = `<table style="border-collapse:collapse;font-size:12px;width:100%">
     <thead>
-        <tr style="background:rgba(244,185,66,.1)">
-            <th style="padding:8px 12px;text-align:left;position:sticky;left:0;background:var(--bg-dark-panel,#2a2a2a);z-index:2;min-width:160px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Obra</th>
+        <tr style="background:var(--primary-lt)">
+            <th style="padding:8px 12px;text-align:left;position:sticky;left:0;background:var(--panel-solid);z-index:2;min-width:160px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Obra</th>
             ${dias.map(d => {
                 const dObj = new Date(d+"T12:00:00");
                 const dow  = dObj.getDay();
@@ -623,17 +627,17 @@ function renderRaMapaObra(ano, mes) {
 
     obras.forEach((obra, oi) => {
         const od  = porObra[obra];
-        const bg  = oi%2===1 ? "rgba(255,255,255,.02)" : "transparent";
+        const bg  = oi%2===1 ? "rgba(0,0,0,.03)" : "transparent";
 
-        html += `<tr style="background:${bg};border-bottom:1px solid rgba(255,255,255,.05)">
-            <td style="padding:7px 12px;position:sticky;left:0;background:var(--bg-dark-panel,#2a2a2a);z-index:1;font-weight:500;white-space:nowrap;border-right:1px solid rgba(255,255,255,.07)">${obra}</td>
+        html += `<tr style="background:${bg};border-bottom:1px solid rgba(0,0,0,.07)">
+            <td style="padding:7px 12px;position:sticky;left:0;background:var(--panel-solid);z-index:1;font-weight:500;white-space:nowrap;border-right:1px solid rgba(0,0,0,.1)">${obra}</td>
             ${dias.map(d => {
                 const dObj = new Date(d+"T12:00:00");
                 const dow  = dObj.getDay();
                 const isWE = dow===0||dow===6;
                 const reg  = od.dias[d];
                 let bg2 = "transparent", sym = "", title = "";
-                if (isWE) { bg2="rgba(255,255,255,.02)"; }
+                if (isWE) { bg2="rgba(0,0,0,.03)"; }
                 else if (reg) {
                     const nFunc = Object.keys(reg).length;
                     const totalH = Object.values(reg).reduce((s,v)=>s+v,0);
@@ -641,7 +645,7 @@ function renderRaMapaObra(ano, mes) {
                     sym = nFunc.toString();
                     title = Object.entries(reg).map(([f,h])=>`${f}: ${h}h`).join(", ");
                 }
-                return `<td style="text-align:center;padding:3px 2px;background:${bg2};border:1px solid rgba(255,255,255,.04);font-size:11px;font-weight:${reg?"600":"400"}" title="${title}">${sym}</td>`;
+                return `<td style="text-align:center;padding:3px 2px;background:${bg2};border:1px solid rgba(0,0,0,.05);font-size:11px;font-weight:${reg?"600":"400"}" title="${title}">${sym}</td>`;
             }).join("")}
             <td style="padding:7px 10px;text-align:right;font-weight:600">${od.totalH.toFixed(1)}h</td>
             <td style="padding:7px 10px;text-align:right;opacity:.7">${od.funcs.size}</td>
@@ -658,7 +662,7 @@ function renderRaDetalhe() {
     const faltas    = _raCache.filter(r => r.tipo === "falta");
 
     let html = `<table style="border-collapse:collapse;font-size:13px;width:100%">
-    <thead style="background:rgba(244,185,66,.1)">
+    <thead style="background:var(--primary-lt)">
         <tr>
             <th style="padding:8px 12px;text-align:left">Data</th>
             <th style="padding:8px 12px;text-align:left">Funcionário</th>
@@ -672,20 +676,20 @@ function renderRaDetalhe() {
     _raCache.forEach((r, i) => {
         const vd  = r.funcionarios?.valor_dia ? Number(r.funcionarios.valor_dia) : null;
         const val = (r.tipo==="presenca" && vd && r.horas) ? (Number(r.horas)/8*vd).toFixed(2)+"€" : "—";
-        const bg  = i%2===1 ? "rgba(255,255,255,.02)" : "transparent";
+        const bg  = i%2===1 ? "rgba(0,0,0,.03)" : "transparent";
         const dataFmt = r.data ? r.data.split("-").reverse().join("/") : "—";
 
-        html += `<tr style="background:${bg};border-bottom:1px solid rgba(255,255,255,.04)">
+        html += `<tr style="background:${bg};border-bottom:1px solid rgba(0,0,0,.05)">
             <td style="padding:7px 12px;font-variant-numeric:tabular-nums">${dataFmt}</td>
             <td style="padding:7px 12px;font-weight:500">${r.funcionarios?.nome||"—"}</td>
             <td style="padding:7px 12px;opacity:.7">${r.obras?.nome||"—"}</td>
             <td style="padding:7px 12px;text-align:center">
                 ${r.tipo==="presenca"
-                    ? `<span style="background:rgba(74,222,128,.15);color:#4ade80;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">Presente</span>`
-                    : `<span style="background:rgba(248,113,113,.15);color:#f87171;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">Falta</span>`}
+                    ? `<span style="background:rgba(74,222,128,.15);color:#16a34a;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">Presente</span>`
+                    : `<span style="background:rgba(248,113,113,.15);color:#dc2626;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">Falta</span>`}
             </td>
             <td style="padding:7px 12px;text-align:right">${r.tipo==="presenca"?Number(r.horas||0).toFixed(1)+"h":"—"}</td>
-            <td style="padding:7px 12px;text-align:right;color:#4ade80">${val}</td>
+            <td style="padding:7px 12px;text-align:right;color:#16a34a">${val}</td>
         </tr>`;
     });
 
