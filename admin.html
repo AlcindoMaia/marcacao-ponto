@@ -45,7 +45,7 @@
     border-color: #dc2626;
 }
 
-/* Todas as tabs — padding e max-width uniformes */
+/* Todas as tabs fora do adminArea — container próprio */
 .tab-content.active {
     box-sizing: border-box;
     width: 100%;
@@ -55,12 +55,14 @@
     padding-right: 28px;
     padding-bottom: 40px;
 }
-/* Tabs DENTRO do adminArea — já têm 28px do .container, não duplicar */
-#adminArea > .tab-content.active {
+/* Tabs DENTRO do adminArea (financeiro, registos e sub-containers)
+   Já têm padding do .container — anular o padding duplicado */
+#adminArea .tab-content.active {
     padding-left: 0;
     padding-right: 0;
     max-width: none;
     margin: 0;
+    width: 100%;
 }
 </style>
 </head>

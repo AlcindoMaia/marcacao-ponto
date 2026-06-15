@@ -126,13 +126,16 @@ function ativarTabs() {
 function abrirTab(nome) {
     document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
     document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+    // Esconder sub-conteúdos que usam style.display inline (fin-subtab, reg-subtab)
+    document.querySelectorAll(".fin-subtab-content").forEach(c => c.style.display = "none");
+    document.querySelectorAll(".reg-subtab-content, [id^='regTabContent-']").forEach(c => c.style.display = "none");
     const tabBtn = document.querySelector(`.tab[data-tab="${nome}"]`);
     const tabDiv = document.getElementById("tab-" + nome);
     if (!tabBtn || !tabDiv) return;
     tabBtn.classList.add("active");
     tabDiv.classList.add("active");
     if (nome === "fluxo")        initFluxo();
-    if (nome === "financeiro")   carregarFinanceiro();
+    if (nome === "financeiro")   { switchFinTab("ordenados"); }
     if (nome === "dashboard")    initDashboard();
     if (nome === "registos")     { gerarCalendario(); carregarRegistos(); }
     if (nome === "funcionarios") initFuncionarios();
