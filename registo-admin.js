@@ -139,7 +139,8 @@ function renderFuncionarios(existentes) {
     const lista = document.getElementById("funcLista");
     lista.innerHTML = "";
 
-    _funcs.forEach(f => {
+    // Só mostrar funcionários fixos — temporários são adicionados manualmente via + Temp
+    _funcs.filter(f => f.tipo_contrato !== 'temporario').forEach(f => {
         // Registos existentes para este funcionário
         const registosFunc = existentes.filter(r => r.funcionario_id === f.id);
 
@@ -214,32 +215,101 @@ async
 // TRABALHADOR TEMPORÁRIO
 // =======================================================
 function adicionarTrabalhadorTemp() {
-    const lista = document.getElementById("funcLista");
-    const tempId = "TEMP_" + Date.now();
+    // Mostrar painel de seleção de temporários
+    const painel = document.getElementById('painelSelecionarTemp');
+    if (painel) {
+        painel.classList.toggle('hidden-painel');
+        if (!painel.classList.contains('hidden-painel')) {
+            preencherListaTemps();
+        }
+        return;
+    }
+}
 
-    const card = document.createElement("div");
-    card.className = "func-card func-card-temp aberto";
-    card.dataset.funcId = tempId;
-    card.dataset.temp = "1";
+function preencherListaTemps() {
+    const lista = document.getElementById('listaTempsExistentes');
+    if (!lista) return;
+    const temps = _funcs.filter(f => f.tipo_contrato === 'temporario');
+    if (temps.length === 0) {
+        lista.innerHTML = '<div style="padding:8px 0;opacity:.5;font-size:13px">Sem temporários registados</div>';
+    } else {
+        lista.innerHTML = temps.map(f => `
+            <div class="temp-opcao" onclick="adicionarTempExistente('${f.id}','${f.nome.replace(/'/g,"\\'")}',${f.valor_dia||0})"
+                style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .15s"
+                onmouseover="this.style.background='rgba(244,185,66,.08)'" onmouseout="this.style.background=''">
+                <div style="width:32px;height:32px;border-radius:50%;background:rgba(244,185,66,.2);color:#c8901e;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${f.nome.charAt(0).toUpperCase()}</div>
+                <span style="font-size:13px;font-weight:500">${f.nome}</span>
+                <span style="margin-left:auto;font-size:11px;opacity:.5">${f.valor_dia ? f.valor_dia+'€/dia' : ''}</span>
+            </div>`).join('');
+    }
+}
+
+function adicionarTempExistente(funcId, nome, valorDia) {
+    // Fechar o painel
+    const painel = document.getElementById('painelSelecionarTemp');
+    if (painel) painel.classList.add('hidden-painel');
+
+    // Ver se já está adicionado
+    if (document.querySelector(`.func-card[data-func-id="${funcId}"]`)) return;
+
+    const lista = document.getElementById('funcLista');
+    const existentes = [];
+    const card = document.createElement('div');
+    card.className = 'func-card';
+    card.dataset.funcId = funcId;
+    card.dataset.falta = '0';
     card.innerHTML = `
-        <div class="func-card-header" style="background:rgba(244,185,66,.08);border:1px solid rgba(244,185,66,.2)">
-            <div class="func-avatar" style="background:var(--primary);color:#000">T</div>
+        <div class="func-card-header">
+            <div class="func-avatar avatar-temp">${nome.charAt(0).toUpperCase()}</div>
+            <div class="func-info">
+                <div class="func-nome">
+                    ${nome}
+                    <span style="font-size:9px;font-weight:700;background:rgba(244,185,66,.2);color:#c8901e;padding:1px 6px;border-radius:8px;margin-left:5px">TEMP</span>
+                </div>
+                <div class="func-resumo">Sem registo</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+                <button class="btn-falta" onclick="toggleFalta(event,'${funcId}')" title="Marcar falta">✕ Falta</button>
+                <button onclick="this.closest('.func-card').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;opacity:.4;line-height:1">×</button>
+                <div class="func-toggle">▼</div>
+            </div>
+        </div>
+        <div class="func-linhas" id="linhas-${funcId}"></div>
+    `;
+    lista.appendChild(card);
+    const linhasDiv = document.getElementById(`linhas-${funcId}`);
+    adicionarLinha(linhasDiv, funcId);
+    card.querySelector('.func-card-header').addEventListener('click', e => {
+        if (e.target.closest('button')) return;
+        toggleCard(card);
+    });
+}
+
+function adicionarNovoTemp() {
+    // Fechar painel
+    const painel = document.getElementById('painelSelecionarTemp');
+    if (painel) painel.classList.add('hidden-painel');
+
+    const lista = document.getElementById('funcLista');
+    const tempId = 'TEMP_' + Date.now();
+    const card = document.createElement('div');
+    card.className = 'func-card func-card-temp aberto';
+    card.dataset.funcId = tempId;
+    card.dataset.temp = '1';
+    card.innerHTML = `
+        <div class="func-card-header" style="background:rgba(244,185,66,.06);border:1px dashed rgba(244,185,66,.3)">
+            <div class="func-avatar avatar-temp">T</div>
             <div class="func-info" style="flex:1">
-                <input class="input-temp-nome" placeholder="Nome do trabalhador temporário"
-                    style="background:transparent;border:none;border-bottom:1px solid rgba(0,0,0,.2);font-size:14px;font-weight:600;width:100%;padding:2px 0;outline:none">
-                <div class="func-resumo" style="font-size:11px;opacity:.5">Trabalho esporádico — não gravado como funcionário</div>
+                <input class="input-temp-nome" placeholder="Nome do trabalhador"
+                    style="background:transparent;border:none;border-bottom:1px solid rgba(0,0,0,.15);font-size:13px;font-weight:600;width:100%;padding:2px 0;outline:none;color:inherit">
+                <div class="func-resumo" style="font-size:11px;opacity:.5;margin-top:2px">Temporário esporádico</div>
             </div>
             <button onclick="this.closest('.func-card').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;opacity:.4">×</button>
         </div>
         <div class="func-linhas" id="linhas-${tempId}"></div>
     `;
-
     lista.appendChild(card);
-
-    const linhasDiv = document.getElementById(`linhas-${tempId}`);
-    adicionarLinha(linhasDiv, tempId);
-
-    // Focar no nome
+    adicionarLinha(document.getElementById(`linhas-${tempId}`), tempId);
     setTimeout(() => card.querySelector('.input-temp-nome')?.focus(), 50);
 }
 
@@ -620,3 +690,11 @@ function toggleTemaRegisto() {
     }
 })();
 
+// Fechar painel de temporários ao clicar fora
+document.addEventListener('click', e => {
+    const painel = document.getElementById('painelSelecionarTemp');
+    if (!painel) return;
+    if (!painel.classList.contains('hidden-painel') && !e.target.closest('#painelSelecionarTemp') && !e.target.closest('[onclick*="adicionarTrabalhadorTemp"]')) {
+        painel.classList.add('hidden-painel');
+    }
+});

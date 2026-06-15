@@ -573,6 +573,15 @@ body {
     body.tema-claro .filtro-data input { background: #fff; color: #1a1a1a; }
     body.tema-claro .btn-guardar-tudo { background: var(--primary); }
     body.tema-claro header { background: #1a1a1a; }
+
+    .hidden-painel { display: none !important; }
+    body.tema-claro #painelSelecionarTemp {
+        background: #fff;
+        border-color: rgba(0,0,0,.1);
+        box-shadow: 0 8px 24px rgba(0,0,0,.12);
+        color: #1a1a1a;
+    }
+    /* Fechar painel ao clicar fora */
 </style>
 </head>
 <body>
@@ -619,9 +628,23 @@ body {
     <button onclick="toggleTemaRegisto()" id="btnTemaRegisto" 
         style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:16px"
         title="Modo claro/escuro">🌙</button>
-    <button onclick="adicionarTrabalhadorTemp()"
-        style="background:rgba(244,185,66,.2);border:1px solid rgba(244,185,66,.4);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:600;color:var(--primary)"
-        title="Adicionar trabalhador temporário/esporádico">+ Temp</button>
+    <div style="position:relative">
+        <button onclick="adicionarTrabalhadorTemp()"
+            style="background:rgba(244,185,66,.2);border:1px solid rgba(244,185,66,.4);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:600;color:var(--primary)"
+            title="Adicionar trabalhador temporário/esporádico">+ Temp</button>
+        <!-- Painel de seleção de temporários -->
+        <div id="painelSelecionarTemp" class="hidden-painel"
+            style="position:absolute;top:calc(100% + 6px);left:0;z-index:200;background:var(--bg-card,#1e1e1e);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;min-width:260px;box-shadow:0 8px 24px rgba(0,0,0,.3)">
+            <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin-bottom:8px;padding:0 4px">Temporários</div>
+            <div id="listaTempsExistentes"></div>
+            <div style="border-top:1px solid rgba(255,255,255,.08);margin-top:8px;padding-top:8px">
+                <button onclick="adicionarNovoTemp()"
+                    style="width:100%;padding:8px;border-radius:8px;border:1px dashed rgba(244,185,66,.4);background:rgba(244,185,66,.06);color:var(--primary,#c8901e);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+                    <span style="font-size:16px">+</span> Novo temporário
+                </button>
+            </div>
+        </div>
+    </div>
     <button onclick="navegarDia(-1)" style="background:var(--primary);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:16px;font-weight:700">‹</button>
     <input type="date" id="dataRegisto">
     <button onclick="navegarDia(1)" style="background:var(--primary);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:16px;font-weight:700">›</button>
