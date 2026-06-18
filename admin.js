@@ -4109,7 +4109,10 @@ async function guardarOrcamento(estado = 'rascunho') {
     document.querySelectorAll('.orc-linha').forEach(l => {
         const qtd = parseFloat(l.querySelector('[data-field="quantidade"]')?.value)||0;
         const pu  = parseFloat(l.querySelector('[data-field="preco_unitario"]')?.value)||0;
-        const t = qtd*pu;
+        const nPes = l.dataset.tipo==='mao_obra'
+            ? (parseFloat(l.querySelector('[data-field="n_pessoas"]')?.value)||1)
+            : 1;
+        const t = qtd*pu*nPes;
         if (l.dataset.tipo==='mao_obra') maoObra+=t;
         else if (l.dataset.tipo==='material') materiais+=t;
         else outros+=t;
@@ -4259,6 +4262,9 @@ async function exportarPDFOrcamento(id) {
     const fmt  = v => Number(v||0).toFixed(2);
     const ivaP = Number(o.taxa_iva||23);
 
+    // Recalcular subtotais a partir das linhas (inclui nº de pessoas na M.O.)
+    let pdfMaoObra = 0, pdfMateriais = 0, pdfOutros = 0;
+
     // Gerar HTML do PDF
     let tabelaHTML = '';
     cats.forEach(cat => {
@@ -4268,12 +4274,17 @@ async function exportarPDFOrcamento(id) {
                 <td colspan="6">${cat.nome.toUpperCase()}</td>
             </tr>`;
         cat.linhas.forEach(l => {
-            const total = Number(l.quantidade) * Number(l.preco_unitario);
+            const nPes  = l.tipo==='mao_obra' ? (Number(l.n_pessoas)||1) : 1;
+            const total = Number(l.quantidade) * Number(l.preco_unitario) * nPes;
+            if (l.tipo==='mao_obra') pdfMaoObra += total;
+            else if (l.tipo==='material') pdfMateriais += total;
+            else pdfOutros += total;
             const tipoLabel = { mao_obra:'M.O.', material:'Mat.', outro:'Outro' }[l.tipo] || '';
+            const descExtra = (l.tipo==='mao_obra' && nPes>1) ? ` <span style="opacity:.55">(${nPes} pessoas × ${Number(l.quantidade).toFixed(1)}h)</span>` : '';
             tabelaHTML += `
             <tr>
                 <td class="tipo-badge tipo-${l.tipo}">${tipoLabel}</td>
-                <td>${l.descricao}</td>
+                <td>${l.descricao}${descExtra}</td>
                 <td class="num">${l.unidade||'vg'}</td>
                 <td class="num">${Number(l.quantidade).toFixed(2)}</td>
                 <td class="num">${fmt(l.preco_unitario)} €</td>
@@ -4281,6 +4292,10 @@ async function exportarPDFOrcamento(id) {
             </tr>`;
         });
     });
+
+    const pdfSemIva = pdfMaoObra + pdfMateriais + pdfOutros;
+    const pdfIva    = pdfSemIva * (ivaP/100);
+    const pdfComIva = pdfSemIva + pdfIva;
 
     const htmlContent = `<!DOCTYPE html>
 <html lang="pt">
@@ -4406,12 +4421,12 @@ async function exportarPDFOrcamento(id) {
         ${o.notas ? `<h3 style="margin-top:10px">Notas</h3><p>${o.notas}</p>` : ''}
     </div>
     <div class="totais-box">
-        <div class="totais-linha"><span class="label">Mão de Obra</span><span class="valor">${fmt(o.subtotal_mao_obra)} €</span></div>
-        <div class="totais-linha"><span class="label">Materiais</span><span class="valor">${fmt(o.subtotal_materiais)} €</span></div>
-        ${Number(o.subtotal_outros)>0 ? `<div class="totais-linha"><span class="label">Outros</span><span class="valor">${fmt(o.subtotal_outros)} €</span></div>` : ''}
-        <div class="totais-linha"><span class="label">Subtotal s/ IVA</span><span class="valor">${fmt(o.total_sem_iva)} €</span></div>
-        <div class="totais-linha"><span class="label">IVA ${ivaP}%</span><span class="valor">${fmt(o.total_iva)} €</span></div>
-        <div class="totais-linha final"><span class="label">Total</span><span class="valor">${fmt(o.total_com_iva)} €</span></div>
+        <div class="totais-linha"><span class="label">Mão de Obra</span><span class="valor">${fmt(pdfMaoObra)} €</span></div>
+        <div class="totais-linha"><span class="label">Materiais</span><span class="valor">${fmt(pdfMateriais)} €</span></div>
+        ${pdfOutros>0 ? `<div class="totais-linha"><span class="label">Outros</span><span class="valor">${fmt(pdfOutros)} €</span></div>` : ''}
+        <div class="totais-linha"><span class="label">Subtotal s/ IVA</span><span class="valor">${fmt(pdfSemIva)} €</span></div>
+        <div class="totais-linha"><span class="label">IVA ${ivaP}%</span><span class="valor">${fmt(pdfIva)} €</span></div>
+        <div class="totais-linha final"><span class="label">Total</span><span class="valor">${fmt(pdfComIva)} €</span></div>
     </div>
 </div>
 
@@ -4438,6 +4453,10 @@ async function exportarPDFOrcamento(id) {
 </html>`;
 
     const win = window.open('', '_blank', 'width=900,height=700');
+    if (!win) {
+        alert('Não foi possível abrir o PDF. Permite janelas de pop-up para este site e tenta novamente.');
+        return;
+    }
     win.document.write(htmlContent);
     win.document.close();
 }
