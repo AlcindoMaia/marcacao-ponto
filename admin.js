@@ -1387,12 +1387,9 @@ async function guardarFuncionario() {
         const { error } = await SB.from("funcionarios").update(payload).eq("id", funcEditId);
         if (error) { msg.textContent = "Erro: " + error.message; return; }
     } else {
-        // Novo funcionário — device_id será atribuído quando o funcionário
-        // fizer o cadastro no seu dispositivo via QR
-        const { error } = await SB.from("funcionarios").insert({
-            ...payload,
-            device_id: crypto.randomUUID()  // placeholder — será substituído no cadastro
-        });
+        // Novo funcionário — device_id fica vazio até o funcionário fazer o
+        // cadastro no seu dispositivo via QR (é assim que o cadastro o encontra)
+        const { error } = await SB.from("funcionarios").insert(payload);
         if (error) { msg.textContent = "Erro: " + error.message; return; }
     }
 
