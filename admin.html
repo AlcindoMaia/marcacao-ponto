@@ -6,7 +6,7 @@
 
 <title>Painel Administrativo — Maia Solutions</title>
 
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
 <!-- jQuery -->
@@ -133,6 +133,7 @@
         <button class="tab" data-tab="funcionarios">Funcionários</button>
         <button class="tab" data-tab="inventario">Inventário</button>
         <button class="tab" data-tab="obras">Obras</button>
+        <button class="tab" data-tab="planeamento">Planeamento</button>
         <button class="tab" data-tab="gerarqr">Gerar QR</button>
         <button class="tab" data-tab="config">⚙ Config</button>
     </div>
@@ -899,6 +900,25 @@
 
 </div>
 
+<!-- ================= TAB PLANEAMENTO ================= -->
+<div class="tab-content" id="tab-planeamento">
+
+    <div class="inventario-header">
+        <div class="plan-nav">
+            <button id="planSemanaAnterior" class="btn-primary">‹</button>
+            <button id="planSemanaHoje"     class="btn-primary">Hoje</button>
+            <button id="planSemanaSeguinte" class="btn-primary">›</button>
+            <span id="planLabelSemana" class="plan-label"></span>
+        </div>
+        <button id="btnNovaTarefa" class="btn-primary btn-circular">+</button>
+    </div>
+
+    <div class="card" style="overflow-x:auto">
+        <table id="planGrelha" class="plan-grelha"></table>
+    </div>
+
+</div>
+
 <!-- ================= TAB ORÇAMENTOS ================= -->
 <div class="tab-content" id="tab-orcamentos">
 
@@ -1163,11 +1183,85 @@
     </div>
 </div>
 
+<!-- ================= MODAL TAREFA ================= -->
+<div class="modal hidden" id="modalTarefa">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="planModalTitulo">Nova tarefa</h2>
+      <button class="modal-close" id="planModalFechar">&times;</button>
+    </div>
+
+    <label>Descrição</label>
+    <input type="text" id="planDescricao" placeholder="Ex.: Cofragem do muro poente">
+
+    <label>Obra</label>
+    <select id="planObra"></select>
+
+    <div class="plan-linha">
+      <div>
+        <label>Data</label>
+        <input type="date" id="planData">
+      </div>
+      <div>
+        <label>Hora início (opcional)</label>
+        <input type="time" id="planHora">
+      </div>
+      <div>
+        <label>Duração (h)</label>
+        <input type="number" id="planDuracao" step="0.5" min="0.5" value="8">
+      </div>
+    </div>
+
+    <label>Funcionários</label>
+    <div id="planFuncionarios" class="plan-checks"></div>
+
+    <label class="plan-check" style="margin-top:12px">
+      <input type="checkbox" id="planUsarMoradaObra" checked>
+      Usar a morada da obra
+    </label>
+
+    <div id="planBlocoMorada" style="display:none">
+      <label>Morada</label>
+      <input type="text" id="planMorada" placeholder="Morada do local">
+      <div class="plan-linha">
+        <div>
+          <label>Latitude</label>
+          <input type="text" id="planLat">
+        </div>
+        <div>
+          <label>Longitude</label>
+          <input type="text" id="planLng">
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <button id="planBtnGps" class="btn-primary">GPS atual</button>
+        </div>
+      </div>
+    </div>
+
+    <label>Estado</label>
+    <select id="planEstado">
+      <option value="planeada">Planeada</option>
+      <option value="em_curso">Em curso</option>
+      <option value="concluida">Concluída</option>
+      <option value="cancelada">Cancelada</option>
+    </select>
+
+    <label>Notas</label>
+    <textarea id="planNotas" rows="2"></textarea>
+
+    <div class="modal-actions">
+      <button id="planModalEliminar" class="btn-primary" style="background:var(--color-err);color:#fff">Eliminar</button>
+      <button id="planModalGuardar" class="btn-primary">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script src="config.js"></script>
+<script src="planeamento.js"></script>
 <script src="admin.js"></script>
 
 <script>
