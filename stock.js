@@ -38,6 +38,16 @@ function mostrarFeedback(msg, tipo = "info") {
   if (tipo === "ok") setTimeout(() => { el.textContent = ""; el.className = "feedback"; }, 3000);
 }
 
+// --- Mensagem de erro para o ecrã ---
+// O servidor recusa saídas acima do stock e devolve a razão: mostra-a tal
+// como vem. Para o resto, mensagem genérica.
+function msgErro(error) {
+  const m = error?.message || "";
+  if (m.startsWith("Stock insuficiente")) return m;
+  if (m.includes("sem_permissao")) return "Não tens acesso ao registo de stock.";
+  return "Erro ao registar. Tente novamente.";
+}
+
 // --- Tipos com stock variável ---
 function temStock(tipo) {
   return tipo === "consumivel" || tipo === "mercadoria";
@@ -120,7 +130,7 @@ async function confirmarMovimentoStock() {
   btn.disabled = false;
   btn.textContent = "Confirmar";
 
-  if (error) { console.error(error); mostrarFeedback("Erro ao registar. Tente novamente.", "erro"); return; }
+  if (error) { console.error(error); mostrarFeedback(msgErro(error), "erro"); return; }
 
   mostrarFeedback(`✓ ${tipo === "entrada" ? "Entrada" : "Saída"} de ${qtd} registada!`, "ok");
   document.getElementById("quantidade").value = "";
@@ -163,7 +173,7 @@ async function confirmarMovimentacao() {
   btn.disabled = false;
   btn.textContent = "Confirmar Movimentação";
 
-  if (error) { console.error(error); mostrarFeedback("Erro ao registar. Tente novamente.", "erro"); return; }
+  if (error) { console.error(error); mostrarFeedback(msgErro(error), "erro"); return; }
 
   // O local de armazenamento é actualizado pela mesma função (p_local)
   artigo.local_armazenamento = nomeDestino;
