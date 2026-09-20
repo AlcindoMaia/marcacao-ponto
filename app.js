@@ -21,9 +21,12 @@ async function getObra(id) {
   return data;
 }
 
+// A tabela funcionarios não é legível sem login (tem salários, IBAN e NIF).
+// Esta função do servidor devolve só o necessário para o dispositivo actual.
 async function getFuncionario(deviceId) {
-  const { data } = await SB.from("funcionarios").select("*").eq("device_id", deviceId).maybeSingle();
-  return data;
+  const { data, error } = await SB.rpc("funcionario_por_dispositivo", { p_device: deviceId });
+  if (error) { console.error(error); return null; }
+  return Array.isArray(data) ? (data[0] || null) : data;
 }
 
 // =======================================================

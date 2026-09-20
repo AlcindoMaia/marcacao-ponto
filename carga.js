@@ -518,10 +518,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   mostrarEcrã("ecrãLoading");
 
   // Verificar dispositivo
-  const { data: func } = await SB.from("funcionarios")
-    .select("id, nome, acesso_stock, ativo")
-    .eq("device_id", getDeviceId())
-    .maybeSingle();
+  const { data: funcs } = await SB.rpc("funcionario_por_dispositivo", { p_device: getDeviceId() });
+  const func = Array.isArray(funcs) ? funcs[0] : funcs;
 
   if (!func || !func.ativo) {
     mostrarBloqueio("Dispositivo não autorizado", "Este dispositivo não está registado no sistema.<br>Contacte o administrador.");
