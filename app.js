@@ -118,11 +118,13 @@ function actualizarEstado(registos) {
 // =======================================================
 async function carregarHistorico(funcId) {
   const inicio = startOfWeek();
-  const { data } = await SB.from("ponto").select("*")
-    .eq("funcionario_id", funcId)
-    .gte("datahora", inicio.toISOString())
-    .order("datahora", { ascending: false })
-    .limit(12);
+  // A tabela ponto não é acessível sem login: a função devolve apenas as
+  // marcações do funcionário deste dispositivo.
+  const { data, error } = await SB.rpc("ponto_historico", {
+    p_device: getDeviceId(),
+    p_desde:  inicio.toISOString()
+  });
+  if (error) console.error(error);
 
   // Usar diaLocal() para comparar dias em hora de Lisboa (não UTC)
   const hoje = diaLocal(new Date().toISOString());
@@ -177,25 +179,33 @@ async function confirmarMarcacao() {
     async pos => {
       try {
         const { latitude: lat, longitude: lon } = pos.coords;
+
+        // Aviso imediato, antes de chamar o servidor. A decisão é sempre
+        // do servidor: é lá que o perímetro é verificado a sério.
         const dist = haversineDistance(lat, lon, obra.latitude, obra.longitude);
         const raio = obra.raio || 120;
         if (dist > raio) {
           mostrarFeedback(`Fora do perímetro. ${Math.round(dist)}m (máx. ${raio}m)`, "erro");
           return;
         }
-        const { data: ult } = await SB.from("ponto").select("tipo")
-          .eq("funcionario_id", funcionario.id)
-          .order("datahora", { ascending: false }).limit(1).maybeSingle();
-        const tipo = ult?.tipo === "entrada" ? "saida" : "entrada";
-        const { error } = await SB.from("ponto").insert({
-          funcionario_id: funcionario.id,
-          obra_id: obraID,
-          datahora: new Date().toISOString(),
-          latitude: lat,
-          longitude: lon,
-          tipo
+
+        // O funcionário e o tipo (entrada/saída) são determinados no servidor
+        const { data, error } = await SB.rpc("ponto_marcar", {
+          p_device:  getDeviceId(),
+          p_obra_id: obraID,
+          p_lat:     lat,
+          p_lon:     lon
         });
-        if (error) { mostrarFeedback("Erro ao registar. Tente novamente.", "erro"); return; }
+        if (error) {
+          console.error(error);
+          const m = error.message || "";
+          mostrarFeedback(
+            m.startsWith("Fora do perímetro") ? m : "Erro ao registar. Tente novamente.",
+            "erro"
+          );
+          return;
+        }
+        const tipo = (Array.isArray(data) ? data[0] : data)?.tipo;
         mostrarFeedback(tipo==="entrada" ? "✓ Entrada registada!" : "✓ Saída registada!", "ok");
         await carregarHistorico(funcionario.id);
       } finally {
