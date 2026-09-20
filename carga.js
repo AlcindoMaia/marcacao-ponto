@@ -171,11 +171,13 @@ async function processarCodigo(codigo) {
   qrPausado = true;
   document.getElementById("qrStatus").textContent = `A verificar ${codigo}…`;
 
-  const { data: artigo, error } = await SB.from("artigos")
-    .select("id, codigo, descricao, tipo_artigo")
-    .eq("codigo", codigo)
-    .eq("ativo", true)
-    .maybeSingle();
+  // A tabela artigos não é acessível sem login: vai pela função do servidor,
+  // que valida o dispositivo e o acesso ao stock.
+  const { data: arts, error } = await SB.rpc("stock_artigo_por_codigo", {
+    p_device: getDeviceId(),
+    p_codigo: codigo
+  });
+  const artigo = Array.isArray(arts) ? arts[0] : arts;
 
   if (error || !artigo) {
     document.getElementById("qrStatus").textContent = `⚠️ Artigo "${codigo}" não encontrado. Tenta de novo.`;
@@ -310,26 +312,27 @@ async function terminarSessao() {
     tipo_movimento:  "saida",
     quantidade:      item.quantidade,
     data_movimento:  data_mov,
-    funcionario_id:  funcionario.id,
     obra_origem_id:  sessao.origem.id  !== "armazem" ? sessao.origem.id  : null,
     obra_destino_id: sessao.destino.id !== "armazem" ? sessao.destino.id : null,
     sessao_id:       sessao.id,
     observacoes:     obs_base
   }));
 
-  const { error } = await SB.from("movimentos_stock").insert(movimentos);
+  // Grava os movimentos e actualiza o local dos artigos numa só chamada.
+  // O funcionário é determinado no servidor a partir do dispositivo.
+  const { error } = await SB.rpc("stock_registar_movimentos", {
+    p_device:     getDeviceId(),
+    p_movimentos: movimentos,
+    p_local:      sessao.destino.nome
+  });
 
   if (error) {
     alert("Erro ao gravar: " + error.message);
     return;
   }
 
-  // Actualizar local_armazenamento de todos os artigos para o destino
-  const nomeDestino = sessao.destino.nome;
-  const idsUnicos   = [...new Set(sessao.itens.map(i => i.artigo.id))];
-  await SB.from("artigos")
-    .update({ local_armazenamento: nomeDestino })
-    .in("id", idsUnicos);
+  // O local_armazenamento dos artigos já foi actualizado para o destino
+  // pela própria função (parâmetro p_local).
 
   pararQR();
   mostrarResumo();

@@ -43,19 +43,17 @@ function temStock(tipo) {
   return tipo === "consumivel" || tipo === "mercadoria";
 }
 
-// --- Calcular stock actual ---
-async function calcularStock(artigoId) {
-  const { data } = await SB.from("movimentos_stock")
-    .select("tipo_movimento, quantidade")
-    .eq("artigo_id", artigoId);
-  if (!data) return 0;
-  let stock = artigo.stock_inicial || 0;
-  data.forEach(m => {
-    const q = Number(m.quantidade) || 0;
-    if (m.tipo_movimento === "entrada" || m.tipo_movimento === "ajuste_entrada") stock += q;
-    else stock -= q;
+// --- Carregar artigo e stock actual ---
+// As tabelas artigos e movimentos_stock não são acessíveis sem login: a
+// função do servidor valida o dispositivo e já devolve o stock calculado.
+async function carregarArtigo(codigo) {
+  const { data, error } = await SB.rpc("stock_artigo_por_codigo", {
+    p_device: getDeviceId(),
+    p_codigo: codigo
   });
-  return stock;
+  if (error) { console.error(error); return null; }
+  const lista = Array.isArray(data) ? data : (data ? [data] : []);
+  return lista[0] || null;
 }
 
 // --- Renderizar formulário consoante tipo ---
@@ -73,7 +71,7 @@ async function renderFormulario() {
 
   if (temStock(artigo.tipo_artigo)) {
     // Materiais / consumíveis — entrada ou saída com quantidade
-    const stock = await calcularStock(artigo.id);
+    const stock = Number(artigo.stock_atual) || 0;
     stockEl.textContent = `Stock actual: ${stock}`;
     stockEl.style.display = "block";
     formStock.style.display = "block";
@@ -100,34 +98,35 @@ async function confirmarMovimentoStock() {
   btn.disabled = true;
   btn.textContent = "A registar…";
 
-  const { error } = await SB.from("movimentos_stock").insert({
-    artigo_id:      artigo.id,
-    tipo_movimento: tipo,
-    quantidade:     qtd,
-    data_movimento: new Date().toLocaleDateString("sv-SE", { timeZone: TZ }),
-    funcionario_id: funcionario.id,
-    obra_destino_id: tipo === "entrada"  ? (obra !== "armazem" ? obra : null) : null,
-    obra_origem_id:  tipo === "saida"    ? (obra !== "armazem" ? obra : null) : null,
-    observacoes:    `Via QR — ${tipo === "entrada" ? "Entrou de" : "Saiu para"}: ${obra === "armazem" ? "Armazém" : obras.find(o=>o.id===obra)?.nome || obra}`
+  // O local do movimento fica também como local de armazenamento do artigo
+  const nomeLocal = obra === "armazem"
+    ? "Armazém"
+    : obras.find(o => o.id === obra)?.nome || "";
+
+  const { error } = await SB.rpc("stock_registar_movimentos", {
+    p_device: getDeviceId(),
+    p_local:  nomeLocal || null,
+    p_movimentos: [{
+      artigo_id:      artigo.id,
+      tipo_movimento: tipo,
+      quantidade:     qtd,
+      data_movimento: new Date().toLocaleDateString("sv-SE", { timeZone: TZ }),
+      obra_destino_id: tipo === "entrada" ? (obra !== "armazem" ? obra : null) : null,
+      obra_origem_id:  tipo === "saida"   ? (obra !== "armazem" ? obra : null) : null,
+      observacoes:    `Via QR — ${tipo === "entrada" ? "Entrou de" : "Saiu para"}: ${obra === "armazem" ? "Armazém" : obras.find(o=>o.id===obra)?.nome || obra}`
+    }]
   });
 
   btn.disabled = false;
   btn.textContent = "Confirmar";
 
-  if (error) { mostrarFeedback("Erro ao registar. Tente novamente.", "erro"); return; }
-
-  // Actualizar local_armazenamento do artigo com o local do movimento
-  const nomeLocal = obra === "armazem"
-    ? "Armazém"
-    : obras.find(o => o.id === obra)?.nome || "";
-  if (nomeLocal) {
-    await SB.from("artigos").update({ local_armazenamento: nomeLocal }).eq("id", artigo.id);
-  }
+  if (error) { console.error(error); mostrarFeedback("Erro ao registar. Tente novamente.", "erro"); return; }
 
   mostrarFeedback(`✓ ${tipo === "entrada" ? "Entrada" : "Saída"} de ${qtd} registada!`, "ok");
   document.getElementById("quantidade").value = "";
   document.querySelector('input[name="tipoMov"]')?.parentElement?.querySelectorAll('input').forEach(r => r.checked = false);
-  // Actualizar stock
+  // Actualizar stock — voltar a ler para reflectir o movimento registado
+  artigo = (await carregarArtigo(artigo.codigo)) || artigo;
   renderFormulario();
 }
 
@@ -147,24 +146,26 @@ async function confirmarMovimentacao() {
   const nomeOrigem  = origem  === "armazem" ? "Armazém" : obras.find(o=>o.id===origem)?.nome  || origem;
   const nomeDestino = destino === "armazem" ? "Armazém" : obras.find(o=>o.id===destino)?.nome || destino;
 
-  const { error } = await SB.from("movimentos_stock").insert({
+  const { error } = await SB.rpc("stock_registar_movimentos", {
+    p_device: getDeviceId(),
+    p_local:  nomeDestino,
+    p_movimentos: [{
     artigo_id:       artigo.id,
     tipo_movimento:  "saida",
     quantidade:      1,
     data_movimento:  new Date().toLocaleDateString("sv-SE", { timeZone: TZ }),
-    funcionario_id:  funcionario.id,
     obra_origem_id:  origem  !== "armazem" ? origem  : null,
     obra_destino_id: destino !== "armazem" ? destino : null,
     observacoes:     `Movimentação: ${nomeOrigem} → ${nomeDestino}`
+    }]
   });
 
   btn.disabled = false;
   btn.textContent = "Confirmar Movimentação";
 
-  if (error) { mostrarFeedback("Erro ao registar. Tente novamente.", "erro"); return; }
+  if (error) { console.error(error); mostrarFeedback("Erro ao registar. Tente novamente.", "erro"); return; }
 
-  // Actualizar local_armazenamento do artigo com o destino
-  await SB.from("artigos").update({ local_armazenamento: nomeDestino }).eq("id", artigo.id);
+  // O local de armazenamento é actualizado pela mesma função (p_local)
   artigo.local_armazenamento = nomeDestino;
 
   mostrarFeedback(`✓ ${artigo.descricao} movido para ${nomeDestino}!`, "ok");
@@ -204,11 +205,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   funcionario = func;
 
   // Carregar artigo pelo código
-  const { data: art } = await SB.from("artigos")
-    .select("*")
-    .eq("codigo", codigoArtigo)
-    .eq("ativo", true)
-    .maybeSingle();
+  const art = await carregarArtigo(codigoArtigo);
 
   if (!art) {
     mostrarBloqueio("Artigo não encontrado", `Não existe nenhum artigo com o código <strong>${codigoArtigo}</strong>.<br>Verifique se o QR está actualizado.`);
