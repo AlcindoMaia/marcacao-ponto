@@ -109,6 +109,7 @@ function iniciarSessao() {
 // LEITOR QR
 // =======================================================
 async function iniciarQR() {
+  prepararLeitorQR();   // adianta o carregamento do leitor
   const video   = document.getElementById("qrVideo");
   const status  = document.getElementById("qrStatus");
 
@@ -130,7 +131,7 @@ function pararQR() {
   if (qrAnimFrame) { cancelAnimationFrame(qrAnimFrame); qrAnimFrame = null; }
 }
 
-function scanFrame() {
+async function scanFrame() {
   if (qrPausado) { qrAnimFrame = requestAnimationFrame(scanFrame); return; }
 
   const video  = document.getElementById("qrVideo");
@@ -143,14 +144,14 @@ function scanFrame() {
   canvas.height = video.videoHeight;
   const ctx  = canvas.getContext("2d");
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  const img  = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const code = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+  const img     = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const valorQR = await lerQR(canvas, img);
 
-  if (code) {
+  if (valorQR) {
     // Extrair código do artigo do URL (stock.html?artigo=CODIGO)
-    let codigo = code.data;
+    let codigo = valorQR;
     try {
-      const url = new URL(code.data);
+      const url = new URL(valorQR);
       const param = url.searchParams.get("artigo");
       if (param) codigo = param;
     } catch(e) { /* não é URL, usar como código directo */ }

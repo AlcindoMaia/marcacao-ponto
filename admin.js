@@ -2096,6 +2096,7 @@ let qrAnimFrame = null;
 let qrTorchOn   = false;
 
 async function iniciarScanQR() {
+    prepararLeitorQR();   // adianta o carregamento do leitor
     const wrap   = document.getElementById("qrReaderWrap");
     const video  = document.getElementById("qrVideo");
     const status = document.getElementById("qrStatusText");
@@ -2143,7 +2144,7 @@ async function iniciarScanQR() {
     }
 }
 
-function scanFrame() {
+async function scanFrame() {
     const video  = document.getElementById("qrVideo");
     const canvas = document.getElementById("qrCanvas");
     if (!video || video.readyState < video.HAVE_ENOUGH_DATA) {
@@ -2170,11 +2171,9 @@ function scanFrame() {
     ctx.drawImage(video, cropX, cropY, cropSize, cropSize, 0, 0, cropSize, cropSize);
 
     const imgData = ctx.getImageData(0, 0, cropSize, cropSize);
-    const code    = jsQR(imgData.data, cropSize, cropSize, {
-        inversionAttempts: "attemptBoth"  // tenta QR normal e invertido
-    });
+    const valorQR = await lerQR(canvas, imgData);
 
-    if (code) {
+    if (valorQR) {
         // Flash verde na moldura para feedback visual
         const moldura = document.getElementById("qrMoldura");
         if (moldura) {
@@ -2182,7 +2181,7 @@ function scanFrame() {
             moldura.style.opacity    = "0";
             setTimeout(() => { if(moldura) moldura.style.opacity="1"; }, 150);
         }
-        parsearQRFatura(code.data);
+        parsearQRFatura(valorQR);
         fecharScanQR();
         return;
     }
