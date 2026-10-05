@@ -2826,8 +2826,8 @@ async function carregarMovimentosStock() {
         .select(`id, tipo_movimento, quantidade, data_movimento, observacoes, created_at,
                  artigos(codigo, descricao, tipo_artigo),
                  funcionarios(nome),
-                 obra_origem:obras!movimentos_stock_obra_origem_id_fkey(nome),
-                 obra_destino:obras!movimentos_stock_obra_destino_id_fkey(nome)`)
+                 obra_origem:obras!movimentos_stock_obra_origem_id_fkey(id, nome),
+                 obra_destino:obras!movimentos_stock_obra_destino_id_fkey(id, nome)`)
         .order("data_movimento", { ascending: false })
         .order("created_at",     { ascending: false })
         .limit(200);
@@ -2890,6 +2890,15 @@ async function carregarFiltrosMovStock() {
     if (selFunc && selFunc.options.length <= 1) {
         const { data } = await SB.from("funcionarios").select("id, nome").order("nome");
         data?.forEach(f => { selFunc.innerHTML += `<option value="${f.id}">${f.nome}</option>`; });
+    }
+    // Preencher select de obras
+    const selObra = document.getElementById("filtroMovObra");
+    if (selObra && selObra.options.length <= 1) {
+        const { data } = await SB.from("obras").select("id, nome, codigo").order("nome");
+        data?.forEach(o => {
+            const etiqueta = o.codigo ? `${o.codigo} · ${o.nome}` : o.nome;
+            selObra.innerHTML += `<option value="${o.id}">${etiqueta}</option>`;
+        });
     }
 }
 
