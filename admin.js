@@ -3299,7 +3299,10 @@ function renderTotais() {
 }
 
 
-async function carregarServicosImputacao(obraId) {
+// movId opcional: em edição, repõe as imputações já gravadas. Sem isto,
+// guardar um movimento editado apagava as imputações existentes, porque o
+// guardarMovimento apaga as antigas e volta a inserir o que estiver no ecrã.
+async function carregarServicosImputacao(obraId, movId = null) {
     let wrap = document.getElementById("imputacaoServicosWrap");
     if (!wrap) return;
     if (!obraId) { wrap.style.display = "none"; return; }
@@ -3308,6 +3311,13 @@ async function carregarServicosImputacao(obraId) {
         .select("id, nome, extra").eq("obra_id", obraId).order("ordem").order("created_at");
 
     if (!servs?.length) { wrap.style.display = "none"; return; }
+
+    let guardadas = [];
+    if (movId) {
+        const { data } = await SB.from("movimento_servicos")
+            .select("obra_servico_id, valor").eq("movimento_id", movId);
+        guardadas = data || [];
+    }
 
     wrap.style.display = "block";
     const linhasDiv = document.getElementById("imputacaoLinhas");
@@ -3320,11 +3330,16 @@ async function carregarServicosImputacao(obraId) {
             style="background:rgba(244,185,66,.1);border:1px solid rgba(244,185,66,.2);color:var(--primary,#f4b942);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;margin-top:6px">
             + Adicionar serviço
         </button>`;
-    // Adicionar uma linha por defeito
-    adicionarLinhaImput(servs);
+
+    if (guardadas.length) {
+        // Repor o que já estava imputado a este movimento
+        guardadas.forEach(g => adicionarLinhaImput(servs, g.obra_servico_id, g.valor));
+    } else {
+        adicionarLinhaImput(servs);   // uma linha vazia por defeito
+    }
 }
 
-function adicionarLinhaImput(servs) {
+function adicionarLinhaImput(servs, servicoId = null, valor = null) {
     const inner = document.getElementById("imputLinhasInner");
     if (!inner) return;
     const opts = servs.map(s => `<option value="${s.id}">${s.nome}${s.extra?" [Extra]":""}</option>`).join("");
@@ -3332,13 +3347,16 @@ function adicionarLinhaImput(servs) {
     div.className = "linha-imput-serv";
     div.style.cssText = "display:flex;gap:8px;align-items:center;margin-bottom:6px";
     div.innerHTML = `
-        <select class="imput-serv-sel" style="flex:1;padding:6px 8px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;font-size:13px">
+        <select class="imput-serv-sel" style="flex:1;padding:6px 8px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:13px">
             <option value="">— Serviço —</option>${opts}
         </select>
         <input class="imput-serv-val" type="number" step="0.01" min="0" placeholder="€"
-            style="width:80px;padding:6px 8px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;font-size:13px">
+            style="width:80px;padding:6px 8px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:13px">
         <button type="button" onclick="this.parentElement.remove()" style="background:rgba(248,113,113,.1);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>`;
     inner.appendChild(div);
+
+    if (servicoId) div.querySelector(".imput-serv-sel").value = servicoId;
+    if (valor != null) div.querySelector(".imput-serv-val").value = valor;
 }
 
 function fecharModalMovimento() {
@@ -3648,6 +3666,12 @@ function ligarEventosGlobais() {
     document.getElementById("fecharModalEtiquetaBtn")?.addEventListener("click", fecharModalEtiqueta);
     document.getElementById("modalEtiqueta")?.addEventListener("click", e => {
         if (e.target.id === "modalEtiqueta") fecharModalEtiqueta();
+    });
+
+    // Fluxo de caixa — ao escolher a obra, mostrar os serviços dela para
+    // imputação. Num movimento novo não há mais nada que dispare isto.
+    document.getElementById("movObra")?.addEventListener("change", function () {
+        carregarServicosImputacao(this.value || null, movEditId);
     });
 
     // Movimentos stock — filtros

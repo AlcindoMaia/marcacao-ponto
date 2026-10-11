@@ -959,6 +959,14 @@
             <input id="movObs" placeholder="Opcional">
         </div>
 
+        <!-- Imputação a serviços da obra: só aparece quando a obra
+             escolhida tem serviços definidos -->
+        <div id="imputacaoServicosContainer">
+            <div id="imputacaoServicosWrap" style="display:none;margin-top:4px;padding:12px;background:rgba(244,185,66,.05);border:1px solid rgba(244,185,66,.15);border-radius:8px">
+                <div id="imputacaoLinhas"></div>
+            </div>
+        </div>
+
         <div class="modal-actions">
             <button class="btn-secondary" id="fecharModalMovBtnAlt" onclick="fecharModalMovimento()">Cancelar</button>
             <button class="btn-primary" id="btnGuardarMov">Guardar</button>
