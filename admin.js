@@ -2144,7 +2144,10 @@ async function iniciarScanQR() {
             }
             // Mostrar botão da lanterna se suportado
             if (caps.torch) {
-                document.getElementById("btnTorch").style.display = "inline-flex";
+                // Sem o "?." um botão em falta rebentava aqui dentro do try,
+                // e o utilizador via um erro de câmara que não era real
+                const btnT = document.getElementById("btnTorch");
+                if (btnT) btnT.style.display = "inline-flex";
             }
         }
 
