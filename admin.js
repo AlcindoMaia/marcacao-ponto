@@ -2343,6 +2343,153 @@ function parsearQRFatura(texto) {
 // =======================================================
 let _linhasFaturaLidas = [];   // guardadas até o movimento ser gravado
 
+// -------------------------------------------------------
+// ARTIGOS, SINÓNIMOS E PREÇOS
+// Cada linha de fatura pode apontar para um artigo do inventário.
+// A ligação é guardada em artigo_sinonimos: da próxima vez que a mesma
+// descrição aparecer, o artigo é reconhecido sem gastar IA.
+// Com artigo + fornecedor + data, grava-se o preço em "precos" — é daí
+// que sai o aviso de material que subiu de preço.
+// -------------------------------------------------------
+let _artigosFatura   = [];   // artigos activos, para as listas
+let _sinonimosFatura = {};   // texto normalizado -> artigo_id (o que está gravado)
+let _ultimosPrecos   = {};   // artigo_id -> último preço conhecido
+let _unidadesFatura  = [];   // unidades_medida, para criar artigos novos
+
+// Mesma normalização do lado do ecrã e do lado do que se grava:
+// minúsculas, sem acentos, sem pontuação, sem espaços a mais.
+function normalizarTextoArtigo(s) {
+    return String(s == null ? "" : s)
+        .normalize("NFD").replace(/\p{Diacritic}/gu, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9%.\/ ]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+async function carregarArtigosESinonimos(forcar = false) {
+    if (_artigosFatura.length && !forcar) return;
+    const [{ data: arts }, { data: sins }, { data: uns }] = await Promise.all([
+        SB.from("artigos").select("id, codigo, descricao, unidade_compra, preco_atual")
+          .eq("ativo", true).order("descricao"),
+        SB.from("artigo_sinonimos").select("texto, artigo_id"),
+        SB.from("unidades_medida").select("id, codigo"),
+    ]);
+    _artigosFatura   = arts || [];
+    _unidadesFatura  = uns  || [];
+    _sinonimosFatura = {};
+    (sins || []).forEach(s => { _sinonimosFatura[s.texto] = s.artigo_id; });
+}
+
+// A fatura traz "UN", "M2", "sc", "vg"... e o inventário só tem quatro
+// unidades. Guarda-se o texto original em unidade_compra e aproxima-se
+// à unidade mais parecida; na dúvida, unidade.
+function unidadeIdPorTexto(texto) {
+    const n = normalizarTextoArtigo(texto).replace(/\s/g, "");
+    const porCodigo = (c) => _unidadesFatura.find(u => u.codigo === c)?.id;
+    if (/^(m2|mt2|metroquadrado)$/.test(n)) return porCodigo("m2") || 1;
+    if (/^(kg|kgs|quilo|quilograma)$/.test(n)) return porCodigo("kg") || 1;
+    if (/^(m|ml|mt|metro|metrolinear)$/.test(n)) return porCodigo("m") || 1;
+    return porCodigo("un") || _unidadesFatura[0]?.id || 1;
+}
+
+// Reconhece pelo sinónimo gravado e, se não houver, pelo próprio nome
+// ou código do artigo.
+function artigoParaTexto(texto) {
+    const n = normalizarTextoArtigo(texto);
+    if (!n) return null;
+    if (_sinonimosFatura[n]) return _sinonimosFatura[n];
+    const a = _artigosFatura.find(x =>
+        normalizarTextoArtigo(x.descricao) === n ||
+        (x.codigo && normalizarTextoArtigo(x.codigo) === n));
+    return a ? a.id : null;
+}
+
+async function carregarUltimosPrecos(ids) {
+    const falta = [...new Set((ids || []).filter(id => id && !(id in _ultimosPrecos)))];
+    if (!falta.length) return;
+    falta.forEach(id => { _ultimosPrecos[id] = null; });   // já procurado
+    const { data } = await SB.from("precos")
+        .select("artigo_id, preco, unidade, data")
+        .in("artigo_id", falta)
+        .order("data", { ascending: false });
+    (data || []).forEach(p => { if (!_ultimosPrecos[p.artigo_id]) _ultimosPrecos[p.artigo_id] = p; });
+}
+
+function opcoesArtigos(escolhido) {
+    const sel = (v) => (String(escolhido || "") === String(v) ? " selected" : "");
+    return `<option value=""${sel("")}>— sem artigo —</option>` +
+           `<option value="__novo__">➕ criar artigo novo…</option>` +
+           _artigosFatura.map(a =>
+               `<option value="${a.id}"${sel(a.id)}>${escapeHtmlFatura(a.descricao || a.codigo || "(sem nome)")}</option>`
+           ).join("");
+}
+
+// Mostra, por baixo da lista, o último preço pago e quanto variou.
+// É isto que depois alimenta o aviso "fatura acima do cotado".
+function actualizarPrecoAnterior(tr) {
+    const el = tr?.querySelector(".linha-preco-ant");
+    if (!el) return;
+    const artigoId = tr.querySelector('[data-campo="artigo"]')?.value;
+    const preco    = parseFloat(tr.querySelector('[data-campo="preco_unitario"]')?.value);
+    const ant      = artigoId ? _ultimosPrecos[artigoId] : null;
+
+    if (!artigoId || !ant || !(ant.preco > 0)) { el.textContent = ""; return; }
+
+    const antigo = Number(ant.preco);
+    if (!(preco > 0)) {
+        el.innerHTML = `<span style="opacity:.7">último: ${antigo.toFixed(2)} €</span>`;
+        return;
+    }
+    const var_pc = ((preco - antigo) / antigo) * 100;
+    if (Math.abs(var_pc) < 1) {
+        el.innerHTML = `<span style="opacity:.7">igual ao último (${antigo.toFixed(2)} €)</span>`;
+    } else if (var_pc > 0) {
+        el.innerHTML = `<span style="color:#b45309;font-weight:600">▲ ${var_pc.toFixed(0)}%</span>` +
+                       `<span style="opacity:.7"> — era ${antigo.toFixed(2)} € em ${ant.data}</span>`;
+    } else {
+        el.innerHTML = `<span style="color:#15803d;font-weight:600">▼ ${Math.abs(var_pc).toFixed(0)}%</span>` +
+                       `<span style="opacity:.7"> — era ${antigo.toFixed(2)} € em ${ant.data}</span>`;
+    }
+}
+
+// Escolher o artigo de uma linha; "criar artigo novo" cria-o já no inventário.
+async function aoEscolherArtigoLinha(sel) {
+    const tr = sel.closest("tr");
+
+    if (sel.value === "__novo__") {
+        sel.value = "";
+        const desc = tr.querySelector('[data-campo="descricao"]')?.value?.trim();
+        if (!desc) { alert("Escreve primeiro a descrição da linha."); return; }
+        if (!confirm(`Criar o artigo "${desc}" no inventário?`)) return;
+
+        const preco   = parseFloat(tr.querySelector('[data-campo="preco_unitario"]')?.value) || 0;
+        const unidade = tr.querySelector('[data-campo="unidade"]')?.value?.trim() || null;
+        const { data: novo, error } = await SB.from("artigos").insert({
+            descricao:      desc,
+            preco_atual:    preco,
+            tipo_artigo:    "consumivel",
+            unidade_id:     unidadeIdPorTexto(unidade),
+            unidade_compra: unidade,
+            stock_inicial:  0,
+            ativo:          true,
+        }).select("id, codigo, descricao, unidade_compra, preco_atual").single();
+
+        if (error) { alert("Não foi possível criar o artigo: " + error.message); return; }
+
+        _artigosFatura.push(novo);
+        _artigosFatura.sort((a, b) => (a.descricao || "").localeCompare(b.descricao || "", "pt"));
+
+        // Refazer as listas de todas as linhas sem perder as escolhas já feitas
+        const selects  = [...document.querySelectorAll('#tabelaFaturaLinhas [data-campo="artigo"]')];
+        const escolhas = selects.map(s => (s === sel ? novo.id : s.value));
+        selects.forEach((s, i) => { s.innerHTML = opcoesArtigos(escolhas[i]); });
+    }
+
+    await carregarUltimosPrecos([sel.value]);
+    actualizarPrecoAnterior(tr);
+}
+
 async function lerFicheiroFatura(ficheiro) {
     if (!ficheiro) return;
 
@@ -2390,7 +2537,7 @@ async function lerFicheiroFatura(ficheiro) {
         // trata-se a primeira e avisa-se das restantes.
         const doc = docs[0];
         preencherMovimentoComFatura(doc);
-        mostrarLinhasFatura(doc);
+        await mostrarLinhasFatura(doc);
 
         const extra = docs.length > 1
             ? ` (o ficheiro tem ${docs.length} faturas: as outras ficam por lançar)`
@@ -2439,8 +2586,16 @@ function preencherMovimentoComFatura(d) {
     setTimeout(() => document.getElementById("movObra")?.focus(), 200);
 }
 
-function mostrarLinhasFatura(d) {
-    _linhasFaturaLidas = (d.linhas || []).map((l, i) => ({ ...l, ordem: i }));
+async function mostrarLinhasFatura(d) {
+    await carregarArtigosESinonimos();
+
+    // Cada linha já chega com artigo, ou tenta-se reconhecer pela descrição
+    _linhasFaturaLidas = (d.linhas || []).map((l, i) => ({
+        ...l,
+        ordem: i,
+        artigo_id: l.artigo_id || artigoParaTexto(l.descricao),
+    }));
+    await carregarUltimosPrecos(_linhasFaturaLidas.map(l => l.artigo_id));
 
     const wrap  = document.getElementById("faturaLinhasWrap");
     const tbody = document.querySelector("#tabelaFaturaLinhas tbody");
@@ -2463,6 +2618,13 @@ function mostrarLinhasFatura(d) {
         <tr data-i="${i}">
             <td style="padding:3px 6px"><input value="${escapeHtmlFatura(l.descricao || "")}" data-campo="descricao"
                 style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;background:#fff;color:var(--text-dark)"></td>
+            <td style="padding:3px 6px">
+                <select data-campo="artigo" onchange="aoEscolherArtigoLinha(this)"
+                    style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;background:#fff;color:var(--text-dark)">
+                    ${opcoesArtigos(l.artigo_id)}
+                </select>
+                <div class="linha-preco-ant" style="font-size:10px;margin-top:2px;line-height:1.3"></div>
+            </td>
             <td style="padding:3px 6px"><input type="number" step="0.001" value="${l.quantidade ?? ""}" data-campo="quantidade"
                 style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;text-align:right;background:#fff;color:var(--text-dark)"></td>
             <td style="padding:3px 6px"><input value="${escapeHtmlFatura(l.unidade || "")}" data-campo="unidade"
@@ -2477,6 +2639,13 @@ function mostrarLinhasFatura(d) {
             </td>
         </tr>`).join("");
 
+    // Comparação com o último preço pago, e a recalcular enquanto se corrige
+    tbody.querySelectorAll("tr").forEach(tr => {
+        actualizarPrecoAnterior(tr);
+        tr.querySelector('[data-campo="preco_unitario"]')
+          ?.addEventListener("input", () => actualizarPrecoAnterior(tr));
+    });
+
     wrap.style.display = "block";
     actualizarResumoLinhas();
 }
@@ -2485,8 +2654,10 @@ function mostrarLinhasFatura(d) {
 function linhasFaturaDoEcra() {
     return [...document.querySelectorAll("#tabelaFaturaLinhas tbody tr")].map((tr, i) => {
         const v = (campo) => tr.querySelector(`[data-campo="${campo}"]`)?.value ?? "";
+        const artigo = v("artigo");
         return {
             descricao_original: v("descricao").trim(),
+            artigo_id:      artigo && artigo !== "__novo__" ? artigo : null,
             quantidade:     v("quantidade")     !== "" ? parseFloat(v("quantidade"))     : null,
             unidade:        v("unidade").trim() || null,
             preco_unitario: v("preco_unitario") !== "" ? parseFloat(v("preco_unitario")) : null,
@@ -2513,6 +2684,64 @@ function limparLinhasFatura() {
     const tbody = document.querySelector("#tabelaFaturaLinhas tbody");
     if (tbody) tbody.innerHTML = "";
     if (wrap) wrap.style.display = "none";
+}
+
+// Depois de as linhas estarem gravadas: aprender os sinónimos e registar
+// os preços. Corre sempre a seguir ao movimento, nunca antes — precisa
+// dos ids das linhas e do fornecedor.
+async function gravarSinonimosEPrecos(linhas, fornecedor_id, dataDoc) {
+    const comArtigo = (linhas || []).filter(l => l.artigo_id);
+    if (!comArtigo.length) return;
+
+    // 1) Aprender: a descrição desta fatura passa a reconhecer o artigo
+    const sinonimos = [];
+    comArtigo.forEach(l => {
+        const n = normalizarTextoArtigo(l.descricao_original);
+        if (!n) return;
+        if (_sinonimosFatura[n] === l.artigo_id) return;            // já aprendido
+        const art = _artigosFatura.find(a => a.id === l.artigo_id);
+        if (art && normalizarTextoArtigo(art.descricao) === n) return;  // é o próprio nome
+        sinonimos.push({ texto: n, artigo_id: l.artigo_id, origem: "correcao" });
+    });
+    if (sinonimos.length) {
+        const { error } = await SB.from("artigo_sinonimos")
+            .upsert(sinonimos, { onConflict: "texto" });
+        if (error) console.error("sinónimos:", error);
+        else sinonimos.forEach(s => { _sinonimosFatura[s.texto] = s.artigo_id; });
+    }
+
+    // 2) Histórico de preços
+    const precos = comArtigo
+        .filter(l => Number(l.preco_unitario) > 0)
+        .map(l => ({
+            artigo_id:       l.artigo_id,
+            fornecedor_id:   fornecedor_id || null,
+            preco:           Number(l.preco_unitario),
+            unidade:         l.unidade || null,
+            data:            dataDoc,
+            origem:          "fatura",
+            fatura_linha_id: l.id,
+        }));
+    if (!precos.length) return;
+
+    const { error: errP } = await SB.from("precos").insert(precos);
+    if (errP) { console.error("preços:", errP); return; }
+
+    // 3) O preço actual do artigo passa a ser o mais recente que conhecemos.
+    //    Pergunta-se à base de dados em vez de assumir que esta fatura é a
+    //    mais recente — pode estar a lançar-se uma fatura atrasada.
+    for (const artigoId of [...new Set(precos.map(p => p.artigo_id))]) {
+        delete _ultimosPrecos[artigoId];
+        const { data: recente } = await SB.from("precos")
+            .select("preco, data").eq("artigo_id", artigoId)
+            .order("data", { ascending: false })
+            .order("criado_em", { ascending: false })
+            .limit(1).maybeSingle();
+        if (!(Number(recente?.preco) > 0)) continue;
+        await SB.from("artigos").update({ preco_atual: recente.preco }).eq("id", artigoId);
+        const a = _artigosFatura.find(x => x.id === artigoId);
+        if (a) a.preco_atual = recente.preco;
+    }
 }
 
 function escapeHtmlFatura(s) {
@@ -2710,6 +2939,52 @@ async function abrirModalArtigo(artigo = null) {
 
     document.getElementById("modalArtigoMsg").textContent = "";
     const _ma = document.getElementById("modalArtigo"); _ma.style.display = ""; _ma.classList.remove("hidden");
+
+    await carregarHistoricoPrecos(artigoEditId);
+}
+
+// Preços que este artigo já teve, mais recente primeiro, com a variação
+// em relação à compra anterior. Vem do que foi lido nas faturas.
+async function carregarHistoricoPrecos(artigoId) {
+    const wrap  = document.getElementById("artPrecosWrap");
+    const lista = document.getElementById("artPrecosLista");
+    if (!wrap || !lista) return;
+
+    if (!artigoId) { wrap.style.display = "none"; lista.innerHTML = ""; return; }
+
+    const { data, error } = await SB.from("precos")
+        .select("preco, unidade, data, origem, fornecedores(nome)")
+        .eq("artigo_id", artigoId)
+        .order("data", { ascending: false })
+        .limit(12);
+
+    if (error) { wrap.style.display = "none"; console.warn("histórico de preços:", error); return; }
+
+    if (!data.length) {
+        lista.innerHTML = '<div style="font-size:12px;opacity:.6">Ainda sem preços registados. Aparecem aqui à medida que as faturas forem lidas.</div>';
+        wrap.style.display = "block";
+        return;
+    }
+
+    lista.innerHTML = data.map((p, i) => {
+        const ant = data[i + 1];                 // a compra anterior (data mais antiga)
+        let variacao = "";
+        if (ant && Number(ant.preco) > 0) {
+            const pc = ((Number(p.preco) - Number(ant.preco)) / Number(ant.preco)) * 100;
+            if (Math.abs(pc) >= 1) {
+                const sobe = pc > 0;
+                variacao = `<span style="color:${sobe ? "#b45309" : "#15803d"};font-weight:600;font-size:11px">
+                    ${sobe ? "▲" : "▼"} ${Math.abs(pc).toFixed(0)}%</span>`;
+            }
+        }
+        return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-top:${i ? "1px solid rgba(0,0,0,.06)" : "none"};font-size:12px">
+            <span style="width:84px;opacity:.7">${p.data}</span>
+            <span style="font-weight:600;width:84px">${Number(p.preco).toFixed(2)} €${p.unidade ? "/" + escapeHtmlFatura(p.unidade) : ""}</span>
+            ${variacao}
+            <span style="flex:1;text-align:right;opacity:.6">${escapeHtmlFatura(p.fornecedores?.nome || (p.origem === "manual" ? "manual" : "—"))}</span>
+        </div>`;
+    }).join("");
+    wrap.style.display = "block";
 }
 
 // =======================================================
@@ -3632,12 +3907,13 @@ async function abrirModalMovimento(mov = null) {
 
         // Linhas da fatura já gravadas, para poderem ser revistas
         const { data: linhasGravadas } = await SB.from("fatura_linhas")
-            .select("descricao_original, quantidade, unidade, preco_unitario, valor_total")
+            .select("descricao_original, artigo_id, quantidade, unidade, preco_unitario, valor_total")
             .eq("movimento_id", mov.id).order("ordem");
         if (linhasGravadas?.length) {
-            mostrarLinhasFatura({
+            await mostrarLinhasFatura({
                 linhas: linhasGravadas.map(l => ({
                     descricao: l.descricao_original,
+                    artigo_id: l.artigo_id,
                     quantidade: l.quantidade,
                     unidade: l.unidade,
                     preco_unitario: l.preco_unitario,
@@ -3802,17 +4078,27 @@ async function guardarMovimento() {
     const movIdLinhas = movSalvo?.id || movEditId;
     const linhasFatura = linhasFaturaDoEcra();
     if (movIdLinhas && linhasFatura.length) {
-        // Em edição, substitui as linhas lidas antes (as manuais ficam)
+        // Em edição, substitui as linhas lidas antes (as manuais ficam).
+        // Os preços saem primeiro: se saíssem depois das linhas, ficavam
+        // órfãos, sem se saber de que fatura vieram.
         if (movEditId) {
-            await SB.from("fatura_linhas").delete()
-                .eq("movimento_id", movEditId).eq("origem", "ia");
+            const { data: antigas } = await SB.from("fatura_linhas")
+                .select("id").eq("movimento_id", movEditId).eq("origem", "ia");
+            const ids = (antigas || []).map(l => l.id);
+            if (ids.length) {
+                await SB.from("precos").delete().in("fatura_linha_id", ids);
+                await SB.from("fatura_linhas").delete().in("id", ids);
+            }
         }
-        const { error: errLinhas } = await SB.from("fatura_linhas").insert(
+        const { data: gravadas, error: errLinhas } = await SB.from("fatura_linhas").insert(
             linhasFatura.map(l => ({ ...l, movimento_id: movIdLinhas, origem: "ia" }))
-        );
+        ).select("id, artigo_id, descricao_original, preco_unitario, unidade");
+
         if (errLinhas) {
             console.error(errLinhas);
             alert("O movimento foi guardado, mas as linhas da fatura não: " + errLinhas.message);
+        } else {
+            await gravarSinonimosEPrecos(gravadas, fornecedor_id, dataDoc);
         }
     }
 
