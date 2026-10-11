@@ -211,6 +211,50 @@
     <!-- SUB-TAB: PONTO QR -->
     <div id="regTabContent-ponto" style="display:block">
 
+    <!-- KPIs de assiduidade -->
+    <div class="grid-cards" style="margin-bottom:16px" id="registosKpis">
+        <div class="card metric" style="border-left:3px solid #5ad65a">
+            <h3>Taxa Assiduidade</h3>
+            <div id="kpiAssiduidade" class="value" style="color:#5ad65a">–</div>
+        </div>
+        <div class="card metric">
+            <h3>Dias com Registo</h3>
+            <div id="kpiDiasRegisto" class="value">–</div>
+        </div>
+        <div class="card metric" style="border-left:3px solid #f97316">
+            <h3>Horas Extras</h3>
+            <div id="kpiHorasExtras" class="value" style="color:#f97316">–</div>
+        </div>
+        <div class="card metric" style="border-left:3px solid #ff7a7a">
+            <h3>Incompletos</h3>
+            <div id="kpiIncompletos" class="value" style="color:#ff7a7a">–</div>
+        </div>
+    </div>
+
+    <!-- Vista: Lista ou Mapa de Presenças -->
+    <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
+        <button id="btnVistaLista" onclick="setVistaRegistos('lista')"
+            style="background:rgba(244,185,66,.15);color:var(--primary);border:1px solid rgba(244,185,66,.4);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">
+            📋 Lista
+        </button>
+        <button id="btnVistaMapa" onclick="setVistaRegistos('mapa')"
+            style="background:rgba(255,255,255,.06);color:var(--text-muted);border:1px solid rgba(0,0,0,.1);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">
+            📅 Mapa de Presenças
+        </button>
+        <button onclick="exportarPontoExcel()"
+            style="margin-left:auto;background:rgba(90,214,90,.12);color:#16a34a;border:1px solid rgba(90,214,90,.3);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">
+            📥 Exportar Excel
+        </button>
+        <button onclick="fecharMes()"
+            style="background:rgba(244,185,66,.12);color:var(--primary);border:1px solid rgba(244,185,66,.3);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">
+            ✅ Fechar Mês
+        </button>
+    </div>
+
+    <div id="mapaPresencas" class="card" style="display:none;overflow-x:auto;margin-bottom:16px"></div>
+
+    <div id="vistaLista" style="display:block">
+
     <!-- Calendário compacto centrado -->
     <div style="display:flex;justify-content:center;margin-bottom:20px">
         <div class="card" style="width:320px;padding:14px">
@@ -244,6 +288,8 @@
         </table>
 </div>
     </div>
+
+    </div><!-- fim vistaLista -->
 
     </div><!-- fim regTabContent-ponto -->
 

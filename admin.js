@@ -1419,13 +1419,6 @@ async function abrirHistoricoFuncionario(func) {
     const inicio = `${ano}-01-01`;
     const fim    = `${ano}-12-31`;
 
-    const [registosRes, movsRes] = await Promise.all([
-        SB.from("vw_registos_ponto").select("funcionario, horas, dia, obra")
-          .eq("funcionario_nome_match_placeholder", func.nome) // não existe — usamos filtro abaixo
-          .gte("dia", inicio).lte("dia", fim),
-        SB.from("movimentos_financeiros").select("valor_total, data_documento").eq("ativo", true)
-    ]);
-
     // Buscar registos pelo nome (a view usa texto)
     const { data: registos } = await SB.from("vw_registos_ponto")
         .select("funcionario, horas, dia, obra")
