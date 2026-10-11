@@ -1287,6 +1287,85 @@
         <div id="bibLista"></div>
     </div>
 </div>
+<!-- ================= MODAL PAINEL DE OBRA ================= -->
+<!-- Painel escuro de propósito: as cores das linhas e dos KPIs são
+     geradas no admin.js em claro sobre escuro. -->
+<div id="modalPainelObra" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1100;align-items:center;justify-content:center;padding:20px">
+    <div style="background:#1e1e1e;border-radius:18px;width:100%;max-width:960px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.07);overflow:hidden">
+
+        <!-- Cabeçalho -->
+        <div style="background:linear-gradient(135deg,#1e1e1e 0%,#252018 100%);padding:24px 28px 0;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div>
+                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--primary,#f4b942);font-family:var(--font-title,sans-serif);margin-bottom:6px;opacity:.8">Painel da Obra</div>
+                    <div id="painelObraNome" style="font-family:var(--font-title,sans-serif);font-size:26px;font-weight:500;letter-spacing:.5px;color:#fff;line-height:1.1"></div>
+                    <div id="painelObraMeta" style="font-size:12px;color:rgba(255,255,255,.35);margin-top:6px;display:flex;gap:12px;align-items:center"></div>
+                </div>
+                <button onclick="fecharPainelObra()" title="Fechar"
+                    style="background:rgba(255,255,255,.08);border:none;color:rgba(255,255,255,.6);width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0">×</button>
+            </div>
+
+            <!-- Separadores -->
+            <div style="display:flex;gap:0;margin-top:16px;overflow-x:auto">
+                <button class="painel-tab active" data-tab="resumo" onclick="abrirPainelTab('resumo')"
+                    style="background:none;border:none;border-bottom:2px solid var(--primary);color:var(--primary);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title,sans-serif);letter-spacing:.5px;white-space:nowrap">
+                    📊 RESUMO
+                </button>
+                <button class="painel-tab" data-tab="financeiro" onclick="abrirPainelTab('financeiro')"
+                    style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title,sans-serif);letter-spacing:.5px;white-space:nowrap">
+                    💰 FINANCEIRO
+                </button>
+                <button class="painel-tab" data-tab="ponto" onclick="abrirPainelTab('ponto')"
+                    style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title,sans-serif);letter-spacing:.5px;white-space:nowrap">
+                    🕐 PONTO
+                </button>
+                <button class="painel-tab" data-tab="stock" onclick="abrirPainelTab('stock')"
+                    style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title,sans-serif);letter-spacing:.5px;white-space:nowrap">
+                    📦 STOCK
+                </button>
+            </div>
+        </div>
+
+        <!-- KPIs (preenchidos pelo admin.js) -->
+        <div id="painelObraKpis" style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0"></div>
+
+        <!-- Conteúdo -->
+        <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column">
+
+            <!-- Serviços: sempre visíveis, fora dos separadores, porque os
+                 separadores reescrevem o seu próprio conteúdo -->
+            <div style="padding:16px 28px 10px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+                <div style="font-family:var(--font-title,sans-serif);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.4)">Serviços da Obra</div>
+                <div id="painelObraProgresso" style="font-size:12px;color:rgba(255,255,255,.4)"></div>
+            </div>
+
+            <div class="serv-thead" style="flex-shrink:0;margin:0 12px;border-radius:6px 6px 0 0">
+                <span>Serviço</span>
+                <span>H. Orç.</span>
+                <span>H. Real</span>
+                <span>€ MO</span>
+                <span>€ Material</span>
+                <span>€ Orç.</span>
+                <span>Desvio</span>
+                <span style="text-align:center">Estado</span>
+            </div>
+
+            <div id="painelServicosTbody" style="margin:0 12px 16px;border:1px solid rgba(255,255,255,.06);border-top:none;border-radius:0 0 8px 8px;overflow:hidden">
+                <div style="padding:32px;text-align:center;color:rgba(255,255,255,.3);font-size:13px">A carregar…</div>
+            </div>
+
+            <!-- Conteúdo dos separadores -->
+            <div style="padding:0 12px 16px">
+                <div id="painelTab-resumo"     class="painel-tab-content" style="display:block"></div>
+                <div id="painelTab-financeiro" class="painel-tab-content" style="display:none"></div>
+                <div id="painelTab-ponto"      class="painel-tab-content" style="display:none"></div>
+                <div id="painelTab-stock"      class="painel-tab-content" style="display:none"></div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
 <!-- MODAL QR OBRA -->
 <div id="modalQR" class="modal hidden">
     <div class="modal-content" style="max-width:400px;text-align:center">

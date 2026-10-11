@@ -1890,6 +1890,8 @@ async function eliminarServico(id, nome) {
 // ═══════════════════════════════════════════════════════
 async function abrirPainelObra(obra) {
     const modal = document.getElementById("modalPainelObra");
+    _painelObraActual = obra;   // os separadores (resumo, financeiro, ponto,
+                                // stock) leem a obra daqui
     document.getElementById("painelObraNome").textContent = obra.nome;
 
     // Meta: data prevista + estado
@@ -1918,6 +1920,9 @@ async function abrirPainelObra(obra) {
                 <div style="font-family:var(--font-title,'Oswald',sans-serif);font-size:14px;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:8px">Sem serviços definidos</div>
                 <div style="font-size:12px;color:rgba(255,255,255,.2)">Edita a obra e vai ao separador Serviços para começar</div>
             </div>`;
+        // Sem serviços, os separadores continuam a ter conteúdo útil
+        // (financeiro, ponto e stock não dependem dos serviços)
+        abrirPainelTab("resumo");
         return;
     }
 
@@ -2051,6 +2056,9 @@ async function abrirPainelObra(obra) {
             <div style="text-align:center">${estadoBadge}</div>
         </div>`;
     }).join("");
+
+    // Abrir o primeiro separador: é o que dispara o carregamento do resumo
+    abrirPainelTab("resumo");
 }
 
 async function toggleEstadoObra(id, nome, estadoAtual) {
@@ -2924,7 +2932,10 @@ let _painelObraActual = null;
 
 
 function fecharPainelObra() {
-    document.getElementById("modalPainelObra").classList.add("hidden");
+    const m = document.getElementById("modalPainelObra");
+    // O painel é aberto com style.display = "flex". Um estilo em linha ganha
+    // sempre à classe, por isso só acrescentar "hidden" não o fechava.
+    if (m) { m.style.display = "none"; m.classList.add("hidden"); }
     _painelObraActual = null;
 }
 
