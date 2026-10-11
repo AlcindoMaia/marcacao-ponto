@@ -1727,15 +1727,23 @@ async function guardarObra() {
     const id     = document.getElementById("editObraId")?.value;
     const nome   = document.getElementById("editObraNome")?.value?.trim();
     const codigo = document.getElementById("editObraCodigo")?.value?.trim();
-    const end    = document.getElementById("editObraEndereco")?.value?.trim();
+    const morada = document.getElementById("editObraMorada")?.value?.trim();
     const estado = document.getElementById("editObraEstado")?.value || "ativa";
     const raio   = parseInt(document.getElementById("editObraRaio")?.value) || 120;
+    const percent = document.getElementById("editObraPercent")?.value;
+    const dataFim = document.getElementById("editObraData")?.value;
 
     if (!nome) { alert("O nome da obra é obrigatório."); return; }
 
-    const payload = { nome, estado, raio };
+    // A coluna chama-se "morada". Até aqui gravava-se "endereco", que não
+    // existe na tabela, e por isso guardar uma obra com morada dava erro.
+    const payload = {
+        nome, estado, raio,
+        morada:                  morada || null,
+        percentagem_conclusao:   percent !== "" && percent != null ? parseInt(percent) : null,
+        data_conclusao_prevista: dataFim || null
+    };
     if (codigo) payload.codigo = codigo;
-    if (end)    payload.endereco = end;
 
     let err;
     if (id) {
@@ -1755,10 +1763,12 @@ async function editarObra(obra) {
     if (!obra) {
         document.getElementById("editObraId").value      = "";
         document.getElementById("editObraNome").value    = "";
-        const _end0 = document.getElementById("editObraEndereco"); if (_end0) _end0.value = "";
+        const _mor0 = document.getElementById("editObraMorada"); if (_mor0) _mor0.value = "";
         const _rai0 = document.getElementById("editObraRaio"); if (_rai0) _rai0.value = "";
         const _est0 = document.getElementById("editObraEstado"); if (_est0) _est0.value = "ativa";
         const _cod0 = document.getElementById("editObraCodigo"); if (_cod0) _cod0.value = "";
+        const _pct0 = document.getElementById("editObraPercent"); if (_pct0) _pct0.value = "";
+        const _dat0 = document.getElementById("editObraData"); if (_dat0) _dat0.value = "";
         document.getElementById("editObraTitulo").textContent = "✏️ Nova Obra";
         switchObraTab("detalhes");
         const _mo = document.getElementById("modalEditarObra"); _mo.style.display = "flex"; _mo.classList.remove("hidden");
@@ -1766,7 +1776,9 @@ async function editarObra(obra) {
     }
     document.getElementById("editObraId").value = obra.id;
     document.getElementById("editObraNome").value = obra.nome || "";
-    const _endE = document.getElementById("editObraEndereco"); if (_endE) _endE.value = obra.endereco || obra.morada || "";
+    const _morE = document.getElementById("editObraMorada"); if (_morE) _morE.value = obra.morada || "";
+    const _pctE = document.getElementById("editObraPercent"); if (_pctE) _pctE.value = obra.percentagem_conclusao ?? "";
+    const _datE = document.getElementById("editObraData"); if (_datE) _datE.value = obra.data_conclusao_prevista || "";
     const _raiE = document.getElementById("editObraRaio"); if (_raiE) _raiE.value = obra.raio || "";
     const _estE = document.getElementById("editObraEstado"); if (_estE) _estE.value = obra.estado || "ativa";
     const _codE = document.getElementById("editObraCodigo"); if (_codE) _codE.value = obra.codigo || "";
@@ -2583,7 +2595,8 @@ async function guardarArtigo() {
         taxa_iva:            parseInt(document.getElementById("artIva").value) || 23,
         tipo_artigo:         document.getElementById("artTipo").value,
         local_armazenamento: document.getElementById("artLocal").value.trim() || null,
-        unidade_id:          unidadeVal ? parseInt(unidadeVal) : null
+        unidade_id:          unidadeVal ? parseInt(unidadeVal) : null,
+        stock_minimo:        parseInt(document.getElementById("artStockMin")?.value) || null
     };
 
     if (artigoEditId) {
@@ -3103,9 +3116,23 @@ async function carregarPainelStock() {
 // FLUXO DE CAIXA — COMPLETO
 // =======================================================
 async function initFluxo() {
+    preencherAnosFluxo();
     await Promise.all([carregarCategoriasFinanceiras(), carregarObrasFluxo()]);
     ligarFiltrosFluxo();
     await carregarMovimentos();
+}
+
+// O filtro de ano é lido pelo carregarMovimentos, mas ninguém o preenchia.
+// Mostra o ano actual e os quatro anteriores, começando no ano actual.
+function preencherAnosFluxo() {
+    const sel = document.getElementById("filtroAnoFluxo");
+    if (!sel || sel.options.length) return;
+    const atual = new Date().getFullYear();
+    sel.innerHTML = `<option value="">— Todos —</option>`;
+    for (let a = atual; a >= atual - 4; a--) {
+        sel.innerHTML += `<option value="${a}">${a}</option>`;
+    }
+    sel.value = String(atual);
 }
 
 async function carregarCategoriasFinanceiras() {
