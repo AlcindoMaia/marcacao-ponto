@@ -2335,6 +2335,192 @@ function parsearQRFatura(texto) {
     }
 }
 
+// =======================================================
+// LER FATURA (PDF ou foto) — assistente
+// Mesmo destino do QR: preenche o formulário do movimento. A diferença é
+// que o QR só traz os totais, e isto traz também as LINHAS.
+// A leitura é feita por uma Edge Function; a chave da IA fica no servidor.
+// =======================================================
+let _linhasFaturaLidas = [];   // guardadas até o movimento ser gravado
+
+async function lerFicheiroFatura(ficheiro) {
+    if (!ficheiro) return;
+
+    const MAX = 8 * 1024 * 1024;
+    if (ficheiro.size > MAX) {
+        mostrarFeedbackQR("O ficheiro tem mais de 8 MB. Tira a foto com menos qualidade.", "err");
+        return;
+    }
+
+    const btn = document.getElementById("btnLerFatura");
+    const textoBtn = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "⏳ A ler…"; }
+    mostrarFeedbackQR("A ler a fatura… demora alguns segundos.", "warn");
+
+    try {
+        const base64 = await new Promise((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload  = () => resolve(String(fr.result).split(",")[1]);
+            fr.onerror = () => reject(new Error("Não foi possível abrir o ficheiro."));
+            fr.readAsDataURL(ficheiro);
+        });
+
+        const { data: { session } } = await SB.auth.getSession();
+        if (!session) throw new Error("Sessão expirada. Volta a entrar.");
+
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/ler-fatura`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ ficheiro_base64: base64, tipo: ficheiro.type || "image/jpeg" }),
+        });
+
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.erro || `Erro ${r.status}`);
+
+        const docs = j.documentos || [];
+        if (!docs.length) {
+            mostrarFeedbackQR("Não foi reconhecida nenhuma fatura neste ficheiro.", "err");
+            return;
+        }
+
+        // Várias faturas no mesmo ficheiro (digitalização em lote):
+        // trata-se a primeira e avisa-se das restantes.
+        const doc = docs[0];
+        preencherMovimentoComFatura(doc);
+        mostrarLinhasFatura(doc);
+
+        const extra = docs.length > 1
+            ? ` (o ficheiro tem ${docs.length} faturas: as outras ficam por lançar)`
+            : "";
+        mostrarFeedbackQR(
+            `✅ ${doc.numero_documento || "Fatura"} · ${doc.fornecedor_nome || "fornecedor por identificar"} · ` +
+            `${Number(doc.total_com_iva || 0).toFixed(2)}€ · ${(doc.linhas || []).length} linhas${extra}`,
+            doc.avisos?.length ? "warn" : "ok"
+        );
+
+    } catch (e) {
+        console.error("lerFicheiroFatura:", e);
+        mostrarFeedbackQR("Não foi possível ler: " + e.message, "err");
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = textoBtn; }
+        const inp = document.getElementById("ficheiroFatura");
+        if (inp) inp.value = "";   // permite reler o mesmo ficheiro
+    }
+}
+
+function preencherMovimentoComFatura(d) {
+    const set = (id, v) => { const el = document.getElementById(id); if (el && v != null && v !== "") el.value = v; };
+
+    set("movReferencia", (d.numero_documento || "").substring(0, 80));
+    set("movData", d.data);
+    set("movTipo", d.tipo_documento === "NC" ? "entrada" : "saida");
+    set("movNif", d.fornecedor_nif);
+    set("movFornecedor", d.fornecedor_conhecido?.nome || d.fornecedor_nome);
+
+    const total = Number(d.total_com_iva);
+    const base  = Number(d.total_sem_iva);
+    const iva   = Number(d.total_iva);
+    if (total > 0) {
+        set("movTotal", total.toFixed(2));
+        if (base > 0) {
+            set("movBase", base.toFixed(2));
+            set("movIva", iva > 0 ? Math.round((iva / base) * 100) : 0);
+        }
+    }
+
+    const obs = [];
+    if (d.atcud) obs.push(`ATCUD: ${d.atcud}`);
+    if (d.motivo_isencao_iva) obs.push(d.motivo_isencao_iva);
+    if (obs.length) set("movObs", obs.join(" · "));
+
+    setTimeout(() => document.getElementById("movObra")?.focus(), 200);
+}
+
+function mostrarLinhasFatura(d) {
+    _linhasFaturaLidas = (d.linhas || []).map((l, i) => ({ ...l, ordem: i }));
+
+    const wrap  = document.getElementById("faturaLinhasWrap");
+    const tbody = document.querySelector("#tabelaFaturaLinhas tbody");
+    const avisosEl = document.getElementById("faturaAvisos");
+    if (!wrap || !tbody) return;
+
+    // Avisos do servidor: totais que não batem, fatura repetida, IBAN diferente
+    if (d.avisos?.length) {
+        avisosEl.innerHTML = d.avisos.map(a => `
+            <div style="background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.3);color:#9a5b04;border-radius:6px;padding:6px 10px;font-size:12px;margin-bottom:4px">
+                ${escapeHtmlFatura(a)}
+            </div>`).join("");
+        avisosEl.style.display = "block";
+    } else {
+        avisosEl.style.display = "none";
+        avisosEl.innerHTML = "";
+    }
+
+    tbody.innerHTML = _linhasFaturaLidas.map((l, i) => `
+        <tr data-i="${i}">
+            <td style="padding:3px 6px"><input value="${escapeHtmlFatura(l.descricao || "")}" data-campo="descricao"
+                style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;background:#fff;color:var(--text-dark)"></td>
+            <td style="padding:3px 6px"><input type="number" step="0.001" value="${l.quantidade ?? ""}" data-campo="quantidade"
+                style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;text-align:right;background:#fff;color:var(--text-dark)"></td>
+            <td style="padding:3px 6px"><input value="${escapeHtmlFatura(l.unidade || "")}" data-campo="unidade"
+                style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;background:#fff;color:var(--text-dark)"></td>
+            <td style="padding:3px 6px"><input type="number" step="0.01" value="${l.preco_unitario ?? ""}" data-campo="preco_unitario"
+                style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;text-align:right;background:#fff;color:var(--text-dark)"></td>
+            <td style="padding:3px 6px"><input type="number" step="0.01" value="${l.valor_total ?? ""}" data-campo="valor_total"
+                style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;text-align:right;background:#fff;color:var(--text-dark)"></td>
+            <td style="padding:3px 6px;text-align:center">
+                <button type="button" onclick="this.closest('tr').remove(); actualizarResumoLinhas()"
+                    style="background:rgba(248,113,113,.1);border:none;border-radius:5px;padding:3px 6px;cursor:pointer;font-size:12px">✕</button>
+            </td>
+        </tr>`).join("");
+
+    wrap.style.display = "block";
+    actualizarResumoLinhas();
+}
+
+// Lê as linhas tal como estão no ecrã (já com as correções do utilizador)
+function linhasFaturaDoEcra() {
+    return [...document.querySelectorAll("#tabelaFaturaLinhas tbody tr")].map((tr, i) => {
+        const v = (campo) => tr.querySelector(`[data-campo="${campo}"]`)?.value ?? "";
+        return {
+            descricao_original: v("descricao").trim(),
+            quantidade:     v("quantidade")     !== "" ? parseFloat(v("quantidade"))     : null,
+            unidade:        v("unidade").trim() || null,
+            preco_unitario: v("preco_unitario") !== "" ? parseFloat(v("preco_unitario")) : null,
+            valor_total:    v("valor_total")    !== "" ? parseFloat(v("valor_total"))    : null,
+            ordem: i,
+        };
+    }).filter(l => l.descricao_original);
+}
+
+function actualizarResumoLinhas() {
+    const el = document.getElementById("faturaLinhasResumo");
+    if (!el) return;
+    const linhas = linhasFaturaDoEcra();
+    const soma   = linhas.reduce((s, l) => s + (l.valor_total || 0), 0);
+    const base   = parseFloat(document.getElementById("movBase")?.value) || 0;
+    const difere = base > 0 && Math.abs(soma - base) > 0.05;
+    el.innerHTML = `${linhas.length} linha${linhas.length === 1 ? "" : "s"} · soma ${soma.toFixed(2)} €` +
+        (difere ? ` <span style="color:#9a5b04">— não bate com a base de ${base.toFixed(2)} €</span>` : "");
+}
+
+function limparLinhasFatura() {
+    _linhasFaturaLidas = [];
+    const wrap = document.getElementById("faturaLinhasWrap");
+    const tbody = document.querySelector("#tabelaFaturaLinhas tbody");
+    if (tbody) tbody.innerHTML = "";
+    if (wrap) wrap.style.display = "none";
+}
+
+function escapeHtmlFatura(s) {
+    return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 function mostrarFeedbackQR(msg, tipo) {
     // Feedback visual no modal — sem alert()
     let el = document.getElementById("qrFeedbackBar");
@@ -3368,6 +3554,7 @@ function fecharModalMovimento() {
         modal.style.display = "none";
         modal.classList.add("hidden");
     }
+    limparLinhasFatura();   // não deixar linhas de uma fatura anterior
     movEditId = null;
     // Remover listener de barcode
     if (window._barcodeListener) {
@@ -3441,6 +3628,23 @@ async function abrirModalMovimento(mov = null) {
         const contImput = document.getElementById("imputacaoServicosContainer");
         if (contImput && mov.obra_id) {
             await carregarServicosImputacao(mov.obra_id, mov.id);
+        }
+
+        // Linhas da fatura já gravadas, para poderem ser revistas
+        const { data: linhasGravadas } = await SB.from("fatura_linhas")
+            .select("descricao_original, quantidade, unidade, preco_unitario, valor_total")
+            .eq("movimento_id", mov.id).order("ordem");
+        if (linhasGravadas?.length) {
+            mostrarLinhasFatura({
+                linhas: linhasGravadas.map(l => ({
+                    descricao: l.descricao_original,
+                    quantidade: l.quantidade,
+                    unidade: l.unidade,
+                    preco_unitario: l.preco_unitario,
+                    valor_total: l.valor_total,
+                })),
+                avisos: [],
+            });
         }
     }
 
@@ -3594,6 +3798,24 @@ async function guardarMovimento() {
 
     if (error) { movMsg.textContent = "Erro: " + error.message; return; }
 
+    // Linhas da fatura lidas pelo assistente
+    const movIdLinhas = movSalvo?.id || movEditId;
+    const linhasFatura = linhasFaturaDoEcra();
+    if (movIdLinhas && linhasFatura.length) {
+        // Em edição, substitui as linhas lidas antes (as manuais ficam)
+        if (movEditId) {
+            await SB.from("fatura_linhas").delete()
+                .eq("movimento_id", movEditId).eq("origem", "ia");
+        }
+        const { error: errLinhas } = await SB.from("fatura_linhas").insert(
+            linhasFatura.map(l => ({ ...l, movimento_id: movIdLinhas, origem: "ia" }))
+        );
+        if (errLinhas) {
+            console.error(errLinhas);
+            alert("O movimento foi guardado, mas as linhas da fatura não: " + errLinhas.message);
+        }
+    }
+
     // Imputar a serviços se existirem linhas de imputação
     const movId = movSalvo?.id || movEditId;
     const linhasImput = document.querySelectorAll(".linha-imput-serv");
@@ -3670,6 +3892,15 @@ function ligarEventosGlobais() {
     document.getElementById("modalEtiqueta")?.addEventListener("click", e => {
         if (e.target.id === "modalEtiqueta") fecharModalEtiqueta();
     });
+
+    // Ler fatura em PDF ou foto — mesmo destino do QR
+    document.getElementById("btnLerFatura")?.addEventListener("click", () => {
+        document.getElementById("ficheiroFatura")?.click();
+    });
+    document.getElementById("ficheiroFatura")?.addEventListener("change", function () {
+        lerFicheiroFatura(this.files?.[0]);
+    });
+    document.getElementById("btnLimparLinhasFatura")?.addEventListener("click", limparLinhasFatura);
 
     // Fluxo de caixa — ao escolher a obra, mostrar os serviços dela para
     // imputação. Num movimento novo não há mais nada que dispare isto.

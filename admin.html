@@ -873,6 +873,12 @@
                     style="background:var(--primary);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">
                     📷 Ler QR Fatura
                 </button>
+                <!-- Leitura do documento inteiro: PDF ou foto -->
+                <button id="btnLerFatura" title="Ler PDF ou foto da fatura"
+                    style="background:rgba(244,185,66,.15);border:1px solid rgba(244,185,66,.4);color:var(--primary-dk,#a06d00);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">
+                    📄 Ler Fatura
+                </button>
+                <input type="file" id="ficheiroFatura" accept="image/*,application/pdf" style="display:none">
                 <button id="fecharModalMovBtn" class="modal-close" style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.5">×</button>
             </div>
         </div>
@@ -986,6 +992,31 @@
         <div class="form-group">
             <label>Observações</label>
             <input id="movObs" placeholder="Opcional">
+        </div>
+
+        <!-- Linhas lidas da fatura: só aparece depois de ler um documento -->
+        <div id="faturaLinhasWrap" style="display:none;margin-top:4px;padding:12px;background:rgba(0,0,0,.03);border:1px solid rgba(0,0,0,.1);border-radius:8px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <div style="font-size:11px;letter-spacing:.5px;opacity:.6;text-transform:uppercase">Linhas da fatura</div>
+                <button type="button" id="btnLimparLinhasFatura" class="btn-secondary" style="font-size:11px;padding:3px 10px">Descartar linhas</button>
+            </div>
+            <div id="faturaAvisos" style="display:none;margin-bottom:8px"></div>
+            <div style="overflow-x:auto">
+                <table id="tabelaFaturaLinhas" style="width:100%;border-collapse:collapse;font-size:12px;min-width:560px">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left;padding:4px 6px;opacity:.6;font-weight:600">Descrição</th>
+                            <th style="text-align:right;padding:4px 6px;opacity:.6;font-weight:600;width:70px">Qtd</th>
+                            <th style="text-align:left;padding:4px 6px;opacity:.6;font-weight:600;width:60px">Un</th>
+                            <th style="text-align:right;padding:4px 6px;opacity:.6;font-weight:600;width:80px">Preço</th>
+                            <th style="text-align:right;padding:4px 6px;opacity:.6;font-weight:600;width:80px">Total</th>
+                            <th style="width:30px"></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="faturaLinhasResumo" style="font-size:12px;opacity:.7;margin-top:8px"></div>
         </div>
 
         <!-- Imputação a serviços da obra: só aparece quando a obra
