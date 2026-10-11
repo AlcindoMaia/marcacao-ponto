@@ -898,3 +898,8 @@ body.dark .plan-grelha th.plan-hoje { color: var(--primary); }
 @media (prefers-reduced-motion: reduce) {
     #qrScanLine { animation: none; opacity: .6; }
 }
+/* O modal de obra tem fundo escuro mas nunca definiu a cor do texto:
+   tudo o que não traga cor própria herdava o texto escuro do body. */
+#modalEditarObra { color: rgba(255,255,255,.85); }
+#modalEditarObra label { color: rgba(255,255,255,.55); }
+#modalEditarObra #listaServicos { color: rgba(255,255,255,.85); }

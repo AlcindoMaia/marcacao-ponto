@@ -1685,11 +1685,26 @@ function toggleDark() {
             </div>
             <!-- Serviços -->
             <div id="obraTabContent-servicos" style="display:none">
-                <div id="listaServicosModal" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px"></div>
-                <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:end">
-                    <input id="novoServicoNome" placeholder="Nome do serviço" style="padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
-                    <input id="novoServicoHoras" type="number" placeholder="Horas" style="width:70px;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
-                    <button onclick="adicionarServico()" class="btn-primary" style="white-space:nowrap">+ Serviço</button>
+
+                <!-- Lista com horas reais, material imputado e progresso -->
+                <div id="listaServicos" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px"></div>
+
+                <!-- Novo serviço -->
+                <div style="border-top:1px solid rgba(255,255,255,.08);padding-top:12px">
+                    <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin-bottom:8px">Novo serviço</div>
+                    <div style="display:grid;grid-template-columns:1fr 80px 90px auto;gap:8px;align-items:center">
+                        <input id="novoServNome" placeholder="Nome do serviço"
+                               style="padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
+                        <input id="novoServHoras" type="number" step="0.5" min="0" placeholder="Horas"
+                               style="padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
+                        <input id="novoServValor" type="number" step="0.01" min="0" placeholder="€ orç."
+                               style="padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
+                        <button onclick="adicionarServico()" class="btn-primary" style="white-space:nowrap">+ Serviço</button>
+                    </div>
+                    <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;opacity:.7;cursor:pointer">
+                        <input type="checkbox" id="novoServExtra" style="width:auto;margin:0">
+                        Trabalho extra (fora do orçamento inicial)
+                    </label>
                 </div>
             </div>
         </div>
