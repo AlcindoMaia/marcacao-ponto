@@ -10,9 +10,9 @@
 --   3. a secção "vw_carga_diaria" no fim deste ficheiro cria a vista
 --      só se a tabela tarefas já existir; volta a correr esse bloco
 --      depois do passo 2.
+--   4. pedidos.sql          (tabelas pedidos + pedido_linhas, ecrã Hoje)
 --
 -- O código usa objetos que NÃO existem em produção:
---   - tabelas pedidos e pedido_linhas (hoje.js, pedidos de material)
 --   - função gerar_numero_orcamento (admin.js; tem fallback 'ORC-<timestamp>')
 -- =======================================================
 
