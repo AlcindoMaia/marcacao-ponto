@@ -38,7 +38,7 @@ create table if not exists tarefas (
     notas              text,
     data_prevista      date not null,
     hora_inicio        time,
-    duracao_horas      numeric not null default 8 check (duracao_horas > 0),
+    duracao_horas      numeric(5,2) not null default 8 check (duracao_horas > 0),
     ordem              integer not null default 0,
     usar_morada_obra   boolean not null default true,
     morada             text,
@@ -47,7 +47,7 @@ create table if not exists tarefas (
     estado             text not null default 'planeada'
                        check (estado in ('planeada', 'em_curso', 'concluida', 'cancelada')),
     concluida_em       timestamptz,
-    duracao_real_horas numeric,
+    duracao_real_horas numeric(5,2),
     criado_em          timestamptz not null default now(),
     atualizado_em      timestamptz not null default now()
 );
