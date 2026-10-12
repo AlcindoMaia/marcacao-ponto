@@ -50,20 +50,9 @@ function arrancar() {
     document.getElementById("hojeCamara").addEventListener("click", () => {
         location.href = `${HOJE_ADMIN}#ler-fatura`;
     });
-    document.getElementById("hojePedido").addEventListener("focus", avisoAssistente);
 
+    ligarBarraPedido();
     carregarTudo();
-}
-
-function avisoAssistente() {
-    const barra = document.getElementById("hojeBarraIA");
-    if (document.getElementById("hojeAvisoIA")) return;
-    const aviso = document.createElement("div");
-    aviso.id = "hojeAvisoIA";
-    aviso.className = "hoje-aviso-ia";
-    aviso.textContent = "Pedidos por texto ainda não estão ligados. A câmara já lê faturas.";
-    barra.insertBefore(aviso, barra.firstChild);
-    setTimeout(() => aviso.remove(), 6000);
 }
 
 async function carregarTudo() {
@@ -82,7 +71,7 @@ async function carregarAlertas() {
     cont.innerHTML = '<div class="hoje-vazio">A ver…</div>';
 
     const alertas = [];
-    for (const procurar of [alertaPrecosSubiram, alertaMovimentosSemObra,
+    for (const procurar of [alertaPedidosPorValidar, alertaPrecosSubiram, alertaMovimentosSemObra,
                             alertaPorPagar, alertaStockAbaixoMinimo, alertaTarefasAtrasadas]) {
         try {
             const a = await procurar();
@@ -97,8 +86,8 @@ async function carregarAlertas() {
         return;
     }
 
-    cont.innerHTML = alertas.map((a, i) => `
-        <button class="hoje-alerta" data-ir="${a.ir}">
+    cont.innerHTML = alertas.map(a => `
+        <button class="hoje-alerta" ${a.accao ? `data-accao="${a.accao}"` : `data-ir="${a.ir}"`}>
             <span class="hoje-icone" style="background:${a.cor}">${a.icone}</span>
             <span class="hoje-alerta-txt">
                 <span class="hoje-alerta-tit">${esc(a.titulo)}</span>
@@ -107,8 +96,12 @@ async function carregarAlertas() {
             <span class="hoje-seta">›</span>
         </button>`).join("");
 
+    // Uns levam a outra página, outros abrem um painel aqui mesmo
     cont.querySelectorAll("[data-ir]").forEach(b => {
         b.addEventListener("click", () => { location.href = b.dataset.ir; });
+    });
+    cont.querySelectorAll('[data-accao="pedidos"]').forEach(b => {
+        b.addEventListener("click", abrirPedidosPorValidar);
     });
 }
 
@@ -330,6 +323,293 @@ async function carregarAgenda() {
             </div>
         </div>`;
     }).join("");
+}
+
+// =======================================================
+// PEDIR MATERIAL
+// Escreves ou ditas em português corrente; o assistente devolve um
+// rascunho estruturado; tu confirmas. Nada é gravado sem passares os
+// olhos — a IA percebe, o código valida, a decisão é tua.
+// =======================================================
+let _obrasHoje   = [];   // obras activas, para as listas
+let _artigosHoje = [];   // artigos activos, para corrigir linhas
+let _rascunho    = null; // o pedido que está em cima da mesa
+
+function ligarBarraPedido() {
+    const campo  = document.getElementById("hojePedido");
+    const enviar = document.getElementById("hojeEnviar");
+    const mic    = document.getElementById("hojeMic");
+
+    campo.addEventListener("input", () => {
+        enviar.style.display = campo.value.trim() ? "" : "none";
+    });
+    campo.addEventListener("keydown", e => {
+        if (e.key === "Enter") { e.preventDefault(); pedirMaterial(); }
+    });
+    enviar.addEventListener("click", pedirMaterial);
+
+    document.getElementById("hojePainelFechar").addEventListener("click", fecharPainel);
+    document.getElementById("hojePainel").addEventListener("click", e => {
+        if (e.target.id === "hojePainel") fecharPainel();
+    });
+
+    ligarMicrofone(campo, mic, enviar);
+}
+
+// Ditar em vez de escrever. Só aparece onde o browser sabe fazê-lo —
+// em Chrome no telemóvel, que é onde isto interessa.
+function ligarMicrofone(campo, mic, enviar) {
+    const Reconhecimento = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Reconhecimento) return;
+
+    mic.style.display = "";
+    let a_ouvir = false;
+    const rec = new Reconhecimento();
+    rec.lang = "pt-PT";
+    rec.interimResults = true;
+    rec.continuous = false;
+
+    rec.onresult = (e) => {
+        campo.value = [...e.results].map(r => r[0].transcript).join("");
+        enviar.style.display = campo.value.trim() ? "" : "none";
+    };
+    rec.onend = () => { a_ouvir = false; mic.textContent = "🎤"; mic.style.opacity = ""; };
+    rec.onerror = () => { a_ouvir = false; mic.textContent = "🎤"; mic.style.opacity = ""; };
+
+    mic.addEventListener("click", () => {
+        if (a_ouvir) { rec.stop(); return; }
+        try {
+            rec.start();
+            a_ouvir = true;
+            mic.textContent = "⏺";
+            mic.style.opacity = "1";
+        } catch { /* já estava a ouvir */ }
+    });
+}
+
+async function pedirMaterial() {
+    const campo = document.getElementById("hojePedido");
+    const texto = campo.value.trim();
+    if (!texto) return;
+
+    const enviar = document.getElementById("hojeEnviar");
+    enviar.disabled = true;
+    enviar.textContent = "…";
+
+    try {
+        const { data: { session } } = await SB.auth.getSession();
+        if (!session) throw new Error("A sessão expirou. Volta a entrar.");
+
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/pedir-material`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ texto }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.erro || `Erro ${r.status}`);
+
+        await carregarListasPedido();
+        _rascunho = { texto, ...j };
+        mostrarRascunho();
+        campo.value = "";
+        enviar.style.display = "none";
+
+    } catch (e) {
+        console.error("pedirMaterial:", e);
+        abrirPainel("Não deu", `<div class="hoje-avisos">${esc(e.message)}</div>`, "");
+    } finally {
+        enviar.disabled = false;
+        enviar.textContent = "➤";
+    }
+}
+
+async function carregarListasPedido() {
+    if (_obrasHoje.length && _artigosHoje.length) return;
+    const [{ data: o }, { data: a }] = await Promise.all([
+        SB.from("obras").select("id, nome").eq("estado", "ativa").order("nome"),
+        SB.from("artigos").select("id, descricao").eq("ativo", true).order("descricao"),
+    ]);
+    _obrasHoje   = o || [];
+    _artigosHoje = a || [];
+}
+
+function mostrarRascunho() {
+    const d = _rascunho;
+    const avisos = [...(d.avisos || [])];
+    if (d.por_perceber) avisos.unshift(d.por_perceber);
+
+    const opcoesObra = `<option value="">— escolhe a obra —</option>` +
+        _obrasHoje.map(o => `<option value="${o.id}"${o.id === d.obra_id ? " selected" : ""}>${esc(o.nome)}</option>`).join("");
+
+    const corpo = `
+        ${avisos.length ? `<div class="hoje-avisos">${avisos.map(esc).join("<br>")}</div>` : ""}
+        <div class="hoje-campo">
+            <label>Obra</label>
+            <select id="pedObra">${opcoesObra}</select>
+        </div>
+        <div class="hoje-campo" style="margin-bottom:4px"><label>Material</label></div>
+        <div id="pedLinhas">${d.linhas.map((l, i) => linhaPedidoHTML(l, i)).join("")}</div>
+        <div class="hoje-campo" style="margin-top:12px">
+            <label>Nota (opcional)</label>
+            <input id="pedNota" placeholder="Ex: para segunda de manhã">
+        </div>
+        <div style="font-size:11.5px;color:var(--text-muted);margin-top:10px">
+            Pedido original: "${esc(d.texto)}"
+        </div>`;
+
+    abrirPainel("Pedido de material", corpo,
+        `<button class="btn-secondary" onclick="fecharPainel()">Cancelar</button>
+         <button class="btn-primary" id="pedGuardar">Guardar pedido</button>`);
+
+    document.getElementById("pedGuardar").addEventListener("click", guardarPedido);
+}
+
+function linhaPedidoHTML(l, i) {
+    const opcoes = `<option value="">— sem artigo —</option>` +
+        _artigosHoje.map(a => `<option value="${a.id}"${a.id === l.artigo_id ? " selected" : ""}>${esc(a.descricao)}</option>`).join("");
+    const rotulo = { alta: "reconhecido", media: "parecido", baixa: "a confirmar" }[l.confianca] || l.confianca;
+    return `<div class="hoje-linha-pedido" data-i="${i}">
+        <div class="hoje-linha-topo">
+            <span class="hoje-linha-desc">${esc(l.descricao)}</span>
+            <span class="hoje-conf conf-${l.confianca}">${rotulo}</span>
+        </div>
+        <div class="hoje-linha-topo">
+            <input type="number" step="0.01" min="0" class="qtd" value="${l.quantidade ?? ""}" placeholder="qtd">
+            <input class="un" value="${esc(l.unidade || "")}" placeholder="un">
+            <select class="art" style="flex:1;min-width:0;padding:6px 8px;font:inherit;font-size:13px;border:1px solid rgba(0,0,0,.15);border-radius:8px;background:#fff;color:var(--text-dark)">${opcoes}</select>
+            <button class="hoje-acao" onclick="this.closest('.hoje-linha-pedido').remove()" title="Tirar">✕</button>
+        </div>
+    </div>`;
+}
+
+async function guardarPedido() {
+    const btn = document.getElementById("pedGuardar");
+    btn.disabled = true;
+    btn.textContent = "A guardar…";
+
+    try {
+        const linhas = [...document.querySelectorAll("#pedLinhas .hoje-linha-pedido")].map((el, i) => {
+            const i0 = Number(el.dataset.i);
+            const q  = el.querySelector(".qtd").value;
+            return {
+                descricao:  _rascunho.linhas[i0].descricao,
+                artigo_id:  el.querySelector(".art").value || null,
+                quantidade: q !== "" ? Number(q) : null,
+                unidade:    el.querySelector(".un").value.trim() || null,
+                confianca:  _rascunho.linhas[i0].confianca,
+                ordem:      i,
+            };
+        });
+        if (!linhas.length) throw new Error("O pedido ficou sem material.");
+
+        const { data: { user } } = await SB.auth.getUser();
+        const { data: pedido, error } = await SB.from("pedidos").insert({
+            obra_id:        document.getElementById("pedObra").value || null,
+            pedido_por:     user?.email || null,
+            texto_original: _rascunho.texto,
+            notas:          document.getElementById("pedNota").value.trim() || null,
+            estado:         "rascunho",
+        }).select("id").single();
+        if (error) throw error;
+
+        const { error: errL } = await SB.from("pedido_linhas")
+            .insert(linhas.map(l => ({ ...l, pedido_id: pedido.id })));
+        if (errL) throw errL;
+
+        _rascunho = null;
+        fecharPainel();
+        await carregarAlertas();
+
+    } catch (e) {
+        console.error("guardarPedido:", e);
+        alert("Não foi possível guardar: " + (e.message || e));
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Guardar pedido";
+    }
+}
+
+// --- Pedidos à espera de validação ---
+async function alertaPedidosPorValidar() {
+    const { data, count } = await SB.from("pedidos")
+        .select("obras(nome)", { count: "exact" })
+        .eq("estado", "rascunho").order("criado_em", { ascending: false }).limit(3);
+    if (!count) return null;
+    const obras = [...new Set((data || []).map(p => p.obras?.nome).filter(Boolean))];
+    return {
+        icone: "🛒", cor: "rgba(0,0,0,.06)",
+        titulo: count === 1 ? "1 pedido por validar" : `${count} pedidos por validar`,
+        sub: `Compras · ${obras.join(", ") || "sem obra indicada"}`,
+        accao: "pedidos",
+    };
+}
+
+async function abrirPedidosPorValidar() {
+    abrirPainel("Pedidos por validar", '<div class="hoje-vazio">A carregar…</div>', "");
+
+    const { data, error } = await SB.from("pedidos")
+        .select("id, texto_original, notas, criado_em, pedido_por, obras(nome), pedido_linhas(descricao, quantidade, unidade, confianca, ordem)")
+        .eq("estado", "rascunho").order("criado_em", { ascending: false }).limit(20);
+
+    const corpo = document.getElementById("hojePainelCorpo");
+    if (error)       { corpo.innerHTML = '<div class="hoje-avisos">Não foi possível ler os pedidos.</div>'; return; }
+    if (!data.length) { corpo.innerHTML = '<div class="hoje-vazio">Nenhum pedido à espera.</div>'; return; }
+
+    corpo.innerHTML = data.map(p => {
+        const linhas = (p.pedido_linhas || []).sort((a, b) => a.ordem - b.ordem);
+        return `<div class="hoje-linha-pedido" data-pedido="${p.id}">
+            <div class="hoje-linha-topo">
+                <span class="hoje-linha-desc">${esc(p.obras?.nome || "sem obra")}</span>
+                <span style="font-size:11.5px;color:var(--text-muted)">${p.criado_em.slice(0, 10)}</span>
+            </div>
+            <div style="font-size:13px;line-height:1.6">
+                ${linhas.map(l => `• ${l.quantidade ?? "?"} ${esc(l.unidade || "")} ${esc(l.descricao)}`).join("<br>")}
+            </div>
+            ${p.notas ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px">${esc(p.notas)}</div>` : ""}
+            <div style="display:flex;gap:8px;margin-top:8px">
+                <button class="btn-primary" style="font-size:12px;padding:4px 12px" data-validar="${p.id}">Validar</button>
+                <button class="btn-secondary" style="font-size:12px;padding:4px 12px" data-cancelar="${p.id}">Cancelar</button>
+            </div>
+        </div>`;
+    }).join("");
+
+    corpo.querySelectorAll("[data-validar]").forEach(b =>
+        b.addEventListener("click", () => mudarEstadoPedido(b.dataset.validar, "validado")));
+    corpo.querySelectorAll("[data-cancelar]").forEach(b =>
+        b.addEventListener("click", () => mudarEstadoPedido(b.dataset.cancelar, "cancelado")));
+}
+
+async function mudarEstadoPedido(id, estado) {
+    const { data: { user } } = await SB.auth.getUser();
+    const { error } = await SB.from("pedidos").update({
+        estado,
+        validado_em:  new Date().toISOString(),
+        validado_por: user?.email || null,
+    }).eq("id", id);
+    if (error) { alert("Não foi possível: " + error.message); return; }
+
+    document.querySelector(`[data-pedido="${id}"]`)?.remove();
+    if (!document.querySelector("[data-pedido]")) {
+        document.getElementById("hojePainelCorpo").innerHTML =
+            '<div class="hoje-vazio">Tratado. Não ficou nenhum à espera.</div>';
+    }
+    await carregarAlertas();
+}
+
+// --- Painel ---
+function abrirPainel(titulo, corpoHTML, accoesHTML) {
+    document.getElementById("hojePainelTitulo").textContent = titulo;
+    document.getElementById("hojePainelCorpo").innerHTML    = corpoHTML;
+    document.getElementById("hojePainelAccoes").innerHTML   = accoesHTML || "";
+    document.getElementById("hojePainel").style.display     = "flex";
+}
+
+function fecharPainel() {
+    document.getElementById("hojePainel").style.display = "none";
+    _rascunho = null;
 }
 
 // =======================================================

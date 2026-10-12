@@ -271,10 +271,12 @@ function reconstruirCartaoTemp(nome, regs, syntheticId) {
 }
 
 
-// =======================================================
-// TOGGLE FALTA
-// =======================================================
-async 
+// (A função toggleFalta está mais abaixo. Aqui ficou um "async" solto de
+//  uma edição antiga: não é sintaxe válida isolada, era lido como uma
+//  variável inexistente e rebentava, matando tudo o que vinha a seguir
+//  neste ficheiro — o arranque automático e o fecho do painel de
+//  temporários incluídos.)
+
 // =======================================================
 // TRABALHADOR TEMPORÁRIO
 // =======================================================
