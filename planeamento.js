@@ -5,7 +5,7 @@
 // =======================================================
 
 let _planSemana   = null;   // segunda-feira da semana visível (Date local)
-let _planFuncs    = [];
+let _planFuncs    = [];      // todos, incluindo inativos (para não perder tarefas antigas)
 let _planObras    = [];
 let _planTarefas  = [];
 let _planDragId   = null;
@@ -68,8 +68,7 @@ function planMudarSemana(dias) {
 
 async function carregarPlanFuncionarios() {
     const { data, error } = await SB.from("funcionarios")
-        .select("id, nome")
-        .eq("ativo", true)
+        .select("id, nome, ativo")
         .order("nome");
     if (error) { console.error(error); return; }
     _planFuncs = data || [];
@@ -127,9 +126,12 @@ function desenharGrelha() {
     });
     html += "</tr></thead><tbody>";
 
-    // Linha por funcionário
-    _planFuncs.forEach(f => {
-        html += `<tr><td class="plan-col-func">${escapeHtmlPlan(f.nome)}</td>`;
+    // Linha por funcionário: os ativos, mais os inativos que ainda têm tarefas nesta semana
+    const comTarefas = new Set(_planTarefas.flatMap(t =>
+        (t.tarefa_funcionarios || []).map(tf => tf.funcionario_id)));
+    _planFuncs.filter(f => f.ativo !== false || comTarefas.has(f.id)).forEach(f => {
+        const nome = escapeHtmlPlan(f.nome) + (f.ativo === false ? " <em>(inativo)</em>" : "");
+        html += `<tr><td class="plan-col-func">${nome}</td>`;
         dias.forEach(d => {
             const ds = planDataStr(d);
             const tarefas = _planTarefas.filter(t =>
@@ -289,10 +291,12 @@ function abrirModalTarefa(id, dataPre = null, funcPre = null) {
 
     // Funcionários
     const atribuidos = t ? (t.tarefa_funcionarios || []).map(x => x.funcionario_id) : (funcPre ? [funcPre] : []);
-    document.getElementById("planFuncionarios").innerHTML = _planFuncs.map(f => `
+    document.getElementById("planFuncionarios").innerHTML = _planFuncs
+        .filter(f => f.ativo !== false || atribuidos.includes(f.id))
+        .map(f => `
         <label class="plan-check">
             <input type="checkbox" value="${f.id}" ${atribuidos.includes(f.id) ? "checked" : ""}>
-            ${escapeHtmlPlan(f.nome)}
+            ${escapeHtmlPlan(f.nome)}${f.ativo === false ? " (inativo)" : ""}
         </label>`).join("");
 
     document.getElementById("planModalEliminar").style.display = t ? "inline-block" : "none";
