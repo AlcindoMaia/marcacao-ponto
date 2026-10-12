@@ -113,8 +113,31 @@ function mostrarPainel() {
 // =======================================================
 function inicializarPainel() {
     ativarTabs();
-    abrirTab("fluxo");
+    abrirTab(tabPedidaNoEndereco() || "fluxo");
     carregarNotificacoes(); // Carregar alertas iniciais
+    tratarAccaoNoEndereco();
+}
+
+// O ecrã "Hoje" manda para aqui com #tab=financeiro ou #ler-fatura.
+// Sem hash, nada muda: abre o fluxo como sempre.
+function tabPedidaNoEndereco() {
+    const m = (location.hash || "").match(/^#tab=([a-z-]+)$/);
+    if (!m) return null;
+    return document.querySelector(`.tab[data-tab="${m[1]}"]`) ? m[1] : null;
+}
+
+function tratarAccaoNoEndereco() {
+    if ((location.hash || "") !== "#ler-fatura") return;
+    abrirTab("financeiro");
+    setTimeout(async () => {
+        await abrirModalMovimento();
+        // O picker não abre sozinho — os browsers exigem um clique teu.
+        const btn = document.getElementById("btnLerFatura");
+        if (!btn) return;
+        btn.style.transition = "box-shadow .3s";
+        btn.style.boxShadow  = "0 0 0 4px rgba(244,185,66,.5)";
+        setTimeout(() => { btn.style.boxShadow = ""; }, 2500);
+    }, 400);
 }
 
 function ativarTabs() {
@@ -2490,19 +2513,112 @@ async function aoEscolherArtigoLinha(sel) {
     actualizarPrecoAnterior(tr);
 }
 
-async function lerFicheiroFatura(ficheiro) {
-    if (!ficheiro) return;
+// -------------------------------------------------------
+// FILA DE FATURAS
+// Um ficheiro do scanner traz várias faturas, e podes escolher vários
+// ficheiros de uma vez. Lança-se uma de cada vez: a primeira preenche o
+// formulário, as outras ficam em fila e entram à medida que gravas.
+// -------------------------------------------------------
+let _filaFaturas = [];   // faturas lidas e ainda por lançar
+let _filaTotal   = 0;    // quantas vieram no lote, para o "3 de 7"
+
+function limparFilaFaturas() {
+    _filaFaturas = [];
+    _filaTotal   = 0;
+    const barra = document.getElementById("filaFaturasBarra");
+    if (barra) barra.style.display = "none";
+}
+
+function actualizarBarraFila() {
+    let barra = document.getElementById("filaFaturasBarra");
+    if (!barra) {
+        barra = document.createElement("div");
+        barra.id = "filaFaturasBarra";
+        barra.style.cssText = "display:none;align-items:center;gap:10px;background:rgba(244,185,66,.12);" +
+            "border:1px solid rgba(244,185,66,.35);border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:12px";
+        const modal = document.getElementById("modalMovimento");
+        const conteudo = modal?.querySelector(".modal-content, .modal-body") || modal;
+        conteudo?.insertBefore(barra, conteudo.firstChild);
+    }
+
+    if (!_filaTotal) { barra.style.display = "none"; return; }
+
+    const actual = _filaTotal - _filaFaturas.length;   // a que está no ecrã
+    barra.innerHTML =
+        `<span style="font-weight:600">Fatura ${actual} de ${_filaTotal}</span>` +
+        `<span style="opacity:.7;flex:1">${_filaFaturas.length} por lançar neste lote</span>` +
+        `<button type="button" id="btnSaltarFatura" class="btn-secondary" style="font-size:12px;padding:3px 10px">Saltar esta</button>` +
+        `<button type="button" id="btnDescartarFila" class="btn-secondary" style="font-size:12px;padding:3px 10px">Descartar lote</button>`;
+    barra.style.display = "flex";
+
+    document.getElementById("btnSaltarFatura").onclick = async () => {
+        if (!_filaFaturas.length) { limparFilaFaturas(); mostrarFeedbackQR("Era a última do lote.", "warn"); return; }
+        await proximaFaturaDaFila();
+    };
+    document.getElementById("btnDescartarFila").onclick = () => {
+        limparFilaFaturas();
+        mostrarFeedbackQR("Lote descartado. O que já gravaste fica.", "warn");
+    };
+}
+
+// Tira a próxima da fila e põe-na no formulário.
+async function proximaFaturaDaFila() {
+    const doc = _filaFaturas.shift();
+    if (!doc) { limparFilaFaturas(); return; }
+
+    preencherMovimentoComFatura(doc);
+    await mostrarLinhasFatura(doc);
+    actualizarBarraFila();
+
+    mostrarFeedbackQR(
+        `${doc.numero_documento || "Fatura"} · ${doc.fornecedor_nome || "fornecedor por identificar"} · ` +
+        `${Number(doc.total_com_iva || 0).toFixed(2)}€ · ${(doc.linhas || []).length} linhas`,
+        doc.avisos?.length ? "warn" : "ok"
+    );
+}
+
+// Vários ficheiros de uma vez: lê-se um a um e junta-se tudo à mesma fila.
+async function lerFicheirosFatura(ficheiros) {
+    const lista = [...(ficheiros || [])];
+    if (!lista.length) return;
+
+    const todas = [];
+    for (let i = 0; i < lista.length; i++) {
+        if (lista.length > 1) {
+            mostrarFeedbackQR(`A ler ficheiro ${i + 1} de ${lista.length}…`, "warn");
+        }
+        const docs = await lerFicheiroFatura(lista[i], true);
+        todas.push(...(docs || []));
+    }
+
+    if (!todas.length) {
+        mostrarFeedbackQR("Não foi reconhecida nenhuma fatura.", "err");
+        return;
+    }
+
+    _filaFaturas = todas;
+    _filaTotal   = todas.length;
+    await proximaFaturaDaFila();
+
+    if (todas.length > 1) {
+        mostrarFeedbackQR(`${todas.length} faturas lidas. Grava esta e a seguinte entra sozinha.`, "ok");
+    }
+}
+
+// Lê um ficheiro. Com emFila=true devolve as faturas em vez de as mostrar.
+async function lerFicheiroFatura(ficheiro, emFila = false) {
+    if (!ficheiro) return null;
 
     const MAX = 8 * 1024 * 1024;
     if (ficheiro.size > MAX) {
-        mostrarFeedbackQR("O ficheiro tem mais de 8 MB. Tira a foto com menos qualidade.", "err");
-        return;
+        mostrarFeedbackQR(`"${ficheiro.name}" tem mais de 8 MB. Digitaliza com menos qualidade.`, "err");
+        return null;
     }
 
     const btn = document.getElementById("btnLerFatura");
     const textoBtn = btn ? btn.textContent : "";
     if (btn) { btn.disabled = true; btn.textContent = "⏳ A ler…"; }
-    mostrarFeedbackQR("A ler a fatura… demora alguns segundos.", "warn");
+    if (!emFila) mostrarFeedbackQR("A ler a fatura… demora alguns segundos.", "warn");
 
     try {
         const base64 = await new Promise((resolve, reject) => {
@@ -2528,29 +2644,26 @@ async function lerFicheiroFatura(ficheiro) {
         if (!r.ok) throw new Error(j.erro || `Erro ${r.status}`);
 
         const docs = j.documentos || [];
+
+        // Em lote, quem chamou é que trata das faturas todas.
+        if (emFila) return docs;
+
         if (!docs.length) {
             mostrarFeedbackQR("Não foi reconhecida nenhuma fatura neste ficheiro.", "err");
-            return;
+            return null;
         }
 
-        // Várias faturas no mesmo ficheiro (digitalização em lote):
-        // trata-se a primeira e avisa-se das restantes.
-        const doc = docs[0];
-        preencherMovimentoComFatura(doc);
-        await mostrarLinhasFatura(doc);
-
-        const extra = docs.length > 1
-            ? ` (o ficheiro tem ${docs.length} faturas: as outras ficam por lançar)`
-            : "";
-        mostrarFeedbackQR(
-            `✅ ${doc.numero_documento || "Fatura"} · ${doc.fornecedor_nome || "fornecedor por identificar"} · ` +
-            `${Number(doc.total_com_iva || 0).toFixed(2)}€ · ${(doc.linhas || []).length} linhas${extra}`,
-            doc.avisos?.length ? "warn" : "ok"
-        );
+        // Um ficheiro do scanner pode trazer várias: a primeira entra já,
+        // as outras ficam em fila.
+        _filaFaturas = docs;
+        _filaTotal   = docs.length;
+        await proximaFaturaDaFila();
+        return docs;
 
     } catch (e) {
         console.error("lerFicheiroFatura:", e);
         mostrarFeedbackQR("Não foi possível ler: " + e.message, "err");
+        return null;
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = textoBtn; }
         const inp = document.getElementById("ficheiroFatura");
@@ -3830,6 +3943,7 @@ function fecharModalMovimento() {
         modal.classList.add("hidden");
     }
     limparLinhasFatura();   // não deixar linhas de uma fatura anterior
+    limparFilaFaturas();    // fechar à mão desiste do lote que estava a meio
     movEditId = null;
     // Remover listener de barcode
     if (window._barcodeListener) {
@@ -4117,8 +4231,19 @@ async function guardarMovimento() {
         if (imputacoes.length) await SB.from("movimento_servicos").insert(imputacoes);
     }
 
+    // Lote em curso: guardar esta não fecha, abre a seguinte já preenchida
+    const restantes = _filaFaturas.slice();
+    const totalLote = _filaTotal;
+
     fecharModalMovimento();
     await carregarMovimentos();
+
+    if (restantes.length) {
+        _filaFaturas = restantes;
+        _filaTotal   = totalLote;
+        await abrirModalMovimento();
+        await proximaFaturaDaFila();
+    }
 }
 
 async function apagarMovimento(id, ref) {
@@ -4184,7 +4309,7 @@ function ligarEventosGlobais() {
         document.getElementById("ficheiroFatura")?.click();
     });
     document.getElementById("ficheiroFatura")?.addEventListener("change", function () {
-        lerFicheiroFatura(this.files?.[0]);
+        lerFicheirosFatura(this.files);
     });
     document.getElementById("btnLimparLinhasFatura")?.addEventListener("click", limparLinhasFatura);
 
@@ -5148,7 +5273,9 @@ async function importarFornecedoresTOC() {
 }
 
 window.addEventListener("load", () => {
-    setTimeout(actualizarEstadoTOC, 500);
+    // Esta função nunca chegou a ser escrita: sem a guarda, rebenta em
+    // todos os carregamentos e mata o que vier a seguir neste handler.
+    if (typeof actualizarEstadoTOC === "function") setTimeout(actualizarEstadoTOC, 500);
 });
 // =======================================================
 // DRE — DEMONSTRAÇÃO DE RESULTADOS
