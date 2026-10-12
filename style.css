@@ -814,6 +814,9 @@ body.dark label { color: rgba(255,255,255,.45); }
 .plan-checks         { display:flex; flex-wrap:wrap; gap:10px; margin-top:4px; }
 .plan-check          { display:flex; align-items:center; gap:6px; font-size:.85rem; cursor:pointer; }
 .plan-check input    { width:auto; margin:0; }
+.plan-func-linha     { display:flex; align-items:center; gap:10px; }
+.plan-resp-opcao     { font-size:.75rem; color:var(--text-muted); }
+.plan-cartao .plan-resp { display:inline; color:var(--color-warn); margin-right:4px; font-size:inherit; }
 
 @media (max-width:820px) {
     .plan-grelha      { min-width:820px; }

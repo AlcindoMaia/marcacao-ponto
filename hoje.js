@@ -311,7 +311,9 @@ async function carregarAgenda() {
     }
 
     cont.innerHTML = data.map(t => {
-        const quem = (t.tarefa_funcionarios || [])
+        // O responsável (se houver) aparece primeiro
+        const quem = [...(t.tarefa_funcionarios || [])]
+            .sort((a, b) => (b.responsavel ? 1 : 0) - (a.responsavel ? 1 : 0))
             .map(tf => tf.funcionarios?.nome).filter(Boolean);
         const sub = [t.obras?.nome, quem.length ? `recebe o ${quem[0].split(" ")[0]}` : null]
             .filter(Boolean).join(" · ");
