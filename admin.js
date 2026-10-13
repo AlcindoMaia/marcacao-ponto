@@ -168,6 +168,7 @@ function abrirTab(nome) {
     if (nome === "config")        initConfig();
     if (nome === "gerarqr")       initGerarQr();
     if (nome === "planeamento")   initPlaneamento();
+    if (nome === "cotacoes")      initCotacoes();
 }
 
 // =======================================================

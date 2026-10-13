@@ -131,6 +131,7 @@
         <button class="tab active" data-tab="fluxo">Fluxo de Caixa</button>
         <button class="tab" data-tab="financeiro">Financeiro</button>
         <button class="tab" data-tab="orcamentos">Orçamentos</button>
+        <button class="tab" data-tab="cotacoes">Cotações</button>
         <button class="tab" data-tab="registos">Registos</button>
         <button class="tab" data-tab="funcionarios">Funcionários</button>
         <button class="tab" data-tab="inventario">Inventário</button>
@@ -1179,6 +1180,58 @@
 
 </div>
 
+<!-- ================= TAB COTAÇÕES (comparar fornecedores) ================= -->
+<div class="tab-content" id="tab-cotacoes">
+
+    <div id="cotListaWrap">
+        <div class="inventario-header">
+            <input type="text" id="pesquisaCotacoes" placeholder="Pesquisar por título, obra ou fornecedor">
+            <button id="btnNovaComparacao" class="btn-primary btn-circular" title="Nova comparação">+</button>
+        </div>
+        <div class="card" style="overflow-x:auto">
+            <table id="tabelaCotacoes" class="display">
+                <thead>
+                    <tr><th>Comparação</th><th>Obra</th><th>Fornecedores</th><th>Base</th><th>Estado</th><th>Criada</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="cotDetalhe" style="display:none">
+        <div class="cot-topo">
+            <button id="cotVoltar" class="btn-secondary">‹ Comparações</button>
+            <div class="cot-topo-titulo">
+                <h2 id="cotTitulo"></h2>
+                <div id="cotSubtitulo"></div>
+            </div>
+            <div class="cot-topo-acoes">
+                <button id="cotImprimir" class="btn-secondary">Imprimir</button>
+                <button id="cotEditar" class="btn-primary">Editar</button>
+            </div>
+        </div>
+        <div id="cotVistas" class="cot-vistas"></div>
+        <div class="card" id="cotConteudo"></div>
+    </div>
+
+</div>
+
+<!-- ================= MODAL COTAÇÃO ================= -->
+<div id="modalCotacao" class="modal hidden">
+    <div class="modal-content" style="max-width:1200px;width:96vw;max-height:94vh;overflow-y:auto">
+        <div class="modal-header">
+            <h2 id="cotEdTitulo">Nova comparação</h2>
+            <button id="cotEdFechar" class="modal-close">&times;</button>
+        </div>
+        <div id="cotEdCorpo"></div>
+        <div class="modal-actions" style="margin-top:20px">
+            <button id="cotEdEliminar" class="btn-primary" style="background:var(--color-err);color:#fff;margin-right:auto">Apagar</button>
+            <button id="cotEdCancelar" class="btn-secondary">Cancelar</button>
+            <button id="cotEdGuardar" class="btn-primary">Guardar</button>
+        </div>
+    </div>
+</div>
+
 <!-- ================= TAB ORÇAMENTOS ================= -->
 <div class="tab-content" id="tab-orcamentos">
 
@@ -1628,6 +1681,7 @@
 <script src="config.js"></script>
 <script src="leitor-qr.js"></script>
 <script src="planeamento.js"></script>
+<script src="cotacoes.js"></script>
 <script src="admin.js"></script>
 
 <script>
