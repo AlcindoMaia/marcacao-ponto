@@ -328,10 +328,14 @@ async function carregarAgenda() {
 }
 
 // =======================================================
-// PEDIR MATERIAL
-// Escreves ou ditas em português corrente; o assistente devolve um
-// rascunho estruturado; tu confirmas. Nada é gravado sem passares os
-// olhos — a IA percebe, o código valida, a decisão é tua.
+// FALAR COM O ASSISTENTE
+// Escreves ou ditas em português corrente. Ele percebe se é material para
+// comprar, uma pergunta sobre os dados, ou coisa que ainda não sabe fazer
+// — e nesse caso diz-te, em vez de inventar.
+//
+// Material: devolve um rascunho que tu confirmas. Nada é gravado sem
+// passares os olhos. Pergunta: os números vêm da base de dados, nunca do
+// modelo. A IA percebe, o código valida, a decisão é tua.
 // =======================================================
 let _obrasHoje   = [];   // obras activas, para as listas
 let _artigosHoje = [];   // artigos activos, para corrigir linhas
@@ -346,9 +350,9 @@ function ligarBarraPedido() {
         enviar.style.display = campo.value.trim() ? "" : "none";
     });
     campo.addEventListener("keydown", e => {
-        if (e.key === "Enter") { e.preventDefault(); pedirMaterial(); }
+        if (e.key === "Enter") { e.preventDefault(); falarComAssistente(); }
     });
-    enviar.addEventListener("click", pedirMaterial);
+    enviar.addEventListener("click", falarComAssistente);
 
     document.getElementById("hojePainelFechar").addEventListener("click", fecharPainel);
     document.getElementById("hojePainel").addEventListener("click", e => {
@@ -389,7 +393,9 @@ function ligarMicrofone(campo, mic, enviar) {
     });
 }
 
-async function pedirMaterial() {
+// O assistente decide o que lhe pediste: material para comprar, uma
+// pergunta sobre os dados, ou coisa que ainda não sabe fazer.
+async function falarComAssistente() {
     const campo = document.getElementById("hojePedido");
     const texto = campo.value.trim();
     if (!texto) return;
@@ -402,7 +408,7 @@ async function pedirMaterial() {
         const { data: { session } } = await SB.auth.getSession();
         if (!session) throw new Error("A sessão expirou. Volta a entrar.");
 
-        const r = await fetch(`${SUPABASE_URL}/functions/v1/pedir-material`, {
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/assistente`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -413,19 +419,40 @@ async function pedirMaterial() {
         const j = await r.json();
         if (!r.ok) throw new Error(j.erro || `Erro ${r.status}`);
 
-        await carregarListasPedido();
-        _rascunho = { texto, ...j };
-        mostrarRascunho();
         campo.value = "";
         enviar.style.display = "none";
 
+        if (j.tipo === "material") {
+            await carregarListasPedido();
+            _rascunho = { texto, ...j };
+            mostrarRascunho();
+            return;
+        }
+
+        if (j.tipo === "pergunta") {
+            mostrarResposta(texto, j.resposta);
+            return;
+        }
+
+        // fora_de_alcance, ou qualquer coisa que não se reconheça
+        mostrarResposta(texto, j.resposta || "Isso ainda não sei fazer.");
+
     } catch (e) {
-        console.error("pedirMaterial:", e);
+        console.error("falarComAssistente:", e);
         abrirPainel("Não deu", `<div class="hoje-avisos">${esc(e.message)}</div>`, "");
     } finally {
         enviar.disabled = false;
         enviar.textContent = "➤";
     }
+}
+
+// Resposta a uma pergunta. Os números vieram da base de dados, não do
+// modelo — por isso é que podem ir assim para o ecrã.
+function mostrarResposta(pergunta, resposta) {
+    abrirPainel("Assistente", `
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">${esc(pergunta)}</div>
+        <div style="font-size:15px;line-height:1.6">${esc(resposta)}</div>`,
+        `<button class="btn-secondary" onclick="fecharPainel()">Fechar</button>`);
 }
 
 async function carregarListasPedido() {
