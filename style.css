@@ -961,6 +961,10 @@ table.cot-ed-tabela input.num { text-align: right; }
 .cot-ed-cel label { display: block; font-size: 10px; color: var(--text-muted); margin-top: 3px; }
 .cot-ed-cel label.cot-ed-chk { display: flex; align-items: center; gap: 4px; font-size: 11px; margin-top: 5px; }
 .cot-falta-bg { background: var(--bg-err); }
+.cot-avisos { background: var(--bg-warn); border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 14px; font-size: 13px; display: grid; gap: 4px; }
+tr.cot-le-ignorada td { opacity: .45; }
+label.cot-ed-chk { display: inline-flex !important; align-items: center; gap: 6px; text-transform: none !important; letter-spacing: 0 !important; font-family: var(--font-body) !important; color: var(--text-dark); margin-top: 4px; }
+label.cot-ed-chk input { width: auto !important; min-width: 0 !important; }
 @media print {
     body.cot-imprimir * { visibility: hidden; }
     body.cot-imprimir #cotDetalhe, body.cot-imprimir #cotDetalhe * { visibility: visible; }

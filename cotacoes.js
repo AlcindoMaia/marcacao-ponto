@@ -146,6 +146,12 @@ async function initCotacoes() {
         document.getElementById("cotEdCancelar").onclick = cotFecharEditor;
         document.getElementById("cotEdGuardar").onclick = cotGuardar;
         document.getElementById("cotEdEliminar").onclick = cotEliminar;
+        document.getElementById("cotCarregar").onclick = () => document.getElementById("cotFicheiros").click();
+        document.getElementById("cotFicheiros").onchange = (ev) => {
+            const fs = Array.from(ev.target.files || []);
+            ev.target.value = "";
+            cotLerFicheiros(fs);
+        };
         document.getElementById("cotVistas").innerHTML = COT_VISTAS.map(([k, n]) =>
             `<button class="cot-vista" data-vista="${k}">${n}</button>`).join("");
         document.querySelectorAll(".cot-vista").forEach(b => b.onclick = () => cotMudarVista(b.dataset.vista));
@@ -253,7 +259,7 @@ function cotMudarVista(v) {
     const d = _cotAtual;
     if (!d) return;
     if (!d.propostas.length) {
-        el.innerHTML = `<p style="color:var(--text-muted);padding:20px">Ainda não há fornecedores. Carrega em Editar para os acrescentar.</p>`;
+        el.innerHTML = `<p style="color:var(--text-muted);padding:20px">Ainda não há fornecedores. Carrega em «📄 Carregar orçamentos» para ler os PDFs, ou em Editar para os meter à mão.</p>`;
         return;
     }
     const f = { resumo: cotVistaResumo, precos: cotVistaPrecos, cotado: cotVistaCotado, cesto: cotVistaCesto, riscos: cotVistaRiscos }[v];
@@ -681,4 +687,244 @@ async function cotEliminar() {
     if (error) { alert("Erro ao apagar: " + error.message); return; }
     cotFecharEditor();
     cotMostrarLista();
+}
+
+// =======================================================
+// CARREGAR ORÇAMENTOS (PDF / foto) — leitura pela Edge Function
+// ler-orcamento-fornecedor; nada é gravado sem confirmação.
+// =======================================================
+let _cotLe = null;          // { ficheiro, orc, fornecedor_conhecido, avisos, linhas }
+
+async function cotLerFicheiros(ficheiros) {
+    if (!ficheiros.length || !_cotAtual) return;
+    const btn = document.getElementById("cotCarregar");
+    const texto = btn.textContent;
+    for (let i = 0; i < ficheiros.length; i++) {
+        const f = ficheiros[i];
+        btn.disabled = true;
+        btn.textContent = ficheiros.length > 1 ? `⏳ A ler ${i + 1} de ${ficheiros.length}…` : "⏳ A ler…";
+        let r;
+        try {
+            r = await cotLerUm(f);
+        } catch (e) {
+            alert(`"${f.name}": ${e.message}`);
+            continue;
+        } finally {
+            btn.disabled = false;
+            btn.textContent = texto;
+        }
+        await cotRever(f, r, i + 1, ficheiros.length);
+    }
+}
+
+async function cotLerUm(ficheiro) {
+    if (ficheiro.size > 8 * 1024 * 1024) throw new Error("tem mais de 8 MB. Digitaliza com menos qualidade.");
+    const base64 = await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload  = () => resolve(String(fr.result).split(",")[1]);
+        fr.onerror = () => reject(new Error("não foi possível abrir o ficheiro."));
+        fr.readAsDataURL(ficheiro);
+    });
+    const { data: { session } } = await SB.auth.getSession();
+    if (!session) throw new Error("a sessão expirou. Volta a entrar.");
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/ler-orcamento-fornecedor`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+            ficheiro_base64: base64,
+            tipo: ficheiro.type || "application/pdf",
+            artigos: _cotAtual.artigos.map(a => ({ nome: a.nome, unidade: a.unidade })),
+        }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.erro || `erro ${r.status}`);
+    return j;
+}
+
+// Abre a revisão de um ficheiro; resolve quando o Alcindo acrescenta ou ignora.
+function cotRever(ficheiro, r, n, total) {
+    const o = r.orcamento || {};
+    const arts = _cotAtual.artigos;
+    _cotLe = {
+        ficheiro, avisos: r.avisos || [],
+        cab: {
+            fornecedor: r.fornecedor_conhecido?.nome || o.fornecedor_nome || "",
+            fornecedor_id: r.fornecedor_conhecido?.id || null,
+            documento: o.documento || "", data_documento: o.data || "", validade: o.validade || "",
+            sistema: o.sistema || "", total_sem_iva: o.total_sem_iva, total_com_iva: o.total_com_iva,
+            pagamento: o.pagamento || "", entrega: o.entrega || "", observacoes: o.observacoes || "",
+        },
+        linhas: (o.linhas || []).map(l => {
+            let destino = "ignorar", novoNome = "", novaUn = "";
+            if (l.artigo != null && arts[l.artigo]) destino = "a:" + arts[l.artigo].id;
+            else if (l.novo_artigo || l.fora_do_cesto) {
+                destino = "novo";
+                novoNome = l.novo_artigo?.nome || l.descricao || "";
+                novaUn = l.novo_artigo?.unidade || (l.fora_do_cesto ? "€" : (l.unidade || "un"));
+            }
+            return {
+                descricao: l.descricao || "", doc: [l.quantidade != null ? cotQtd(l.quantidade) : "", l.unidade || ""].join(" ").trim(),
+                valor: l.valor_liquido_sem_iva, conversao: l.conversao || "", fora: !!l.fora_do_cesto,
+                destino, novoNome, novaUn,
+                qtd: l.fora_do_cesto && l.quantidade_comparavel == null ? 1 : l.quantidade_comparavel,
+                preco: l.fora_do_cesto && l.preco_comparavel == null ? l.valor_liquido_sem_iva : l.preco_comparavel,
+            };
+        }).map(l => ({ ...l, qtdOrig: l.qtd, precoOrig: l.preco })),
+        marcarFaltas: true,
+    };
+    document.getElementById("cotLeTitulo").textContent =
+        `Orçamento lido${total > 1 ? ` (${n} de ${total})` : ""} · ${ficheiro.name}`;
+    cotRenderRevisao();
+    document.getElementById("modalCotLeitura").classList.remove("hidden");
+    return new Promise(resolve => {
+        const fechar = () => { document.getElementById("modalCotLeitura").classList.add("hidden"); _cotLe = null; resolve(); };
+        document.getElementById("cotLeFechar").onclick  = fechar;
+        document.getElementById("cotLeIgnorar").onclick = fechar;
+        document.getElementById("cotLeAcrescentar").onclick = async () => {
+            if (await cotAcrescentar()) fechar();
+        };
+    });
+}
+
+function cotRenderRevisao() {
+    const L = _cotLe, c = L.cab, arts = _cotAtual.artigos;
+    const campo = (k, rot, extra = "") => `<div class="form-group ${extra}"><label>${rot}</label><input data-le="${k}" value="${cotEsc(c[k] ?? "")}"></div>`;
+    let h = "";
+    if (L.avisos.length) h += `<div class="cot-avisos">${L.avisos.map(a => `<div>⚠ ${cotEsc(a)}</div>`).join("")}</div>`;
+    h += `<div class="form-row">${campo("fornecedor", "Fornecedor *")}${campo("documento", "Nº doc.", "input-md")}
+            <div class="form-group input-md"><label>Data</label><input type="date" data-le="data_documento" value="${cotEsc(c.data_documento)}"></div>
+            ${campo("validade", "Validade", "input-md")}</div>
+          <div class="form-row">${campo("sistema", "Sistema / marca")}
+            <div class="form-group input-md"><label>Total s/IVA</label><input data-le="total_sem_iva" class="num" value="${c.total_sem_iva == null ? "" : cotNum(c.total_sem_iva)}"></div>
+            <div class="form-group input-md"><label>Total c/IVA</label><input data-le="total_com_iva" class="num" value="${c.total_com_iva == null ? "" : cotNum(c.total_com_iva)}"></div>
+            ${campo("pagamento", "Pagamento", "input-md")}${campo("entrega", "Entrega", "input-md")}</div>
+          <div class="form-row">${campo("observacoes", "Observações")}</div>`;
+
+    const opcoes = (l) => `<option value="ignorar" ${l.destino === "ignorar" ? "selected" : ""}>— Ignorar esta linha —</option>` +
+        arts.map(a => `<option value="a:${a.id}" ${l.destino === "a:" + a.id ? "selected" : ""}>${cotEsc(a.nome)} (${cotEsc(a.unidade)})</option>`).join("") +
+        `<option value="novo" ${l.destino === "novo" ? "selected" : ""}>+ Novo artigo…</option>`;
+    h += `<h3 class="cot-ed-h">Linhas do orçamento</h3>
+        <div class="cot-legenda">Confirma a que artigo da comparação corresponde cada linha. Quantidade e preço já estão na unidade do artigo, líquidos e sem IVA.</div>
+        <div class="cot-tabela-wrap"><table class="cot-ed-tabela"><thead><tr>
+            <th>No documento</th><th>Valor líq. s/IVA</th><th>Artigo da comparação</th><th>Qtd.</th><th>Preço unit.</th><th>Conversão</th></tr></thead><tbody>`;
+    L.linhas.forEach((l, i) => {
+        const novo = l.destino === "novo";
+        const un = novo ? l.novaUn : (arts.find(a => "a:" + a.id === l.destino)?.unidade || "");
+        h += `<tr data-li="${i}" class="${l.destino === "ignorar" ? "cot-le-ignorada" : ""}">
+            <td style="min-width:240px"><strong>${cotEsc(l.descricao)}</strong><br><span style="color:var(--text-muted)">${cotEsc(l.doc)}</span></td>
+            <td class="num" style="white-space:nowrap">${cotEur(l.valor)}</td>
+            <td style="min-width:220px"><select data-ll="destino">${opcoes(l)}</select>
+                ${novo ? `<div style="display:flex;gap:4px;margin-top:4px"><input data-ll="novoNome" value="${cotEsc(l.novoNome)}" placeholder="Nome do artigo"><input data-ll="novaUn" value="${cotEsc(l.novaUn)}" style="width:60px;min-width:60px" placeholder="un"></div>
+                <label class="cot-ed-chk" style="font-size:11px"><input type="checkbox" data-ll="fora" ${l.fora ? "checked" : ""}> fora do cesto (portes, taxas)</label>` : ""}</td>
+            <td><input data-ll="qtd" class="num" style="width:90px;min-width:90px" value="${l.qtd == null ? "" : cotQtd(l.qtd)}"><div style="font-size:10px;color:var(--text-muted)">${cotEsc(un)}</div></td>
+            <td><input data-ll="preco" class="num" style="width:90px;min-width:90px" value="${l.preco == null ? "" : cotNum(l.preco, 4)}"><div style="font-size:10px;color:var(--text-muted)">€/${cotEsc(un)}</div></td>
+            <td class="cot-nota" style="min-width:180px">${cotEsc(l.conversao)}</td></tr>`;
+    });
+    h += `</tbody></table></div>`;
+    if (arts.length) h += `<label class="cot-ed-chk" style="margin-top:12px;font-size:13px"><input type="checkbox" id="cotLeFaltas" ${L.marcarFaltas ? "checked" : ""}> Marcar como «não cotou» os artigos da comparação que este fornecedor não tem</label>`;
+
+    const el = document.getElementById("cotLeCorpo");
+    el.innerHTML = h;
+    el.querySelectorAll("[data-le]").forEach(inp => inp.oninput = () => {
+        const k = inp.dataset.le;
+        c[k] = ["total_sem_iva", "total_com_iva"].includes(k) ? cotNumInput(inp.value) : inp.value;
+        if (k === "fornecedor") c.fornecedor_id = null;
+    });
+    el.querySelectorAll("[data-ll]").forEach(inp => {
+        const ev = inp.tagName === "SELECT" || inp.type === "checkbox" ? "change" : "input";
+        inp.addEventListener(ev, () => {
+            const l = L.linhas[Number(inp.closest("tr").dataset.li)], k = inp.dataset.ll;
+            if (k === "destino") {
+                l.destino = inp.value;
+                if (l.destino === "novo" && !l.novoNome) { l.novoNome = l.descricao; l.novaUn = l.novaUn || "un"; }
+                const box = document.querySelector("#modalCotLeitura .modal-content"), y = box.scrollTop;
+                cotRenderRevisao(); box.scrollTop = y;
+            } else if (k === "fora") l.fora = inp.checked;
+            else if (k === "qtd" || k === "preco") l[k] = cotNumInput(inp.value);
+            else l[k] = inp.value;
+        });
+    });
+    const chk = document.getElementById("cotLeFaltas");
+    if (chk) chk.onchange = () => { L.marcarFaltas = chk.checked; };
+}
+
+async function cotAcrescentar() {
+    const L = _cotLe, c = L.cab, d = _cotAtual, compId = d.comp.id;
+    if (!String(c.fornecedor || "").trim()) { alert("Falta o nome do fornecedor."); return false; }
+    const usadas = L.linhas.filter(l => l.destino !== "ignorar");
+    if (usadas.some(l => l.destino === "novo" && !String(l.novoNome || "").trim())) { alert("Há um artigo novo sem nome."); return false; }
+
+    const btn = document.getElementById("cotLeAcrescentar");
+    btn.disabled = true; btn.textContent = "A gravar…";
+    try {
+        const chk = r => { if (r.error) throw r.error; return r; };
+        const nomeForn = c.fornecedor.trim();
+        const proposta = {
+            id: cotUid(), comparacao_id: compId, ordem: d.propostas.length, fornecedor: nomeForn,
+            fornecedor_id: c.fornecedor_id || _cotFornecs.find(f => f.nome.trim().toLowerCase() === nomeForn.toLowerCase())?.id || null,
+            documento: c.documento || null, data_documento: c.data_documento || null, validade: c.validade || null,
+            sistema: c.sistema || null, total_sem_iva: c.total_sem_iva ?? null, total_com_iva: c.total_com_iva ?? null,
+            pagamento: c.pagamento || null, entrega: c.entrega || null, observacoes: c.observacoes || null,
+        };
+
+        // Artigos novos (linhas com o mesmo nome juntam-se num só)
+        const novos = {};
+        let ordem = d.artigos.length;
+        for (const l of usadas.filter(l => l.destino === "novo")) {
+            const k = l.novoNome.trim().toLowerCase();
+            if (!novos[k]) novos[k] = {
+                id: cotUid(), comparacao_id: compId, nome: l.novoNome.trim(), unidade: (l.novaUn || "un").trim(),
+                qtd_correta: null, nota: l.fora ? null : "Quantidade do primeiro orçamento lido: confirmar.",
+                destacar: false, no_cesto: !l.fora, ordem: ordem++,
+            };
+            l.artigoId = novos[k].id;
+        }
+        usadas.filter(l => l.destino.startsWith("a:")).forEach(l => { l.artigoId = l.destino.slice(2); });
+
+        // Uma cotação por artigo: soma as linhas que lhe correspondem
+        const porArtigo = {};
+        for (const l of usadas) {
+            const q = Number(l.qtd) || 0, p = Number(l.preco);
+            const a = porArtigo[l.artigoId] = porArtigo[l.artigoId] || { qtd: 0, valor: 0, semPreco: false, desc: [], fora: false };
+            a.qtd += q;
+            a.fora = a.fora || l.fora || !!d.artigos.find(x => x.id === l.artigoId && !x.no_cesto);
+            // Sem alterações, usa o valor do documento (evita arredondar o preço duas vezes)
+            const doDoc = l.valor != null && l.qtd === l.qtdOrig && l.preco === l.precoOrig;
+            if (isNaN(p) || l.preco == null) a.semPreco = true; else a.valor += doDoc ? Number(l.valor) : q * p;
+            a.desc.push(l.descricao);
+        }
+        // Artigo novo sem quantidade certa: usa a deste primeiro orçamento
+        Object.values(novos).forEach(a => { if (a.no_cesto && porArtigo[a.id]?.qtd) a.qtd_correta = porArtigo[a.id].qtd; });
+
+        const cotacoes = Object.entries(porArtigo).map(([artigoId, a]) => ({
+            id: cotUid(), artigo_id: artigoId, proposta_id: proposta.id, nao_cotou: false,
+            quantidade: a.qtd || null, quantidade_txt: a.fora && !a.semPreco ? cotEur(a.valor) : null,
+            preco_unitario: a.semPreco || !a.qtd ? null : Math.round(a.valor / a.qtd * 1e6) / 1e6,
+            descricao: a.desc.join(" · ").slice(0, 500),
+        }));
+        if (L.marcarFaltas) {
+            d.artigos.filter(a => !porArtigo[a.id]).forEach(a => cotacoes.push({
+                id: cotUid(), artigo_id: a.id, proposta_id: proposta.id, nao_cotou: true,
+                quantidade: null, quantidade_txt: null, preco_unitario: null, descricao: null,
+            }));
+        }
+
+        chk(await SB.from("comparacao_propostas").insert(proposta));
+        try {
+            if (Object.keys(novos).length) chk(await SB.from("comparacao_artigos").insert(Object.values(novos)));
+            if (cotacoes.length) chk(await SB.from("comparacao_cotacoes").insert(cotacoes));
+        } catch (e) {
+            // não deixar uma proposta a meio
+            await SB.from("comparacao_artigos").delete().in("id", Object.values(novos).map(a => a.id));
+            await SB.from("comparacao_propostas").delete().eq("id", proposta.id);
+            throw e;
+        }
+        await cotAbrir(compId);
+        return true;
+    } catch (e) {
+        alert("Erro ao gravar: " + (e.message || e));
+        return false;
+    } finally {
+        btn.disabled = false; btn.textContent = "Acrescentar à comparação";
+    }
 }
