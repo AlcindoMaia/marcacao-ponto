@@ -82,7 +82,7 @@ create table if not exists comparacao_cotacoes (
     nao_cotou       boolean not null default false,
     quantidade      numeric(12,3),             -- quantidade cotada, na unidade do artigo
     quantidade_txt  text,                      -- para mostrar quando a unidade é outra (ex.: "45 L")
-    preco_unitario  numeric(12,4),             -- líquido, com descontos, sem IVA, por unidade do artigo
+    preco_unitario  numeric(14,6),             -- líquido, com descontos, sem IVA, por unidade do artigo
     descricao       text,                      -- designação no documento do fornecedor
     criado_em       timestamptz not null default now(),
     unique (artigo_id, proposta_id)
