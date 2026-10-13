@@ -1,6 +1,6 @@
 -- =======================================================
 -- TABELAS: comparação de cotações de fornecedores
--- Separador "Cotações" do admin (cotacoes.js).
+-- Admin › Orçamentos › Comparar fornecedores (cotacoes.js).
 -- Uma comparação junta as propostas de vários fornecedores para o
 -- mesmo trabalho (ex.: material de capoto para 200 m²) e mostra:
 -- resumo, preços unitários, como está cotado, cesto normalizado

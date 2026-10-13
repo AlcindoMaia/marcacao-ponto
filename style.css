@@ -919,6 +919,13 @@ body.dark .plan-grelha th.plan-hoje { color: var(--primary); }
     font-family: var(--font-title); font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
     color: var(--text-muted); cursor: pointer; white-space: nowrap;
 }
+.orc-subtabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid rgba(0,0,0,.08); overflow-x: auto; }
+.orc-subtab {
+    background: none; border: none; border-bottom: 2px solid transparent; padding: 10px 16px;
+    font-family: var(--font-title); font-size: 13px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--text-muted); cursor: pointer; white-space: nowrap;
+}
+.orc-subtab.active { color: var(--primary-dk); border-bottom-color: var(--primary); background: var(--primary-lt); }
 .cot-vista.active { color: var(--primary-dk); border-bottom-color: var(--primary); background: var(--primary-lt); }
 .cot-tabela-wrap { overflow-x: auto; }
 table.cot-tabela td.num, table.cot-tabela th.num { text-align: right !important; white-space: nowrap; }

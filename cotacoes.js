@@ -1,6 +1,7 @@
 // =======================================================
-// COTAÇÕES — comparação de orçamentos de fornecedores
-// Lista de comparações; cada uma abre com 5 vistas:
+// COMPARAR FORNECEDORES — orçamentos pedidos a vários fornecedores
+// Para qualquer pedido de orçamento a vários fornecedores (material ou serviço).
+// Cada comparação abre com 5 vistas:
 // Resumo · Preços unitários · Como está cotado · Cesto normalizado · Faltas e riscos
 // Depende de: config.js (SB global), tabelas de cotacoes.sql
 // =======================================================
@@ -450,7 +451,7 @@ function cotRenderEditor() {
 
     let h = `<div class="cot-ed-sec" data-sec="comp">
         <div class="form-row">
-            <div class="form-group"><label>Título *</label>${cotInp("titulo", c.titulo, 'placeholder="Ex.: Material de capoto / ETICS"')}</div>
+            <div class="form-group"><label>Título *</label>${cotInp("titulo", c.titulo, 'placeholder="Ex.: Pladur obra Sara Cepa, capoto 200 m², caixilharia..."')}</div>
             <div class="form-group"><label>Obra</label><select data-campo="obra_id">${obras}</select></div>
         </div>
         <div class="form-row">

@@ -131,7 +131,6 @@
         <button class="tab active" data-tab="fluxo">Fluxo de Caixa</button>
         <button class="tab" data-tab="financeiro">Financeiro</button>
         <button class="tab" data-tab="orcamentos">Orçamentos</button>
-        <button class="tab" data-tab="cotacoes">Cotações</button>
         <button class="tab" data-tab="registos">Registos</button>
         <button class="tab" data-tab="funcionarios">Funcionários</button>
         <button class="tab" data-tab="inventario">Inventário</button>
@@ -1180,42 +1179,6 @@
 
 </div>
 
-<!-- ================= TAB COTAÇÕES (comparar fornecedores) ================= -->
-<div class="tab-content" id="tab-cotacoes">
-
-    <div id="cotListaWrap">
-        <div class="inventario-header">
-            <input type="text" id="pesquisaCotacoes" placeholder="Pesquisar por título, obra ou fornecedor">
-            <button id="btnNovaComparacao" class="btn-primary btn-circular" title="Nova comparação">+</button>
-        </div>
-        <div class="card" style="overflow-x:auto">
-            <table id="tabelaCotacoes" class="display">
-                <thead>
-                    <tr><th>Comparação</th><th>Obra</th><th>Fornecedores</th><th>Base</th><th>Estado</th><th>Criada</th></tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-    </div>
-
-    <div id="cotDetalhe" style="display:none">
-        <div class="cot-topo">
-            <button id="cotVoltar" class="btn-secondary">‹ Comparações</button>
-            <div class="cot-topo-titulo">
-                <h2 id="cotTitulo"></h2>
-                <div id="cotSubtitulo"></div>
-            </div>
-            <div class="cot-topo-acoes">
-                <button id="cotImprimir" class="btn-secondary">Imprimir</button>
-                <button id="cotEditar" class="btn-primary">Editar</button>
-            </div>
-        </div>
-        <div id="cotVistas" class="cot-vistas"></div>
-        <div class="card" id="cotConteudo"></div>
-    </div>
-
-</div>
-
 <!-- ================= MODAL COTAÇÃO ================= -->
 <div id="modalCotacao" class="modal hidden">
     <div class="modal-content" style="max-width:1200px;width:96vw;max-height:94vh;overflow-y:auto">
@@ -1234,6 +1197,14 @@
 
 <!-- ================= TAB ORÇAMENTOS ================= -->
 <div class="tab-content" id="tab-orcamentos">
+
+    <!-- Sub-separadores: orçamentos a clientes · comparar orçamentos de fornecedores -->
+    <div class="orc-subtabs">
+        <button class="orc-subtab active" data-orcsub="clientes">Orçamentos a clientes</button>
+        <button class="orc-subtab" data-orcsub="fornecedores">Comparar fornecedores</button>
+    </div>
+
+    <div id="orcSub-clientes" class="orc-sub">
 
     <!-- Barra superior -->
     <div class="inventario-header">
@@ -1287,6 +1258,43 @@
             </thead>
             <tbody></tbody>
         </table>
+    </div>
+    </div>
+
+    <!-- Comparação de orçamentos pedidos a vários fornecedores (cotacoes.js) -->
+    <div id="orcSub-fornecedores" class="orc-sub" style="display:none">
+
+    <div id="cotListaWrap">
+        <div class="inventario-header">
+            <input type="text" id="pesquisaCotacoes" placeholder="Pesquisar por título, obra ou fornecedor">
+            <button id="btnNovaComparacao" class="btn-primary btn-circular" title="Nova comparação">+</button>
+        </div>
+        <div class="card" style="overflow-x:auto">
+            <table id="tabelaCotacoes" class="display">
+                <thead>
+                    <tr><th>Comparação</th><th>Obra</th><th>Fornecedores</th><th>Base</th><th>Estado</th><th>Criada</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="cotDetalhe" style="display:none">
+        <div class="cot-topo">
+            <button id="cotVoltar" class="btn-secondary">‹ Comparações</button>
+            <div class="cot-topo-titulo">
+                <h2 id="cotTitulo"></h2>
+                <div id="cotSubtitulo"></div>
+            </div>
+            <div class="cot-topo-acoes">
+                <button id="cotImprimir" class="btn-secondary">Imprimir</button>
+                <button id="cotEditar" class="btn-primary">Editar</button>
+            </div>
+        </div>
+        <div id="cotVistas" class="cot-vistas"></div>
+        <div class="card" id="cotConteudo"></div>
+    </div>
+
     </div>
 
 </div>

@@ -168,7 +168,6 @@ function abrirTab(nome) {
     if (nome === "config")        initConfig();
     if (nome === "gerarqr")       initGerarQr();
     if (nome === "planeamento")   initPlaneamento();
-    if (nome === "cotacoes")      initCotacoes();
 }
 
 // =======================================================
@@ -4424,12 +4423,20 @@ const CATEGORIAS_DEFAULT = [
 ];
 
 async function initOrcamentos() {
+    document.querySelectorAll(".orc-subtab").forEach(b => b.onclick = () => switchOrcSub(b.dataset.orcsub));
     await carregarOrcamentos();
 
     // Ligar eventos
     document.getElementById('pesquisaOrcamentos')?.addEventListener('input', filtrarTabelaOrc);
     document.getElementById('filtroEstadoOrc')?.addEventListener('change', filtrarTabelaOrc);
     document.getElementById('btnNovoOrcamento')?.addEventListener('click', () => abrirModalOrcamento());
+}
+
+// Sub-separadores: orçamentos a clientes · comparar fornecedores (cotacoes.js)
+function switchOrcSub(sub) {
+    document.querySelectorAll(".orc-subtab").forEach(b => b.classList.toggle("active", b.dataset.orcsub === sub));
+    document.querySelectorAll(".orc-sub").forEach(d => d.style.display = d.id === "orcSub-" + sub ? "" : "none");
+    if (sub === "fornecedores") initCotacoes();
 }
 
 // ── Carregar lista ──────────────────────────────────────────
