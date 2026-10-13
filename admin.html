@@ -1010,7 +1010,7 @@
             </div>
             <div id="faturaAvisos" style="display:none;margin-bottom:8px"></div>
             <div style="overflow-x:auto">
-                <table id="tabelaFaturaLinhas" style="width:100%;border-collapse:collapse;font-size:12px;min-width:780px">
+                <table id="tabelaFaturaLinhas" style="width:100%;border-collapse:collapse;font-size:12px;min-width:830px">
                     <thead>
                         <tr>
                             <th style="text-align:left;padding:4px 6px;opacity:.6;font-weight:600">Descrição</th>
@@ -1019,6 +1019,7 @@
                             <th style="text-align:left;padding:4px 6px;opacity:.6;font-weight:600;width:60px">Un</th>
                             <th style="text-align:right;padding:4px 6px;opacity:.6;font-weight:600;width:80px">Preço</th>
                             <th style="text-align:right;padding:4px 6px;opacity:.6;font-weight:600;width:80px">Total</th>
+                            <th style="text-align:center;padding:4px 6px;opacity:.6;font-weight:600;width:46px" title="Dar entrada no inventário">Stock</th>
                             <th style="width:30px"></th>
                         </tr>
                     </thead>
@@ -1026,6 +1027,11 @@
                 </table>
             </div>
             <div id="faturaLinhasResumo" style="font-size:12px;opacity:.7;margin-top:8px"></div>
+            <div style="font-size:11.5px;opacity:.6;margin-top:6px;line-height:1.5">
+                <strong>Stock:</strong> marca as linhas do material que entrou no armazém.
+                O que foi entregue directamente na obra não se marca — senão o inventário
+                fica com material que lá não está.
+            </div>
         </div>
 
         <!-- Imputação a serviços da obra: só aparece quando a obra

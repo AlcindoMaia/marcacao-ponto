@@ -2416,6 +2416,17 @@ function unidadeIdPorTexto(texto) {
     return porCodigo("un") || _unidadesFatura[0]?.id || 1;
 }
 
+// Dar entrada em stock faz sentido quando o material foi comprado para o
+// armazém. Quando a fatura já está imputada a uma obra, o material foi
+// quase sempre entregue lá: dar entrada encheria o inventário de coisas
+// que não estão cá. Fica por isso só sugerido — a decisão é de quem lança.
+function sugerirEntradaStock(artigoId, l) {
+    if (!artigoId) return false;
+    if (!(Number(l.quantidade) > 0)) return false;
+    if (document.getElementById("movTipo")?.value === "entrada") return false;   // nota de crédito
+    return !document.getElementById("movObra")?.value;
+}
+
 // Reconhece pelo sinónimo gravado e, se não houver, pelo próprio nome
 // ou código do artigo.
 function artigoParaTexto(texto) {
@@ -2703,11 +2714,10 @@ async function mostrarLinhasFatura(d) {
     await carregarArtigosESinonimos();
 
     // Cada linha já chega com artigo, ou tenta-se reconhecer pela descrição
-    _linhasFaturaLidas = (d.linhas || []).map((l, i) => ({
-        ...l,
-        ordem: i,
-        artigo_id: l.artigo_id || artigoParaTexto(l.descricao),
-    }));
+    _linhasFaturaLidas = (d.linhas || []).map((l, i) => {
+        const artigoId = l.artigo_id || artigoParaTexto(l.descricao);
+        return { ...l, ordem: i, artigo_id: artigoId, stock: l.stock ?? sugerirEntradaStock(artigoId, l) };
+    });
     await carregarUltimosPrecos(_linhasFaturaLidas.map(l => l.artigo_id));
 
     const wrap  = document.getElementById("faturaLinhasWrap");
@@ -2747,6 +2757,11 @@ async function mostrarLinhasFatura(d) {
             <td style="padding:3px 6px"><input type="number" step="0.01" value="${l.valor_total ?? ""}" data-campo="valor_total"
                 style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;text-align:right;background:#fff;color:var(--text-dark)"></td>
             <td style="padding:3px 6px;text-align:center">
+                <input type="checkbox" data-campo="stock" ${l.stock ? "checked" : ""}
+                    title="Dar entrada desta quantidade no inventário"
+                    style="width:16px;height:16px;cursor:pointer">
+            </td>
+            <td style="padding:3px 6px;text-align:center">
                 <button type="button" onclick="this.closest('tr').remove(); actualizarResumoLinhas()"
                     style="background:rgba(248,113,113,.1);border:none;border-radius:5px;padding:3px 6px;cursor:pointer;font-size:12px">✕</button>
             </td>
@@ -2757,6 +2772,8 @@ async function mostrarLinhasFatura(d) {
         actualizarPrecoAnterior(tr);
         tr.querySelector('[data-campo="preco_unitario"]')
           ?.addEventListener("input", () => actualizarPrecoAnterior(tr));
+        tr.querySelector('[data-campo="stock"]')
+          ?.addEventListener("change", actualizarResumoLinhas);
     });
 
     wrap.style.display = "block";
@@ -2776,6 +2793,9 @@ function linhasFaturaDoEcra() {
             preco_unitario: v("preco_unitario") !== "" ? parseFloat(v("preco_unitario")) : null,
             valor_total:    v("valor_total")    !== "" ? parseFloat(v("valor_total"))    : null,
             ordem: i,
+            // Só para o ecrã: não é coluna de fatura_linhas, é retirado
+            // antes de gravar e usado para a entrada em inventário.
+            stock: !!tr.querySelector('[data-campo="stock"]')?.checked,
         };
     }).filter(l => l.descricao_original);
 }
@@ -2787,8 +2807,10 @@ function actualizarResumoLinhas() {
     const soma   = linhas.reduce((s, l) => s + (l.valor_total || 0), 0);
     const base   = parseFloat(document.getElementById("movBase")?.value) || 0;
     const difere = base > 0 && Math.abs(soma - base) > 0.05;
+    const paraStock = linhas.filter(l => l.stock && l.artigo_id && Number(l.quantidade) > 0).length;
     el.innerHTML = `${linhas.length} linha${linhas.length === 1 ? "" : "s"} · soma ${soma.toFixed(2)} €` +
-        (difere ? ` <span style="color:#9a5b04">— não bate com a base de ${base.toFixed(2)} €</span>` : "");
+        (difere ? ` <span style="color:#9a5b04">— não bate com a base de ${base.toFixed(2)} €</span>` : "") +
+        (paraStock ? ` · ${paraStock} ${paraStock === 1 ? "dá" : "dão"} entrada em stock` : "");
 }
 
 function limparLinhasFatura() {
@@ -2854,6 +2876,34 @@ async function gravarSinonimosEPrecos(linhas, fornecedor_id, dataDoc) {
         await SB.from("artigos").update({ preco_atual: recente.preco }).eq("id", artigoId);
         const a = _artigosFatura.find(x => x.id === artigoId);
         if (a) a.preco_atual = recente.preco;
+    }
+}
+
+// Entrada em inventário das linhas marcadas. Fica ligada à fatura e à
+// linha, para se poder desfazer quando a fatura for corrigida e para se
+// saber sempre de onde veio este material.
+async function gravarEntradasStock(movId, gravadas, linhasEcra, dataDoc, referencia) {
+    const porOrdem = {};
+    (gravadas || []).forEach(g => { porOrdem[g.ordem] = g.id; });
+
+    const entradas = (linhasEcra || [])
+        .filter(l => l.stock && l.artigo_id && Number(l.quantidade) > 0)
+        .map(l => ({
+            artigo_id:       l.artigo_id,
+            tipo_movimento:  "entrada",
+            quantidade:      Number(l.quantidade),
+            preco_unitario:  l.preco_unitario ?? null,
+            data_movimento:  dataDoc,
+            observacoes:     referencia ? `Fatura ${referencia}` : "Entrada por fatura",
+            movimento_id:    movId,
+            fatura_linha_id: porOrdem[l.ordem] || null,
+        }));
+    if (!entradas.length) return;
+
+    const { error } = await SB.from("movimentos_stock").insert(entradas);
+    if (error) {
+        console.error("entradas de stock:", error);
+        alert("O movimento ficou gravado, mas a entrada em inventário não: " + error.message);
     }
 }
 
@@ -4020,14 +4070,21 @@ async function abrirModalMovimento(mov = null) {
         }
 
         // Linhas da fatura já gravadas, para poderem ser revistas
-        const { data: linhasGravadas } = await SB.from("fatura_linhas")
-            .select("descricao_original, artigo_id, quantidade, unidade, preco_unitario, valor_total")
-            .eq("movimento_id", mov.id).order("ordem");
+        const [{ data: linhasGravadas }, { data: stockDaFatura }] = await Promise.all([
+            SB.from("fatura_linhas")
+              .select("id, descricao_original, artigo_id, quantidade, unidade, preco_unitario, valor_total")
+              .eq("movimento_id", mov.id).order("ordem"),
+            SB.from("movimentos_stock").select("fatura_linha_id").eq("movimento_id", mov.id),
+        ]);
+        // Linhas que já deram entrada em inventário aparecem marcadas
+        const comStock = new Set((stockDaFatura || []).map(s => s.fatura_linha_id).filter(Boolean));
+
         if (linhasGravadas?.length) {
             await mostrarLinhasFatura({
                 linhas: linhasGravadas.map(l => ({
                     descricao: l.descricao_original,
                     artigo_id: l.artigo_id,
+                    stock: comStock.has(l.id),
                     quantidade: l.quantidade,
                     unidade: l.unidade,
                     preco_unitario: l.preco_unitario,
@@ -4203,16 +4260,20 @@ async function guardarMovimento() {
                 await SB.from("precos").delete().in("fatura_linha_id", ids);
                 await SB.from("fatura_linhas").delete().in("id", ids);
             }
+            // As entradas em stock desta fatura também saem: senão, editar
+            // a fatura duplicava o material no inventário.
+            await SB.from("movimentos_stock").delete().eq("movimento_id", movEditId);
         }
         const { data: gravadas, error: errLinhas } = await SB.from("fatura_linhas").insert(
-            linhasFatura.map(l => ({ ...l, movimento_id: movIdLinhas, origem: "ia" }))
-        ).select("id, artigo_id, descricao_original, preco_unitario, unidade");
+            linhasFatura.map(({ stock, ...l }) => ({ ...l, movimento_id: movIdLinhas, origem: "ia" }))
+        ).select("id, artigo_id, descricao_original, preco_unitario, unidade, ordem");
 
         if (errLinhas) {
             console.error(errLinhas);
             alert("O movimento foi guardado, mas as linhas da fatura não: " + errLinhas.message);
         } else {
             await gravarSinonimosEPrecos(gravadas, fornecedor_id, dataDoc);
+            await gravarEntradasStock(movIdLinhas, gravadas, linhasFatura, dataDoc, payload.referencia);
         }
     }
 
