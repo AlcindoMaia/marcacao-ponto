@@ -972,3 +972,78 @@ label.cot-ed-chk input { width: auto !important; min-width: 0 !important; }
     body.cot-imprimir .cot-topo-acoes, body.cot-imprimir #cotVoltar, body.cot-imprimir .cot-vistas { display: none !important; }
     body.cot-imprimir .cot-quebra:not(:first-child) { break-before: page; }
 }
+
+/* ══════════════════════════════════════════════
+   TELEMÓVEL — a página nunca anda para o lado
+   ══════════════════════════════════════════════
+   A regra é uma só: o que é largo de mais anda
+   dentro da sua própria caixa, não arrasta o ecrã
+   todo. Tabelas e separadores têm scroll próprio;
+   o resto encolhe ou passa para a linha de baixo.
+*/
+@media (max-width: 820px) {
+
+    /* Última linha de defesa. As causas estão tratadas
+       em baixo; isto só impede que uma margem perdida
+       ponha a página a baloiçar. */
+    html, body { max-width: 100%; overflow-x: hidden; }
+
+    /* Cabeçalho: os botões passam para a linha de baixo
+       em vez de empurrarem a página. */
+    .header {
+        height: auto;
+        min-height: 60px;
+        padding: 10px 14px;
+        flex-wrap: wrap;
+        row-gap: 8px;
+    }
+    .header h1      { font-size: 15px; letter-spacing: 1px; }
+    .header .logo   { height: 36px; }
+    .header .btn-secondary,
+    .header a.btn-secondary {
+        font-size: 11px !important;
+        padding: 5px 10px !important;
+        margin-left: 0 !important;
+    }
+    .header-actions { flex-wrap: wrap; gap: 6px; }
+
+    /* Separadores: scroll horizontal dentro da barra. */
+    .tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        max-width: 100%;
+        gap: 5px;
+        padding-bottom: 4px;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab { flex-shrink: 0; font-size: 11px; padding: 6px 12px; }
+
+    /* Tabelas: cada uma com o seu scroll. */
+    .container table,
+    .tab-content table,
+    .modal-content table {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+    }
+
+    /* Grelhas largas que não cabem: scroll próprio. */
+    .plan-grelha-wrap,
+    .tabela-scroll { overflow-x: auto; max-width: 100%; }
+
+    /* Modais ocupam o ecrã, com margem para o polegar. */
+    .modal-content {
+        width: calc(100vw - 20px);
+        max-width: calc(100vw - 20px);
+        padding: 18px 14px;
+    }
+
+    /* Nada de caixas fixas mais largas do que o ecrã. */
+    .container, .card, .tab-content { max-width: 100%; }
+    .filtros-linha { grid-template-columns: 1fr 1fr !important; }
+}
