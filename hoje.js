@@ -489,6 +489,17 @@ async function falarComAssistente() {
             return;
         }
 
+        if (j.tipo === "contexto_obra") {
+            await carregarListasPedido();
+            mostrarNotaDeObra(texto, j);
+            return;
+        }
+
+        if (j.tipo === "planear_obra") {
+            await pedirPlano(j.obra_id);
+            return;
+        }
+
         // fora_de_alcance, ou qualquer coisa que não se reconheça
         mostrarResposta(texto, j.resposta || "Isso ainda não sei fazer.");
 
@@ -613,6 +624,210 @@ async function guardarPedido() {
     } finally {
         btn.disabled = false;
         btn.textContent = "Guardar pedido";
+    }
+}
+
+// =======================================================
+// CONTEXTO DAS OBRAS
+// O que se vai sabendo de cada obra e não cabe numa coluna. É daqui
+// que o plano parte: sem isto, planear é adivinhar.
+// =======================================================
+function mostrarNotaDeObra(original, j) {
+    const tipos = [
+        ["ponto_situacao", "Ponto de situação — como está agora"],
+        ["contexto",       "Contexto — condição a ter em conta"],
+        ["projeto",        "Projeto — vem do projeto ou do caderno"],
+        ["decisao",        "Decisão — ficou assente"],
+    ];
+    const opcoesObra = `<option value="">— escolhe a obra —</option>` +
+        _obrasHoje.map(o => `<option value="${o.id}"${o.id === j.obra_id ? " selected" : ""}>${esc(o.nome)}</option>`).join("");
+
+    abrirPainel("Nota de obra", `
+        <div class="hoje-campo">
+            <label>Obra</label>
+            <select id="notaObra">${opcoesObra}</select>
+        </div>
+        <div class="hoje-campo">
+            <label>Tipo</label>
+            <select id="notaTipo">${tipos.map(([v, t]) =>
+                `<option value="${v}"${v === j.tipo_nota ? " selected" : ""}>${t}</option>`).join("")}</select>
+        </div>
+        <div class="hoje-campo">
+            <label>Nota</label>
+            <textarea id="notaTexto" rows="5">${esc(j.texto)}</textarea>
+        </div>
+        <div style="font-size:11.5px;color:var(--text-muted)">
+            Fica guardada nesta obra e entra no plano da próxima vez que pedires um.
+        </div>`,
+        `<button class="btn-secondary" onclick="fecharPainel()">Cancelar</button>
+         <button class="btn-primary" id="notaGuardar">Guardar nota</button>`);
+
+    document.getElementById("notaGuardar").addEventListener("click", guardarNotaDeObra);
+}
+
+async function guardarNotaDeObra() {
+    const btn = document.getElementById("notaGuardar");
+    const obra = document.getElementById("notaObra").value;
+    const texto = document.getElementById("notaTexto").value.trim();
+
+    if (!obra)  { alert("Escolhe a obra."); return; }
+    if (!texto) { alert("A nota está vazia."); return; }
+
+    btn.disabled = true; btn.textContent = "A guardar…";
+    try {
+        const { data: { user } } = await SB.auth.getUser();
+        const { error } = await SB.from("obra_notas").insert({
+            obra_id: obra,
+            tipo:    document.getElementById("notaTipo").value,
+            texto,
+            autor:   user?.email || null,
+        });
+        if (error) throw error;
+        fecharPainel();
+    } catch (e) {
+        console.error("guardarNotaDeObra:", e);
+        alert("Não foi possível guardar: " + (e.message || e));
+    } finally {
+        btn.disabled = false; btn.textContent = "Guardar nota";
+    }
+}
+
+// =======================================================
+// O PLANO DE ATAQUE
+// Proposto pelo assistente, cortado por ti, e só depois criado no
+// planeamento. Nada entra na agenda de ninguém sem passar por aqui.
+// =======================================================
+let _plano = null;
+
+async function pedirPlano(obraId) {
+    abrirPainel("A fazer o plano…",
+        '<div class="hoje-vazio">A ler os serviços, as tarefas, as horas e as notas desta obra. Demora alguns segundos.</div>', "");
+
+    try {
+        const { data: { session } } = await SB.auth.getSession();
+        if (!session) throw new Error("A sessão expirou. Volta a entrar.");
+
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/planear-obra`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ obra_id: obraId }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.erro || `Erro ${r.status}`);
+
+        _plano = j;
+        await carregarEquipa();
+        mostrarPlano();
+
+    } catch (e) {
+        console.error("pedirPlano:", e);
+        abrirPainel("Não deu", `<div class="hoje-avisos">${esc(e.message)}</div>`,
+            `<button class="btn-secondary" onclick="fecharPainel()">Fechar</button>`);
+    }
+}
+
+let _equipaHoje = [];
+async function carregarEquipa() {
+    if (_equipaHoje.length) return;
+    const { data } = await SB.from("funcionarios").select("id, nome").eq("ativo", true).order("nome");
+    _equipaHoje = data || [];
+}
+
+function mostrarPlano() {
+    const p = _plano;
+    const nomes = (ids) => (ids || [])
+        .map(id => _equipaHoje.find(f => f.id === id)?.nome?.split(" ")[0])
+        .filter(Boolean).join(", ");
+
+    const listas = (titulo, itens, cor) => (itens || []).length ? `
+        <div class="hoje-campo">
+            <label>${titulo}</label>
+            <div style="font-size:12.5px;line-height:1.6;color:${cor}">
+                ${itens.map(i => "• " + esc(i)).join("<br>")}
+            </div>
+        </div>` : "";
+
+    const corpo = `
+        ${p.resumo ? `<div style="font-size:14px;line-height:1.6;margin-bottom:14px">${esc(p.resumo)}</div>` : ""}
+        ${(p.avisos || []).length ? `<div class="hoje-avisos">${p.avisos.map(esc).join("<br>")}</div>` : ""}
+        <div class="hoje-campo" style="margin-bottom:4px"><label>Tarefas propostas</label></div>
+        <div id="planoTarefas">${(p.tarefas || []).map((t, i) => `
+            <div class="hoje-linha-pedido" data-i="${i}">
+                <div class="hoje-linha-topo">
+                    <span class="hoje-linha-desc">${esc(t.descricao)}</span>
+                    <button class="hoje-acao" onclick="this.closest('.hoje-linha-pedido').remove()" title="Tirar">✕</button>
+                </div>
+                <div style="font-size:12px;color:var(--text-muted)">
+                    ${t.data_prevista || "sem data"} · ${t.duracao_horas}h${nomes(t.funcionario_ids) ? " · " + esc(nomes(t.funcionario_ids)) : " · sem ninguém atribuído"}
+                </div>
+                ${t.porque ? `<div style="font-size:11.5px;color:var(--text-muted);margin-top:3px;font-style:italic">${esc(t.porque)}</div>` : ""}
+            </div>`).join("")}
+        </div>
+        ${listas("Riscos", p.riscos, "#8a5e06")}
+        ${listas("Pressupostos", p.pressupostos, "var(--text-muted)")}`;
+
+    abrirPainel(`Plano · ${p.obra?.nome || "obra"}`, corpo,
+        (p.tarefas || []).length
+            ? `<button class="btn-secondary" onclick="fecharPainel()">Deitar fora</button>
+               <button class="btn-primary" id="planoCriar">Criar no planeamento</button>`
+            : `<button class="btn-secondary" onclick="fecharPainel()">Fechar</button>`);
+
+    document.getElementById("planoCriar")?.addEventListener("click", criarPlano);
+}
+
+async function criarPlano() {
+    const btn = document.getElementById("planoCriar");
+    btn.disabled = true; btn.textContent = "A criar…";
+
+    try {
+        const escolhidas = [...document.querySelectorAll("#planoTarefas .hoje-linha-pedido")]
+            .map(el => _plano.tarefas[Number(el.dataset.i)]);
+        if (!escolhidas.length) throw new Error("Não sobrou nenhuma tarefa.");
+
+        const { data: criadas, error } = await SB.from("tarefas").insert(
+            escolhidas.map((t, i) => ({
+                obra_id:       _plano.obra.id,
+                descricao:     t.descricao,
+                data_prevista: t.data_prevista,
+                duracao_horas: t.duracao_horas,
+                ordem:         i,
+                estado:        "planeada",
+                notas:         t.porque || null,
+            }))
+        ).select("id");
+        if (error) throw error;
+
+        // Quem faz cada uma. As linhas voltam pela ordem em que entraram,
+        // mas se vier um número diferente do que mandámos não se adivinha:
+        // deixa-se a tarefa sem gente em vez de a dar à pessoa errada.
+        const ligacoes = [];
+        if ((criadas || []).length === escolhidas.length) {
+            criadas.forEach((tarefa, i) => {
+                (escolhidas[i]?.funcionario_ids || []).forEach((fid, k) => {
+                    ligacoes.push({ tarefa_id: tarefa.id, funcionario_id: fid, responsavel: k === 0 });
+                });
+            });
+        } else {
+            console.warn("criarPlano: vieram", criadas?.length, "tarefas para", escolhidas.length, "enviadas");
+            alert("As tarefas foram criadas, mas não consegui atribuir as pessoas com segurança. Abre o planeamento e atribui à mão.");
+        }
+        if (ligacoes.length) {
+            const { error: errL } = await SB.from("tarefa_funcionarios").insert(ligacoes);
+            if (errL) console.error("tarefa_funcionarios:", errL);
+        }
+
+        _plano = null;
+        fecharPainel();
+        await Promise.all([carregarAgenda(), carregarAtalhos()]);
+
+    } catch (e) {
+        console.error("criarPlano:", e);
+        alert("Não foi possível criar: " + (e.message || e));
+    } finally {
+        btn.disabled = false; btn.textContent = "Criar no planeamento";
     }
 }
 
