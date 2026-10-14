@@ -310,7 +310,7 @@ async function carregarObras() {
         const pc = Math.max(0, Math.min(100, Number(o.percentagem_conclusao) || 0));
         const sub = [fase[o.id] || o.local || o.codigo, pc ? `${pc}%` : null]
             .filter(Boolean).join(" · ");
-        return `<div class="hoje-obra">
+        return `<button class="hoje-obra" data-obra="${o.id}">
             <div class="hoje-obra-linha">
                 <div style="min-width:0">
                     <div class="hoje-obra-nome">${esc(o.nome)}</div>
@@ -319,8 +319,111 @@ async function carregarObras() {
                 ${etiquetaObra(o.id, orcamento, gasto, horasOrc, horasReais)}
             </div>
             <div class="hoje-barra"><i style="width:${pc}%"></i></div>
-        </div>`;
+        </button>`;
     }).join("");
+
+    cont.querySelectorAll("[data-obra]").forEach(b =>
+        aoClicar(b, () => abrirObra(b.dataset.obra)));
+}
+
+// =======================================================
+// O DOSSIÊ DE UMA OBRA
+// O que a plataforma sabe dela num sítio só: como vai de dinheiro e de
+// horas, o que vem a seguir, e o que lhe foste contando. É daqui que se
+// lhe acrescenta contexto ou se lhe pede um plano.
+// =======================================================
+async function abrirObra(obraId) {
+    abrirPainel("…", '<div class="hoje-vazio">A ler.</div>', "");
+
+    const hoje = new Date().toISOString().slice(0, 10);
+    const [{ data: obra }, { data: servicos }, { data: movs },
+           { data: horas }, { data: tarefas }, { data: notas }] = await Promise.all([
+        SB.from("obras").select("id, nome, local, percentagem_conclusao, data_conclusao_prevista").eq("id", obraId).maybeSingle(),
+        SB.from("obra_servicos").select("nome, valor_orcamento, horas_orcamento, concluido, ordem").eq("obra_id", obraId).order("ordem"),
+        SB.from("movimentos_financeiros").select("valor_total").eq("obra_id", obraId).eq("tipo", "saida").eq("ativo", true),
+        SB.from("registos_admin").select("horas").eq("obra_id", obraId),
+        SB.from("tarefas").select("descricao, data_prevista, duracao_horas").eq("obra_id", obraId)
+          .neq("estado", "concluida").gte("data_prevista", hoje).order("data_prevista").limit(4),
+        SB.from("obra_notas").select("id, tipo, texto, criado_em").eq("obra_id", obraId)
+          .order("criado_em", { ascending: false }).limit(8),
+    ]);
+
+    if (!obra) {
+        abrirPainel("Obra", '<div class="hoje-avisos">Não consegui ler esta obra.</div>',
+            `<button class="btn-secondary" onclick="fecharPainel()">Fechar</button>`);
+        return;
+    }
+
+    const soma = (lista, campo) => (lista || []).reduce((s, x) => s + (Number(x[campo]) || 0), 0);
+    const gasto    = soma(movs, "valor_total");
+    const hs       = soma(horas, "horas");
+    const orc      = soma(servicos, "valor_orcamento");
+    const orcHoras = soma(servicos, "horas_orcamento");
+
+    const linha = (rotulo, valor) =>
+        `<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid rgba(0,0,0,.06);font-size:13px">
+            <span style="color:var(--text-muted)">${rotulo}</span><span style="font-weight:600">${valor}</span>
+        </div>`;
+
+    const rotulosNota = { ponto_situacao: "ponto de situação", contexto: "contexto", projeto: "projeto", decisao: "decisão" };
+
+    const corpo = `
+        ${obra.local ? `<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px">${esc(obra.local)}</div>` : ""}
+
+        <div class="hoje-campo">
+            <label>Como vai</label>
+            ${linha("Gasto", euros(gasto) + (orc > 0 ? ` de ${euros(orc)}` : ""))}
+            ${orc > 0 ? linha("Orçamento consumido", `${((gasto / orc) * 100).toFixed(0)}%`) : ""}
+            ${linha("Horas registadas", hs ? `${hs}${orcHoras > 0 ? ` de ${orcHoras}` : ""}` : "nenhuma")}
+            ${obra.percentagem_conclusao != null ? linha("Conclusão declarada", obra.percentagem_conclusao + "%") : ""}
+            ${obra.data_conclusao_prevista ? linha("Fim previsto", obra.data_conclusao_prevista) : ""}
+        </div>
+
+        <div class="hoje-campo">
+            <label>A seguir</label>
+            ${(tarefas || []).length
+                ? tarefas.map(t => `<div style="font-size:13px;padding:4px 0;border-top:1px solid rgba(0,0,0,.06)">
+                      <span style="color:var(--text-muted)">${t.data_prevista}</span> · ${esc(t.descricao)}
+                      <span style="color:var(--text-muted)">(${t.duracao_horas}h)</span></div>`).join("")
+                : '<div class="hoje-vazio">Sem tarefas marcadas.</div>'}
+        </div>
+
+        <div class="hoje-campo">
+            <label>O que me contaste</label>
+            <div id="obraNotas">
+            ${(notas || []).length
+                ? notas.map(n => `<div style="font-size:13px;padding:7px 0;border-top:1px solid rgba(0,0,0,.06);display:flex;gap:8px" data-nota="${n.id}">
+                      <div style="flex:1;min-width:0">
+                          <div style="font-size:11px;color:var(--text-muted)">${n.criado_em.slice(0,10)} · ${rotulosNota[n.tipo] || n.tipo}</div>
+                          <div style="line-height:1.5">${esc(n.texto)}</div>
+                      </div>
+                      <button class="hoje-acao" data-apagar="${n.id}" title="Apagar nota">✕</button>
+                  </div>`).join("")
+                : '<div class="hoje-vazio">Ainda não me contaste nada sobre esta obra. É isto que faz a diferença num plano.</div>'}
+            </div>
+        </div>`;
+
+    abrirPainel(obra.nome, corpo,
+        `<button class="btn-secondary" id="obraContar">Contar como está</button>
+         <button class="btn-primary" id="obraPlano">Pedir plano</button>`);
+
+    aoClicar(document.getElementById("obraContar"), () =>
+        mostrarNotaDeObra("", { obra_id: obra.id, tipo_nota: "ponto_situacao", texto: "" }));
+    aoClicar(document.getElementById("obraPlano"), () => pedirPlano(obra.id));
+
+    document.querySelectorAll("[data-apagar]").forEach(b =>
+        aoClicar(b, () => apagarNota(b.dataset.apagar)));
+}
+
+async function apagarNota(id) {
+    if (!confirm("Apagar esta nota? O assistente deixa de a ter em conta.")) return;
+    const { error } = await SB.from("obra_notas").delete().eq("id", id);
+    if (error) { alert("Não foi possível apagar: " + error.message); return; }
+    document.querySelector(`[data-nota="${id}"]`)?.remove();
+    if (!document.querySelector("#obraNotas [data-nota]")) {
+        document.getElementById("obraNotas").innerHTML =
+            '<div class="hoje-vazio">Já não há nada guardado sobre esta obra.</div>';
+    }
 }
 
 // A etiqueta diz a coisa mais urgente que se sabe sobre a obra:
@@ -490,8 +593,7 @@ async function falarComAssistente() {
         }
 
         if (j.tipo === "contexto_obra") {
-            await carregarListasPedido();
-            mostrarNotaDeObra(texto, j);
+            await mostrarNotaDeObra(texto, j);
             return;
         }
 
@@ -527,8 +629,21 @@ async function carregarListasPedido() {
         SB.from("obras").select("id, nome").eq("estado", "ativa").order("nome"),
         SB.from("artigos").select("id, descricao").eq("ativo", true).order("descricao"),
     ]);
-    _obrasHoje   = o || [];
-    _artigosHoje = a || [];
+    _obrasHoje   = Array.isArray(o) ? o : [];
+    _artigosHoje = Array.isArray(a) ? a : [];
+}
+
+// Um clique que falha em silêncio é pior do que um erro à vista: fica-se
+// a carregar no botão sem perceber porquê. Isto diz sempre alguma coisa.
+function aoClicar(elemento, accao) {
+    elemento?.addEventListener("click", async () => {
+        try { await accao(); }
+        catch (e) {
+            console.error(e);
+            abrirPainel("Não deu", `<div class="hoje-avisos">${esc(e.message || String(e))}</div>`,
+                `<button class="btn-secondary" onclick="fecharPainel()">Fechar</button>`);
+        }
+    });
 }
 
 function mostrarRascunho() {
@@ -632,7 +747,8 @@ async function guardarPedido() {
 // O que se vai sabendo de cada obra e não cabe numa coluna. É daqui
 // que o plano parte: sem isto, planear é adivinhar.
 // =======================================================
-function mostrarNotaDeObra(original, j) {
+async function mostrarNotaDeObra(original, j) {
+    await carregarListasPedido();   // precisa da lista de obras
     const tipos = [
         ["ponto_situacao", "Ponto de situação — como está agora"],
         ["contexto",       "Contexto — condição a ter em conta"],
