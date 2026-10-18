@@ -128,7 +128,8 @@
 
     <!-- TABS -->
     <div class="tabs">
-        <button class="tab active" data-tab="fluxo">Fluxo de Caixa</button>
+        <button class="tab active" data-tab="visaogeral">Visão Geral</button>
+        <button class="tab" data-tab="fluxo">Fluxo de Caixa</button>
         <button class="tab" data-tab="financeiro">Financeiro</button>
         <button class="tab" data-tab="orcamentos">Orçamentos</button>
         <button class="tab" data-tab="registos">Registos</button>
@@ -789,7 +790,39 @@
 </div>
 
     <!-- ================= TAB FLUXO DE CAIXA ================= -->
-<div class="tab-content active" id="tab-fluxo">
+<!-- ================= TAB VISÃO GERAL =================
+     O estado da casa num ecrã, e daqui decide-se para onde ir. -->
+<div class="tab-content active" id="tab-visaogeral">
+
+    <div class="tab-inner">
+
+        <!-- O que precisa de decisão -->
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px">
+            <h2 style="font-family:var(--font-title);font-size:18px;font-weight:400;letter-spacing:1px;text-transform:uppercase;margin:0">
+                Precisa de ti</h2>
+            <button class="btn-secondary" id="vgActualizar" style="font-size:12px;padding:4px 12px">Actualizar</button>
+        </div>
+        <div id="vgAlertas" class="card" style="padding:4px 18px"></div>
+
+        <!-- Números do mês -->
+        <h2 style="font-family:var(--font-title);font-size:18px;font-weight:400;letter-spacing:1px;text-transform:uppercase;margin:24px 0 10px">
+            Como vai o mês</h2>
+        <div class="grid-cards" id="vgNumeros"></div>
+
+        <!-- Obras -->
+        <h2 style="font-family:var(--font-title);font-size:18px;font-weight:400;letter-spacing:1px;text-transform:uppercase;margin:24px 0 10px">
+            Obras activas</h2>
+        <div id="vgObras" class="card" style="padding:6px 18px"></div>
+
+        <!-- Para onde ir -->
+        <h2 style="font-family:var(--font-title);font-size:18px;font-weight:400;letter-spacing:1px;text-transform:uppercase;margin:24px 0 10px">
+            Ir para</h2>
+        <div id="vgAtalhos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px"></div>
+
+    </div>
+</div>
+
+<div class="tab-content" id="tab-fluxo">
 
     <!-- KPIs -->
     <div class="grid-cards">

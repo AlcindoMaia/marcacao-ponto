@@ -113,7 +113,7 @@ function mostrarPainel() {
 // =======================================================
 function inicializarPainel() {
     ativarTabs();
-    abrirTab(tabPedidaNoEndereco() || "fluxo");
+    abrirTab(tabPedidaNoEndereco() || "visaogeral");
     carregarNotificacoes(); // Carregar alertas iniciais
     tratarAccaoNoEndereco();
 }
@@ -157,6 +157,7 @@ function abrirTab(nome) {
     if (!tabBtn || !tabDiv) return;
     tabBtn.classList.add("active");
     tabDiv.classList.add("active");
+    if (nome === "visaogeral")   initVisaoGeral();
     if (nome === "fluxo")        initFluxo();
     if (nome === "financeiro")   { switchFinTab("ordenados"); }
     if (nome === "dashboard")    initDashboard();
@@ -2943,6 +2944,331 @@ function mostrarFeedbackQR(msg, tipo) {
 }
 
 
+
+// =======================================================
+// VISÃO GERAL
+// O primeiro separador: o estado da casa num ecrã. O que precisa de
+// decisão em cima, os números do mês a seguir, as obras, e os caminhos
+// para o resto. Nada aqui é novo — é o que já está noutros separadores,
+// reunido para não se ter de ir a cada um ver se há alguma coisa.
+// =======================================================
+const VG_SUBIDA_PC = 5;    // a partir daqui, um preço que sobe é para avisar
+
+async function initVisaoGeral() {
+    document.getElementById("vgActualizar")?.addEventListener("click", carregarVisaoGeral, { once: true });
+    await carregarVisaoGeral();
+}
+
+async function carregarVisaoGeral() {
+    const btn = document.getElementById("vgActualizar");
+    if (btn) { btn.disabled = true; btn.textContent = "A ler…"; }
+
+    await Promise.all([vgCarregarAlertas(), vgCarregarNumeros(), vgCarregarObras(), vgCarregarAtalhos()]);
+
+    if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Actualizar";
+        btn.addEventListener("click", carregarVisaoGeral, { once: true });
+    }
+}
+
+const vgEuros = (n) =>
+    new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(Number(n) || 0);
+
+// ---------- O que precisa de decisão ----------
+async function vgCarregarAlertas() {
+    const cont = document.getElementById("vgAlertas");
+    if (!cont) return;
+    cont.innerHTML = '<div style="padding:14px 0;font-size:13px;opacity:.6">A ver…</div>';
+
+    const alertas = [];
+    for (const procurar of [vgPedidosPorValidar, vgPrecosSubiram, vgDespesasSemObra,
+                            vgFaturasPorPagar, vgStockAbaixoMinimo, vgTarefasAtrasadas]) {
+        try { const a = await procurar(); if (a) alertas.push(a); }
+        catch (e) { console.warn(procurar.name, e); }
+    }
+
+    if (!alertas.length) {
+        cont.innerHTML = '<div style="padding:14px 0;font-size:13.5px;opacity:.7">' +
+            'Nada à tua espera. Nem preços fora do normal, nem faturas por imputar, nem tarefas atrasadas.</div>';
+        return;
+    }
+
+    cont.innerHTML = alertas.map((a, i) => `
+        <div style="display:flex;align-items:center;gap:14px;padding:13px 0;${i ? "border-top:1px solid rgba(0,0,0,.07)" : ""}">
+            <span style="width:36px;height:36px;border-radius:9px;background:${a.cor};display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0">${a.icone}</span>
+            <div style="flex:1;min-width:0">
+                <div style="font-weight:600;font-size:14.5px">${escapeHtmlFatura(a.titulo)}</div>
+                <div style="font-size:12.5px;opacity:.65;margin-top:1px">${escapeHtmlFatura(a.sub)}</div>
+            </div>
+            ${a.tab ? `<button class="btn-secondary" style="font-size:12px;padding:4px 12px;flex-shrink:0"
+                        onclick="abrirTab('${a.tab}')">Ver</button>` : ""}
+        </div>`).join("");
+}
+
+async function vgPedidosPorValidar() {
+    const { count } = await SB.from("pedidos").select("id", { count: "exact", head: true }).eq("estado", "rascunho");
+    if (!count) return null;
+    return { icone: "🛒", cor: "rgba(0,0,0,.06)",
+             titulo: count === 1 ? "1 pedido de material por validar" : `${count} pedidos de material por validar`,
+             sub: "Vieram do assistente e estão à espera de ti", tab: null };
+}
+
+async function vgPrecosSubiram() {
+    const { data } = await SB.from("precos")
+        .select("artigo_id, preco, data, artigos(descricao)")
+        .order("data", { ascending: false }).limit(400);
+    if (!data?.length) return null;
+
+    const porArtigo = {};
+    data.forEach(p => { (porArtigo[p.artigo_id] ||= []).push(p); });
+
+    const subidas = [];
+    Object.values(porArtigo).forEach(lista => {
+        if (lista.length < 2) return;
+        const [novo, anterior] = lista;
+        const a = Number(anterior.preco), n = Number(novo.preco);
+        if (!(a > 0) || !(n > a)) return;
+        const pc = ((n - a) / a) * 100;
+        if (pc >= VG_SUBIDA_PC) subidas.push({ nome: novo.artigos?.descricao || "artigo", pc });
+    });
+    if (!subidas.length) return null;
+
+    subidas.sort((x, y) => y.pc - x.pc);
+    return { icone: "📄", cor: "rgba(244,185,66,.22)",
+             titulo: subidas.length === 1 ? "Preço acima do anterior" : `${subidas.length} preços acima do anterior`,
+             sub: `+${subidas[0].pc.toFixed(0)}% em ${subidas[0].nome}`, tab: "inventario" };
+}
+
+async function vgDespesasSemObra() {
+    const { count } = await SB.from("movimentos_financeiros")
+        .select("id", { count: "exact", head: true })
+        .is("obra_id", null).eq("tipo", "saida").eq("ativo", true);
+    if (!count) return null;
+    return { icone: "🧾", cor: "rgba(0,0,0,.06)",
+             titulo: count === 1 ? "1 despesa sem obra" : `${count} despesas sem obra`,
+             sub: "Não entram no custo de nenhuma obra", tab: "financeiro" };
+}
+
+async function vgFaturasPorPagar() {
+    const { data, count } = await SB.from("movimentos_financeiros")
+        .select("valor_total", { count: "exact" })
+        .neq("estado_pagamento", "pago").eq("tipo", "saida").eq("ativo", true).limit(200);
+    if (!count) return null;
+    const soma = (data || []).reduce((s, m) => s + Number(m.valor_total || 0), 0);
+    return { icone: "💶", cor: "rgba(192,57,43,.10)",
+             titulo: count === 1 ? "1 fatura por pagar" : `${count} faturas por pagar`,
+             sub: vgEuros(soma), tab: "financeiro" };
+}
+
+async function vgStockAbaixoMinimo() {
+    const [{ data: arts }, { data: movs }] = await Promise.all([
+        SB.from("artigos").select("id, descricao, stock_inicial, stock_minimo").eq("ativo", true).gt("stock_minimo", 0),
+        SB.from("movimentos_stock").select("artigo_id, tipo_movimento, quantidade"),
+    ]);
+    if (!arts?.length) return null;
+
+    const saldo = {};
+    (movs || []).forEach(m => {
+        const q = Number(m.quantidade) || 0;
+        const entra = m.tipo_movimento === "entrada" || m.tipo_movimento === "ajuste_entrada";
+        saldo[m.artigo_id] = (saldo[m.artigo_id] || 0) + (entra ? q : -q);
+    });
+    const abaixo = arts.filter(a => (Number(a.stock_inicial) || 0) + (saldo[a.id] || 0) < Number(a.stock_minimo));
+    if (!abaixo.length) return null;
+
+    return { icone: "📦", cor: "rgba(0,0,0,.06)",
+             titulo: abaixo.length === 1 ? "1 artigo abaixo do mínimo" : `${abaixo.length} artigos abaixo do mínimo`,
+             sub: abaixo.slice(0, 3).map(a => a.descricao).join(", ") + (abaixo.length > 3 ? "…" : ""),
+             tab: "inventario" };
+}
+
+async function vgTarefasAtrasadas() {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const { data, count } = await SB.from("tarefas")
+        .select("descricao, obras(nome)", { count: "exact" })
+        .lt("data_prevista", hoje).neq("estado", "concluida").limit(5);
+    if (!count) return null;
+    return { icone: "⏰", cor: "rgba(244,185,66,.22)",
+             titulo: count === 1 ? "1 tarefa atrasada" : `${count} tarefas atrasadas`,
+             sub: data?.[0]?.obras?.nome || "sem obra", tab: "planeamento" };
+}
+
+// ---------- Números do mês ----------
+async function vgCarregarNumeros() {
+    const cont = document.getElementById("vgNumeros");
+    if (!cont) return;
+
+    const hoje = new Date();
+    const mes  = hoje.toISOString().slice(0, 7) + "-01";
+    const mesAnterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1).toISOString().slice(0, 10);
+
+    const [{ data: esteMes }, { data: anterior }, { count: obras }, { count: funcs }] = await Promise.all([
+        SB.from("movimentos_financeiros").select("valor_total, tipo").gte("data_documento", mes).eq("ativo", true),
+        SB.from("movimentos_financeiros").select("valor_total, tipo")
+          .gte("data_documento", mesAnterior).lt("data_documento", mes).eq("ativo", true),
+        SB.from("obras").select("id", { count: "exact", head: true }).eq("estado", "ativa"),
+        SB.from("funcionarios").select("id", { count: "exact", head: true }).eq("ativo", true),
+    ]);
+
+    const somaPor = (lista, tipo) => (lista || [])
+        .filter(m => m.tipo === tipo).reduce((s, m) => s + Number(m.valor_total || 0), 0);
+
+    const saidas    = somaPor(esteMes, "saida");
+    const entradas  = somaPor(esteMes, "entrada");
+    const saidasAnt = somaPor(anterior, "saida");
+
+    // A comparação só se mostra quando o mês anterior teve movimento;
+    // "subiu infinito por cento" não diz nada a ninguém.
+    let variacao = "";
+    if (saidasAnt > 0) {
+        const pc = ((saidas - saidasAnt) / saidasAnt) * 100;
+        if (Math.abs(pc) < 1) {
+            variacao = `<div style="font-size:11.5px;margin-top:4px;opacity:.6">como no mês passado</div>`;
+        } else {
+            const sobe = pc > 0;
+            variacao = `<div style="font-size:11.5px;margin-top:4px;color:${sobe ? "#b45309" : "#15803d"}">
+                ${sobe ? "▲" : "▼"} ${Math.abs(pc).toFixed(0)}% do que no mês passado</div>`;
+        }
+    }
+
+    const cartao = (titulo, valor, extra = "") => `
+        <div class="card metric">
+            <h3>${titulo}</h3>
+            <div class="value">${valor}</div>
+            ${extra}
+        </div>`;
+
+    cont.innerHTML =
+        cartao("Saídas este mês",   vgEuros(saidas), variacao) +
+        cartao("Entradas este mês", vgEuros(entradas)) +
+        cartao("Obras activas",     obras ?? "–") +
+        cartao("Funcionários",      funcs ?? "–");
+}
+
+// ---------- Obras ----------
+async function vgCarregarObras() {
+    const cont = document.getElementById("vgObras");
+    if (!cont) return;
+
+    const { data: obras } = await SB.from("obras")
+        .select("id, nome, codigo, local, percentagem_conclusao")
+        .eq("estado", "ativa").order("nome");
+
+    if (!obras?.length) {
+        cont.innerHTML = '<div style="padding:14px 0;font-size:13px;opacity:.6">Nenhuma obra activa.</div>';
+        return;
+    }
+
+    const ids = obras.map(o => o.id);
+    const [{ data: servicos }, { data: gastos }, { data: horas }] = await Promise.all([
+        SB.from("obra_servicos").select("obra_id, nome, valor_orcamento, horas_orcamento, concluido, ordem").in("obra_id", ids),
+        SB.from("movimentos_financeiros").select("obra_id, valor_total").in("obra_id", ids).eq("tipo", "saida").eq("ativo", true),
+        SB.from("registos_admin").select("obra_id, horas").in("obra_id", ids),
+    ]);
+
+    const somar = (lista, campo) => (lista || []).reduce((acc, r) => {
+        acc[r.obra_id] = (acc[r.obra_id] || 0) + (Number(r[campo]) || 0); return acc;
+    }, {});
+    const orcamento  = somar(servicos, "valor_orcamento");
+    const horasOrc   = somar(servicos, "horas_orcamento");
+    const gasto      = somar(gastos,   "valor_total");
+    const horasReais = somar(horas,    "horas");
+
+    const fase = {};
+    (servicos || []).slice().sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
+        .forEach(s => { if (!s.concluido && !fase[s.obra_id]) fase[s.obra_id] = s.nome; });
+
+    cont.innerHTML = obras.map((o, i) => {
+        const pc  = Math.max(0, Math.min(100, Number(o.percentagem_conclusao) || 0));
+        const sub = [fase[o.id] || o.local || o.codigo, pc ? `${pc}%` : null].filter(Boolean).join(" · ");
+        const g   = gasto[o.id] || 0, orc = orcamento[o.id] || 0;
+        return `<div style="padding:12px 0;${i ? "border-top:1px solid rgba(0,0,0,.07)" : ""}">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                <div style="min-width:0">
+                    <div style="font-weight:600;font-size:14.5px">${escapeHtmlFatura(o.nome)}</div>
+                    <div style="font-size:12.5px;opacity:.65;margin-top:1px">${escapeHtmlFatura(sub || "sem fase definida")}</div>
+                </div>
+                <div style="text-align:right;flex-shrink:0">
+                    <div style="font-size:13px;font-weight:600">${vgEuros(g)}</div>
+                    ${orc > 0 ? `<div style="font-size:11.5px;opacity:.6">de ${vgEuros(orc)}</div>` : ""}
+                </div>
+                ${vgEtiqueta(o.id, orcamento, gasto, horasOrc, horasReais)}
+            </div>
+            <div style="height:5px;border-radius:3px;background:rgba(0,0,0,.08);margin-top:9px;overflow:hidden">
+                <i style="display:block;height:100%;width:${pc}%;background:var(--text-dark);border-radius:3px"></i>
+            </div>
+        </div>`;
+    }).join("");
+}
+
+function vgEtiqueta(id, orcamento, gasto, horasOrc, horasReais) {
+    const et = (texto, bg, cor) =>
+        `<span style="font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:20px;white-space:nowrap;background:${bg};color:${cor}">${texto}</span>`;
+
+    const orc = orcamento[id] || 0, g = gasto[id] || 0;
+    const ho  = horasOrc[id] || 0, hr = horasReais[id] || 0;
+
+    if (orc > 0) {
+        const pc = (g / orc) * 100;
+        if (pc > 100) return et(`Acima ${(pc - 100).toFixed(0)}%`, "rgba(192,57,43,.12)", "#a4332a");
+        if (pc >= 90) return et(`Orçamento a ${pc.toFixed(0)}%`, "rgba(244,185,66,.22)", "#8a5e06");
+    }
+    if (ho > 0) {
+        const pc = (hr / ho) * 100;
+        if (pc >= 80) return et(`Horas a ${pc.toFixed(0)}%`, "rgba(244,185,66,.22)", "#8a5e06");
+    }
+    if (orc > 0) return et("No orçamento", "rgba(42,138,42,.12)", "#1f6b1f");
+    return et("Sem orçamento", "rgba(0,0,0,.06)", "var(--text-muted)");
+}
+
+// ---------- Para onde ir ----------
+async function vgCarregarAtalhos() {
+    const cont = document.getElementById("vgAtalhos");
+    if (!cont) return;
+
+    const hoje = new Date().toISOString().slice(0, 10);
+    const mes  = hoje.slice(0, 7) + "-01";
+
+    const conta = async (tabela, afinar) => {
+        try {
+            let q = SB.from(tabela).select("id", { count: "exact", head: true });
+            if (afinar) q = afinar(q);
+            const { count, error } = await q;
+            return error ? null : (count ?? 0);
+        } catch { return null; }
+    };
+
+    const [docsMes, artigos, tarefas, registosHoje] = await Promise.all([
+        conta("movimentos_financeiros", q => q.gte("data_documento", mes).eq("ativo", true)),
+        conta("artigos",        q => q.eq("ativo", true)),
+        conta("tarefas",        q => q.neq("estado", "concluida")),
+        conta("registos_admin", q => q.eq("data", hoje)),
+    ]);
+
+    const plural = (n, um, muitos) => n == null ? "ver" : `${n} ${n === 1 ? um : muitos}`;
+
+    const atalhos = [
+        { ic: "💶", nome: "Financeiro",  sub: plural(docsMes, "documento este mês", "documentos este mês"), tab: "financeiro" },
+        { ic: "📦", nome: "Inventário",  sub: plural(artigos, "artigo", "artigos"),                          tab: "inventario" },
+        { ic: "🗓", nome: "Planeamento", sub: plural(tarefas, "tarefa por fazer", "tarefas por fazer"),      tab: "planeamento" },
+        { ic: "🏗", nome: "Obras",       sub: "fichas e serviços",                                           tab: "obras" },
+        { ic: "👷", nome: "Funcionários",sub: "fichas e dispositivos",                                       tab: "funcionarios" },
+        { ic: "📊", nome: "Fluxo de caixa", sub: "entradas e saídas",                                        tab: "fluxo" },
+        { ic: "📋", nome: "Registo diário", sub: plural(registosHoje, "registo hoje", "registos hoje"),      ir: "registo-admin.html" },
+        { ic: "☀", nome: "Hoje",         sub: "o ecrã do telemóvel",                                         ir: "hoje.html" },
+    ];
+
+    cont.innerHTML = atalhos.map(a => {
+        const accao = a.tab ? `onclick="abrirTab('${a.tab}')"` : `onclick="location.href='${a.ir}'"`;
+        return `<button class="card" ${accao}
+            style="text-align:left;border:none;cursor:pointer;padding:14px 16px;display:flex;flex-direction:column;gap:3px;font:inherit">
+            <span style="font-size:19px;line-height:1;margin-bottom:3px">${a.ic}</span>
+            <span style="font-weight:600;font-size:14px">${a.nome}</span>
+            <span style="font-size:11.5px;opacity:.6">${escapeHtmlFatura(a.sub)}</span>
+        </button>`;
+    }).join("");
+}
 
 // =======================================================
 // INVENTÁRIO — CRUD COMPLETO

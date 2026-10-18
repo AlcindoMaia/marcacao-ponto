@@ -56,28 +56,6 @@ body { background: var(--bg); }
 .hoje-alerta-sub   { display:block; font-size:12.5px; color: var(--text-muted); margin-top:1px; }
 .hoje-seta         { color: var(--text-muted); font-size:17px; flex-shrink:0; }
 
-/* --- Visão geral: para onde ir a seguir --- */
-.hoje-atalhos {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 9px;
-}
-.hoje-atalho {
-    display: flex; flex-direction: column; gap: 3px;
-    padding: 13px 14px;
-    border: 1px solid rgba(0,0,0,.09);
-    border-radius: 12px;
-    background: #fff;
-    text-decoration: none; color: inherit;
-    font: inherit; text-align: left; cursor: pointer;
-    transition: border-color .15s, transform .08s;
-}
-.hoje-atalho:active { transform: scale(.985); }
-.hoje-atalho:hover  { border-color: rgba(0,0,0,.22); }
-.hoje-atalho-ic     { font-size: 19px; line-height: 1; margin-bottom: 3px; }
-.hoje-atalho-nome   { font-weight: 600; font-size: 14px; }
-.hoje-atalho-sub    { font-size: 11.5px; color: var(--text-muted); }
-
 /* --- Obras --- */
 .hoje-obra       {
     display:block; width:100%; text-align:left;
@@ -212,9 +190,6 @@ body { background: var(--bg); }
 
     <div class="hoje-seccao" id="hojeAlertasTitulo">Precisa de ti</div>
     <div id="hojeAlertas"></div>
-
-    <div class="hoje-seccao">Visão geral</div>
-    <div class="hoje-atalhos" id="hojeAtalhos"></div>
 
     <div class="hoje-seccao" id="hojeObrasTitulo">Obras</div>
     <div id="hojeObras"></div>

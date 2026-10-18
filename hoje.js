@@ -58,63 +58,8 @@ function arrancar() {
 async function carregarTudo() {
     const btn = document.getElementById("hojeActualizar");
     btn.style.opacity = ".3";
-    await Promise.all([carregarAlertas(), carregarAtalhos(), carregarObras(), carregarAgenda()]);
+    await Promise.all([carregarAlertas(), carregarObras(), carregarAgenda()]);
     btn.style.opacity = "";
-}
-
-// =======================================================
-// VISÃO GERAL
-// Para onde ir a seguir, com um número ao lado de cada
-// caminho para não se ir lá só para ver se há alguma coisa.
-// =======================================================
-async function carregarAtalhos() {
-    const cont = document.getElementById("hojeAtalhos");
-    if (!cont) return;
-
-    const hoje = new Date().toISOString().slice(0, 10);
-    const mes  = hoje.slice(0, 7) + "-01";
-
-    // Cada conta é um pedido com head:true — traz o número, não as linhas.
-    const conta = async (tabela, afinar) => {
-        try {
-            let q = SB.from(tabela).select("id", { count: "exact", head: true });
-            if (afinar) q = afinar(q);
-            const { count, error } = await q;
-            return error ? null : (count ?? 0);
-        } catch { return null; }
-    };
-
-    const [obras, registosHoje, faturasMes, artigos, tarefas] = await Promise.all([
-        conta("obras",          q => q.eq("estado", "ativa")),
-        conta("registos_admin", q => q.eq("data", hoje)),
-        conta("movimentos_financeiros", q => q.gte("data_documento", mes).eq("ativo", true)),
-        conta("artigos",        q => q.eq("ativo", true)),
-        conta("tarefas",        q => q.neq("estado", "concluida")),
-    ]);
-
-    const plural = (n, um, muitos) => `${n} ${n === 1 ? um : muitos}`;
-
-    const atalhos = [
-        { ic: "🏗", nome: "Obras",     sub: obras == null ? "ver" : plural(obras, "activa", "activas"),
-          ir: `${HOJE_ADMIN}#tab=obras` },
-        { ic: "📋", nome: "Registo diário",
-          sub: registosHoje == null ? "marcar presenças" : (registosHoje ? plural(registosHoje, "registo hoje", "registos hoje") : "ainda sem registos hoje"),
-          ir: "registo-admin.html" },
-        { ic: "💶", nome: "Financeiro", sub: faturasMes == null ? "ver" : plural(faturasMes, "documento este mês", "documentos este mês"),
-          ir: `${HOJE_ADMIN}#tab=financeiro` },
-        { ic: "📦", nome: "Inventário", sub: artigos == null ? "ver" : plural(artigos, "artigo", "artigos"),
-          ir: `${HOJE_ADMIN}#tab=inventario` },
-        { ic: "🗓", nome: "Planeamento", sub: tarefas == null ? "ver" : (tarefas ? plural(tarefas, "tarefa por fazer", "tarefas por fazer") : "sem tarefas"),
-          ir: `${HOJE_ADMIN}#tab=planeamento` },
-        { ic: "⚙", nome: "Painel", sub: "tudo o resto", ir: HOJE_ADMIN },
-    ];
-
-    cont.innerHTML = atalhos.map(a => `
-        <a class="hoje-atalho" href="${a.ir}">
-            <span class="hoje-atalho-ic">${a.ic}</span>
-            <span class="hoje-atalho-nome">${esc(a.nome)}</span>
-            <span class="hoje-atalho-sub">${esc(a.sub)}</span>
-        </a>`).join("");
 }
 
 // =======================================================
@@ -937,7 +882,7 @@ async function criarPlano() {
 
         _plano = null;
         fecharPainel();
-        await Promise.all([carregarAgenda(), carregarAtalhos()]);
+        await carregarAgenda();
 
     } catch (e) {
         console.error("criarPlano:", e);
