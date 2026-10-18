@@ -5435,6 +5435,10 @@ async function apagarOrcamento(id, numero) {
 }
 
 // ── Exportar PDF ────────────────────────────────────────────
+// O HTML deste PDF leva dados da base de dados. São escritos por quem já é
+// administrador, pelo que não há caminho de terceiro até aqui — mas o PDF
+// abre numa janela da mesma origem, e um nome de cliente com marcação lá
+// dentro corria no contexto do painel. Escapa-se por igual.
 async function exportarPDFOrcamento(id) {
     // Buscar todos os dados
     const [orcRes, catRes] = await Promise.all([
@@ -5461,7 +5465,7 @@ async function exportarPDFOrcamento(id) {
         if (!cat.linhas.length) return;
         tabelaHTML += `
             <tr class="cat-header">
-                <td colspan="6">${cat.nome.toUpperCase()}</td>
+                <td colspan="6">${escHtml(cat.nome.toUpperCase())}</td>
             </tr>`;
         cat.linhas.forEach(l => {
             const nPes  = l.tipo==='mao_obra' ? (Number(l.n_pessoas)||1) : 1;
@@ -5473,9 +5477,9 @@ async function exportarPDFOrcamento(id) {
             const descExtra = (l.tipo==='mao_obra' && nPes>1) ? ` <span style="opacity:.55">(${nPes} pessoas × ${Number(l.quantidade).toFixed(1)}h)</span>` : '';
             tabelaHTML += `
             <tr>
-                <td class="tipo-badge tipo-${l.tipo}">${tipoLabel}</td>
-                <td>${l.descricao}${descExtra}</td>
-                <td class="num">${l.unidade||'vg'}</td>
+                <td class="tipo-badge tipo-${escHtml(l.tipo)}">${escHtml(tipoLabel)}</td>
+                <td>${escHtml(l.descricao)}${descExtra}</td>
+                <td class="num">${escHtml(l.unidade||'vg')}</td>
                 <td class="num">${Number(l.quantidade).toFixed(2)}</td>
                 <td class="num">${fmt(l.preco_unitario)} €</td>
                 <td class="num">${fmt(total)} €</td>
@@ -5491,7 +5495,7 @@ async function exportarPDFOrcamento(id) {
 <html lang="pt">
 <head>
 <meta charset="utf-8">
-<title>Orçamento ${o.numero}</title>
+<title>Orçamento ${escHtml(o.numero)}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600&family=Inter:wght@300;400;500;600&display=swap');
   * { box-sizing:border-box; margin:0; padding:0; }
@@ -5562,11 +5566,11 @@ async function exportarPDFOrcamento(id) {
         <div class="empresa-sub">Construção Civil &amp; Remodelações</div>
     </div>
     <div class="orc-info">
-        <div class="orc-numero">${o.numero}</div>
+        <div class="orc-numero">${escHtml(o.numero)}</div>
         <div class="orc-estado">${{rascunho:'Rascunho',enviado:'Enviado',aceite:'Aceite',recusado:'Recusado'}[o.estado]||o.estado}</div>
         <div class="orc-datas">
-            Data: ${o.data || '—'}<br>
-            ${o.validade ? 'Válido até: ' + o.validade : ''}
+            Data: ${escHtml(o.data || '—')}<br>
+            ${o.validade ? 'Válido até: ' + escHtml(o.validade) : ''}
         </div>
     </div>
 </div>
@@ -5575,16 +5579,16 @@ async function exportarPDFOrcamento(id) {
 <div class="info-grid">
     <div class="info-box">
         <h3>Cliente</h3>
-        <p class="destaque">${o.cliente_nome}</p>
-        ${o.cliente_nif    ? `<p>NIF: ${o.cliente_nif}</p>` : ''}
-        ${o.cliente_morada ? `<p>${o.cliente_morada}</p>` : ''}
-        ${o.cliente_email  ? `<p>${o.cliente_email}</p>` : ''}
-        ${o.cliente_tel    ? `<p>${o.cliente_tel}</p>` : ''}
+        <p class="destaque">${escHtml(o.cliente_nome)}</p>
+        ${o.cliente_nif    ? `<p>NIF: ${escHtml(o.cliente_nif)}</p>` : ''}
+        ${o.cliente_morada ? `<p>${escHtml(o.cliente_morada)}</p>` : ''}
+        ${o.cliente_email  ? `<p>${escHtml(o.cliente_email)}</p>` : ''}
+        ${o.cliente_tel    ? `<p>${escHtml(o.cliente_tel)}</p>` : ''}
     </div>
     <div class="info-box">
         <h3>Obra / Trabalho</h3>
-        <p class="destaque">${o.obras?.nome || o.obra_descricao || '—'}</p>
-        ${o.prazo_obra ? `<p>Prazo: ${o.prazo_obra}</p>` : ''}
+        <p class="destaque">${escHtml(o.obras?.nome || o.obra_descricao || '—')}</p>
+        ${o.prazo_obra ? `<p>Prazo: ${escHtml(o.prazo_obra)}</p>` : ''}
     </div>
 </div>
 
@@ -5607,8 +5611,8 @@ async function exportarPDFOrcamento(id) {
 <!-- TOTAIS + CONDIÇÕES -->
 <div class="totais-wrap">
     <div class="condicoes">
-        ${o.condicoes_pag ? `<h3>Condições de Pagamento</h3><p>${o.condicoes_pag}</p>` : ''}
-        ${o.notas ? `<h3 style="margin-top:10px">Notas</h3><p>${o.notas}</p>` : ''}
+        ${o.condicoes_pag ? `<h3>Condições de Pagamento</h3><p>${escHtml(o.condicoes_pag)}</p>` : ''}
+        ${o.notas ? `<h3 style="margin-top:10px">Notas</h3><p>${escHtml(o.notas)}</p>` : ''}
     </div>
     <div class="totais-box">
         <div class="totais-linha"><span class="label">Mão de Obra</span><span class="valor">${fmt(pdfMaoObra)} €</span></div>
@@ -5628,14 +5632,14 @@ async function exportarPDFOrcamento(id) {
         <div class="assin-legenda">Assinatura e carimbo</div>
     </div>
     <div class="assin-box">
-        <h3>Cliente — ${o.cliente_nome}</h3>
+        <h3>Cliente — ${escHtml(o.cliente_nome)}</h3>
         <div class="assin-linha"></div>
         <div class="assin-legenda">Assinatura (aceite do orçamento)</div>
     </div>
 </div>
 
 <div class="footer">
-    Maia Solutions — Construção Civil &amp; Remodelações · ${o.numero} · ${o.data || ''}
+    Maia Solutions — Construção Civil &amp; Remodelações · ${escHtml(o.numero)} · ${escHtml(o.data || '')}
 </div>
 
 <script>window.print();</script>
