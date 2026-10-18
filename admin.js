@@ -713,8 +713,8 @@ function renderRaDetalhe() {
 
         html += `<tr style="background:${bg};border-bottom:1px solid rgba(0,0,0,.05)">
             <td style="padding:7px 12px;font-variant-numeric:tabular-nums">${dataFmt}</td>
-            <td style="padding:7px 12px;font-weight:500">${r.funcionarios?.nome || (r.funcionario_id ? "—" : nomeTempRA(r.observacoes))}</td>
-            <td style="padding:7px 12px;opacity:.7">${r.obras?.nome||"—"}</td>
+            <td style="padding:7px 12px;font-weight:500">${escHtml(r.funcionarios?.nome || (r.funcionario_id ? "—" : nomeTempRA(r.observacoes)))}</td>
+            <td style="padding:7px 12px;opacity:.7">${escHtml(r.obras?.nome||"—")}</td>
             <td style="padding:7px 12px;text-align:center">
                 ${r.tipo==="presenca"
                     ? `<span style="background:rgba(74,222,128,.15);color:#16a34a;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">Presente</span>`
@@ -2456,7 +2456,7 @@ function opcoesArtigos(escolhido) {
     return `<option value=""${sel("")}>— sem artigo —</option>` +
            `<option value="__novo__">➕ criar artigo novo…</option>` +
            _artigosFatura.map(a =>
-               `<option value="${a.id}"${sel(a.id)}>${escapeHtmlFatura(a.descricao || a.codigo || "(sem nome)")}</option>`
+               `<option value="${a.id}"${sel(a.id)}>${escHtml(a.descricao || a.codigo || "(sem nome)")}</option>`
            ).join("");
 }
 
@@ -2730,7 +2730,7 @@ async function mostrarLinhasFatura(d) {
     if (d.avisos?.length) {
         avisosEl.innerHTML = d.avisos.map(a => `
             <div style="background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.3);color:#9a5b04;border-radius:6px;padding:6px 10px;font-size:12px;margin-bottom:4px">
-                ${escapeHtmlFatura(a)}
+                ${escHtml(a)}
             </div>`).join("");
         avisosEl.style.display = "block";
     } else {
@@ -2740,7 +2740,7 @@ async function mostrarLinhasFatura(d) {
 
     tbody.innerHTML = _linhasFaturaLidas.map((l, i) => `
         <tr data-i="${i}">
-            <td style="padding:3px 6px"><input value="${escapeHtmlFatura(l.descricao || "")}" data-campo="descricao"
+            <td style="padding:3px 6px"><input value="${escHtml(l.descricao || "")}" data-campo="descricao"
                 style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;background:#fff;color:var(--text-dark)"></td>
             <td style="padding:3px 6px">
                 <select data-campo="artigo" onchange="aoEscolherArtigoLinha(this)"
@@ -2751,7 +2751,7 @@ async function mostrarLinhasFatura(d) {
             </td>
             <td style="padding:3px 6px"><input type="number" step="0.001" value="${l.quantidade ?? ""}" data-campo="quantidade"
                 style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;text-align:right;background:#fff;color:var(--text-dark)"></td>
-            <td style="padding:3px 6px"><input value="${escapeHtmlFatura(l.unidade || "")}" data-campo="unidade"
+            <td style="padding:3px 6px"><input value="${escHtml(l.unidade || "")}" data-campo="unidade"
                 style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;background:#fff;color:var(--text-dark)"></td>
             <td style="padding:3px 6px"><input type="number" step="0.01" value="${l.preco_unitario ?? ""}" data-campo="preco_unitario"
                 style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;text-align:right;background:#fff;color:var(--text-dark)"></td>
@@ -2908,10 +2908,21 @@ async function gravarEntradasStock(movId, gravadas, linhasEcra, dataDoc, referen
     }
 }
 
-function escapeHtmlFatura(s) {
-    return String(s == null ? "" : s)
-        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+// Escape de HTML, para usar em TODO o sítio onde um dado da base de dados
+// entra numa string de HTML.
+//
+// A regra é escapar na LEITURA, não na entrada. O texto que vem de uma
+// fatura lida — nome do fornecedor, referência, descrição de linha — é
+// escolhido por quem manda a fatura, e basta conseguir enviar uma à empresa.
+// Escapá-lo só no ecrã de revisão não chega: ele fica gravado e volta a
+// aparecer em todos os ecrãs que o mostrem.
+//
+// Escapa também a plica, que faltava: sem ela, um atributo delimitado por
+// plicas fica aberto a quem souber disso.
+function escHtml(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
 }
 
 function mostrarFeedbackQR(msg, tipo) {
@@ -2998,8 +3009,8 @@ async function vgCarregarAlertas() {
         <div style="display:flex;align-items:center;gap:14px;padding:13px 0;${i ? "border-top:1px solid rgba(0,0,0,.07)" : ""}">
             <span style="width:36px;height:36px;border-radius:9px;background:${a.cor};display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0">${a.icone}</span>
             <div style="flex:1;min-width:0">
-                <div style="font-weight:600;font-size:14.5px">${escapeHtmlFatura(a.titulo)}</div>
-                <div style="font-size:12.5px;opacity:.65;margin-top:1px">${escapeHtmlFatura(a.sub)}</div>
+                <div style="font-weight:600;font-size:14.5px">${escHtml(a.titulo)}</div>
+                <div style="font-size:12.5px;opacity:.65;margin-top:1px">${escHtml(a.sub)}</div>
             </div>
             ${a.tab ? `<button class="btn-secondary" style="font-size:12px;padding:4px 12px;flex-shrink:0"
                         onclick="abrirTab('${a.tab}')">Ver</button>` : ""}
@@ -3186,8 +3197,8 @@ async function vgCarregarObras() {
         return `<div style="padding:12px 0;${i ? "border-top:1px solid rgba(0,0,0,.07)" : ""}">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
                 <div style="min-width:0">
-                    <div style="font-weight:600;font-size:14.5px">${escapeHtmlFatura(o.nome)}</div>
-                    <div style="font-size:12.5px;opacity:.65;margin-top:1px">${escapeHtmlFatura(sub || "sem fase definida")}</div>
+                    <div style="font-weight:600;font-size:14.5px">${escHtml(o.nome)}</div>
+                    <div style="font-size:12.5px;opacity:.65;margin-top:1px">${escHtml(sub || "sem fase definida")}</div>
                 </div>
                 <div style="text-align:right;flex-shrink:0">
                     <div style="font-size:13px;font-weight:600">${vgEuros(g)}</div>
@@ -3265,7 +3276,7 @@ async function vgCarregarAtalhos() {
             style="text-align:left;border:none;cursor:pointer;padding:14px 16px;display:flex;flex-direction:column;gap:3px;font:inherit">
             <span style="font-size:19px;line-height:1;margin-bottom:3px">${a.ic}</span>
             <span style="font-weight:600;font-size:14px">${a.nome}</span>
-            <span style="font-size:11.5px;opacity:.6">${escapeHtmlFatura(a.sub)}</span>
+            <span style="font-size:11.5px;opacity:.6">${escHtml(a.sub)}</span>
         </button>`;
     }).join("");
 }
@@ -3368,15 +3379,15 @@ async function carregarArtigos() {
         const tr = document.createElement("tr");
         const stockBaixo = a.stock_minimo && a.quantidade < a.stock_minimo;
         tr.innerHTML = `
-            <td>${a.codigo || ""}</td>
-            <td>${a.descricao || ""}</td>
-            <td>${a.tipo_artigo || ""}</td>
+            <td>${escHtml(a.codigo || "")}</td>
+            <td>${escHtml(a.descricao || "")}</td>
+            <td>${escHtml(a.tipo_artigo || "")}</td>
             <td>${Number(a.preco_atual || 0).toFixed(2)} €</td>
             <td style="color:${stockBaixo ? "#f97316" : "inherit"};font-weight:${stockBaixo ? "700" : "400"}">
                 ${a.quantidade ?? 0}${stockBaixo ? " ⚠️" : ""}
                 ${a.stock_minimo ? `<span style="font-size:10px;opacity:.5;margin-left:4px">(mín: ${a.stock_minimo})</span>` : ""}
             </td>
-            <td>${a.local_armazenamento || ""}</td>
+            <td>${escHtml(a.local_armazenamento || "")}</td>
             <td class="acoes-td">
                 <button class="btn-acao" title="Editar">✏️</button>
                 <button class="btn-acao" title="Histórico">📋</button>
@@ -3468,9 +3479,9 @@ async function carregarHistoricoPrecos(artigoId) {
         }
         return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-top:${i ? "1px solid rgba(0,0,0,.06)" : "none"};font-size:12px">
             <span style="width:84px;opacity:.7">${p.data}</span>
-            <span style="font-weight:600;width:84px">${Number(p.preco).toFixed(2)} €${p.unidade ? "/" + escapeHtmlFatura(p.unidade) : ""}</span>
+            <span style="font-weight:600;width:84px">${Number(p.preco).toFixed(2)} €${p.unidade ? "/" + escHtml(p.unidade) : ""}</span>
             ${variacao}
-            <span style="flex:1;text-align:right;opacity:.6">${escapeHtmlFatura(p.fornecedores?.nome || (p.origem === "manual" ? "manual" : "—"))}</span>
+            <span style="flex:1;text-align:right;opacity:.6">${escHtml(p.fornecedores?.nome || (p.origem === "manual" ? "manual" : "—"))}</span>
         </div>`;
     }).join("");
     wrap.style.display = "block";
@@ -3516,11 +3527,11 @@ async function abrirHistoricoStock(artigoId, descricao) {
         const delta = m.tipo_movimento === "saida" ? -m.quantidade : +m.quantidade;
         const sinal = delta >= 0 ? "+" : "";
         return `<tr>
-            <td>${m.data_movimento || "—"}</td>
+            <td>${escHtml(m.data_movimento || "—")}</td>
             <td><span style="color:${cor};font-weight:600">${label}</span></td>
             <td style="text-align:right;color:${cor}">${sinal}${delta}</td>
             <td style="text-align:right;font-weight:500">${m.saldo}</td>
-            <td style="opacity:.7;font-size:12px">${m.observacoes || "—"}</td>
+            <td style="opacity:.7;font-size:12px">${escHtml(m.observacoes || "—")}</td>
         </tr>`;
     }).join("");
 }
@@ -3690,13 +3701,13 @@ function gerarPaginaImpressao(itens) {
             <div class="etiqueta etq-${item.tam}" style="width:${w}mm;height:${h}mm">
                 <div class="etq-header">
                     <span class="etq-empresa">MAIA SOLUTIONS</span>
-                    <span class="etq-tipo">${tipoLabel}</span>
+                    <span class="etq-tipo">${escHtml(tipoLabel)}</span>
                 </div>
                 <div class="etq-body">
                     <canvas class="etq-qr" data-url="${url}" width="100" height="100"></canvas>
                     <div class="etq-info">
-                        <div class="etq-codigo">${item.codigo}</div>
-                        <div class="etq-nome">${item.nome}</div>
+                        <div class="etq-codigo">${escHtml(item.codigo)}</div>
+                        <div class="etq-nome">${escHtml(item.nome)}</div>
                     </div>
                 </div>
             </div>`;
@@ -3836,17 +3847,17 @@ async function carregarMovimentosStock() {
         const destino = m.obra_destino?.nome || (m.observacoes?.includes("Armazém") ? "Armazém" : "—");
         const tr = document.createElement("tr");
         tr.innerHTML = `
-            <td style="font-size:12px;opacity:.7">${m.data_movimento || "—"}</td>
+            <td style="font-size:12px;opacity:.7">${escHtml(m.data_movimento || "—")}</td>
             <td>
-                <div style="font-weight:600;font-size:13px">${m.artigos?.descricao || "—"}</div>
-                <div style="font-size:11px;opacity:.5;font-family:monospace">${m.artigos?.codigo || ""}</div>
+                <div style="font-weight:600;font-size:13px">${escHtml(m.artigos?.descricao || "—")}</div>
+                <div style="font-size:11px;opacity:.5;font-family:monospace">${escHtml(m.artigos?.codigo || "")}</div>
             </td>
             <td><span style="color:${cor};font-weight:700;font-size:12px">${label}</span></td>
             <td style="text-align:right;font-weight:600">${m.quantidade ?? "—"}</td>
-            <td style="font-size:13px">${m.funcionarios?.nome || "—"}</td>
-            <td style="font-size:12px;opacity:.8">${origem}</td>
-            <td style="font-size:12px;opacity:.8">${destino}</td>
-            <td style="font-size:11px;opacity:.6">${m.observacoes || "—"}</td>`;
+            <td style="font-size:13px">${escHtml(m.funcionarios?.nome || "—")}</td>
+            <td style="font-size:12px;opacity:.8">${escHtml(origem)}</td>
+            <td style="font-size:12px;opacity:.8">${escHtml(destino)}</td>
+            <td style="font-size:11px;opacity:.6">${escHtml(m.observacoes || "—")}</td>`;
         tbody.appendChild(tr);
     });
 }
@@ -4001,7 +4012,7 @@ async function carregarPainelFinanceiro() {
                 </span>
             </div>
             ${d.items.map(m => `<div style="padding:8px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12px">
-                <div><div style="opacity:.6">${m.data_documento}</div><div style="font-weight:500">${m.fornecedores?.nome || m.observacoes || m.referencia || "—"}</div></div>
+                <div><div style="opacity:.6">${escHtml(m.data_documento)}</div><div style="font-weight:500">${escHtml(m.fornecedores?.nome || m.observacoes || m.referencia || "—")}</div></div>
                 <div style="font-weight:700;color:${m.tipo === "entrada" ? "#5ad65a" : "#ff7a7a"}">${m.tipo === "entrada" ? "+" : "−"}${Number(m.valor_total).toFixed(2)} €</div>
             </div>`).join("")}
         </div>`).join("");
@@ -4059,12 +4070,12 @@ async function carregarPainelStock() {
         <table class="display" style="margin:0">
             <thead><tr><th>Data</th><th>Artigo</th><th>Tipo</th><th style="text-align:right">Qtd</th><th>Funcionário</th><th>Obs</th></tr></thead>
             <tbody>${data.map(m => `<tr>
-                <td style="font-size:12px;opacity:.7">${m.data_movimento}</td>
-                <td><div style="font-weight:600;font-size:13px">${m.artigos?.descricao||"—"}</div><div style="font-size:11px;opacity:.5;font-family:monospace">${m.artigos?.codigo||""}</div></td>
-                <td><span style="color:${tipoCor[m.tipo_movimento]||"#888"};font-weight:700;font-size:12px">${tipoLabel[m.tipo_movimento]||m.tipo_movimento}</span></td>
+                <td style="font-size:12px;opacity:.7">${escHtml(m.data_movimento)}</td>
+                <td><div style="font-weight:600;font-size:13px">${escHtml(m.artigos?.descricao||"—")}</div><div style="font-size:11px;opacity:.5;font-family:monospace">${escHtml(m.artigos?.codigo||"")}</div></td>
+                <td><span style="color:${tipoCor[m.tipo_movimento]||"#888"};font-weight:700;font-size:12px">${escHtml(tipoLabel[m.tipo_movimento]||m.tipo_movimento)}</span></td>
                 <td style="text-align:right;font-weight:700">${m.quantidade}</td>
-                <td style="font-size:12px">${m.funcionarios?.nome||"—"}</td>
-                <td style="font-size:11px;opacity:.6">${m.observacoes||"—"}</td>
+                <td style="font-size:12px">${escHtml(m.funcionarios?.nome||"—")}</td>
+                <td style="font-size:11px;opacity:.6">${escHtml(m.observacoes||"—")}</td>
             </tr>`).join("")}</tbody>
         </table>
     </div>`;
@@ -4211,12 +4222,12 @@ function renderMovimentos() {
         const ent = m.tipo === "entrada";
         const tr  = document.createElement("tr");
         tr.innerHTML = `
-            <td>${m.data_documento || ""}</td>
-            <td>${m.referencia || "—"}</td>
+            <td>${escHtml(m.data_documento || "")}</td>
+            <td>${escHtml(m.referencia || "—")}</td>
             <td><span class="badge-tipo ${ent ? "entrada" : "saida"}">${ent ? "Entrada" : "Saída"}</span></td>
-            <td>${m.fornecedores?.nome || "—"}</td>
-            <td>${m.categorias_financeiras?.nome || "—"}</td>
-            <td>${m.obras?.nome || "—"}</td>
+            <td>${escHtml(m.fornecedores?.nome || "—")}</td>
+            <td>${escHtml(m.categorias_financeiras?.nome || "—")}</td>
+            <td>${escHtml(m.obras?.nome || "—")}</td>
             <td style="text-align:right;font-weight:500;color:${ent ? "#5ad65a" : "#ff7a7a"}">${ent ? "+" : "–"}${Number(m.valor_total).toFixed(2)} €</td>
             <td><span class="badge-estado ${m.estado_pagamento}">${m.estado_pagamento === "pago" ? "Pago" : "Por pagar"}</span></td>
             <td class="acoes-td">
@@ -5791,9 +5802,9 @@ async function carregarFluxo() {
             const ent = m.tipo==="entrada", atr = m.atrasado;
             const desc = m.fornecedores?.nome || m.observacoes || m.referencia || "—";
             return `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
-                <td style="padding:8px;font-size:13px;${atr?"color:#f97316":""}">${m.data_documento}</td>
-                <td style="padding:8px;font-size:13px">${desc}</td>
-                <td style="padding:8px;font-size:13px;opacity:.7">${m.obras?.nome||"—"}</td>
+                <td style="padding:8px;font-size:13px;${atr?"color:#f97316":""}">${escHtml(m.data_documento)}</td>
+                <td style="padding:8px;font-size:13px">${escHtml(desc)}</td>
+                <td style="padding:8px;font-size:13px;opacity:.7">${escHtml(m.obras?.nome||"—")}</td>
                 <td style="padding:8px;font-size:13px;text-align:right;color:${ent?"#5ad65a":"#ff7a7a"};font-weight:600">${ent?"+":"–"}${Number(m.valor_total).toFixed(2)} €</td>
                 <td style="padding:8px;text-align:center"><span style="font-size:11px;padding:2px 8px;border-radius:12px;background:${atr?"rgba(249,115,22,.15)":"rgba(255,255,255,.08)"};color:${atr?"#f97316":"var(--text-muted)"}">
                     ${atr?"ATRASADO":"Previsto"}</span></td>
@@ -5918,8 +5929,8 @@ async function carregarNotificacoes() {
                 onmouseenter="this.style.background='rgba(0,0,0,.04)'" onmouseleave="this.style.background=''"
                 onclick="activarTab('fluxo')">
                 <div>
-                    <div style="font-size:13px;font-weight:500;color:#1a1a1a">${desc}</div>
-                    <div style="font-size:11px;color:#e05c5c;margin-top:2px">${m.data_documento} · ${dias} dia(s) atraso</div>
+                    <div style="font-size:13px;font-weight:500;color:#1a1a1a">${escHtml(desc)}</div>
+                    <div style="font-size:11px;color:#e05c5c;margin-top:2px">${escHtml(m.data_documento)} · ${dias} dia(s) atraso</div>
                 </div>
                 <div style="font-size:13px;font-weight:700;color:#e05c5c;white-space:nowrap;margin-left:12px">–${Number(m.valor_total).toFixed(2)} €</div>
             </div>`;
@@ -5932,7 +5943,7 @@ async function carregarNotificacoes() {
         stockAlertas.forEach(a => {
             html += `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;cursor:pointer"
                 onclick="activarTab('inventario')">
-                <div style="font-size:13px;font-weight:500;color:#1a1a1a">${a.descricao}</div>
+                <div style="font-size:13px;font-weight:500;color:#1a1a1a">${escHtml(a.descricao)}</div>
                 <div style="font-size:11px;color:#f97316;white-space:nowrap;margin-left:12px">Abaixo do mínimo (${a.stock_minimo})</div>
             </div>`;
         });
