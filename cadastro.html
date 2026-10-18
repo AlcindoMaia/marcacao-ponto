@@ -92,11 +92,14 @@ body.dark .cadastro-form {
 <form id="frmCadastro" class="cadastro-form">
 
     <p style="font-size:13px;opacity:.7;margin-bottom:16px;line-height:1.5">
-        Introduza o seu nome completo exatamente como foi registado pelo administrador.
+        Introduza o código de inscrição que o administrador lhe deu.
+        É usado uma única vez e expira em 48 horas.
     </p>
 
-    <label>Nome do Funcionário</label>
-    <input id="nome" placeholder="Ex.: João Silva" autocomplete="off" />
+    <label>Código de Inscrição</label>
+    <input id="codigo" placeholder="Ex.: K7M2PQR4" autocomplete="off"
+           maxlength="8" inputmode="latin" autocapitalize="characters" spellcheck="false"
+           style="text-transform:uppercase;letter-spacing:.18em;font-family:ui-monospace,monospace;text-align:center;font-size:20px" />
 
     <div id="deviceInfo" style="margin-top:10px;font-size:11px;opacity:.4"></div>
 

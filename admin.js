@@ -1370,11 +1370,20 @@ function abrirModalFuncionario(func = null) {
     // Info dispositivo — só em edição
     const deviceInfo = document.getElementById("funcDeviceInfo");
     const deviceIdEl = document.getElementById("funcDeviceId");
+    const semDisp    = document.getElementById("funcSemDispositivo");
+    const codGerado  = document.getElementById("funcCodigoGerado");
+
+    if (codGerado) codGerado.style.display = "none";
+
     if (func?.device_id) {
         deviceInfo.style.display = "block";
         deviceIdEl.textContent   = func.device_id;
+        if (semDisp) semDisp.style.display = "none";
     } else {
         deviceInfo.style.display = "none";
+        // Em edição de alguém sem dispositivo, oferecer o código de inscrição.
+        // Em criação (sem func) não faz sentido: ainda não há id.
+        if (semDisp) semDisp.style.display = func?.id ? "block" : "none";
     }
 
     document.getElementById("modalFuncMsg").textContent = "";
@@ -1608,6 +1617,37 @@ async function toggleAcessoStock(id, nome, temAcesso) {
     await carregarFuncionarios();
 }
 
+// Gera o código que substitui o nome como credencial no cadastro. O nome não
+// é um segredo: quem o soubesse ficava com a identidade de quem ainda não
+// tinha dispositivo associado.
+async function gerarCodigoInscricao() {
+    if (!funcEditId) return;
+
+    const caixa = document.getElementById("funcCodigoGerado");
+    const btn   = document.getElementById("btnGerarCodigo");
+    const msgEl = document.getElementById("modalFuncMsg");
+
+    if (btn) { btn.disabled = true; btn.textContent = "A gerar…"; }
+
+    const { data: codigo, error } = await SB.rpc("gerar_codigo_inscricao", {
+        p_funcionario: funcEditId
+    });
+
+    if (btn) { btn.disabled = false; btn.textContent = "Gerar outro código"; }
+
+    if (error || !codigo) {
+        console.error(error);
+        msgEl.textContent = "Não foi possível gerar o código.";
+        msgEl.style.color = "#ff7a7a";
+        return;
+    }
+
+    // textContent, não innerHTML: nada aqui precisa de marcação.
+    caixa.querySelector("div").textContent = codigo;
+    caixa.style.display = "block";
+    msgEl.textContent = "";
+}
+
 async function revogarDispositivoFuncionario() {
     if (!funcEditId) return;
     if (!confirm("Revogar o dispositivo deste funcionário?\nEle terá de fazer novo cadastro.")) return;
@@ -1619,7 +1659,12 @@ async function revogarDispositivoFuncionario() {
     if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
 
     document.getElementById("funcDeviceInfo").style.display = "none";
-    document.getElementById("modalFuncMsg").textContent = "Dispositivo revogado. O funcionário terá de se registar novamente.";
+    // Aparece a caixa do código, para se poder gerar um logo a seguir.
+    const _semDisp = document.getElementById("funcSemDispositivo");
+    if (_semDisp) _semDisp.style.display = "block";
+    const _cod = document.getElementById("funcCodigoGerado");
+    if (_cod) _cod.style.display = "none";
+    document.getElementById("modalFuncMsg").textContent = "Dispositivo revogado. Gere um código de inscrição para esta pessoa se registar de novo.";
     document.getElementById("modalFuncMsg").style.color = "#5ad65a";
     await carregarFuncionarios();
 }
@@ -4698,6 +4743,7 @@ function ligarEventosGlobais() {
     document.getElementById("btnNovoFuncionario")?.addEventListener("click", () => abrirModalFuncionario());
     document.getElementById("guardarFuncionarioBtn")?.addEventListener("click", guardarFuncionario);
     document.getElementById("btnRevogarDispositivo")?.addEventListener("click", revogarDispositivoFuncionario);
+    document.getElementById("btnGerarCodigo")?.addEventListener("click", gerarCodigoInscricao);
     document.getElementById("modalFuncionario")?.addEventListener("click", e => {
         if (e.target.id === "modalFuncionario") fecharModalFuncionario();
     });

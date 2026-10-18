@@ -1653,6 +1653,27 @@
             </button>
         </div>
 
+        <!-- Código de inscrição: substitui o nome como credencial no cadastro -->
+        <div id="funcSemDispositivo" style="display:none;margin-top:12px;padding:12px;border-radius:8px;background:rgba(244,185,66,.08);border:1px solid rgba(244,185,66,.2);font-size:13px">
+            <div style="opacity:.6;font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Sem dispositivo associado</div>
+            <p style="margin:0 0 10px;font-size:12px;opacity:.75;line-height:1.5">
+                Para associar o telemóvel, esta pessoa precisa de um código de
+                inscrição. Gera-o aqui e entrega-lho em mão ou por mensagem —
+                serve uma vez e expira em 48 horas.
+            </p>
+            <button id="btnGerarCodigo" class="btn-secondary"
+                    style="font-size:12px;padding:5px 12px">
+                Gerar código de inscrição
+            </button>
+            <div id="funcCodigoGerado" style="display:none;margin-top:10px">
+                <div style="font-family:ui-monospace,monospace;font-size:26px;letter-spacing:.18em;font-weight:700;color:var(--primary,#f4b942);text-align:center;padding:10px;background:rgba(0,0,0,.2);border-radius:8px"></div>
+                <p style="margin:8px 0 0;font-size:11px;opacity:.6;line-height:1.5">
+                    Anota-o agora: não volta a ser mostrado. Se se perder,
+                    gera outro — o anterior deixa de servir.
+                </p>
+            </div>
+        </div>
+
         <div class="modal-actions" style="margin-top:20px">
             <button class="btn-secondary" onclick="fecharModalFuncionario()">Cancelar</button>
             <button class="btn-primary" id="guardarFuncionarioBtn">Guardar</button>
