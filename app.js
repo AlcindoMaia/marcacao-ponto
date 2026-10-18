@@ -8,17 +8,16 @@ function getDeviceId() {
   return id;
 }
 
-function haversineDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371e3, toRad = d => d * Math.PI / 180;
-  const φ1 = toRad(lat1), φ2 = toRad(lat2);
-  const Δφ = toRad(lat2-lat1), Δλ = toRad(lon2-lon1);
-  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
-
+// A tabela obras não é legível sem login: tinha morada, coordenadas GPS e
+// raio de todas as obras — inteligência comercial, e as coordenadas exactas
+// para falsificar uma marcação. Esta função do servidor devolve só o nome, e
+// só a quem tiver um dispositivo registado.
 async function getObra(id) {
-  const { data } = await SB.from("obras").select("*").eq("id", id).maybeSingle();
-  return data;
+  const { data, error } = await SB.rpc("obra_por_dispositivo", {
+    p_device: getDeviceId(), p_obra_id: id
+  });
+  if (error) { console.error(error); return null; }
+  return Array.isArray(data) ? (data[0] || null) : data;
 }
 
 // A tabela funcionarios não é legível sem login (tem salários, IBAN e NIF).
@@ -180,14 +179,11 @@ async function confirmarMarcacao() {
       try {
         const { latitude: lat, longitude: lon } = pos.coords;
 
-        // Aviso imediato, antes de chamar o servidor. A decisão é sempre
-        // do servidor: é lá que o perímetro é verificado a sério.
-        const dist = haversineDistance(lat, lon, obra.latitude, obra.longitude);
-        const raio = obra.raio || 120;
-        if (dist > raio) {
-          mostrarFeedback(`Fora do perímetro. ${Math.round(dist)}m (máx. ${raio}m)`, "erro");
-          return;
-        }
+        // Não há aviso antecipado de perímetro: para o dar, o cliente tinha
+        // de conhecer as coordenadas e o raio da obra, e isso obrigava a
+        // publicá-los a quem tivesse a chave anon. Quem decide é o servidor,
+        // dentro de ponto_marcar, e a mensagem de recusa dele é mostrada
+        // abaixo tal como vem.
 
         // O funcionário e o tipo (entrada/saída) são determinados no servidor
         const { data, error } = await SB.rpc("ponto_marcar", {

@@ -225,10 +225,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   artigo = art;
 
   // Carregar obras activas
-  const { data: obrasData } = await SB.from("obras")
-    .select("id, nome")
-    .eq("estado", "ativa")
-    .order("nome");
+  // Pela RPC, não pela tabela: obras tinha morada e GPS de todas as obras
+  // e era legível por qualquer anónimo com a chave publicada.
+  const { data: obrasData } = await SB.rpc("obras_ativas_por_dispositivo", {
+    p_device: getDeviceId()
+  });
   obras = obrasData || [];
 
   // Preencher UI
