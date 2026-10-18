@@ -785,7 +785,7 @@ async function carregarRegistos() {
     if (filtroDia) query = query.eq("dia", filtroDia.toISOString().split("T")[0]);
 
     const { data, error } = await query.order("dia", { ascending: false });
-    if (error) { alert("Erro: " + error.message); return; }
+    if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
 
     _todosRegistos = data || [];
 
@@ -1409,12 +1409,12 @@ async function guardarFuncionario() {
 
     if (funcEditId) {
         const { error } = await SB.from("funcionarios").update(payload).eq("id", funcEditId);
-        if (error) { msg.textContent = "Erro: " + error.message; return; }
+        if (error) { console.error(error); msg.textContent = "Não foi possível gravar."; return; }
     } else {
         // Novo funcionário — device_id fica vazio até o funcionário fazer o
         // cadastro no seu dispositivo via QR (é assim que o cadastro o encontra)
         const { error } = await SB.from("funcionarios").insert(payload);
-        if (error) { msg.textContent = "Erro: " + error.message; return; }
+        if (error) { console.error(error); msg.textContent = "Não foi possível gravar."; return; }
     }
 
     fecharModalFuncionario();
@@ -1429,7 +1429,7 @@ async function toggleAtivoFuncionario(id, nome, ativoAtual) {
         .update({ ativo: !ativoAtual })
         .eq("id", id);
 
-    if (error) { alert("Erro: " + error.message); return; }
+    if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
     await carregarFuncionarios();
 }
 
@@ -1604,7 +1604,7 @@ async function toggleAcessoStock(id, nome, temAcesso) {
         .update({ acesso_stock: !temAcesso })
         .eq("id", id);
 
-    if (error) { alert("Erro: " + error.message); return; }
+    if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
     await carregarFuncionarios();
 }
 
@@ -1616,7 +1616,7 @@ async function revogarDispositivoFuncionario() {
         .update({ device_id: null })
         .eq("id", funcEditId);
 
-    if (error) { alert("Erro: " + error.message); return; }
+    if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
 
     document.getElementById("funcDeviceInfo").style.display = "none";
     document.getElementById("modalFuncMsg").textContent = "Dispositivo revogado. O funcionário terá de se registar novamente.";
@@ -1822,10 +1822,10 @@ async function guardarEditObra() {
     };
     if (id) {
         const { error } = await SB.from("obras").update(payload).eq("id", id);
-        if (error) { alert("Erro: " + error.message); return; }
+        if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
     } else {
         const { error } = await SB.from("obras").insert(payload);
-        if (error) { alert("Erro: " + error.message); return; }
+        if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
     }
     document.getElementById("modalEditarObra").style.display = "none";
     await carregarObras();
@@ -1900,7 +1900,7 @@ async function adicionarServico() {
     const valor = parseFloat(document.getElementById("novoServValor").value) || null;
     const extra = document.getElementById("novoServExtra").checked;
     const { error } = await SB.from("obra_servicos").insert({ obra_id: obraId, nome, horas_orcamento: horas, valor_orcamento: valor, extra });
-    if (error) { alert("Erro: " + error.message); return; }
+    if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
     document.getElementById("novoServNome").value  = "";
     document.getElementById("novoServHoras").value = "";
     document.getElementById("novoServValor").value = "";
@@ -2103,7 +2103,7 @@ async function toggleEstadoObra(id, nome, estadoAtual) {
     const { error } = await SB.from("obras")
         .update({ estado: novoEstado })
         .eq("id", id);
-    if (error) { alert("Erro ao actualizar estado: " + error.message); return; }
+    if (error) { { console.error(error); alert("Não foi possível actualizar o estado."); }; return; }
     await carregarObras();
 }
 
@@ -2130,7 +2130,7 @@ async function eliminarObra(id, nome) {
     if (!confirm(aviso)) return;
 
     const { error } = await SB.from("obras").delete().eq("id", id);
-    if (error) { alert("Erro ao eliminar: " + error.message); return; }
+    if (error) { { console.error(error); alert("Não foi possível eliminar."); }; return; }
     await carregarObras();
 }
 
@@ -2520,7 +2520,7 @@ async function aoEscolherArtigoLinha(sel) {
             ativo:          true,
         }).select("id, codigo, descricao, unidade_compra, preco_atual").single();
 
-        if (error) { alert("Não foi possível criar o artigo: " + error.message); return; }
+        if (error) { { console.error(error); alert("Não foi possível criar o artigo."); }; return; }
 
         _artigosFatura.push(novo);
         _artigosFatura.sort((a, b) => (a.descricao || "").localeCompare(b.descricao || "", "pt"));
@@ -2914,7 +2914,7 @@ async function gravarEntradasStock(movId, gravadas, linhasEcra, dataDoc, referen
     const { error } = await SB.from("movimentos_stock").insert(entradas);
     if (error) {
         console.error("entradas de stock:", error);
-        alert("O movimento ficou gravado, mas a entrada em inventário não: " + error.message);
+        { console.error(error); alert("O movimento ficou gravado, mas a entrada em inventário não."); };
     }
 }
 
@@ -3577,7 +3577,7 @@ async function guardarArtigo() {
     if (artigoEditId) {
         // EDITAR — actualizar dados do artigo
         const { error } = await SB.from("artigos").update(payload).eq("id", artigoEditId);
-        if (error) { msg.textContent = "Erro: " + error.message; return; }
+        if (error) { console.error(error); msg.textContent = "Não foi possível gravar."; return; }
 
         // Movimento de ajuste de stock (só se quantidade preenchida)
         const qtdAjuste  = parseFloat(document.getElementById("artAjusteQtd").value);
@@ -3607,7 +3607,7 @@ async function guardarArtigo() {
         payload.ativo = true;
 
         const { data, error } = await SB.from("artigos").insert(payload).select("id").single();
-        if (error) { msg.textContent = "Erro: " + error.message; return; }
+        if (error) { console.error(error); msg.textContent = "Não foi possível gravar."; return; }
 
         // Movimento inicial se stock > 0
         if (qtd > 0 && data?.id) {
@@ -3893,7 +3893,7 @@ async function carregarFiltrosMovStock() {
 async function apagarArtigo(id, nome) {
     if (!confirm(`Apagar "${nome}"? Esta ação não pode ser revertida.`)) return;
     const { error } = await SB.from("artigos").delete().eq("id", id);
-    if (error) { alert("Erro: " + error.message); return; }
+    if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
     await carregarArtigos();
 }
 
@@ -4568,9 +4568,28 @@ async function guardarMovimento() {
         if (ex) {
             fornecedor_id = ex.id;
         } else {
+            // Um fornecedor novo era criado em silêncio ao gravar. Juntando isso
+            // ao aviso de IBAN, que só disparava quando o NIF casava, bastava
+            // uma fatura com um dígito trocado no NIF para passar sem nada:
+            // nenhum aviso, e um fornecedor novo parecido com o verdadeiro.
+            // Criar um fornecedor passa a ser uma decisão, não um efeito.
+            if (!confirm(
+                `Não conheço o NIF ${nif}.\n\n` +
+                `Criar o fornecedor "${nome || "(sem nome)"}" com este NIF?\n\n` +
+                `Se esperavas que já existisse, cancela e confirma o NIF e o ` +
+                `IBAN da fatura — uma fatura falsa imita um fornecedor ` +
+                `conhecido com um dígito trocado.`
+            )) {
+                movMsg.textContent = "Gravação cancelada. Confirme o fornecedor.";
+                return;
+            }
             const { data: novo, error: ef } = await SB.from("fornecedores")
                 .insert({ nif, nome }).select("id").single();
-            if (ef) { movMsg.textContent = "Erro fornecedor: " + ef.message; return; }
+            if (ef) {
+                console.error(ef);
+                movMsg.textContent = "Não foi possível criar o fornecedor.";
+                return;
+            }
             fornecedor_id = novo.id;
         }
     }
@@ -4593,7 +4612,7 @@ async function guardarMovimento() {
         ? await SB.from("movimentos_financeiros").update(payload).eq("id", movEditId).select("id").single()
         : await SB.from("movimentos_financeiros").insert(payload).select("id").single();
 
-    if (error) { movMsg.textContent = "Erro: " + error.message; return; }
+    if (error) { console.error(error); movMsg.textContent = "Não foi possível gravar o movimento."; return; }
 
     // Linhas da fatura lidas pelo assistente
     const movIdLinhas = movSalvo?.id || movEditId;
@@ -4660,7 +4679,7 @@ async function guardarMovimento() {
 async function apagarMovimento(id, ref) {
     if (!confirm(`Apagar movimento "${ref || id}"?`)) return;
     const { error } = await SB.from("movimentos_financeiros").delete().eq("id", id);
-    if (error) { alert("Erro: " + error.message); return; }
+    if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
     await carregarMovimentos();
 }
 
@@ -5275,13 +5294,13 @@ async function guardarOrcamento(estado = 'rascunho') {
 
     if (orcId) {
         const { error } = await SB.from('orcamentos').update(payload).eq('id', orcId);
-        if (error) { msg.textContent='Erro: '+error.message; msg.style.color='var(--color-err)'; return; }
+        if (error) { msg.textContent = (console.error(error), "Não foi possível concluir."); msg.style.color='var(--color-err)'; return; }
     } else {
         // Gerar número
         const { data: numData } = await SB.rpc('gerar_numero_orcamento');
         payload.numero = numData || ('ORC-' + Date.now());
         const { data: novo, error } = await SB.from('orcamentos').insert(payload).select('id').single();
-        if (error) { msg.textContent='Erro: '+error.message; msg.style.color='var(--color-err)'; return; }
+        if (error) { msg.textContent = (console.error(error), "Não foi possível concluir."); msg.style.color='var(--color-err)'; return; }
         orcId = novo.id;
         _orcEditId = orcId;
         document.getElementById('orcNumero').value = payload.numero;
