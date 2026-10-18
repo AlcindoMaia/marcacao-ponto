@@ -1,3 +1,11 @@
+// Escape de HTML. Um nome com uma aspa ou um sinal de menor fechava o
+// atributo onde era interpolado.
+function escRA(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+}
+
 // =======================================================
 // REGISTO DIÁRIO DO ENCARREGADO
 // =======================================================
@@ -300,11 +308,11 @@ function preencherListaTemps() {
         lista.innerHTML = '<div style="padding:8px 0;opacity:.5;font-size:13px">Sem temporários registados</div>';
     } else {
         lista.innerHTML = temps.map(f => `
-            <div class="temp-opcao" onclick="adicionarTempExistente('${f.id}','${f.nome.replace(/'/g,"\\'")}',${f.valor_dia||0})"
+            <div class="temp-opcao" data-temp-id="${escRA(f.id)}" data-temp-nome="${escRA(f.nome)}" data-temp-valor="${Number(f.valor_dia)||0}"
                 style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .15s"
                 onmouseover="this.style.background='rgba(244,185,66,.08)'" onmouseout="this.style.background=''">
-                <div style="width:32px;height:32px;border-radius:50%;background:rgba(244,185,66,.2);color:#c8901e;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${f.nome.charAt(0).toUpperCase()}</div>
-                <span style="font-size:13px;font-weight:500">${f.nome}</span>
+                <div style="width:32px;height:32px;border-radius:50%;background:rgba(244,185,66,.2);color:#c8901e;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${escRA(f.nome.charAt(0).toUpperCase())}</div>
+                <span style="font-size:13px;font-weight:500">${escRA(f.nome)}</span>
                 <span style="margin-left:auto;font-size:11px;opacity:.5">${f.valor_dia ? f.valor_dia+'€/dia' : ''}</span>
             </div>`).join('');
     }
@@ -453,6 +461,12 @@ function adicionarLinha(container, funcId, registo = null, btnAdd = null) {
     const selectObra = document.createElement("select");
     selectObra.innerHTML = `<option value="">— Obra —</option>` +
         _obras.map(o => `<option value="${o.id}" ${registo?.obra_id === o.id ? "selected" : ""}>${o.nome}</option>`).join("");
+
+        // Os dados vêm do dataset, não interpolados dentro do onclick.
+        lista.querySelectorAll(".temp-opcao").forEach(d => {
+            d.addEventListener("click", () => adicionarTempExistente(
+                d.dataset.tempId, d.dataset.tempNome, Number(d.dataset.tempValor) || 0));
+        });
 
     // Input de horas
     const inputHoras = document.createElement("input");

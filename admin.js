@@ -607,7 +607,7 @@ function renderRaMapaFuncionario(ano, mes) {
                     bg2="rgba(74,222,128,.15)"; sym=reg.horas<8?"½":"✓";
                     title = `${reg.obra||""} ${reg.horas}h`;
                 }
-                return `<td style="text-align:center;padding:3px 2px;background:${bg2};border:1px solid rgba(0,0,0,.05);font-size:11px" title="${title}">${sym}</td>`;
+                return `<td style="text-align:center;padding:3px 2px;background:${bg2};border:1px solid rgba(0,0,0,.05);font-size:11px" title="${escHtml(title)}">${sym}</td>`;
             }).join("")}
             <td style="padding:7px 10px;text-align:right;font-weight:600">${fd.totalDias}</td>
             <td style="padding:7px 10px;text-align:right">${fd.totalH.toFixed(1)}h</td>
@@ -677,7 +677,7 @@ function renderRaMapaObra(ano, mes) {
                     sym = nFunc.toString();
                     title = Object.entries(reg).map(([f,h])=>`${f}: ${h}h`).join(", ");
                 }
-                return `<td style="text-align:center;padding:3px 2px;background:${bg2};border:1px solid rgba(0,0,0,.05);font-size:11px;font-weight:${reg?"600":"400"}" title="${title}">${sym}</td>`;
+                return `<td style="text-align:center;padding:3px 2px;background:${bg2};border:1px solid rgba(0,0,0,.05);font-size:11px;font-weight:${reg?"600":"400"}" title="${escHtml(title)}">${sym}</td>`;
             }).join("")}
             <td style="padding:7px 10px;text-align:right;font-weight:600">${od.totalH.toFixed(1)}h</td>
             <td style="padding:7px 10px;text-align:right;opacity:.7">${od.funcs.size}</td>
@@ -1064,7 +1064,7 @@ function initDashboard() {
     if (sel && !sel.options.length) {
         const anoAtual = new Date().getFullYear();
         for (let a = anoAtual; a >= anoAtual - 2; a--) {
-            sel.innerHTML += `<option value="${a}">${a}</option>`;
+            sel.innerHTML += `<option value="${escHtml(a)}">${escHtml(a)}</option>`;
         }
     }
     carregarDashboard();
@@ -1519,10 +1519,15 @@ async function abrirHistoricoFuncionario(func) {
             </div>`
           ).join("")}
 
-        <button onclick="exportarPDFFuncionario(${JSON.stringify(func).replace(/"/g,'&quot;')}, ${JSON.stringify(regs).replace(/"/g,'&quot;')})"
+        <button id="btnPDFFuncionario"
             style="margin-top:16px;width:100%;background:rgba(244,185,66,.12);border:1px solid rgba(244,185,66,.3);color:var(--primary,#f4b942);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;font-weight:600">
             📄 Exportar PDF do Mês
         </button>`;
+
+    // Os dados vão pelo ouvinte, não por dentro do onclick: um nome que
+    // contenha &quot; fechava a string do atributo e corria o que quisesse.
+    const btnPDFFunc = document.getElementById("btnPDFFuncionario");
+    if (btnPDFFunc) btnPDFFunc.addEventListener("click", () => exportarPDFFuncionario(func, regs));
 
     document.getElementById("modalHistFuncionario").style.display = "flex";
 }
@@ -1863,7 +1868,7 @@ async function carregarServicosModal() {
         return `<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;border:1px solid ${s.concluido?"rgba(74,222,128,.2)":"rgba(255,255,255,.06)"}">
             <div style="flex:1;min-width:0">
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-                    <span style="font-size:13px;font-weight:600">${s.nome}</span>
+                    <span style="font-size:13px;font-weight:600">${escHtml(s.nome)}</span>
                     ${s.extra?`<span style="font-size:10px;background:rgba(251,146,60,.15);color:#fb923c;padding:1px 6px;border-radius:10px">Extra</span>`:""}
                     ${s.concluido?`<span style="font-size:10px;background:rgba(74,222,128,.15);color:#4ade80;padding:1px 6px;border-radius:10px">✓ Concluído</span>`:""}
                 </div>
@@ -1875,10 +1880,15 @@ async function carregarServicosModal() {
             </div>
             <div style="display:flex;gap:4px;flex-shrink:0">
                 <button onclick="toggleServicoConcluido('${s.id}',${s.concluido})" style="background:${s.concluido?"rgba(74,222,128,.15)":"rgba(255,255,255,.07)"};border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px" title="${s.concluido?"Reabrir":"Concluir"}">${s.concluido?"↩":"✓"}</button>
-                <button onclick="eliminarServico('${s.id}','${s.nome.replace(/'/g,"")}')" style="background:rgba(248,113,113,.1);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;opacity:.6">🗑</button>
+                <button data-servico-id="${escHtml(s.id)}" data-servico-nome="${escHtml(s.nome)}" class="btn-elim-servico" style="background:rgba(248,113,113,.1);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;opacity:.6">🗑</button>
             </div>
         </div>`;
     }).join("");
+
+    // O nome do serviço ia interpolado dentro do onclick; agora vem do dataset.
+    lista.querySelectorAll(".btn-elim-servico").forEach(b => {
+        b.addEventListener("click", () => eliminarServico(b.dataset.servicoId, b.dataset.servicoNome));
+    });
 }
 
 async function adicionarServico() {
@@ -3333,7 +3343,7 @@ async function carregarUnidades() {
     const sel = document.getElementById("artUnidade");
     if (!sel) return;
     sel.innerHTML = "";
-    data?.forEach(u => { sel.innerHTML += `<option value="${u.id}">${u.codigo}</option>`; });
+    data?.forEach(u => { sel.innerHTML += `<option value="${escHtml(u.id)}">${escHtml(u.codigo)}</option>`; });
 }
 
 async function carregarArtigos() {
@@ -3867,7 +3877,7 @@ async function carregarFiltrosMovStock() {
     const selFunc = document.getElementById("filtroMovFunc");
     if (selFunc && selFunc.options.length <= 1) {
         const { data } = await SB.from("funcionarios").select("id, nome").order("nome");
-        data?.forEach(f => { selFunc.innerHTML += `<option value="${f.id}">${f.nome}</option>`; });
+        data?.forEach(f => { selFunc.innerHTML += `<option value="${escHtml(f.id)}">${escHtml(f.nome)}</option>`; });
     }
     // Preencher select de obras
     const selObra = document.getElementById("filtroMovObra");
@@ -3875,7 +3885,7 @@ async function carregarFiltrosMovStock() {
         const { data } = await SB.from("obras").select("id, nome, codigo").order("nome");
         data?.forEach(o => {
             const etiqueta = o.codigo ? `${o.codigo} · ${o.nome}` : o.nome;
-            selObra.innerHTML += `<option value="${o.id}">${etiqueta}</option>`;
+            selObra.innerHTML += `<option value="${escHtml(o.id)}">${escHtml(etiqueta)}</option>`;
         });
     }
 }
@@ -4098,7 +4108,7 @@ function preencherAnosFluxo() {
     const atual = new Date().getFullYear();
     sel.innerHTML = `<option value="">— Todos —</option>`;
     for (let a = atual; a >= atual - 4; a--) {
-        sel.innerHTML += `<option value="${a}">${a}</option>`;
+        sel.innerHTML += `<option value="${escHtml(a)}">${escHtml(a)}</option>`;
     }
     sel.value = String(atual);
 }
@@ -4110,7 +4120,7 @@ async function carregarCategoriasFinanceiras() {
         if (!sel) return;
         const placeholder = id.startsWith("filtro") ? "— Todas —" : "— Selecionar —";
         sel.innerHTML = `<option value="">${placeholder}</option>`;
-        data?.forEach(c => { sel.innerHTML += `<option value="${c.id}">${c.nome}</option>`; });
+        data?.forEach(c => { sel.innerHTML += `<option value="${escHtml(c.id)}">${escHtml(c.nome)}</option>`; });
     });
 }
 
@@ -4121,7 +4131,7 @@ async function carregarObrasFluxo() {
         if (!sel) return;
         const placeholder = id.startsWith("filtro") ? "— Todas —" : "— Sem obra —";
         sel.innerHTML = `<option value="">${placeholder}</option>`;
-        data?.forEach(o => { sel.innerHTML += `<option value="${o.id}">${o.nome}</option>`; });
+        data?.forEach(o => { sel.innerHTML += `<option value="${escHtml(o.id)}">${escHtml(o.nome)}</option>`; });
     });
 }
 
@@ -4290,10 +4300,13 @@ async function carregarServicosImputacao(obraId, movId = null) {
             Imputar material a serviço(s) desta obra
         </div>
         <div id="imputLinhasInner"></div>
-        <button type="button" onclick="adicionarLinhaImput(${JSON.stringify(servs).replace(/"/g,'&quot;')})"
+        <button type="button" id="btnAddImput"
             style="background:rgba(244,185,66,.1);border:1px solid rgba(244,185,66,.2);color:var(--primary,#f4b942);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;margin-top:6px">
             + Adicionar serviço
         </button>`;
+
+    const btnAddImput = document.getElementById("btnAddImput");
+    if (btnAddImput) btnAddImput.addEventListener("click", () => adicionarLinhaImput(servs));
 
     if (guardadas.length) {
         // Repor o que já estava imputado a este movimento
@@ -4950,7 +4963,7 @@ async function abrirModalOrcamento(id = null) {
     }
     const selObra = document.getElementById('orcObra');
     selObra.innerHTML = '<option value="">— Sem obra —</option>' +
-        _orcObras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('');
+        _orcObras.map(o => `<option value="${escHtml(o.id)}">${escHtml(o.nome)}</option>`).join('');
 
     if (id) {
         // Carregar dados do orçamento
@@ -5069,7 +5082,7 @@ function adicionarLinha(cid, tipo = 'material', dados = null) {
         div.innerHTML = `
         <div style="display:grid;grid-template-columns:24px 1fr 70px 70px 90px 100px 28px;gap:0;align-items:center;padding:5px 14px">
             <span style="font-size:10px;opacity:.3">${lid}</span>
-            <input value="${dados?.descricao||''}" placeholder="Descrição do trabalho" data-field="descricao"
+            <input value="${escHtml(dados?.descricao||'')}" placeholder="Descrição do trabalho" data-field="descricao"
                 style="border:none;background:transparent;font-size:13px;padding:3px 6px;outline:none">
             <input value="${nPessoas}" type="number" min="1" step="1" data-field="n_pessoas" placeholder="Pess."
                 style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:3px 5px;text-align:center;outline:none;width:100%"
@@ -5101,9 +5114,9 @@ function adicionarLinha(cid, tipo = 'material', dados = null) {
         div.innerHTML = `
         <div style="display:grid;grid-template-columns:24px 1fr 60px 80px 90px 100px 28px;gap:0;align-items:center;padding:5px 14px">
             <span style="font-size:10px;opacity:.3">${lid}</span>
-            <input value="${dados?.descricao||''}" placeholder="Descrição do artigo / trabalho" data-field="descricao"
+            <input value="${escHtml(dados?.descricao||'')}" placeholder="Descrição do artigo / trabalho" data-field="descricao"
                 style="border:none;background:transparent;font-size:13px;padding:3px 6px;outline:none">
-            <input value="${dados?.unidade||'un'}" data-field="unidade"
+            <input value="${escHtml(dados?.unidade||'un')}" data-field="unidade"
                 style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:3px 4px;text-align:center;outline:none;width:100%">
             <input value="${qtd}" type="number" min="0" step="0.01" data-field="quantidade"
                 style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:3px 6px;text-align:right;outline:none;width:100%"
@@ -6115,7 +6128,7 @@ function adicionarLinhaBibMat(mat = null) {
     div.style.cssText = "display:grid;grid-template-columns:1fr 80px 70px 28px;gap:6px;align-items:center";
     if (mat?.id) div.dataset.id = mat.id;
     div.innerHTML = `
-        <input value="${mat?.descricao||''}" placeholder="Nome do material" data-field="descricao"
+        <input value="${escHtml(mat?.descricao||'')}" placeholder="Nome do material" data-field="descricao"
             style="padding:6px 8px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:12px;outline:none">
         <input value="${mat?.quantidade||''}" type="number" step="0.001" min="0" placeholder="Qtd" data-field="quantidade"
             style="padding:6px 8px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:12px;text-align:right;outline:none">
