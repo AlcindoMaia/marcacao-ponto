@@ -2,15 +2,21 @@
 <html lang="pt">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com https://cdn.datatables.net; style-src 'self' 'unsafe-inline' https://cdn.datatables.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https://npyosbigynxmxdakcymg.supabase.co wss://npyosbigynxmxdakcymg.supabase.co; object-src 'none'; base-uri 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Maia Solutions</title>
 <script>
-  // Se vier com ?obra=..., redirecionar para app.html
+  // Para onde vai quem abre a aplicação:
+  //   com ?obra=...  -> a marcação de ponto do funcionário
+  //   no telemóvel   -> o ecrã Hoje, com a visão geral e os atalhos
+  //   no computador  -> o dashboard de sempre
   const params = window.location.search;
+
   if (params.includes('obra=')) {
     window.location.replace('app.html' + params);
   } else {
-    window.location.replace('dashboard.html');
+    const telemovel = window.matchMedia('(max-width: 820px)').matches;
+    window.location.replace(telemovel ? 'hoje.html' : 'dashboard.html');
   }
 </script>
 </head>

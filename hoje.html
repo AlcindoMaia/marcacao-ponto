@@ -2,6 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com https://cdn.datatables.net; style-src 'self' 'unsafe-inline' https://cdn.datatables.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https://npyosbigynxmxdakcymg.supabase.co wss://npyosbigynxmxdakcymg.supabase.co; object-src 'none'; base-uri 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hoje — Maia Solutions</title>
 <link rel="stylesheet" href="style.css?v=3">
@@ -52,12 +53,17 @@ body { background: var(--bg); }
     display:flex; align-items:center; justify-content:center; font-size:17px;
 }
 .hoje-alerta-txt   { flex:1; min-width:0; }
-.hoje-alerta-tit   { font-weight:600; font-size:15px; }
-.hoje-alerta-sub   { font-size:12.5px; color: var(--text-muted); margin-top:1px; }
+.hoje-alerta-tit   { display:block; font-weight:600; font-size:15px; }
+.hoje-alerta-sub   { display:block; font-size:12.5px; color: var(--text-muted); margin-top:1px; }
 .hoje-seta         { color: var(--text-muted); font-size:17px; flex-shrink:0; }
 
 /* --- Obras --- */
-.hoje-obra       { padding: 12px 0; border-top:1px solid rgba(0,0,0,.07); }
+.hoje-obra       {
+    display:block; width:100%; text-align:left;
+    background:none; border:none; font:inherit; color:inherit; cursor:pointer;
+    padding: 12px 2px; border-top:1px solid rgba(0,0,0,.07);
+}
+.hoje-obra:hover { background: rgba(0,0,0,.02); }
 .hoje-obra:first-of-type { border-top:none; }
 .hoje-obra-linha { display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .hoje-obra-nome  { font-weight:600; font-size:15px; }
@@ -124,6 +130,7 @@ body { background: var(--bg); }
 
 .hoje-campo       { margin-bottom: 12px; }
 .hoje-campo label { display:block; font-size:11.5px; color: var(--text-muted); margin-bottom:4px; }
+.hoje-campo textarea { resize: vertical; min-height: 70px; line-height: 1.5; font-family: inherit; }
 .hoje-campo select, .hoje-campo input, .hoje-campo textarea {
     width:100%; padding:8px 10px; font: inherit; font-size:14px;
     border:1px solid rgba(0,0,0,.15); border-radius:8px;
@@ -195,7 +202,7 @@ body { background: var(--bg); }
 
 <div class="hoje-barra-ia" id="hojeBarraIA" style="display:none">
     <div>
-        <input class="hoje-pedido" id="hojePedido" placeholder="Pede material ao assistente">
+        <input class="hoje-pedido" id="hojePedido" placeholder="Olá chefe, em que posso ajudar?">
         <button class="hoje-acao" id="hojeCamara" title="Ler fatura">📷</button>
         <button class="hoje-acao" id="hojeMic" title="Ditar" style="display:none">🎤</button>
         <button class="hoje-acao" id="hojeEnviar" title="Enviar" style="display:none">➤</button>
@@ -214,7 +221,7 @@ body { background: var(--bg); }
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="config.js"></script>
 <script src="hoje.js"></script>
 </body>

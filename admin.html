@@ -2,6 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com https://cdn.datatables.net; style-src 'self' 'unsafe-inline' https://cdn.datatables.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https://npyosbigynxmxdakcymg.supabase.co wss://npyosbigynxmxdakcymg.supabase.co; object-src 'none'; base-uri 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <title>Painel Administrativo — Maia Solutions</title>
@@ -10,10 +11,10 @@
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
 <!-- jQuery -->
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.0.min.js" integrity="sha384-NXgwF8Kv9SSAr+jemKKcbvQsz+teULH/a5UNJvZc6kP47hZgl62M1vGnw6gHQhb1" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
 <!-- DataTables -->
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js" integrity="sha384-k5vbMeKHbxEZ0AEBTSdR7UjAgWCcUfrS8c0c5b2AfIh7olfhNkyCZYwOfzOQhauK" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
 
 <style>
@@ -128,7 +129,8 @@
 
     <!-- TABS -->
     <div class="tabs">
-        <button class="tab active" data-tab="fluxo">Fluxo de Caixa</button>
+        <button class="tab active" data-tab="visaogeral">Visão Geral</button>
+        <button class="tab" data-tab="fluxo">Fluxo de Caixa</button>
         <button class="tab" data-tab="financeiro">Financeiro</button>
         <button class="tab" data-tab="orcamentos">Orçamentos</button>
         <button class="tab" data-tab="registos">Registos</button>
@@ -789,7 +791,39 @@
 </div>
 
     <!-- ================= TAB FLUXO DE CAIXA ================= -->
-<div class="tab-content active" id="tab-fluxo">
+<!-- ================= TAB VISÃO GERAL =================
+     O estado da casa num ecrã, e daqui decide-se para onde ir. -->
+<div class="tab-content active" id="tab-visaogeral">
+
+    <div class="tab-inner">
+
+        <!-- O que precisa de decisão -->
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px">
+            <h2 style="font-family:var(--font-title);font-size:18px;font-weight:400;letter-spacing:1px;text-transform:uppercase;margin:0">
+                Precisa de ti</h2>
+            <button class="btn-secondary" id="vgActualizar" style="font-size:12px;padding:4px 12px">Actualizar</button>
+        </div>
+        <div id="vgAlertas" class="card" style="padding:4px 18px"></div>
+
+        <!-- Números do mês -->
+        <h2 style="font-family:var(--font-title);font-size:18px;font-weight:400;letter-spacing:1px;text-transform:uppercase;margin:24px 0 10px">
+            Como vai o mês</h2>
+        <div class="grid-cards" id="vgNumeros"></div>
+
+        <!-- Obras -->
+        <h2 style="font-family:var(--font-title);font-size:18px;font-weight:400;letter-spacing:1px;text-transform:uppercase;margin:24px 0 10px">
+            Obras activas</h2>
+        <div id="vgObras" class="card" style="padding:6px 18px"></div>
+
+        <!-- Para onde ir -->
+        <h2 style="font-family:var(--font-title);font-size:18px;font-weight:400;letter-spacing:1px;text-transform:uppercase;margin:24px 0 10px">
+            Ir para</h2>
+        <div id="vgAtalhos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px"></div>
+
+    </div>
+</div>
+
+<div class="tab-content" id="tab-fluxo">
 
     <!-- KPIs -->
     <div class="grid-cards">
@@ -1010,7 +1044,7 @@
             </div>
             <div id="faturaAvisos" style="display:none;margin-bottom:8px"></div>
             <div style="overflow-x:auto">
-                <table id="tabelaFaturaLinhas" style="width:100%;border-collapse:collapse;font-size:12px;min-width:780px">
+                <table id="tabelaFaturaLinhas" style="width:100%;border-collapse:collapse;font-size:12px;min-width:830px">
                     <thead>
                         <tr>
                             <th style="text-align:left;padding:4px 6px;opacity:.6;font-weight:600">Descrição</th>
@@ -1019,6 +1053,7 @@
                             <th style="text-align:left;padding:4px 6px;opacity:.6;font-weight:600;width:60px">Un</th>
                             <th style="text-align:right;padding:4px 6px;opacity:.6;font-weight:600;width:80px">Preço</th>
                             <th style="text-align:right;padding:4px 6px;opacity:.6;font-weight:600;width:80px">Total</th>
+                            <th style="text-align:center;padding:4px 6px;opacity:.6;font-weight:600;width:46px" title="Dar entrada no inventário">Stock</th>
                             <th style="width:30px"></th>
                         </tr>
                     </thead>
@@ -1026,6 +1061,11 @@
                 </table>
             </div>
             <div id="faturaLinhasResumo" style="font-size:12px;opacity:.7;margin-top:8px"></div>
+            <div style="font-size:11.5px;opacity:.6;margin-top:6px;line-height:1.5">
+                <strong>Stock:</strong> marca as linhas do material que entrou no armazém.
+                O que foi entregue directamente na obra não se marca — senão o inventário
+                fica com material que lá não está.
+            </div>
         </div>
 
         <!-- Imputação a serviços da obra: só aparece quando a obra
@@ -1179,8 +1219,47 @@
 
 </div>
 
+<!-- ================= MODAL COTAÇÃO ================= -->
+<div id="modalCotacao" class="modal hidden">
+    <div class="modal-content" style="max-width:1200px;width:96vw;max-height:94vh;overflow-y:auto">
+        <div class="modal-header">
+            <h2 id="cotEdTitulo">Nova comparação</h2>
+            <button id="cotEdFechar" class="modal-close">&times;</button>
+        </div>
+        <div id="cotEdCorpo"></div>
+        <div class="modal-actions" style="margin-top:20px">
+            <button id="cotEdEliminar" class="btn-primary" style="background:var(--color-err);color:#fff;margin-right:auto">Apagar</button>
+            <button id="cotEdCancelar" class="btn-secondary">Cancelar</button>
+            <button id="cotEdGuardar" class="btn-primary">Guardar</button>
+        </div>
+    </div>
+</div>
+
+<!-- ================= MODAL LEITURA DE ORÇAMENTO DE FORNECEDOR ================= -->
+<div id="modalCotLeitura" class="modal hidden">
+    <div class="modal-content" style="max-width:1200px;width:96vw;max-height:94vh;overflow-y:auto">
+        <div class="modal-header">
+            <h2 id="cotLeTitulo">Orçamento lido</h2>
+            <button id="cotLeFechar" class="modal-close">&times;</button>
+        </div>
+        <div id="cotLeCorpo"></div>
+        <div class="modal-actions" style="margin-top:20px">
+            <button id="cotLeIgnorar" class="btn-secondary" style="margin-right:auto">Ignorar este ficheiro</button>
+            <button id="cotLeAcrescentar" class="btn-primary">Acrescentar à comparação</button>
+        </div>
+    </div>
+</div>
+
 <!-- ================= TAB ORÇAMENTOS ================= -->
 <div class="tab-content" id="tab-orcamentos">
+
+    <!-- Sub-separadores: orçamentos a clientes · comparar orçamentos de fornecedores -->
+    <div class="orc-subtabs">
+        <button class="orc-subtab active" data-orcsub="clientes">Orçamentos a clientes</button>
+        <button class="orc-subtab" data-orcsub="fornecedores">Comparar fornecedores</button>
+    </div>
+
+    <div id="orcSub-clientes" class="orc-sub">
 
     <!-- Barra superior -->
     <div class="inventario-header">
@@ -1234,6 +1313,45 @@
             </thead>
             <tbody></tbody>
         </table>
+    </div>
+    </div>
+
+    <!-- Comparação de orçamentos pedidos a vários fornecedores (cotacoes.js) -->
+    <div id="orcSub-fornecedores" class="orc-sub" style="display:none">
+
+    <div id="cotListaWrap">
+        <div class="inventario-header">
+            <input type="text" id="pesquisaCotacoes" placeholder="Pesquisar por título, obra ou fornecedor">
+            <button id="btnNovaComparacao" class="btn-primary btn-circular" title="Nova comparação">+</button>
+        </div>
+        <div class="card" style="overflow-x:auto">
+            <table id="tabelaCotacoes" class="display">
+                <thead>
+                    <tr><th>Comparação</th><th>Obra</th><th>Fornecedores</th><th>Base</th><th>Estado</th><th>Criada</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="cotDetalhe" style="display:none">
+        <div class="cot-topo">
+            <button id="cotVoltar" class="btn-secondary">‹ Comparações</button>
+            <div class="cot-topo-titulo">
+                <h2 id="cotTitulo"></h2>
+                <div id="cotSubtitulo"></div>
+            </div>
+            <div class="cot-topo-acoes">
+                <button id="cotCarregar" class="btn-secondary" title="Ler PDFs ou fotos de orçamentos de fornecedores">📄 Carregar orçamentos</button>
+                <input type="file" id="cotFicheiros" accept="application/pdf,image/*" multiple style="display:none">
+                <button id="cotImprimir" class="btn-secondary">Imprimir</button>
+                <button id="cotEditar" class="btn-primary">Editar</button>
+            </div>
+        </div>
+        <div id="cotVistas" class="cot-vistas"></div>
+        <div class="card" id="cotConteudo"></div>
+    </div>
+
     </div>
 
 </div>
@@ -1535,6 +1653,27 @@
             </button>
         </div>
 
+        <!-- Código de inscrição: substitui o nome como credencial no cadastro -->
+        <div id="funcSemDispositivo" style="display:none;margin-top:12px;padding:12px;border-radius:8px;background:rgba(244,185,66,.08);border:1px solid rgba(244,185,66,.2);font-size:13px">
+            <div style="opacity:.6;font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Sem dispositivo associado</div>
+            <p style="margin:0 0 10px;font-size:12px;opacity:.75;line-height:1.5">
+                Para associar o telemóvel, esta pessoa precisa de um código de
+                inscrição. Gera-o aqui e entrega-lho em mão ou por mensagem —
+                serve uma vez e expira em 48 horas.
+            </p>
+            <button id="btnGerarCodigo" class="btn-secondary"
+                    style="font-size:12px;padding:5px 12px">
+                Gerar código de inscrição
+            </button>
+            <div id="funcCodigoGerado" style="display:none;margin-top:10px">
+                <div style="font-family:ui-monospace,monospace;font-size:26px;letter-spacing:.18em;font-weight:700;color:var(--primary,#f4b942);text-align:center;padding:10px;background:rgba(0,0,0,.2);border-radius:8px"></div>
+                <p style="margin:8px 0 0;font-size:11px;opacity:.6;line-height:1.5">
+                    Anota-o agora: não volta a ser mostrado. Se se perder,
+                    gera outro — o anterior deixa de servir.
+                </p>
+            </div>
+        </div>
+
         <div class="modal-actions" style="margin-top:20px">
             <button class="btn-secondary" onclick="fecharModalFuncionario()">Cancelar</button>
             <button class="btn-primary" id="guardarFuncionarioBtn">Guardar</button>
@@ -1621,13 +1760,14 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js" integrity="sha384-Dr98ddmUw2QkdCarNQ+OL7xLty7cSxgR0T7v1tq4UErS/qLV0132sBYTolRAFuOV" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js" integrity="sha384-hStSInNIZ8ljtOVrmrgf7zdHMapaLBWoSnPTtF0nzsybp4+LuhDz6sHuEVpWIX8o" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="config.js"></script>
 <script src="leitor-qr.js"></script>
 <script src="planeamento.js"></script>
+<script src="cotacoes.js"></script>
 <script src="admin.js"></script>
 
 <script>

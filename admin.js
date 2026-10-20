@@ -113,7 +113,7 @@ function mostrarPainel() {
 // =======================================================
 function inicializarPainel() {
     ativarTabs();
-    abrirTab(tabPedidaNoEndereco() || "fluxo");
+    abrirTab(tabPedidaNoEndereco() || "visaogeral");
     carregarNotificacoes(); // Carregar alertas iniciais
     tratarAccaoNoEndereco();
 }
@@ -157,6 +157,7 @@ function abrirTab(nome) {
     if (!tabBtn || !tabDiv) return;
     tabBtn.classList.add("active");
     tabDiv.classList.add("active");
+    if (nome === "visaogeral")   initVisaoGeral();
     if (nome === "fluxo")        initFluxo();
     if (nome === "financeiro")   { switchFinTab("ordenados"); }
     if (nome === "dashboard")    initDashboard();
@@ -606,7 +607,7 @@ function renderRaMapaFuncionario(ano, mes) {
                     bg2="rgba(74,222,128,.15)"; sym=reg.horas<8?"½":"✓";
                     title = `${reg.obra||""} ${reg.horas}h`;
                 }
-                return `<td style="text-align:center;padding:3px 2px;background:${bg2};border:1px solid rgba(0,0,0,.05);font-size:11px" title="${title}">${sym}</td>`;
+                return `<td style="text-align:center;padding:3px 2px;background:${bg2};border:1px solid rgba(0,0,0,.05);font-size:11px" title="${escHtml(title)}">${sym}</td>`;
             }).join("")}
             <td style="padding:7px 10px;text-align:right;font-weight:600">${fd.totalDias}</td>
             <td style="padding:7px 10px;text-align:right">${fd.totalH.toFixed(1)}h</td>
@@ -676,7 +677,7 @@ function renderRaMapaObra(ano, mes) {
                     sym = nFunc.toString();
                     title = Object.entries(reg).map(([f,h])=>`${f}: ${h}h`).join(", ");
                 }
-                return `<td style="text-align:center;padding:3px 2px;background:${bg2};border:1px solid rgba(0,0,0,.05);font-size:11px;font-weight:${reg?"600":"400"}" title="${title}">${sym}</td>`;
+                return `<td style="text-align:center;padding:3px 2px;background:${bg2};border:1px solid rgba(0,0,0,.05);font-size:11px;font-weight:${reg?"600":"400"}" title="${escHtml(title)}">${sym}</td>`;
             }).join("")}
             <td style="padding:7px 10px;text-align:right;font-weight:600">${od.totalH.toFixed(1)}h</td>
             <td style="padding:7px 10px;text-align:right;opacity:.7">${od.funcs.size}</td>
@@ -712,8 +713,8 @@ function renderRaDetalhe() {
 
         html += `<tr style="background:${bg};border-bottom:1px solid rgba(0,0,0,.05)">
             <td style="padding:7px 12px;font-variant-numeric:tabular-nums">${dataFmt}</td>
-            <td style="padding:7px 12px;font-weight:500">${r.funcionarios?.nome || (r.funcionario_id ? "—" : nomeTempRA(r.observacoes))}</td>
-            <td style="padding:7px 12px;opacity:.7">${r.obras?.nome||"—"}</td>
+            <td style="padding:7px 12px;font-weight:500">${escHtml(r.funcionarios?.nome || (r.funcionario_id ? "—" : nomeTempRA(r.observacoes)))}</td>
+            <td style="padding:7px 12px;opacity:.7">${escHtml(r.obras?.nome||"—")}</td>
             <td style="padding:7px 12px;text-align:center">
                 ${r.tipo==="presenca"
                     ? `<span style="background:rgba(74,222,128,.15);color:#16a34a;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">Presente</span>`
@@ -784,7 +785,7 @@ async function carregarRegistos() {
     if (filtroDia) query = query.eq("dia", filtroDia.toISOString().split("T")[0]);
 
     const { data, error } = await query.order("dia", { ascending: false });
-    if (error) { alert("Erro: " + error.message); return; }
+    if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
 
     _todosRegistos = data || [];
 
@@ -1063,7 +1064,7 @@ function initDashboard() {
     if (sel && !sel.options.length) {
         const anoAtual = new Date().getFullYear();
         for (let a = anoAtual; a >= anoAtual - 2; a--) {
-            sel.innerHTML += `<option value="${a}">${a}</option>`;
+            sel.innerHTML += `<option value="${escHtml(a)}">${escHtml(a)}</option>`;
         }
     }
     carregarDashboard();
@@ -1369,11 +1370,20 @@ function abrirModalFuncionario(func = null) {
     // Info dispositivo — só em edição
     const deviceInfo = document.getElementById("funcDeviceInfo");
     const deviceIdEl = document.getElementById("funcDeviceId");
+    const semDisp    = document.getElementById("funcSemDispositivo");
+    const codGerado  = document.getElementById("funcCodigoGerado");
+
+    if (codGerado) codGerado.style.display = "none";
+
     if (func?.device_id) {
         deviceInfo.style.display = "block";
         deviceIdEl.textContent   = func.device_id;
+        if (semDisp) semDisp.style.display = "none";
     } else {
         deviceInfo.style.display = "none";
+        // Em edição de alguém sem dispositivo, oferecer o código de inscrição.
+        // Em criação (sem func) não faz sentido: ainda não há id.
+        if (semDisp) semDisp.style.display = func?.id ? "block" : "none";
     }
 
     document.getElementById("modalFuncMsg").textContent = "";
@@ -1408,12 +1418,12 @@ async function guardarFuncionario() {
 
     if (funcEditId) {
         const { error } = await SB.from("funcionarios").update(payload).eq("id", funcEditId);
-        if (error) { msg.textContent = "Erro: " + error.message; return; }
+        if (error) { console.error(error); msg.textContent = "Não foi possível gravar."; return; }
     } else {
         // Novo funcionário — device_id fica vazio até o funcionário fazer o
         // cadastro no seu dispositivo via QR (é assim que o cadastro o encontra)
         const { error } = await SB.from("funcionarios").insert(payload);
-        if (error) { msg.textContent = "Erro: " + error.message; return; }
+        if (error) { console.error(error); msg.textContent = "Não foi possível gravar."; return; }
     }
 
     fecharModalFuncionario();
@@ -1428,7 +1438,7 @@ async function toggleAtivoFuncionario(id, nome, ativoAtual) {
         .update({ ativo: !ativoAtual })
         .eq("id", id);
 
-    if (error) { alert("Erro: " + error.message); return; }
+    if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
     await carregarFuncionarios();
 }
 
@@ -1518,10 +1528,15 @@ async function abrirHistoricoFuncionario(func) {
             </div>`
           ).join("")}
 
-        <button onclick="exportarPDFFuncionario(${JSON.stringify(func).replace(/"/g,'&quot;')}, ${JSON.stringify(regs).replace(/"/g,'&quot;')})"
+        <button id="btnPDFFuncionario"
             style="margin-top:16px;width:100%;background:rgba(244,185,66,.12);border:1px solid rgba(244,185,66,.3);color:var(--primary,#f4b942);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;font-weight:600">
             📄 Exportar PDF do Mês
         </button>`;
+
+    // Os dados vão pelo ouvinte, não por dentro do onclick: um nome que
+    // contenha &quot; fechava a string do atributo e corria o que quisesse.
+    const btnPDFFunc = document.getElementById("btnPDFFuncionario");
+    if (btnPDFFunc) btnPDFFunc.addEventListener("click", () => exportarPDFFuncionario(func, regs));
 
     document.getElementById("modalHistFuncionario").style.display = "flex";
 }
@@ -1598,8 +1613,39 @@ async function toggleAcessoStock(id, nome, temAcesso) {
         .update({ acesso_stock: !temAcesso })
         .eq("id", id);
 
-    if (error) { alert("Erro: " + error.message); return; }
+    if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
     await carregarFuncionarios();
+}
+
+// Gera o código que substitui o nome como credencial no cadastro. O nome não
+// é um segredo: quem o soubesse ficava com a identidade de quem ainda não
+// tinha dispositivo associado.
+async function gerarCodigoInscricao() {
+    if (!funcEditId) return;
+
+    const caixa = document.getElementById("funcCodigoGerado");
+    const btn   = document.getElementById("btnGerarCodigo");
+    const msgEl = document.getElementById("modalFuncMsg");
+
+    if (btn) { btn.disabled = true; btn.textContent = "A gerar…"; }
+
+    const { data: codigo, error } = await SB.rpc("gerar_codigo_inscricao", {
+        p_funcionario: funcEditId
+    });
+
+    if (btn) { btn.disabled = false; btn.textContent = "Gerar outro código"; }
+
+    if (error || !codigo) {
+        console.error(error);
+        msgEl.textContent = "Não foi possível gerar o código.";
+        msgEl.style.color = "#ff7a7a";
+        return;
+    }
+
+    // textContent, não innerHTML: nada aqui precisa de marcação.
+    caixa.querySelector("div").textContent = codigo;
+    caixa.style.display = "block";
+    msgEl.textContent = "";
 }
 
 async function revogarDispositivoFuncionario() {
@@ -1610,10 +1656,15 @@ async function revogarDispositivoFuncionario() {
         .update({ device_id: null })
         .eq("id", funcEditId);
 
-    if (error) { alert("Erro: " + error.message); return; }
+    if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
 
     document.getElementById("funcDeviceInfo").style.display = "none";
-    document.getElementById("modalFuncMsg").textContent = "Dispositivo revogado. O funcionário terá de se registar novamente.";
+    // Aparece a caixa do código, para se poder gerar um logo a seguir.
+    const _semDisp = document.getElementById("funcSemDispositivo");
+    if (_semDisp) _semDisp.style.display = "block";
+    const _cod = document.getElementById("funcCodigoGerado");
+    if (_cod) _cod.style.display = "none";
+    document.getElementById("modalFuncMsg").textContent = "Dispositivo revogado. Gere um código de inscrição para esta pessoa se registar de novo.";
     document.getElementById("modalFuncMsg").style.color = "#5ad65a";
     await carregarFuncionarios();
 }
@@ -1816,10 +1867,10 @@ async function guardarEditObra() {
     };
     if (id) {
         const { error } = await SB.from("obras").update(payload).eq("id", id);
-        if (error) { alert("Erro: " + error.message); return; }
+        if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
     } else {
         const { error } = await SB.from("obras").insert(payload);
-        if (error) { alert("Erro: " + error.message); return; }
+        if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
     }
     document.getElementById("modalEditarObra").style.display = "none";
     await carregarObras();
@@ -1862,7 +1913,7 @@ async function carregarServicosModal() {
         return `<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;border:1px solid ${s.concluido?"rgba(74,222,128,.2)":"rgba(255,255,255,.06)"}">
             <div style="flex:1;min-width:0">
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-                    <span style="font-size:13px;font-weight:600">${s.nome}</span>
+                    <span style="font-size:13px;font-weight:600">${escHtml(s.nome)}</span>
                     ${s.extra?`<span style="font-size:10px;background:rgba(251,146,60,.15);color:#fb923c;padding:1px 6px;border-radius:10px">Extra</span>`:""}
                     ${s.concluido?`<span style="font-size:10px;background:rgba(74,222,128,.15);color:#4ade80;padding:1px 6px;border-radius:10px">✓ Concluído</span>`:""}
                 </div>
@@ -1874,10 +1925,15 @@ async function carregarServicosModal() {
             </div>
             <div style="display:flex;gap:4px;flex-shrink:0">
                 <button onclick="toggleServicoConcluido('${s.id}',${s.concluido})" style="background:${s.concluido?"rgba(74,222,128,.15)":"rgba(255,255,255,.07)"};border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px" title="${s.concluido?"Reabrir":"Concluir"}">${s.concluido?"↩":"✓"}</button>
-                <button onclick="eliminarServico('${s.id}','${s.nome.replace(/'/g,"")}')" style="background:rgba(248,113,113,.1);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;opacity:.6">🗑</button>
+                <button data-servico-id="${escHtml(s.id)}" data-servico-nome="${escHtml(s.nome)}" class="btn-elim-servico" style="background:rgba(248,113,113,.1);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;opacity:.6">🗑</button>
             </div>
         </div>`;
     }).join("");
+
+    // O nome do serviço ia interpolado dentro do onclick; agora vem do dataset.
+    lista.querySelectorAll(".btn-elim-servico").forEach(b => {
+        b.addEventListener("click", () => eliminarServico(b.dataset.servicoId, b.dataset.servicoNome));
+    });
 }
 
 async function adicionarServico() {
@@ -1889,7 +1945,7 @@ async function adicionarServico() {
     const valor = parseFloat(document.getElementById("novoServValor").value) || null;
     const extra = document.getElementById("novoServExtra").checked;
     const { error } = await SB.from("obra_servicos").insert({ obra_id: obraId, nome, horas_orcamento: horas, valor_orcamento: valor, extra });
-    if (error) { alert("Erro: " + error.message); return; }
+    if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
     document.getElementById("novoServNome").value  = "";
     document.getElementById("novoServHoras").value = "";
     document.getElementById("novoServValor").value = "";
@@ -2092,7 +2148,7 @@ async function toggleEstadoObra(id, nome, estadoAtual) {
     const { error } = await SB.from("obras")
         .update({ estado: novoEstado })
         .eq("id", id);
-    if (error) { alert("Erro ao actualizar estado: " + error.message); return; }
+    if (error) { { console.error(error); alert("Não foi possível actualizar o estado."); }; return; }
     await carregarObras();
 }
 
@@ -2119,7 +2175,7 @@ async function eliminarObra(id, nome) {
     if (!confirm(aviso)) return;
 
     const { error } = await SB.from("obras").delete().eq("id", id);
-    if (error) { alert("Erro ao eliminar: " + error.message); return; }
+    if (error) { { console.error(error); alert("Não foi possível eliminar."); }; return; }
     await carregarObras();
 }
 
@@ -2416,6 +2472,17 @@ function unidadeIdPorTexto(texto) {
     return porCodigo("un") || _unidadesFatura[0]?.id || 1;
 }
 
+// Dar entrada em stock faz sentido quando o material foi comprado para o
+// armazém. Quando a fatura já está imputada a uma obra, o material foi
+// quase sempre entregue lá: dar entrada encheria o inventário de coisas
+// que não estão cá. Fica por isso só sugerido — a decisão é de quem lança.
+function sugerirEntradaStock(artigoId, l) {
+    if (!artigoId) return false;
+    if (!(Number(l.quantidade) > 0)) return false;
+    if (document.getElementById("movTipo")?.value === "entrada") return false;   // nota de crédito
+    return !document.getElementById("movObra")?.value;
+}
+
 // Reconhece pelo sinónimo gravado e, se não houver, pelo próprio nome
 // ou código do artigo.
 function artigoParaTexto(texto) {
@@ -2444,7 +2511,7 @@ function opcoesArtigos(escolhido) {
     return `<option value=""${sel("")}>— sem artigo —</option>` +
            `<option value="__novo__">➕ criar artigo novo…</option>` +
            _artigosFatura.map(a =>
-               `<option value="${a.id}"${sel(a.id)}>${escapeHtmlFatura(a.descricao || a.codigo || "(sem nome)")}</option>`
+               `<option value="${a.id}"${sel(a.id)}>${escHtml(a.descricao || a.codigo || "(sem nome)")}</option>`
            ).join("");
 }
 
@@ -2498,7 +2565,7 @@ async function aoEscolherArtigoLinha(sel) {
             ativo:          true,
         }).select("id, codigo, descricao, unidade_compra, preco_atual").single();
 
-        if (error) { alert("Não foi possível criar o artigo: " + error.message); return; }
+        if (error) { { console.error(error); alert("Não foi possível criar o artigo."); }; return; }
 
         _artigosFatura.push(novo);
         _artigosFatura.sort((a, b) => (a.descricao || "").localeCompare(b.descricao || "", "pt"));
@@ -2703,11 +2770,10 @@ async function mostrarLinhasFatura(d) {
     await carregarArtigosESinonimos();
 
     // Cada linha já chega com artigo, ou tenta-se reconhecer pela descrição
-    _linhasFaturaLidas = (d.linhas || []).map((l, i) => ({
-        ...l,
-        ordem: i,
-        artigo_id: l.artigo_id || artigoParaTexto(l.descricao),
-    }));
+    _linhasFaturaLidas = (d.linhas || []).map((l, i) => {
+        const artigoId = l.artigo_id || artigoParaTexto(l.descricao);
+        return { ...l, ordem: i, artigo_id: artigoId, stock: l.stock ?? sugerirEntradaStock(artigoId, l) };
+    });
     await carregarUltimosPrecos(_linhasFaturaLidas.map(l => l.artigo_id));
 
     const wrap  = document.getElementById("faturaLinhasWrap");
@@ -2719,7 +2785,7 @@ async function mostrarLinhasFatura(d) {
     if (d.avisos?.length) {
         avisosEl.innerHTML = d.avisos.map(a => `
             <div style="background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.3);color:#9a5b04;border-radius:6px;padding:6px 10px;font-size:12px;margin-bottom:4px">
-                ${escapeHtmlFatura(a)}
+                ${escHtml(a)}
             </div>`).join("");
         avisosEl.style.display = "block";
     } else {
@@ -2729,7 +2795,7 @@ async function mostrarLinhasFatura(d) {
 
     tbody.innerHTML = _linhasFaturaLidas.map((l, i) => `
         <tr data-i="${i}">
-            <td style="padding:3px 6px"><input value="${escapeHtmlFatura(l.descricao || "")}" data-campo="descricao"
+            <td style="padding:3px 6px"><input value="${escHtml(l.descricao || "")}" data-campo="descricao"
                 style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;background:#fff;color:var(--text-dark)"></td>
             <td style="padding:3px 6px">
                 <select data-campo="artigo" onchange="aoEscolherArtigoLinha(this)"
@@ -2740,12 +2806,17 @@ async function mostrarLinhasFatura(d) {
             </td>
             <td style="padding:3px 6px"><input type="number" step="0.001" value="${l.quantidade ?? ""}" data-campo="quantidade"
                 style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;text-align:right;background:#fff;color:var(--text-dark)"></td>
-            <td style="padding:3px 6px"><input value="${escapeHtmlFatura(l.unidade || "")}" data-campo="unidade"
+            <td style="padding:3px 6px"><input value="${escHtml(l.unidade || "")}" data-campo="unidade"
                 style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;background:#fff;color:var(--text-dark)"></td>
             <td style="padding:3px 6px"><input type="number" step="0.01" value="${l.preco_unitario ?? ""}" data-campo="preco_unitario"
                 style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;text-align:right;background:#fff;color:var(--text-dark)"></td>
             <td style="padding:3px 6px"><input type="number" step="0.01" value="${l.valor_total ?? ""}" data-campo="valor_total"
                 style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;text-align:right;background:#fff;color:var(--text-dark)"></td>
+            <td style="padding:3px 6px;text-align:center">
+                <input type="checkbox" data-campo="stock" ${l.stock ? "checked" : ""}
+                    title="Dar entrada desta quantidade no inventário"
+                    style="width:16px;height:16px;cursor:pointer">
+            </td>
             <td style="padding:3px 6px;text-align:center">
                 <button type="button" onclick="this.closest('tr').remove(); actualizarResumoLinhas()"
                     style="background:rgba(248,113,113,.1);border:none;border-radius:5px;padding:3px 6px;cursor:pointer;font-size:12px">✕</button>
@@ -2757,6 +2828,8 @@ async function mostrarLinhasFatura(d) {
         actualizarPrecoAnterior(tr);
         tr.querySelector('[data-campo="preco_unitario"]')
           ?.addEventListener("input", () => actualizarPrecoAnterior(tr));
+        tr.querySelector('[data-campo="stock"]')
+          ?.addEventListener("change", actualizarResumoLinhas);
     });
 
     wrap.style.display = "block";
@@ -2776,6 +2849,9 @@ function linhasFaturaDoEcra() {
             preco_unitario: v("preco_unitario") !== "" ? parseFloat(v("preco_unitario")) : null,
             valor_total:    v("valor_total")    !== "" ? parseFloat(v("valor_total"))    : null,
             ordem: i,
+            // Só para o ecrã: não é coluna de fatura_linhas, é retirado
+            // antes de gravar e usado para a entrada em inventário.
+            stock: !!tr.querySelector('[data-campo="stock"]')?.checked,
         };
     }).filter(l => l.descricao_original);
 }
@@ -2787,8 +2863,10 @@ function actualizarResumoLinhas() {
     const soma   = linhas.reduce((s, l) => s + (l.valor_total || 0), 0);
     const base   = parseFloat(document.getElementById("movBase")?.value) || 0;
     const difere = base > 0 && Math.abs(soma - base) > 0.05;
+    const paraStock = linhas.filter(l => l.stock && l.artigo_id && Number(l.quantidade) > 0).length;
     el.innerHTML = `${linhas.length} linha${linhas.length === 1 ? "" : "s"} · soma ${soma.toFixed(2)} €` +
-        (difere ? ` <span style="color:#9a5b04">— não bate com a base de ${base.toFixed(2)} €</span>` : "");
+        (difere ? ` <span style="color:#9a5b04">— não bate com a base de ${base.toFixed(2)} €</span>` : "") +
+        (paraStock ? ` · ${paraStock} ${paraStock === 1 ? "dá" : "dão"} entrada em stock` : "");
 }
 
 function limparLinhasFatura() {
@@ -2857,10 +2935,49 @@ async function gravarSinonimosEPrecos(linhas, fornecedor_id, dataDoc) {
     }
 }
 
-function escapeHtmlFatura(s) {
-    return String(s == null ? "" : s)
-        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+// Entrada em inventário das linhas marcadas. Fica ligada à fatura e à
+// linha, para se poder desfazer quando a fatura for corrigida e para se
+// saber sempre de onde veio este material.
+async function gravarEntradasStock(movId, gravadas, linhasEcra, dataDoc, referencia) {
+    const porOrdem = {};
+    (gravadas || []).forEach(g => { porOrdem[g.ordem] = g.id; });
+
+    const entradas = (linhasEcra || [])
+        .filter(l => l.stock && l.artigo_id && Number(l.quantidade) > 0)
+        .map(l => ({
+            artigo_id:       l.artigo_id,
+            tipo_movimento:  "entrada",
+            quantidade:      Number(l.quantidade),
+            preco_unitario:  l.preco_unitario ?? null,
+            data_movimento:  dataDoc,
+            observacoes:     referencia ? `Fatura ${referencia}` : "Entrada por fatura",
+            movimento_id:    movId,
+            fatura_linha_id: porOrdem[l.ordem] || null,
+        }));
+    if (!entradas.length) return;
+
+    const { error } = await SB.from("movimentos_stock").insert(entradas);
+    if (error) {
+        console.error("entradas de stock:", error);
+        { console.error(error); alert("O movimento ficou gravado, mas a entrada em inventário não."); };
+    }
+}
+
+// Escape de HTML, para usar em TODO o sítio onde um dado da base de dados
+// entra numa string de HTML.
+//
+// A regra é escapar na LEITURA, não na entrada. O texto que vem de uma
+// fatura lida — nome do fornecedor, referência, descrição de linha — é
+// escolhido por quem manda a fatura, e basta conseguir enviar uma à empresa.
+// Escapá-lo só no ecrã de revisão não chega: ele fica gravado e volta a
+// aparecer em todos os ecrãs que o mostrem.
+//
+// Escapa também a plica, que faltava: sem ela, um atributo delimitado por
+// plicas fica aberto a quem souber disso.
+function escHtml(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
 }
 
 function mostrarFeedbackQR(msg, tipo) {
@@ -2893,6 +3010,331 @@ function mostrarFeedbackQR(msg, tipo) {
 }
 
 
+
+// =======================================================
+// VISÃO GERAL
+// O primeiro separador: o estado da casa num ecrã. O que precisa de
+// decisão em cima, os números do mês a seguir, as obras, e os caminhos
+// para o resto. Nada aqui é novo — é o que já está noutros separadores,
+// reunido para não se ter de ir a cada um ver se há alguma coisa.
+// =======================================================
+const VG_SUBIDA_PC = 5;    // a partir daqui, um preço que sobe é para avisar
+
+async function initVisaoGeral() {
+    document.getElementById("vgActualizar")?.addEventListener("click", carregarVisaoGeral, { once: true });
+    await carregarVisaoGeral();
+}
+
+async function carregarVisaoGeral() {
+    const btn = document.getElementById("vgActualizar");
+    if (btn) { btn.disabled = true; btn.textContent = "A ler…"; }
+
+    await Promise.all([vgCarregarAlertas(), vgCarregarNumeros(), vgCarregarObras(), vgCarregarAtalhos()]);
+
+    if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Actualizar";
+        btn.addEventListener("click", carregarVisaoGeral, { once: true });
+    }
+}
+
+const vgEuros = (n) =>
+    new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(Number(n) || 0);
+
+// ---------- O que precisa de decisão ----------
+async function vgCarregarAlertas() {
+    const cont = document.getElementById("vgAlertas");
+    if (!cont) return;
+    cont.innerHTML = '<div style="padding:14px 0;font-size:13px;opacity:.6">A ver…</div>';
+
+    const alertas = [];
+    for (const procurar of [vgPedidosPorValidar, vgPrecosSubiram, vgDespesasSemObra,
+                            vgFaturasPorPagar, vgStockAbaixoMinimo, vgTarefasAtrasadas]) {
+        try { const a = await procurar(); if (a) alertas.push(a); }
+        catch (e) { console.warn(procurar.name, e); }
+    }
+
+    if (!alertas.length) {
+        cont.innerHTML = '<div style="padding:14px 0;font-size:13.5px;opacity:.7">' +
+            'Nada à tua espera. Nem preços fora do normal, nem faturas por imputar, nem tarefas atrasadas.</div>';
+        return;
+    }
+
+    cont.innerHTML = alertas.map((a, i) => `
+        <div style="display:flex;align-items:center;gap:14px;padding:13px 0;${i ? "border-top:1px solid rgba(0,0,0,.07)" : ""}">
+            <span style="width:36px;height:36px;border-radius:9px;background:${a.cor};display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0">${a.icone}</span>
+            <div style="flex:1;min-width:0">
+                <div style="font-weight:600;font-size:14.5px">${escHtml(a.titulo)}</div>
+                <div style="font-size:12.5px;opacity:.65;margin-top:1px">${escHtml(a.sub)}</div>
+            </div>
+            ${a.tab ? `<button class="btn-secondary" style="font-size:12px;padding:4px 12px;flex-shrink:0"
+                        onclick="abrirTab('${a.tab}')">Ver</button>` : ""}
+        </div>`).join("");
+}
+
+async function vgPedidosPorValidar() {
+    const { count } = await SB.from("pedidos").select("id", { count: "exact", head: true }).eq("estado", "rascunho");
+    if (!count) return null;
+    return { icone: "🛒", cor: "rgba(0,0,0,.06)",
+             titulo: count === 1 ? "1 pedido de material por validar" : `${count} pedidos de material por validar`,
+             sub: "Vieram do assistente e estão à espera de ti", tab: null };
+}
+
+async function vgPrecosSubiram() {
+    const { data } = await SB.from("precos")
+        .select("artigo_id, preco, data, artigos(descricao)")
+        .order("data", { ascending: false }).limit(400);
+    if (!data?.length) return null;
+
+    const porArtigo = {};
+    data.forEach(p => { (porArtigo[p.artigo_id] ||= []).push(p); });
+
+    const subidas = [];
+    Object.values(porArtigo).forEach(lista => {
+        if (lista.length < 2) return;
+        const [novo, anterior] = lista;
+        const a = Number(anterior.preco), n = Number(novo.preco);
+        if (!(a > 0) || !(n > a)) return;
+        const pc = ((n - a) / a) * 100;
+        if (pc >= VG_SUBIDA_PC) subidas.push({ nome: novo.artigos?.descricao || "artigo", pc });
+    });
+    if (!subidas.length) return null;
+
+    subidas.sort((x, y) => y.pc - x.pc);
+    return { icone: "📄", cor: "rgba(244,185,66,.22)",
+             titulo: subidas.length === 1 ? "Preço acima do anterior" : `${subidas.length} preços acima do anterior`,
+             sub: `+${subidas[0].pc.toFixed(0)}% em ${subidas[0].nome}`, tab: "inventario" };
+}
+
+async function vgDespesasSemObra() {
+    const { count } = await SB.from("movimentos_financeiros")
+        .select("id", { count: "exact", head: true })
+        .is("obra_id", null).eq("tipo", "saida").eq("ativo", true);
+    if (!count) return null;
+    return { icone: "🧾", cor: "rgba(0,0,0,.06)",
+             titulo: count === 1 ? "1 despesa sem obra" : `${count} despesas sem obra`,
+             sub: "Não entram no custo de nenhuma obra", tab: "financeiro" };
+}
+
+async function vgFaturasPorPagar() {
+    const { data, count } = await SB.from("movimentos_financeiros")
+        .select("valor_total", { count: "exact" })
+        .neq("estado_pagamento", "pago").eq("tipo", "saida").eq("ativo", true).limit(200);
+    if (!count) return null;
+    const soma = (data || []).reduce((s, m) => s + Number(m.valor_total || 0), 0);
+    return { icone: "💶", cor: "rgba(192,57,43,.10)",
+             titulo: count === 1 ? "1 fatura por pagar" : `${count} faturas por pagar`,
+             sub: vgEuros(soma), tab: "financeiro" };
+}
+
+async function vgStockAbaixoMinimo() {
+    const [{ data: arts }, { data: movs }] = await Promise.all([
+        SB.from("artigos").select("id, descricao, stock_inicial, stock_minimo").eq("ativo", true).gt("stock_minimo", 0),
+        SB.from("movimentos_stock").select("artigo_id, tipo_movimento, quantidade"),
+    ]);
+    if (!arts?.length) return null;
+
+    const saldo = {};
+    (movs || []).forEach(m => {
+        const q = Number(m.quantidade) || 0;
+        const entra = m.tipo_movimento === "entrada" || m.tipo_movimento === "ajuste_entrada";
+        saldo[m.artigo_id] = (saldo[m.artigo_id] || 0) + (entra ? q : -q);
+    });
+    const abaixo = arts.filter(a => (Number(a.stock_inicial) || 0) + (saldo[a.id] || 0) < Number(a.stock_minimo));
+    if (!abaixo.length) return null;
+
+    return { icone: "📦", cor: "rgba(0,0,0,.06)",
+             titulo: abaixo.length === 1 ? "1 artigo abaixo do mínimo" : `${abaixo.length} artigos abaixo do mínimo`,
+             sub: abaixo.slice(0, 3).map(a => a.descricao).join(", ") + (abaixo.length > 3 ? "…" : ""),
+             tab: "inventario" };
+}
+
+async function vgTarefasAtrasadas() {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const { data, count } = await SB.from("tarefas")
+        .select("descricao, obras(nome)", { count: "exact" })
+        .lt("data_prevista", hoje).neq("estado", "concluida").limit(5);
+    if (!count) return null;
+    return { icone: "⏰", cor: "rgba(244,185,66,.22)",
+             titulo: count === 1 ? "1 tarefa atrasada" : `${count} tarefas atrasadas`,
+             sub: data?.[0]?.obras?.nome || "sem obra", tab: "planeamento" };
+}
+
+// ---------- Números do mês ----------
+async function vgCarregarNumeros() {
+    const cont = document.getElementById("vgNumeros");
+    if (!cont) return;
+
+    const hoje = new Date();
+    const mes  = hoje.toISOString().slice(0, 7) + "-01";
+    const mesAnterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1).toISOString().slice(0, 10);
+
+    const [{ data: esteMes }, { data: anterior }, { count: obras }, { count: funcs }] = await Promise.all([
+        SB.from("movimentos_financeiros").select("valor_total, tipo").gte("data_documento", mes).eq("ativo", true),
+        SB.from("movimentos_financeiros").select("valor_total, tipo")
+          .gte("data_documento", mesAnterior).lt("data_documento", mes).eq("ativo", true),
+        SB.from("obras").select("id", { count: "exact", head: true }).eq("estado", "ativa"),
+        SB.from("funcionarios").select("id", { count: "exact", head: true }).eq("ativo", true),
+    ]);
+
+    const somaPor = (lista, tipo) => (lista || [])
+        .filter(m => m.tipo === tipo).reduce((s, m) => s + Number(m.valor_total || 0), 0);
+
+    const saidas    = somaPor(esteMes, "saida");
+    const entradas  = somaPor(esteMes, "entrada");
+    const saidasAnt = somaPor(anterior, "saida");
+
+    // A comparação só se mostra quando o mês anterior teve movimento;
+    // "subiu infinito por cento" não diz nada a ninguém.
+    let variacao = "";
+    if (saidasAnt > 0) {
+        const pc = ((saidas - saidasAnt) / saidasAnt) * 100;
+        if (Math.abs(pc) < 1) {
+            variacao = `<div style="font-size:11.5px;margin-top:4px;opacity:.6">como no mês passado</div>`;
+        } else {
+            const sobe = pc > 0;
+            variacao = `<div style="font-size:11.5px;margin-top:4px;color:${sobe ? "#b45309" : "#15803d"}">
+                ${sobe ? "▲" : "▼"} ${Math.abs(pc).toFixed(0)}% do que no mês passado</div>`;
+        }
+    }
+
+    const cartao = (titulo, valor, extra = "") => `
+        <div class="card metric">
+            <h3>${titulo}</h3>
+            <div class="value">${valor}</div>
+            ${extra}
+        </div>`;
+
+    cont.innerHTML =
+        cartao("Saídas este mês",   vgEuros(saidas), variacao) +
+        cartao("Entradas este mês", vgEuros(entradas)) +
+        cartao("Obras activas",     obras ?? "–") +
+        cartao("Funcionários",      funcs ?? "–");
+}
+
+// ---------- Obras ----------
+async function vgCarregarObras() {
+    const cont = document.getElementById("vgObras");
+    if (!cont) return;
+
+    const { data: obras } = await SB.from("obras")
+        .select("id, nome, codigo, local, percentagem_conclusao")
+        .eq("estado", "ativa").order("nome");
+
+    if (!obras?.length) {
+        cont.innerHTML = '<div style="padding:14px 0;font-size:13px;opacity:.6">Nenhuma obra activa.</div>';
+        return;
+    }
+
+    const ids = obras.map(o => o.id);
+    const [{ data: servicos }, { data: gastos }, { data: horas }] = await Promise.all([
+        SB.from("obra_servicos").select("obra_id, nome, valor_orcamento, horas_orcamento, concluido, ordem").in("obra_id", ids),
+        SB.from("movimentos_financeiros").select("obra_id, valor_total").in("obra_id", ids).eq("tipo", "saida").eq("ativo", true),
+        SB.from("registos_admin").select("obra_id, horas").in("obra_id", ids),
+    ]);
+
+    const somar = (lista, campo) => (lista || []).reduce((acc, r) => {
+        acc[r.obra_id] = (acc[r.obra_id] || 0) + (Number(r[campo]) || 0); return acc;
+    }, {});
+    const orcamento  = somar(servicos, "valor_orcamento");
+    const horasOrc   = somar(servicos, "horas_orcamento");
+    const gasto      = somar(gastos,   "valor_total");
+    const horasReais = somar(horas,    "horas");
+
+    const fase = {};
+    (servicos || []).slice().sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
+        .forEach(s => { if (!s.concluido && !fase[s.obra_id]) fase[s.obra_id] = s.nome; });
+
+    cont.innerHTML = obras.map((o, i) => {
+        const pc  = Math.max(0, Math.min(100, Number(o.percentagem_conclusao) || 0));
+        const sub = [fase[o.id] || o.local || o.codigo, pc ? `${pc}%` : null].filter(Boolean).join(" · ");
+        const g   = gasto[o.id] || 0, orc = orcamento[o.id] || 0;
+        return `<div style="padding:12px 0;${i ? "border-top:1px solid rgba(0,0,0,.07)" : ""}">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                <div style="min-width:0">
+                    <div style="font-weight:600;font-size:14.5px">${escHtml(o.nome)}</div>
+                    <div style="font-size:12.5px;opacity:.65;margin-top:1px">${escHtml(sub || "sem fase definida")}</div>
+                </div>
+                <div style="text-align:right;flex-shrink:0">
+                    <div style="font-size:13px;font-weight:600">${vgEuros(g)}</div>
+                    ${orc > 0 ? `<div style="font-size:11.5px;opacity:.6">de ${vgEuros(orc)}</div>` : ""}
+                </div>
+                ${vgEtiqueta(o.id, orcamento, gasto, horasOrc, horasReais)}
+            </div>
+            <div style="height:5px;border-radius:3px;background:rgba(0,0,0,.08);margin-top:9px;overflow:hidden">
+                <i style="display:block;height:100%;width:${pc}%;background:var(--text-dark);border-radius:3px"></i>
+            </div>
+        </div>`;
+    }).join("");
+}
+
+function vgEtiqueta(id, orcamento, gasto, horasOrc, horasReais) {
+    const et = (texto, bg, cor) =>
+        `<span style="font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:20px;white-space:nowrap;background:${bg};color:${cor}">${texto}</span>`;
+
+    const orc = orcamento[id] || 0, g = gasto[id] || 0;
+    const ho  = horasOrc[id] || 0, hr = horasReais[id] || 0;
+
+    if (orc > 0) {
+        const pc = (g / orc) * 100;
+        if (pc > 100) return et(`Acima ${(pc - 100).toFixed(0)}%`, "rgba(192,57,43,.12)", "#a4332a");
+        if (pc >= 90) return et(`Orçamento a ${pc.toFixed(0)}%`, "rgba(244,185,66,.22)", "#8a5e06");
+    }
+    if (ho > 0) {
+        const pc = (hr / ho) * 100;
+        if (pc >= 80) return et(`Horas a ${pc.toFixed(0)}%`, "rgba(244,185,66,.22)", "#8a5e06");
+    }
+    if (orc > 0) return et("No orçamento", "rgba(42,138,42,.12)", "#1f6b1f");
+    return et("Sem orçamento", "rgba(0,0,0,.06)", "var(--text-muted)");
+}
+
+// ---------- Para onde ir ----------
+async function vgCarregarAtalhos() {
+    const cont = document.getElementById("vgAtalhos");
+    if (!cont) return;
+
+    const hoje = new Date().toISOString().slice(0, 10);
+    const mes  = hoje.slice(0, 7) + "-01";
+
+    const conta = async (tabela, afinar) => {
+        try {
+            let q = SB.from(tabela).select("id", { count: "exact", head: true });
+            if (afinar) q = afinar(q);
+            const { count, error } = await q;
+            return error ? null : (count ?? 0);
+        } catch { return null; }
+    };
+
+    const [docsMes, artigos, tarefas, registosHoje] = await Promise.all([
+        conta("movimentos_financeiros", q => q.gte("data_documento", mes).eq("ativo", true)),
+        conta("artigos",        q => q.eq("ativo", true)),
+        conta("tarefas",        q => q.neq("estado", "concluida")),
+        conta("registos_admin", q => q.eq("data", hoje)),
+    ]);
+
+    const plural = (n, um, muitos) => n == null ? "ver" : `${n} ${n === 1 ? um : muitos}`;
+
+    const atalhos = [
+        { ic: "💶", nome: "Financeiro",  sub: plural(docsMes, "documento este mês", "documentos este mês"), tab: "financeiro" },
+        { ic: "📦", nome: "Inventário",  sub: plural(artigos, "artigo", "artigos"),                          tab: "inventario" },
+        { ic: "🗓", nome: "Planeamento", sub: plural(tarefas, "tarefa por fazer", "tarefas por fazer"),      tab: "planeamento" },
+        { ic: "🏗", nome: "Obras",       sub: "fichas e serviços",                                           tab: "obras" },
+        { ic: "👷", nome: "Funcionários",sub: "fichas e dispositivos",                                       tab: "funcionarios" },
+        { ic: "📊", nome: "Fluxo de caixa", sub: "entradas e saídas",                                        tab: "fluxo" },
+        { ic: "📋", nome: "Registo diário", sub: plural(registosHoje, "registo hoje", "registos hoje"),      ir: "registo-admin.html" },
+        { ic: "☀", nome: "Hoje",         sub: "o ecrã do telemóvel",                                         ir: "hoje.html" },
+    ];
+
+    cont.innerHTML = atalhos.map(a => {
+        const accao = a.tab ? `onclick="abrirTab('${a.tab}')"` : `onclick="location.href='${a.ir}'"`;
+        return `<button class="card" ${accao}
+            style="text-align:left;border:none;cursor:pointer;padding:14px 16px;display:flex;flex-direction:column;gap:3px;font:inherit">
+            <span style="font-size:19px;line-height:1;margin-bottom:3px">${a.ic}</span>
+            <span style="font-weight:600;font-size:14px">${a.nome}</span>
+            <span style="font-size:11.5px;opacity:.6">${escHtml(a.sub)}</span>
+        </button>`;
+    }).join("");
+}
 
 // =======================================================
 // INVENTÁRIO — CRUD COMPLETO
@@ -2946,7 +3388,7 @@ async function carregarUnidades() {
     const sel = document.getElementById("artUnidade");
     if (!sel) return;
     sel.innerHTML = "";
-    data?.forEach(u => { sel.innerHTML += `<option value="${u.id}">${u.codigo}</option>`; });
+    data?.forEach(u => { sel.innerHTML += `<option value="${escHtml(u.id)}">${escHtml(u.codigo)}</option>`; });
 }
 
 async function carregarArtigos() {
@@ -2992,15 +3434,15 @@ async function carregarArtigos() {
         const tr = document.createElement("tr");
         const stockBaixo = a.stock_minimo && a.quantidade < a.stock_minimo;
         tr.innerHTML = `
-            <td>${a.codigo || ""}</td>
-            <td>${a.descricao || ""}</td>
-            <td>${a.tipo_artigo || ""}</td>
+            <td>${escHtml(a.codigo || "")}</td>
+            <td>${escHtml(a.descricao || "")}</td>
+            <td>${escHtml(a.tipo_artigo || "")}</td>
             <td>${Number(a.preco_atual || 0).toFixed(2)} €</td>
             <td style="color:${stockBaixo ? "#f97316" : "inherit"};font-weight:${stockBaixo ? "700" : "400"}">
                 ${a.quantidade ?? 0}${stockBaixo ? " ⚠️" : ""}
                 ${a.stock_minimo ? `<span style="font-size:10px;opacity:.5;margin-left:4px">(mín: ${a.stock_minimo})</span>` : ""}
             </td>
-            <td>${a.local_armazenamento || ""}</td>
+            <td>${escHtml(a.local_armazenamento || "")}</td>
             <td class="acoes-td">
                 <button class="btn-acao" title="Editar">✏️</button>
                 <button class="btn-acao" title="Histórico">📋</button>
@@ -3092,9 +3534,9 @@ async function carregarHistoricoPrecos(artigoId) {
         }
         return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-top:${i ? "1px solid rgba(0,0,0,.06)" : "none"};font-size:12px">
             <span style="width:84px;opacity:.7">${p.data}</span>
-            <span style="font-weight:600;width:84px">${Number(p.preco).toFixed(2)} €${p.unidade ? "/" + escapeHtmlFatura(p.unidade) : ""}</span>
+            <span style="font-weight:600;width:84px">${Number(p.preco).toFixed(2)} €${p.unidade ? "/" + escHtml(p.unidade) : ""}</span>
             ${variacao}
-            <span style="flex:1;text-align:right;opacity:.6">${escapeHtmlFatura(p.fornecedores?.nome || (p.origem === "manual" ? "manual" : "—"))}</span>
+            <span style="flex:1;text-align:right;opacity:.6">${escHtml(p.fornecedores?.nome || (p.origem === "manual" ? "manual" : "—"))}</span>
         </div>`;
     }).join("");
     wrap.style.display = "block";
@@ -3140,11 +3582,11 @@ async function abrirHistoricoStock(artigoId, descricao) {
         const delta = m.tipo_movimento === "saida" ? -m.quantidade : +m.quantidade;
         const sinal = delta >= 0 ? "+" : "";
         return `<tr>
-            <td>${m.data_movimento || "—"}</td>
+            <td>${escHtml(m.data_movimento || "—")}</td>
             <td><span style="color:${cor};font-weight:600">${label}</span></td>
             <td style="text-align:right;color:${cor}">${sinal}${delta}</td>
             <td style="text-align:right;font-weight:500">${m.saldo}</td>
-            <td style="opacity:.7;font-size:12px">${m.observacoes || "—"}</td>
+            <td style="opacity:.7;font-size:12px">${escHtml(m.observacoes || "—")}</td>
         </tr>`;
     }).join("");
 }
@@ -3180,7 +3622,7 @@ async function guardarArtigo() {
     if (artigoEditId) {
         // EDITAR — actualizar dados do artigo
         const { error } = await SB.from("artigos").update(payload).eq("id", artigoEditId);
-        if (error) { msg.textContent = "Erro: " + error.message; return; }
+        if (error) { console.error(error); msg.textContent = "Não foi possível gravar."; return; }
 
         // Movimento de ajuste de stock (só se quantidade preenchida)
         const qtdAjuste  = parseFloat(document.getElementById("artAjusteQtd").value);
@@ -3210,7 +3652,7 @@ async function guardarArtigo() {
         payload.ativo = true;
 
         const { data, error } = await SB.from("artigos").insert(payload).select("id").single();
-        if (error) { msg.textContent = "Erro: " + error.message; return; }
+        if (error) { console.error(error); msg.textContent = "Não foi possível gravar."; return; }
 
         // Movimento inicial se stock > 0
         if (qtd > 0 && data?.id) {
@@ -3314,13 +3756,13 @@ function gerarPaginaImpressao(itens) {
             <div class="etiqueta etq-${item.tam}" style="width:${w}mm;height:${h}mm">
                 <div class="etq-header">
                     <span class="etq-empresa">MAIA SOLUTIONS</span>
-                    <span class="etq-tipo">${tipoLabel}</span>
+                    <span class="etq-tipo">${escHtml(tipoLabel)}</span>
                 </div>
                 <div class="etq-body">
                     <canvas class="etq-qr" data-url="${url}" width="100" height="100"></canvas>
                     <div class="etq-info">
-                        <div class="etq-codigo">${item.codigo}</div>
-                        <div class="etq-nome">${item.nome}</div>
+                        <div class="etq-codigo">${escHtml(item.codigo)}</div>
+                        <div class="etq-nome">${escHtml(item.nome)}</div>
                     </div>
                 </div>
             </div>`;
@@ -3460,17 +3902,17 @@ async function carregarMovimentosStock() {
         const destino = m.obra_destino?.nome || (m.observacoes?.includes("Armazém") ? "Armazém" : "—");
         const tr = document.createElement("tr");
         tr.innerHTML = `
-            <td style="font-size:12px;opacity:.7">${m.data_movimento || "—"}</td>
+            <td style="font-size:12px;opacity:.7">${escHtml(m.data_movimento || "—")}</td>
             <td>
-                <div style="font-weight:600;font-size:13px">${m.artigos?.descricao || "—"}</div>
-                <div style="font-size:11px;opacity:.5;font-family:monospace">${m.artigos?.codigo || ""}</div>
+                <div style="font-weight:600;font-size:13px">${escHtml(m.artigos?.descricao || "—")}</div>
+                <div style="font-size:11px;opacity:.5;font-family:monospace">${escHtml(m.artigos?.codigo || "")}</div>
             </td>
             <td><span style="color:${cor};font-weight:700;font-size:12px">${label}</span></td>
             <td style="text-align:right;font-weight:600">${m.quantidade ?? "—"}</td>
-            <td style="font-size:13px">${m.funcionarios?.nome || "—"}</td>
-            <td style="font-size:12px;opacity:.8">${origem}</td>
-            <td style="font-size:12px;opacity:.8">${destino}</td>
-            <td style="font-size:11px;opacity:.6">${m.observacoes || "—"}</td>`;
+            <td style="font-size:13px">${escHtml(m.funcionarios?.nome || "—")}</td>
+            <td style="font-size:12px;opacity:.8">${escHtml(origem)}</td>
+            <td style="font-size:12px;opacity:.8">${escHtml(destino)}</td>
+            <td style="font-size:11px;opacity:.6">${escHtml(m.observacoes || "—")}</td>`;
         tbody.appendChild(tr);
     });
 }
@@ -3480,7 +3922,7 @@ async function carregarFiltrosMovStock() {
     const selFunc = document.getElementById("filtroMovFunc");
     if (selFunc && selFunc.options.length <= 1) {
         const { data } = await SB.from("funcionarios").select("id, nome").order("nome");
-        data?.forEach(f => { selFunc.innerHTML += `<option value="${f.id}">${f.nome}</option>`; });
+        data?.forEach(f => { selFunc.innerHTML += `<option value="${escHtml(f.id)}">${escHtml(f.nome)}</option>`; });
     }
     // Preencher select de obras
     const selObra = document.getElementById("filtroMovObra");
@@ -3488,7 +3930,7 @@ async function carregarFiltrosMovStock() {
         const { data } = await SB.from("obras").select("id, nome, codigo").order("nome");
         data?.forEach(o => {
             const etiqueta = o.codigo ? `${o.codigo} · ${o.nome}` : o.nome;
-            selObra.innerHTML += `<option value="${o.id}">${etiqueta}</option>`;
+            selObra.innerHTML += `<option value="${escHtml(o.id)}">${escHtml(etiqueta)}</option>`;
         });
     }
 }
@@ -3496,7 +3938,7 @@ async function carregarFiltrosMovStock() {
 async function apagarArtigo(id, nome) {
     if (!confirm(`Apagar "${nome}"? Esta ação não pode ser revertida.`)) return;
     const { error } = await SB.from("artigos").delete().eq("id", id);
-    if (error) { alert("Erro: " + error.message); return; }
+    if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
     await carregarArtigos();
 }
 
@@ -3625,7 +4067,7 @@ async function carregarPainelFinanceiro() {
                 </span>
             </div>
             ${d.items.map(m => `<div style="padding:8px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12px">
-                <div><div style="opacity:.6">${m.data_documento}</div><div style="font-weight:500">${m.fornecedores?.nome || m.observacoes || m.referencia || "—"}</div></div>
+                <div><div style="opacity:.6">${escHtml(m.data_documento)}</div><div style="font-weight:500">${escHtml(m.fornecedores?.nome || m.observacoes || m.referencia || "—")}</div></div>
                 <div style="font-weight:700;color:${m.tipo === "entrada" ? "#5ad65a" : "#ff7a7a"}">${m.tipo === "entrada" ? "+" : "−"}${Number(m.valor_total).toFixed(2)} €</div>
             </div>`).join("")}
         </div>`).join("");
@@ -3683,12 +4125,12 @@ async function carregarPainelStock() {
         <table class="display" style="margin:0">
             <thead><tr><th>Data</th><th>Artigo</th><th>Tipo</th><th style="text-align:right">Qtd</th><th>Funcionário</th><th>Obs</th></tr></thead>
             <tbody>${data.map(m => `<tr>
-                <td style="font-size:12px;opacity:.7">${m.data_movimento}</td>
-                <td><div style="font-weight:600;font-size:13px">${m.artigos?.descricao||"—"}</div><div style="font-size:11px;opacity:.5;font-family:monospace">${m.artigos?.codigo||""}</div></td>
-                <td><span style="color:${tipoCor[m.tipo_movimento]||"#888"};font-weight:700;font-size:12px">${tipoLabel[m.tipo_movimento]||m.tipo_movimento}</span></td>
+                <td style="font-size:12px;opacity:.7">${escHtml(m.data_movimento)}</td>
+                <td><div style="font-weight:600;font-size:13px">${escHtml(m.artigos?.descricao||"—")}</div><div style="font-size:11px;opacity:.5;font-family:monospace">${escHtml(m.artigos?.codigo||"")}</div></td>
+                <td><span style="color:${tipoCor[m.tipo_movimento]||"#888"};font-weight:700;font-size:12px">${escHtml(tipoLabel[m.tipo_movimento]||m.tipo_movimento)}</span></td>
                 <td style="text-align:right;font-weight:700">${m.quantidade}</td>
-                <td style="font-size:12px">${m.funcionarios?.nome||"—"}</td>
-                <td style="font-size:11px;opacity:.6">${m.observacoes||"—"}</td>
+                <td style="font-size:12px">${escHtml(m.funcionarios?.nome||"—")}</td>
+                <td style="font-size:11px;opacity:.6">${escHtml(m.observacoes||"—")}</td>
             </tr>`).join("")}</tbody>
         </table>
     </div>`;
@@ -3711,7 +4153,7 @@ function preencherAnosFluxo() {
     const atual = new Date().getFullYear();
     sel.innerHTML = `<option value="">— Todos —</option>`;
     for (let a = atual; a >= atual - 4; a--) {
-        sel.innerHTML += `<option value="${a}">${a}</option>`;
+        sel.innerHTML += `<option value="${escHtml(a)}">${escHtml(a)}</option>`;
     }
     sel.value = String(atual);
 }
@@ -3723,7 +4165,7 @@ async function carregarCategoriasFinanceiras() {
         if (!sel) return;
         const placeholder = id.startsWith("filtro") ? "— Todas —" : "— Selecionar —";
         sel.innerHTML = `<option value="">${placeholder}</option>`;
-        data?.forEach(c => { sel.innerHTML += `<option value="${c.id}">${c.nome}</option>`; });
+        data?.forEach(c => { sel.innerHTML += `<option value="${escHtml(c.id)}">${escHtml(c.nome)}</option>`; });
     });
 }
 
@@ -3734,7 +4176,7 @@ async function carregarObrasFluxo() {
         if (!sel) return;
         const placeholder = id.startsWith("filtro") ? "— Todas —" : "— Sem obra —";
         sel.innerHTML = `<option value="">${placeholder}</option>`;
-        data?.forEach(o => { sel.innerHTML += `<option value="${o.id}">${o.nome}</option>`; });
+        data?.forEach(o => { sel.innerHTML += `<option value="${escHtml(o.id)}">${escHtml(o.nome)}</option>`; });
     });
 }
 
@@ -3835,12 +4277,12 @@ function renderMovimentos() {
         const ent = m.tipo === "entrada";
         const tr  = document.createElement("tr");
         tr.innerHTML = `
-            <td>${m.data_documento || ""}</td>
-            <td>${m.referencia || "—"}</td>
+            <td>${escHtml(m.data_documento || "")}</td>
+            <td>${escHtml(m.referencia || "—")}</td>
             <td><span class="badge-tipo ${ent ? "entrada" : "saida"}">${ent ? "Entrada" : "Saída"}</span></td>
-            <td>${m.fornecedores?.nome || "—"}</td>
-            <td>${m.categorias_financeiras?.nome || "—"}</td>
-            <td>${m.obras?.nome || "—"}</td>
+            <td>${escHtml(m.fornecedores?.nome || "—")}</td>
+            <td>${escHtml(m.categorias_financeiras?.nome || "—")}</td>
+            <td>${escHtml(m.obras?.nome || "—")}</td>
             <td style="text-align:right;font-weight:500;color:${ent ? "#5ad65a" : "#ff7a7a"}">${ent ? "+" : "–"}${Number(m.valor_total).toFixed(2)} €</td>
             <td><span class="badge-estado ${m.estado_pagamento}">${m.estado_pagamento === "pago" ? "Pago" : "Por pagar"}</span></td>
             <td class="acoes-td">
@@ -3903,10 +4345,13 @@ async function carregarServicosImputacao(obraId, movId = null) {
             Imputar material a serviço(s) desta obra
         </div>
         <div id="imputLinhasInner"></div>
-        <button type="button" onclick="adicionarLinhaImput(${JSON.stringify(servs).replace(/"/g,'&quot;')})"
+        <button type="button" id="btnAddImput"
             style="background:rgba(244,185,66,.1);border:1px solid rgba(244,185,66,.2);color:var(--primary,#f4b942);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;margin-top:6px">
             + Adicionar serviço
         </button>`;
+
+    const btnAddImput = document.getElementById("btnAddImput");
+    if (btnAddImput) btnAddImput.addEventListener("click", () => adicionarLinhaImput(servs));
 
     if (guardadas.length) {
         // Repor o que já estava imputado a este movimento
@@ -4020,14 +4465,21 @@ async function abrirModalMovimento(mov = null) {
         }
 
         // Linhas da fatura já gravadas, para poderem ser revistas
-        const { data: linhasGravadas } = await SB.from("fatura_linhas")
-            .select("descricao_original, artigo_id, quantidade, unidade, preco_unitario, valor_total")
-            .eq("movimento_id", mov.id).order("ordem");
+        const [{ data: linhasGravadas }, { data: stockDaFatura }] = await Promise.all([
+            SB.from("fatura_linhas")
+              .select("id, descricao_original, artigo_id, quantidade, unidade, preco_unitario, valor_total")
+              .eq("movimento_id", mov.id).order("ordem"),
+            SB.from("movimentos_stock").select("fatura_linha_id").eq("movimento_id", mov.id),
+        ]);
+        // Linhas que já deram entrada em inventário aparecem marcadas
+        const comStock = new Set((stockDaFatura || []).map(s => s.fatura_linha_id).filter(Boolean));
+
         if (linhasGravadas?.length) {
             await mostrarLinhasFatura({
                 linhas: linhasGravadas.map(l => ({
                     descricao: l.descricao_original,
                     artigo_id: l.artigo_id,
+                    stock: comStock.has(l.id),
                     quantidade: l.quantidade,
                     unidade: l.unidade,
                     preco_unitario: l.preco_unitario,
@@ -4161,9 +4613,28 @@ async function guardarMovimento() {
         if (ex) {
             fornecedor_id = ex.id;
         } else {
+            // Um fornecedor novo era criado em silêncio ao gravar. Juntando isso
+            // ao aviso de IBAN, que só disparava quando o NIF casava, bastava
+            // uma fatura com um dígito trocado no NIF para passar sem nada:
+            // nenhum aviso, e um fornecedor novo parecido com o verdadeiro.
+            // Criar um fornecedor passa a ser uma decisão, não um efeito.
+            if (!confirm(
+                `Não conheço o NIF ${nif}.\n\n` +
+                `Criar o fornecedor "${nome || "(sem nome)"}" com este NIF?\n\n` +
+                `Se esperavas que já existisse, cancela e confirma o NIF e o ` +
+                `IBAN da fatura — uma fatura falsa imita um fornecedor ` +
+                `conhecido com um dígito trocado.`
+            )) {
+                movMsg.textContent = "Gravação cancelada. Confirme o fornecedor.";
+                return;
+            }
             const { data: novo, error: ef } = await SB.from("fornecedores")
                 .insert({ nif, nome }).select("id").single();
-            if (ef) { movMsg.textContent = "Erro fornecedor: " + ef.message; return; }
+            if (ef) {
+                console.error(ef);
+                movMsg.textContent = "Não foi possível criar o fornecedor.";
+                return;
+            }
             fornecedor_id = novo.id;
         }
     }
@@ -4186,7 +4657,7 @@ async function guardarMovimento() {
         ? await SB.from("movimentos_financeiros").update(payload).eq("id", movEditId).select("id").single()
         : await SB.from("movimentos_financeiros").insert(payload).select("id").single();
 
-    if (error) { movMsg.textContent = "Erro: " + error.message; return; }
+    if (error) { console.error(error); movMsg.textContent = "Não foi possível gravar o movimento."; return; }
 
     // Linhas da fatura lidas pelo assistente
     const movIdLinhas = movSalvo?.id || movEditId;
@@ -4203,16 +4674,20 @@ async function guardarMovimento() {
                 await SB.from("precos").delete().in("fatura_linha_id", ids);
                 await SB.from("fatura_linhas").delete().in("id", ids);
             }
+            // As entradas em stock desta fatura também saem: senão, editar
+            // a fatura duplicava o material no inventário.
+            await SB.from("movimentos_stock").delete().eq("movimento_id", movEditId);
         }
         const { data: gravadas, error: errLinhas } = await SB.from("fatura_linhas").insert(
-            linhasFatura.map(l => ({ ...l, movimento_id: movIdLinhas, origem: "ia" }))
-        ).select("id, artigo_id, descricao_original, preco_unitario, unidade");
+            linhasFatura.map(({ stock, ...l }) => ({ ...l, movimento_id: movIdLinhas, origem: "ia" }))
+        ).select("id, artigo_id, descricao_original, preco_unitario, unidade, ordem");
 
         if (errLinhas) {
             console.error(errLinhas);
             alert("O movimento foi guardado, mas as linhas da fatura não: " + errLinhas.message);
         } else {
             await gravarSinonimosEPrecos(gravadas, fornecedor_id, dataDoc);
+            await gravarEntradasStock(movIdLinhas, gravadas, linhasFatura, dataDoc, payload.referencia);
         }
     }
 
@@ -4249,7 +4724,7 @@ async function guardarMovimento() {
 async function apagarMovimento(id, ref) {
     if (!confirm(`Apagar movimento "${ref || id}"?`)) return;
     const { error } = await SB.from("movimentos_financeiros").delete().eq("id", id);
-    if (error) { alert("Erro: " + error.message); return; }
+    if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
     await carregarMovimentos();
 }
 
@@ -4268,6 +4743,7 @@ function ligarEventosGlobais() {
     document.getElementById("btnNovoFuncionario")?.addEventListener("click", () => abrirModalFuncionario());
     document.getElementById("guardarFuncionarioBtn")?.addEventListener("click", guardarFuncionario);
     document.getElementById("btnRevogarDispositivo")?.addEventListener("click", revogarDispositivoFuncionario);
+    document.getElementById("btnGerarCodigo")?.addEventListener("click", gerarCodigoInscricao);
     document.getElementById("modalFuncionario")?.addEventListener("click", e => {
         if (e.target.id === "modalFuncionario") fecharModalFuncionario();
     });
@@ -4423,12 +4899,20 @@ const CATEGORIAS_DEFAULT = [
 ];
 
 async function initOrcamentos() {
+    document.querySelectorAll(".orc-subtab").forEach(b => b.onclick = () => switchOrcSub(b.dataset.orcsub));
     await carregarOrcamentos();
 
     // Ligar eventos
     document.getElementById('pesquisaOrcamentos')?.addEventListener('input', filtrarTabelaOrc);
     document.getElementById('filtroEstadoOrc')?.addEventListener('change', filtrarTabelaOrc);
     document.getElementById('btnNovoOrcamento')?.addEventListener('click', () => abrirModalOrcamento());
+}
+
+// Sub-separadores: orçamentos a clientes · comparar fornecedores (cotacoes.js)
+function switchOrcSub(sub) {
+    document.querySelectorAll(".orc-subtab").forEach(b => b.classList.toggle("active", b.dataset.orcsub === sub));
+    document.querySelectorAll(".orc-sub").forEach(d => d.style.display = d.id === "orcSub-" + sub ? "" : "none");
+    if (sub === "fornecedores") initCotacoes();
 }
 
 // ── Carregar lista ──────────────────────────────────────────
@@ -4544,7 +5028,7 @@ async function abrirModalOrcamento(id = null) {
     }
     const selObra = document.getElementById('orcObra');
     selObra.innerHTML = '<option value="">— Sem obra —</option>' +
-        _orcObras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('');
+        _orcObras.map(o => `<option value="${escHtml(o.id)}">${escHtml(o.nome)}</option>`).join('');
 
     if (id) {
         // Carregar dados do orçamento
@@ -4663,7 +5147,7 @@ function adicionarLinha(cid, tipo = 'material', dados = null) {
         div.innerHTML = `
         <div style="display:grid;grid-template-columns:24px 1fr 70px 70px 90px 100px 28px;gap:0;align-items:center;padding:5px 14px">
             <span style="font-size:10px;opacity:.3">${lid}</span>
-            <input value="${dados?.descricao||''}" placeholder="Descrição do trabalho" data-field="descricao"
+            <input value="${escHtml(dados?.descricao||'')}" placeholder="Descrição do trabalho" data-field="descricao"
                 style="border:none;background:transparent;font-size:13px;padding:3px 6px;outline:none">
             <input value="${nPessoas}" type="number" min="1" step="1" data-field="n_pessoas" placeholder="Pess."
                 style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:3px 5px;text-align:center;outline:none;width:100%"
@@ -4695,9 +5179,9 @@ function adicionarLinha(cid, tipo = 'material', dados = null) {
         div.innerHTML = `
         <div style="display:grid;grid-template-columns:24px 1fr 60px 80px 90px 100px 28px;gap:0;align-items:center;padding:5px 14px">
             <span style="font-size:10px;opacity:.3">${lid}</span>
-            <input value="${dados?.descricao||''}" placeholder="Descrição do artigo / trabalho" data-field="descricao"
+            <input value="${escHtml(dados?.descricao||'')}" placeholder="Descrição do artigo / trabalho" data-field="descricao"
                 style="border:none;background:transparent;font-size:13px;padding:3px 6px;outline:none">
-            <input value="${dados?.unidade||'un'}" data-field="unidade"
+            <input value="${escHtml(dados?.unidade||'un')}" data-field="unidade"
                 style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:3px 4px;text-align:center;outline:none;width:100%">
             <input value="${qtd}" type="number" min="0" step="0.01" data-field="quantidade"
                 style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:3px 6px;text-align:right;outline:none;width:100%"
@@ -4856,13 +5340,13 @@ async function guardarOrcamento(estado = 'rascunho') {
 
     if (orcId) {
         const { error } = await SB.from('orcamentos').update(payload).eq('id', orcId);
-        if (error) { msg.textContent='Erro: '+error.message; msg.style.color='var(--color-err)'; return; }
+        if (error) { msg.textContent = (console.error(error), "Não foi possível concluir."); msg.style.color='var(--color-err)'; return; }
     } else {
         // Gerar número
         const { data: numData } = await SB.rpc('gerar_numero_orcamento');
         payload.numero = numData || ('ORC-' + Date.now());
         const { data: novo, error } = await SB.from('orcamentos').insert(payload).select('id').single();
-        if (error) { msg.textContent='Erro: '+error.message; msg.style.color='var(--color-err)'; return; }
+        if (error) { msg.textContent = (console.error(error), "Não foi possível concluir."); msg.style.color='var(--color-err)'; return; }
         orcId = novo.id;
         _orcEditId = orcId;
         document.getElementById('orcNumero').value = payload.numero;
@@ -4951,6 +5435,10 @@ async function apagarOrcamento(id, numero) {
 }
 
 // ── Exportar PDF ────────────────────────────────────────────
+// O HTML deste PDF leva dados da base de dados. São escritos por quem já é
+// administrador, pelo que não há caminho de terceiro até aqui — mas o PDF
+// abre numa janela da mesma origem, e um nome de cliente com marcação lá
+// dentro corria no contexto do painel. Escapa-se por igual.
 async function exportarPDFOrcamento(id) {
     // Buscar todos os dados
     const [orcRes, catRes] = await Promise.all([
@@ -4977,7 +5465,7 @@ async function exportarPDFOrcamento(id) {
         if (!cat.linhas.length) return;
         tabelaHTML += `
             <tr class="cat-header">
-                <td colspan="6">${cat.nome.toUpperCase()}</td>
+                <td colspan="6">${escHtml(cat.nome.toUpperCase())}</td>
             </tr>`;
         cat.linhas.forEach(l => {
             const nPes  = l.tipo==='mao_obra' ? (Number(l.n_pessoas)||1) : 1;
@@ -4989,9 +5477,9 @@ async function exportarPDFOrcamento(id) {
             const descExtra = (l.tipo==='mao_obra' && nPes>1) ? ` <span style="opacity:.55">(${nPes} pessoas × ${Number(l.quantidade).toFixed(1)}h)</span>` : '';
             tabelaHTML += `
             <tr>
-                <td class="tipo-badge tipo-${l.tipo}">${tipoLabel}</td>
-                <td>${l.descricao}${descExtra}</td>
-                <td class="num">${l.unidade||'vg'}</td>
+                <td class="tipo-badge tipo-${escHtml(l.tipo)}">${escHtml(tipoLabel)}</td>
+                <td>${escHtml(l.descricao)}${descExtra}</td>
+                <td class="num">${escHtml(l.unidade||'vg')}</td>
                 <td class="num">${Number(l.quantidade).toFixed(2)}</td>
                 <td class="num">${fmt(l.preco_unitario)} €</td>
                 <td class="num">${fmt(total)} €</td>
@@ -5007,7 +5495,7 @@ async function exportarPDFOrcamento(id) {
 <html lang="pt">
 <head>
 <meta charset="utf-8">
-<title>Orçamento ${o.numero}</title>
+<title>Orçamento ${escHtml(o.numero)}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600&family=Inter:wght@300;400;500;600&display=swap');
   * { box-sizing:border-box; margin:0; padding:0; }
@@ -5078,11 +5566,11 @@ async function exportarPDFOrcamento(id) {
         <div class="empresa-sub">Construção Civil &amp; Remodelações</div>
     </div>
     <div class="orc-info">
-        <div class="orc-numero">${o.numero}</div>
+        <div class="orc-numero">${escHtml(o.numero)}</div>
         <div class="orc-estado">${{rascunho:'Rascunho',enviado:'Enviado',aceite:'Aceite',recusado:'Recusado'}[o.estado]||o.estado}</div>
         <div class="orc-datas">
-            Data: ${o.data || '—'}<br>
-            ${o.validade ? 'Válido até: ' + o.validade : ''}
+            Data: ${escHtml(o.data || '—')}<br>
+            ${o.validade ? 'Válido até: ' + escHtml(o.validade) : ''}
         </div>
     </div>
 </div>
@@ -5091,16 +5579,16 @@ async function exportarPDFOrcamento(id) {
 <div class="info-grid">
     <div class="info-box">
         <h3>Cliente</h3>
-        <p class="destaque">${o.cliente_nome}</p>
-        ${o.cliente_nif    ? `<p>NIF: ${o.cliente_nif}</p>` : ''}
-        ${o.cliente_morada ? `<p>${o.cliente_morada}</p>` : ''}
-        ${o.cliente_email  ? `<p>${o.cliente_email}</p>` : ''}
-        ${o.cliente_tel    ? `<p>${o.cliente_tel}</p>` : ''}
+        <p class="destaque">${escHtml(o.cliente_nome)}</p>
+        ${o.cliente_nif    ? `<p>NIF: ${escHtml(o.cliente_nif)}</p>` : ''}
+        ${o.cliente_morada ? `<p>${escHtml(o.cliente_morada)}</p>` : ''}
+        ${o.cliente_email  ? `<p>${escHtml(o.cliente_email)}</p>` : ''}
+        ${o.cliente_tel    ? `<p>${escHtml(o.cliente_tel)}</p>` : ''}
     </div>
     <div class="info-box">
         <h3>Obra / Trabalho</h3>
-        <p class="destaque">${o.obras?.nome || o.obra_descricao || '—'}</p>
-        ${o.prazo_obra ? `<p>Prazo: ${o.prazo_obra}</p>` : ''}
+        <p class="destaque">${escHtml(o.obras?.nome || o.obra_descricao || '—')}</p>
+        ${o.prazo_obra ? `<p>Prazo: ${escHtml(o.prazo_obra)}</p>` : ''}
     </div>
 </div>
 
@@ -5123,8 +5611,8 @@ async function exportarPDFOrcamento(id) {
 <!-- TOTAIS + CONDIÇÕES -->
 <div class="totais-wrap">
     <div class="condicoes">
-        ${o.condicoes_pag ? `<h3>Condições de Pagamento</h3><p>${o.condicoes_pag}</p>` : ''}
-        ${o.notas ? `<h3 style="margin-top:10px">Notas</h3><p>${o.notas}</p>` : ''}
+        ${o.condicoes_pag ? `<h3>Condições de Pagamento</h3><p>${escHtml(o.condicoes_pag)}</p>` : ''}
+        ${o.notas ? `<h3 style="margin-top:10px">Notas</h3><p>${escHtml(o.notas)}</p>` : ''}
     </div>
     <div class="totais-box">
         <div class="totais-linha"><span class="label">Mão de Obra</span><span class="valor">${fmt(pdfMaoObra)} €</span></div>
@@ -5144,14 +5632,14 @@ async function exportarPDFOrcamento(id) {
         <div class="assin-legenda">Assinatura e carimbo</div>
     </div>
     <div class="assin-box">
-        <h3>Cliente — ${o.cliente_nome}</h3>
+        <h3>Cliente — ${escHtml(o.cliente_nome)}</h3>
         <div class="assin-linha"></div>
         <div class="assin-legenda">Assinatura (aceite do orçamento)</div>
     </div>
 </div>
 
 <div class="footer">
-    Maia Solutions — Construção Civil &amp; Remodelações · ${o.numero} · ${o.data || ''}
+    Maia Solutions — Construção Civil &amp; Remodelações · ${escHtml(o.numero)} · ${escHtml(o.data || '')}
 </div>
 
 <script>window.print();</script>
@@ -5396,9 +5884,9 @@ async function carregarFluxo() {
             const ent = m.tipo==="entrada", atr = m.atrasado;
             const desc = m.fornecedores?.nome || m.observacoes || m.referencia || "—";
             return `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
-                <td style="padding:8px;font-size:13px;${atr?"color:#f97316":""}">${m.data_documento}</td>
-                <td style="padding:8px;font-size:13px">${desc}</td>
-                <td style="padding:8px;font-size:13px;opacity:.7">${m.obras?.nome||"—"}</td>
+                <td style="padding:8px;font-size:13px;${atr?"color:#f97316":""}">${escHtml(m.data_documento)}</td>
+                <td style="padding:8px;font-size:13px">${escHtml(desc)}</td>
+                <td style="padding:8px;font-size:13px;opacity:.7">${escHtml(m.obras?.nome||"—")}</td>
                 <td style="padding:8px;font-size:13px;text-align:right;color:${ent?"#5ad65a":"#ff7a7a"};font-weight:600">${ent?"+":"–"}${Number(m.valor_total).toFixed(2)} €</td>
                 <td style="padding:8px;text-align:center"><span style="font-size:11px;padding:2px 8px;border-radius:12px;background:${atr?"rgba(249,115,22,.15)":"rgba(255,255,255,.08)"};color:${atr?"#f97316":"var(--text-muted)"}">
                     ${atr?"ATRASADO":"Previsto"}</span></td>
@@ -5523,8 +6011,8 @@ async function carregarNotificacoes() {
                 onmouseenter="this.style.background='rgba(0,0,0,.04)'" onmouseleave="this.style.background=''"
                 onclick="activarTab('fluxo')">
                 <div>
-                    <div style="font-size:13px;font-weight:500;color:#1a1a1a">${desc}</div>
-                    <div style="font-size:11px;color:#e05c5c;margin-top:2px">${m.data_documento} · ${dias} dia(s) atraso</div>
+                    <div style="font-size:13px;font-weight:500;color:#1a1a1a">${escHtml(desc)}</div>
+                    <div style="font-size:11px;color:#e05c5c;margin-top:2px">${escHtml(m.data_documento)} · ${dias} dia(s) atraso</div>
                 </div>
                 <div style="font-size:13px;font-weight:700;color:#e05c5c;white-space:nowrap;margin-left:12px">–${Number(m.valor_total).toFixed(2)} €</div>
             </div>`;
@@ -5537,7 +6025,7 @@ async function carregarNotificacoes() {
         stockAlertas.forEach(a => {
             html += `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;cursor:pointer"
                 onclick="activarTab('inventario')">
-                <div style="font-size:13px;font-weight:500;color:#1a1a1a">${a.descricao}</div>
+                <div style="font-size:13px;font-weight:500;color:#1a1a1a">${escHtml(a.descricao)}</div>
                 <div style="font-size:11px;color:#f97316;white-space:nowrap;margin-left:12px">Abaixo do mínimo (${a.stock_minimo})</div>
             </div>`;
         });
@@ -5709,7 +6197,7 @@ function adicionarLinhaBibMat(mat = null) {
     div.style.cssText = "display:grid;grid-template-columns:1fr 80px 70px 28px;gap:6px;align-items:center";
     if (mat?.id) div.dataset.id = mat.id;
     div.innerHTML = `
-        <input value="${mat?.descricao||''}" placeholder="Nome do material" data-field="descricao"
+        <input value="${escHtml(mat?.descricao||'')}" placeholder="Nome do material" data-field="descricao"
             style="padding:6px 8px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:12px;outline:none">
         <input value="${mat?.quantidade||''}" type="number" step="0.001" min="0" placeholder="Qtd" data-field="quantidade"
             style="padding:6px 8px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:12px;text-align:right;outline:none">

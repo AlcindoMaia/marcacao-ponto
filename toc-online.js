@@ -27,32 +27,35 @@ const TOC = (() => {
     }
 
     function estaAutenticado() { return !!_token; }
-    function estaConfigurado() { return true; } // configuração está na Edge Function
+    function estaConfigurado() { return true; } // credenciais só na Edge Function
 
     // ── Iniciar fluxo de autorização ─────────────────────────────
-    function iniciarAutorizacao() {
-        const cfg = JSON.parse(localStorage.getItem('toc_config') || '{}');
-        const clientId = cfg.clientId || '';
-        const oauthUrl = cfg.oauthUrl || 'https://app35.toconline.pt/oauth';
+    // ── Iniciar fluxo de autorização ─────────────────────────────
+    // O URL de autorização é pedido ao servidor, que gera e guarda um
+    // `state` de uso único. Antes era construído aqui, sem state, e o
+    // callback aceitava qualquer ?code= de qualquer pessoa — o que permitia
+    // induzir um administrador a ficar com a conta TOC de outra pessoa
+    // ligada ao painel dele.
+    async function iniciarAutorizacao() {
+        const { data: { session } } = await SB.auth.getSession();
+        if (!session) throw new Error('Inicie sessão no painel primeiro.');
 
-        if (!clientId) {
-            throw new Error('Client ID não configurado. Guarda as credenciais primeiro.');
-        }
-
-        // Guardar URL actual para voltar depois do redirect
-        sessionStorage.setItem('toc_return_url', window.location.href.split('#')[0]);
-
-        const params = new URLSearchParams({
-            client_id:     clientId,
-            redirect_uri:  PROXY_URL,
-            response_type: 'code',
-            scope:         'commercial',
+        const resp = await fetch(PROXY_URL, {
+            headers: {
+                'Authorization': 'Bearer ' + session.access_token,
+                'x-toc-action':  'auth_url',
+            }
         });
+        if (!resp.ok) {
+            const d = await resp.json().catch(() => ({}));
+            throw new Error(d.erro || 'Não foi possível iniciar a autorização.');
+        }
+        const { auth_url } = await resp.json();
+        if (!auth_url) throw new Error('O servidor não devolveu um URL de autorização.');
 
-        // Redirecionar na mesma janela — mais fiável que popup (não pode ser bloqueado)
-        window.location.href = `${oauthUrl}/auth?${params}`;
+        sessionStorage.setItem('toc_return_url', window.location.href.split('#')[0]);
+        window.location.href = auth_url;
     }
-
     function desligar() {
         _token = null;
         localStorage.removeItem('toc_access_token');
@@ -61,10 +64,16 @@ const TOC = (() => {
     // ── Pedido autenticado via proxy ──────────────────────────────
     async function api(path) {
         if (!_token) throw new Error('Não autenticado no TOC Online. Clica em "Autorizar TOC".');
+        // O proxy exige JWT de administrador: estava aberto a qualquer pessoa,
+        // com o destino do pedido escolhido por quem chamava.
+        const { data: { session } } = await SB.auth.getSession();
+        if (!session) throw new Error('Inicie sessão no painel primeiro.');
+
         const resp = await fetch(PROXY_URL, {
             headers: {
-                'x-toc-path':  path,
-                'x-toc-token': _token,
+                'Authorization': 'Bearer ' + session.access_token,
+                'x-toc-path':   path,
+                'x-toc-token':  _token,
                 'x-toc-action': 'api',
             }
         });

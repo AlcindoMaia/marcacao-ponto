@@ -531,7 +531,9 @@ async function eliminarTarefa() {
 }
 
 function escapeHtmlPlan(s) {
-    return String(s == null ? "" : s)
-        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
+    // Escapa também a plica: sem ela, um atributo delimitado por plicas
+    // fica aberto a quem souber disso.
+    return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
 }
