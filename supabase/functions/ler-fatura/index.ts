@@ -246,13 +246,19 @@ Deno.serve(async (req) => {
             avisos.push("O NIF lido é o da nossa empresa: confirma quem emitiu a fatura.");
         }
 
-        // Fatura repetida?
+        // Fatura repetida? limit(1) e não maybeSingle(): com duas cópias já
+        // gravadas, o maybeSingle dava erro e o aviso não aparecia — que era
+        // precisamente quando mais fazia falta.
         if (d.numero_documento) {
-            const { data: rep } = await admin
+            const { data: reps } = await admin
                 .from("movimentos_financeiros")
-                .select("id, data_documento")
-                .eq("referencia", d.numero_documento).eq("ativo", true).maybeSingle();
-            if (rep) avisos.push(`Já existe um movimento com a referência ${d.numero_documento} (${rep.data_documento}).`);
+                .select("id, data_documento, fornecedores(nome)")
+                .eq("referencia", d.numero_documento).eq("ativo", true).limit(1);
+            const rep = reps?.[0];
+            if (rep) {
+                const de = rep.fornecedores?.nome ? ` de ${rep.fornecedores.nome}` : "";
+                avisos.push(`Já existe um movimento${de} com a referência ${d.numero_documento} (${rep.data_documento}).`);
+            }
         }
 
         // ---- Fornecedor conhecido? E o IBAN bate certo? ----

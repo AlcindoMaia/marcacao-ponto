@@ -401,6 +401,12 @@ create index if not exists idx_movimentos_fonte on movimentos_financeiros(fonte,
 -- impede importar a mesma fatura de compra duas vezes
 create unique index if not exists unico_saida_qr on movimentos_financeiros(referencia, data_documento, valor_total)
     where tipo = 'saida' and ativo = true;
+-- uma fatura ativa por fornecedor e referência (as importações TOC/SAF-T
+-- substituem-se a si próprias e ficam de fora)
+create unique index if not exists movimentos_financeiros_ref_unica
+    on movimentos_financeiros (fornecedor_id, referencia)
+    where ativo and fornecedor_id is not null and referencia is not null and referencia <> ''
+      and coalesce(fonte, '') not in ('toc_online', 'saft');
 
 create index if not exists idx_fatura_linhas_artigo    on fatura_linhas(artigo_id);
 create index if not exists idx_fatura_linhas_movimento on fatura_linhas(movimento_id);
@@ -422,6 +428,27 @@ create index if not exists idx_assistente_registo_data on assistente_registo(cri
 -- =======================================================
 -- FUNÇÕES DE APOIO
 -- =======================================================
+
+-- numeração dos orçamentos: ORC-AAAA-NNN, recomeça em cada ano
+create or replace function public.gerar_numero_orcamento()
+returns text
+language plpgsql
+security invoker
+set search_path to 'public'
+as $function$
+declare
+    v_ano text := to_char(now() at time zone 'Europe/Lisbon', 'YYYY');
+    v_n   int;
+begin
+    perform pg_advisory_xact_lock(hashtext('gerar_numero_orcamento'));
+    select coalesce(max((regexp_match(numero, '^ORC-' || v_ano || '-(\d+)$'))[1]::int), 0) + 1
+      into v_n
+      from orcamentos;
+    return 'ORC-' || v_ano || '-' || lpad(v_n::text, 3, '0');
+end;
+$function$;
+revoke execute on function public.gerar_numero_orcamento() from public, anon;
+grant execute on function public.gerar_numero_orcamento() to authenticated;
 
 create or replace function public.is_admin()
 returns boolean
