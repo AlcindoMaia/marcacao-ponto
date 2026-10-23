@@ -1518,6 +1518,10 @@
                     style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title,sans-serif);letter-spacing:.5px;white-space:nowrap">
                     📦 STOCK
                 </button>
+                <button class="painel-tab" data-tab="documentos" onclick="abrirPainelTab('documentos')"
+                    style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title,sans-serif);letter-spacing:.5px;white-space:nowrap">
+                    📁 DOCUMENTOS
+                </button>
             </div>
         </div>
 
@@ -1555,6 +1559,7 @@
                 <div id="painelTab-financeiro" class="painel-tab-content" style="display:none"></div>
                 <div id="painelTab-ponto"      class="painel-tab-content" style="display:none"></div>
                 <div id="painelTab-stock"      class="painel-tab-content" style="display:none"></div>
+                <div id="painelTab-documentos" class="painel-tab-content" style="display:none"></div>
             </div>
 
         </div>
@@ -1872,6 +1877,9 @@ function toggleDark() {
                         <input id="editObraPercent" type="number" min="0" max="100" placeholder="0 a 100" style="width:100%;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px"></div>
                     <div><label style="font-size:11px;opacity:.6;display:block;margin-bottom:4px">Conclusão prevista</label>
                         <input id="editObraData" type="date" style="width:100%;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px"></div>
+                    <div style="grid-column:1/-1"><label style="font-size:11px;opacity:.6;display:block;margin-bottom:4px">Pasta no Google Drive (link)</label>
+                        <input id="editObraDrive" placeholder="https://drive.google.com/drive/folders/..." style="width:100%;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
+                        <div style="font-size:11px;opacity:.55;margin-top:4px">Fotos, orçamentos, faturas e outros documentos da obra ficam nesta pasta. Abre-se no painel da obra, separador Documentos.</div></div>
                 </div>
             </div>
             <!-- Serviços -->
