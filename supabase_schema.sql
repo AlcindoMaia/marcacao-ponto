@@ -60,7 +60,8 @@ create table if not exists obras (
     raio                    integer default 120,  -- metros, validação GPS
     estado                  text default 'ativa' check (estado in ('ativa', 'concluida')),
     percentagem_conclusao   integer check (percentagem_conclusao >= 0 and percentagem_conclusao <= 100),
-    data_conclusao_prevista date
+    data_conclusao_prevista date,
+    drive_pastas            jsonb  -- IDs das pastas no Google Drive: {pasta, fotos, orcamentos, projeto, faturas, documentos}
 );
 
 -- PONTO (marcações individuais de entrada/saída; inseridas via ponto_marcar)

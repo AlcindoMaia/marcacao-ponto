@@ -1727,6 +1727,7 @@ async function carregarObras() {
             </td>
             <td class="acoes-td" style="white-space:nowrap">
                 <button class="btn-acao btn-painel-obra" title="Ver Painel">📊</button>
+                <button class="btn-acao btn-drive-obra" title="${o.drive_pastas?.pasta ? "Abrir pasta no Google Drive" : "Sem pasta no Google Drive"}" style="${o.drive_pastas?.pasta ? "" : "opacity:.3"}">📁</button>
                 <button class="btn-acao btn-editar-obra" title="Editar">✏️</button>
                 <button class="btn-acao btn-qr-obra" title="Ver QR">🔲</button>
                 <button class="btn-acao btn-estado-obra" title="${estado === "ativa" ? "Concluir" : "Reativar"}">${estado === "ativa" ? "✅" : "🔄"}</button>
@@ -1735,6 +1736,9 @@ async function carregarObras() {
 
         // Usar classes em vez de querySelector composto — evita o bug
         tr.querySelector(".btn-painel-obra").onclick   = () => abrirPainelObra(o);
+        tr.querySelector(".btn-drive-obra").onclick    = () => o.drive_pastas?.pasta
+            ? window.open(urlPastaDrive(o.drive_pastas.pasta), "_blank")
+            : alert("Esta obra ainda não tem pasta no Google Drive. Edita a obra e cola o link da pasta.");
         tr.querySelector(".btn-editar-obra").onclick  = () => editarObra(o);
         tr.querySelector(".btn-qr-obra").onclick      = () => abrirModalQR(o);
         tr.querySelector(".btn-estado-obra").onclick  = () => toggleEstadoObra(o.id, o.nome, estado);
@@ -1841,6 +1845,7 @@ async function editarObra(obra) {
         const _cod0 = document.getElementById("editObraCodigo"); if (_cod0) _cod0.value = "";
         const _pct0 = document.getElementById("editObraPercent"); if (_pct0) _pct0.value = "";
         const _dat0 = document.getElementById("editObraData"); if (_dat0) _dat0.value = "";
+        const _drv0 = document.getElementById("editObraDrive"); if (_drv0) _drv0.value = "";
         mostrarGpsDaObra(null, null);
         document.getElementById("editObraTitulo").textContent = "✏️ Nova Obra";
         switchObraTab("detalhes");
@@ -1852,6 +1857,7 @@ async function editarObra(obra) {
     const _morE = document.getElementById("editObraMorada"); if (_morE) _morE.value = obra.morada || "";
     const _pctE = document.getElementById("editObraPercent"); if (_pctE) _pctE.value = obra.percentagem_conclusao ?? "";
     const _datE = document.getElementById("editObraData"); if (_datE) _datE.value = obra.data_conclusao_prevista || "";
+    const _drvE = document.getElementById("editObraDrive"); if (_drvE) _drvE.value = obra.drive_pastas?.pasta ? urlPastaDrive(obra.drive_pastas.pasta) : "";
     const _raiE = document.getElementById("editObraRaio"); if (_raiE) _raiE.value = obra.raio || "";
     const _estE = document.getElementById("editObraEstado"); if (_estE) _estE.value = obra.estado || "ativa";
     const _codE = document.getElementById("editObraCodigo"); if (_codE) _codE.value = obra.codigo || "";
@@ -1941,6 +1947,16 @@ async function guardarEditObra() {
         percentagem_conclusao:   parseInt(document.getElementById("editObraPercent").value) || null,
         data_conclusao_prevista: document.getElementById("editObraData").value || null,
     };
+    // Pasta do Google Drive: guarda-se o ID da pasta. As subpastas (fotos,
+    // orçamentos...) só se mantêm se a pasta principal não mudou.
+    const linkDrive = document.getElementById("editObraDrive")?.value.trim() || "";
+    const pastaId = idPastaDrive(linkDrive);
+    if (linkDrive && !pastaId) { alert("O link da pasta do Google Drive não parece válido."); return; }
+    const obraAntes = id ? (await SB.from("obras").select("drive_pastas").eq("id", id).maybeSingle()).data : null;
+    const pastasAntes = obraAntes?.drive_pastas || null;
+    payload.drive_pastas = !pastaId ? null
+        : pastasAntes?.pasta === pastaId ? pastasAntes
+        : { pasta: pastaId };
     if (id) {
         const { error } = await SB.from("obras").update(payload).eq("id", id);
         if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
@@ -4049,6 +4065,60 @@ function abrirPainelTab(tab) {
     if (tab === "financeiro") carregarPainelFinanceiro();
     if (tab === "ponto")      carregarPainelPonto();
     if (tab === "stock")      carregarPainelStock();
+    if (tab === "documentos") carregarPainelDocumentos();
+}
+
+// ── Documentos da obra (Google Drive) ────────────────────────
+// Cada obra tem uma pasta no Google Drive (Maia Solutions › Obras) com
+// subpastas por tipo. Guardam-se os IDs em obras.drive_pastas. Os ficheiros
+// adicionam-se na própria Drive: no telemóvel o link abre a app Google Drive.
+const DRIVE_SUBPASTAS = [
+    { chave: "fotos",      icone: "📷", nome: "Fotos",                              dica: "Fotos da obra, por data" },
+    { chave: "orcamentos", icone: "🧾", nome: "Orçamentos e mapas de quantidades", dica: "Orçamentos, mapas e comparações de fornecedores" },
+    { chave: "projeto",    icone: "📐", nome: "Projeto e desenhos",                 dica: "Projetos, plantas e desenhos" },
+    { chave: "faturas",    icone: "💶", nome: "Faturas",                            dica: "Faturas de fornecedores e ao cliente" },
+    { chave: "documentos", icone: "📄", nome: "Declarações e outros documentos",    dica: "Declarações, licenças, contratos, autos" },
+];
+
+function urlPastaDrive(id) {
+    return `https://drive.google.com/drive/folders/${encodeURIComponent(id)}`;
+}
+
+function idPastaDrive(link) {
+    if (!link) return null;
+    const m = link.match(/\/folders\/([\w-]{10,})/) || link.match(/[?&]id=([\w-]{10,})/);
+    if (m) return m[1];
+    return /^[\w-]{10,}$/.test(link) ? link : null;
+}
+
+function carregarPainelDocumentos() {
+    const el = document.getElementById("painelTab-documentos");
+    const pastas = _painelObraActual?.drive_pastas;
+    if (!pastas?.pasta) {
+        el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.6">
+            Esta obra ainda não tem pasta no Google Drive.<br>
+            <span style="font-size:12px">Cria a pasta na Drive e cola o link em ✏️ Editar obra › Pasta no Google Drive.</span></div>`;
+        return;
+    }
+    const cartao = (icone, nome, dica, id) => `
+        <a href="${urlPastaDrive(id)}" target="_blank" rel="noopener" class="card"
+           style="display:flex;align-items:center;gap:12px;padding:14px;text-decoration:none;color:inherit;margin:0">
+            <span style="font-size:24px">${icone}</span>
+            <span style="flex:1;min-width:0">
+                <span style="display:block;font-weight:600;font-size:13px">${nome}</span>
+                <span style="display:block;font-size:11px;opacity:.55">${dica}</span>
+            </span>
+            <span style="font-size:11px;color:var(--primary);white-space:nowrap">Abrir ↗</span>
+        </a>`;
+    const subs = DRIVE_SUBPASTAS.filter(s => pastas[s.chave]);
+    el.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin:4px 0 12px">
+            <div style="font-size:12px;opacity:.6">Para adicionar ficheiros, abre a pasta e usa <b>+ Novo › Carregar</b> (computador) ou <b>+</b> (app Google Drive no telemóvel).</div>
+            <a href="${urlPastaDrive(pastas.pasta)}" target="_blank" rel="noopener" class="btn-secondary" style="text-decoration:none;white-space:nowrap">📁 Abrir pasta da obra</a>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
+            ${subs.map(s => cartao(s.icone, s.nome, s.dica, pastas[s.chave])).join("")}
+        </div>`;
 }
 
 async function carregarPainelResumo() {
