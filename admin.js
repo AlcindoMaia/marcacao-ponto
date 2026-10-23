@@ -1802,13 +1802,18 @@ async function guardarObra() {
 
     if (!nome) { alert("O nome da obra é obrigatório."); return; }
 
+    const gps = lerGpsDaObra();
+    if (gps === false) return;
+
     // A coluna chama-se "morada". Até aqui gravava-se "endereco", que não
     // existe na tabela, e por isso guardar uma obra com morada dava erro.
     const payload = {
         nome, estado, raio,
         morada:                  morada || null,
         percentagem_conclusao:   percent !== "" && percent != null ? parseInt(percent) : null,
-        data_conclusao_prevista: dataFim || null
+        data_conclusao_prevista: dataFim || null,
+        latitude:                gps.lat,
+        longitude:               gps.lon,
     };
     if (codigo) payload.codigo = codigo;
 
@@ -1836,6 +1841,7 @@ async function editarObra(obra) {
         const _cod0 = document.getElementById("editObraCodigo"); if (_cod0) _cod0.value = "";
         const _pct0 = document.getElementById("editObraPercent"); if (_pct0) _pct0.value = "";
         const _dat0 = document.getElementById("editObraData"); if (_dat0) _dat0.value = "";
+        mostrarGpsDaObra(null, null);
         document.getElementById("editObraTitulo").textContent = "✏️ Nova Obra";
         switchObraTab("detalhes");
         const _mo = document.getElementById("modalEditarObra"); _mo.style.display = "flex"; _mo.classList.remove("hidden");
@@ -1849,9 +1855,79 @@ async function editarObra(obra) {
     const _raiE = document.getElementById("editObraRaio"); if (_raiE) _raiE.value = obra.raio || "";
     const _estE = document.getElementById("editObraEstado"); if (_estE) _estE.value = obra.estado || "ativa";
     const _codE = document.getElementById("editObraCodigo"); if (_codE) _codE.value = obra.codigo || "";
+    mostrarGpsDaObra(obra.latitude, obra.longitude);
     document.getElementById("editObraTitulo").textContent = `✏️ ${obra.nome || "Editar Obra"}`;
     switchObraTab("detalhes");
     const _moE = document.getElementById("modalEditarObra"); _moE.style.display = "flex"; _moE.classList.remove("hidden");
+}
+
+// ── Localização GPS da obra ─────────────────────────────────
+// Sem latitude e longitude, o ponto_marcar não verifica a distância e aceita
+// a marcação em qualquer sítio. O painel não tinha onde as pôr: só se
+// conseguiam gravar pela base de dados. O botão "Estou na obra" lê a posição
+// do telemóvel de quem está no local, que é a forma mais fiável de a acertar.
+function mostrarGpsDaObra(lat, lon) {
+    const elLat = document.getElementById("editObraLat");
+    const elLon = document.getElementById("editObraLon");
+    if (!elLat || !elLon) return;
+    elLat.value = lat ?? "";
+    elLon.value = lon ?? "";
+    actualizarInfoGpsDaObra();
+}
+
+function actualizarInfoGpsDaObra(precisao) {
+    const info = document.getElementById("editObraGpsInfo");
+    if (!info) return;
+    const lat = document.getElementById("editObraLat").value.trim();
+    const lon = document.getElementById("editObraLon").value.trim();
+    if (!lat || !lon) {
+        info.textContent = "Sem localização, o ponto aceita marcações em qualquer sítio.";
+        return;
+    }
+    const mapa = `https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lon)}`;
+    info.innerHTML = (precisao ? `Precisão do telemóvel: ±${Math.round(precisao)} m. ` : "") +
+        `<a href="${mapa}" target="_blank" rel="noopener" style="color:var(--primary)">Ver no mapa</a>`;
+}
+
+function usarLocalizacaoActualNaObra() {
+    const info = document.getElementById("editObraGpsInfo");
+    if (!navigator.geolocation) { alert("Este dispositivo não dá a localização."); return; }
+    info.textContent = "A obter a localização…";
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            document.getElementById("editObraLat").value = pos.coords.latitude.toFixed(7);
+            document.getElementById("editObraLon").value = pos.coords.longitude.toFixed(7);
+            actualizarInfoGpsDaObra(pos.coords.accuracy);
+            // Um raio mais pequeno do que o erro do GPS recusa marcações de
+            // quem está mesmo dentro da obra.
+            const elRaio = document.getElementById("editObraRaio");
+            const minimo = Math.max(100, Math.ceil(pos.coords.accuracy * 2));
+            if (elRaio && (parseInt(elRaio.value) || 0) < minimo) elRaio.value = minimo;
+        },
+        err => {
+            info.textContent = err.code === 1
+                ? "Sem autorização para usar a localização. Ativa-a nas definições do browser."
+                : "Não foi possível obter a localização. Tenta outra vez ao ar livre.";
+        },
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    );
+}
+
+// Devolve { lat, lon } (ambos null quando vazios) ou false se forem inválidos.
+function lerGpsDaObra() {
+    const elLat = document.getElementById("editObraLat");
+    const elLon = document.getElementById("editObraLon");
+    if (!elLat || !elLon) return { lat: undefined, lon: undefined };
+    const tLat = elLat.value.trim().replace(",", ".");
+    const tLon = elLon.value.trim().replace(",", ".");
+    if (!tLat && !tLon) return { lat: null, lon: null };
+    const lat = Number(tLat), lon = Number(tLon);
+    if (!tLat || !tLon || !Number.isFinite(lat) || !Number.isFinite(lon) ||
+        Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+        alert("A localização GPS não é válida. Preenche latitude e longitude, ou deixa as duas vazias.");
+        return false;
+    }
+    return { lat, lon };
 }
 
 async function guardarEditObra() {
@@ -3980,27 +4056,35 @@ async function carregarPainelResumo() {
     const el = document.getElementById("painelTab-resumo");
     el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">A carregar...</div>`;
 
-    const [movsRes, orcRes, pontoRes] = await Promise.all([
+    const [movsRes, orcRes, pontoRes, regRes] = await Promise.all([
         SB.from("movimentos_financeiros").select("tipo, valor_total, categorias_financeiras(nome)").eq("obra_id", obraId).eq("ativo", true),
         SB.from("orcamentos").select("numero, estado, total_com_iva, total_sem_iva, subtotal_mao_obra, subtotal_materiais").eq("obra_id", obraId),
-        SB.from("vw_registos_ponto").select("funcionario, horas, dia").eq("obra", _painelObraActual.nome)
+        SB.from("vw_registos_ponto").select("funcionario, horas, dia").eq("obra", _painelObraActual.nome),
+        // registos_admin é a fonte de verdade das horas pagas (é daí que
+        // saem os salários), por isso é daí que sai o custo de mão de obra.
+        SB.from("registos_admin").select("horas, funcionarios(valor_dia)").eq("obra_id", obraId).eq("tipo", "presenca")
     ]);
 
     const movs  = movsRes.data  || [];
     const orcs  = orcRes.data   || [];
     const ponto = pontoRes.data || [];
+    const regs  = regRes.data   || [];
 
     const totalEntradas = movs.filter(m => m.tipo === "entrada").reduce((s,m) => s + Number(m.valor_total), 0);
-    const totalSaidas   = movs.filter(m => m.tipo === "saida").reduce((s,m) => s + Number(m.valor_total), 0);
+    const totalFaturas  = movs.filter(m => m.tipo === "saida").reduce((s,m) => s + Number(m.valor_total), 0);
+    const horasRegistos = regs.reduce((s,r) => s + Number(r.horas || 0), 0);
+    const custoMaoObra  = regs.reduce((s,r) => s + Number(r.horas || 0) * Number(r.funcionarios?.valor_dia || 0) / 8, 0);
+    const totalSaidas   = totalFaturas + custoMaoObra;
     const margem        = totalEntradas - totalSaidas;
     const margemPct     = totalEntradas > 0 ? ((margem / totalEntradas) * 100).toFixed(1) : null;
     const orcAceite     = orcs.filter(o => o.estado === "aceite");
     const totalOrc      = orcAceite.reduce((s,o) => s + Number(o.total_com_iva||0), 0);
     const desvio        = totalOrc > 0 ? totalOrc - totalSaidas : null;
-    let totalHoras = 0;
+    let horasPonto = 0;
     ponto.forEach(r => {
-        if (r.horas && r.horas.includes(":")) { const [h,m] = r.horas.split(":").map(Number); totalHoras += h + m/60; }
+        if (r.horas && r.horas.includes(":")) { const [h,m] = r.horas.split(":").map(Number); horasPonto += h + m/60; }
     });
+    const totalHoras = horasRegistos || horasPonto;
 
     const fmt = v => Number(v).toFixed(2) + " €";
     const corMargem = margem >= 0 ? "#5ad65a" : "#ff7a7a";
@@ -4014,6 +4098,7 @@ async function carregarPainelResumo() {
             <div class="card" style="padding:16px;text-align:center">
                 <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">GASTO</div>
                 <div style="font-size:20px;font-weight:800;color:#ff7a7a">${fmt(totalSaidas)}</div>
+                <div style="font-size:11px;opacity:.55;margin-top:4px">${fmt(totalFaturas)} faturas · ${fmt(custoMaoObra)} mão de obra</div>
             </div>
             <div class="card" style="padding:16px;text-align:center">
                 <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">MARGEM BRUTA</div>
@@ -4023,12 +4108,15 @@ async function carregarPainelResumo() {
             <div class="card" style="padding:16px;text-align:center">
                 <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">HORAS OBRA</div>
                 <div style="font-size:20px;font-weight:800;color:var(--primary)">${totalHoras.toFixed(1)}h</div>
+                <div style="font-size:11px;opacity:.55;margin-top:4px">${horasRegistos ? `registos · ${horasPonto.toFixed(1)}h no ponto` : "do ponto"}</div>
             </div>
         </div>
         ${totalOrc > 0 ? `
         <div class="card" style="padding:16px;margin-bottom:12px">
             <div style="font-size:11px;opacity:.5;margin-bottom:12px;font-family:var(--font-title);letter-spacing:.5px">ORÇAMENTO VS REAL</div>
             <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Orçamento aceite</span><span style="font-weight:700">${fmt(totalOrc)}</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Faturas</span><span style="font-weight:700">${fmt(totalFaturas)}</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Mão de obra (${horasRegistos.toFixed(0)}h)</span><span style="font-weight:700">${fmt(custoMaoObra)}</span></div>
             <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Gasto real</span><span style="font-weight:700;color:#ff7a7a">${fmt(totalSaidas)}</span></div>
             <div style="border-top:1px solid var(--border);margin:8px 0;padding-top:8px;display:flex;justify-content:space-between;font-size:14px">
                 <span style="font-weight:600">Desvio</span>
@@ -4657,7 +4745,15 @@ async function guardarMovimento() {
         ? await SB.from("movimentos_financeiros").update(payload).eq("id", movEditId).select("id").single()
         : await SB.from("movimentos_financeiros").insert(payload).select("id").single();
 
-    if (error) { console.error(error); movMsg.textContent = "Não foi possível gravar o movimento."; return; }
+    if (error) {
+        console.error(error);
+        // 23505: o índice movimentos_financeiros_ref_unica recusa a mesma
+        // referência duas vezes para o mesmo fornecedor.
+        movMsg.textContent = error.code === "23505"
+            ? `Já existe um movimento com a referência ${payload.referencia} deste fornecedor. Não foi gravado outra vez.`
+            : "Não foi possível gravar o movimento.";
+        return;
+    }
 
     // Linhas da fatura lidas pelo assistente
     const movIdLinhas = movSalvo?.id || movEditId;
