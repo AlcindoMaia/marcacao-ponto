@@ -43,6 +43,7 @@
             tabela.classList.remove("tabela-cartoes");
             return;
         }
+        tabela.classList.remove("tabela-mapa");
         tabela.classList.add("tabela-cartoes");
         for (const corpo of [...tabela.tBodies, ...(tabela.tFoot ? [tabela.tFoot] : [])]) {
             for (const tr of corpo.rows) {
