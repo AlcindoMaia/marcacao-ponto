@@ -1,6 +1,7 @@
 // =======================================================
 // PLANEAMENTO OPERACIONAL
-// Grelha semanal: funcionários em linhas, dias em colunas.
+// Quadro semanal estilo Trello: uma coluna por dia, tarefas em cartões.
+// Quem está atribuído aparece em iniciais no canto do cartão.
 // Depende de: config.js (SB global)
 // =======================================================
 
@@ -9,7 +10,6 @@ let _planFuncs    = [];      // todos, incluindo inativos (para não perder tare
 let _planObras    = [];
 let _planTarefas  = [];
 let _planDragId   = null;
-let _planDragOrigem = null; // funcionário da linha de onde o cartão saiu
 let _planEditId   = null;
 let _planPedido   = 0;      // descarta respostas de semanas antigas
 
@@ -119,43 +119,19 @@ function desenharGrelha() {
     const hoje  = planDataStr(new Date());
     const tabela = document.getElementById("planGrelha");
 
-    let html = "<thead><tr><th class='plan-col-func'>Funcionário</th>";
+    let html = "<thead><tr>";
     dias.forEach((d, i) => {
         const ds = planDataStr(d);
         html += `<th class="${ds === hoje ? "plan-hoje" : ""}">
                     ${PLAN_DIAS[i]}<span>${d.getDate()}/${d.getMonth() + 1}</span>
                  </th>`;
     });
-    html += "</tr></thead><tbody>";
+    html += "</tr></thead><tbody><tr>";
 
-    // Linha por funcionário: os ativos, mais os inativos que ainda têm tarefas nesta semana
-    const comTarefas = new Set(_planTarefas.flatMap(t =>
-        (t.tarefa_funcionarios || []).map(tf => tf.funcionario_id)));
-    _planFuncs.filter(f => f.ativo !== false || comTarefas.has(f.id)).forEach(f => {
-        const nome = escapeHtmlPlan(f.nome) + (f.ativo === false ? " <em>(inativo)</em>" : "");
-        html += `<tr><td class="plan-col-func">${nome}</td>`;
-        dias.forEach(d => {
-            const ds = planDataStr(d);
-            const tarefas = _planTarefas.filter(t =>
-                t.data_prevista === ds &&
-                (t.tarefa_funcionarios || []).some(tf => tf.funcionario_id === f.id)
-            );
-            const horas = tarefas
-                .filter(t => t.estado !== "cancelada")
-                .reduce((s, t) => s + planHorasEfetivas(t), 0);
-            html += celulaHtml(ds, f.id, tarefas, horas);
-        });
-        html += "</tr>";
-    });
-
-    // Linha de tarefas sem ninguém atribuído
-    html += `<tr class="plan-linha-livre"><td class="plan-col-func">Por atribuir</td>`;
+    // Uma coluna por dia, com os cartões empilhados pela ordem (como no Trello)
     dias.forEach(d => {
         const ds = planDataStr(d);
-        const tarefas = _planTarefas.filter(t =>
-            t.data_prevista === ds && (t.tarefa_funcionarios || []).length === 0
-        );
-        html += celulaHtml(ds, null, tarefas, 0);
+        html += colunaHtml(ds, _planTarefas.filter(t => t.data_prevista === ds));
     });
     html += "</tr></tbody>";
 
@@ -163,28 +139,57 @@ function desenharGrelha() {
     ligarEventosGrelha();
 }
 
-function celulaHtml(dataStr, funcId, tarefas, horas) {
-    const excesso = horas > 8;
+function colunaHtml(dataStr, tarefas) {
+    // Quem passa das 8h neste dia (soma das tarefas não canceladas)
+    const horasPorFunc = {};
+    tarefas.filter(t => t.estado !== "cancelada").forEach(t =>
+        (t.tarefa_funcionarios || []).forEach(tf => {
+            horasPorFunc[tf.funcionario_id] = (horasPorFunc[tf.funcionario_id] || 0) + planHorasEfetivas(t);
+        }));
+    const excesso = Object.entries(horasPorFunc).filter(([, h]) => h > 8)
+        .map(([fid, h]) => `${planNomeFunc(fid)} ${h}h`);
+
     const cartoes = tarefas.map(t => {
         const obra  = t.obras ? (t.obras.codigo || t.obras.nome) : "Sem obra";
         const hora  = t.hora_inicio ? t.hora_inicio.slice(0, 5) + " · " : "";
         const real  = t.duracao_real_horas != null ? ` · real ${Number(t.duracao_real_horas)}h` : "";
-        const resp  = funcId && (t.tarefa_funcionarios || [])
-            .some(tf => tf.funcionario_id === funcId && tf.responsavel);
+        // Responsável primeiro, depois os restantes por nome
+        const atrib = [...(t.tarefa_funcionarios || [])].sort((a, b) =>
+            (b.responsavel - a.responsavel) || planNomeFunc(a.funcionario_id).localeCompare(planNomeFunc(b.funcionario_id)));
+        const iniciais = atrib.map(tf => {
+            const nome = planNomeFunc(tf.funcionario_id);
+            return `<span class="plan-avatar ${tf.responsavel ? "plan-avatar-resp" : ""}"
+                          title="${escapeHtmlPlan(nome)}${tf.responsavel ? " (responsável)" : ""}">${escapeHtmlPlan(planIniciais(nome))}</span>`;
+        }).join("");
         return `<div class="plan-cartao plan-estado-${t.estado}"
                      draggable="true" data-id="${t.id}">
-                    <strong>${resp ? '<span class="plan-resp" title="Responsável">★</span>' : ""}${escapeHtmlPlan(t.descricao)}</strong>
+                    <strong>${escapeHtmlPlan(t.descricao)}</strong>
                     <span>${escapeHtmlPlan(obra)}</span>
-                    <span>${hora}${Number(t.duracao_horas)}h${real}</span>
+                    <div class="plan-cartao-rodape">
+                        <span>${hora}${Number(t.duracao_horas)}h${real}</span>
+                        <div class="plan-avatares">${iniciais}</div>
+                    </div>
                 </div>`;
     }).join("");
 
-    return `<td class="plan-celula ${excesso ? "plan-excesso" : ""}"
-                data-data="${dataStr}" data-func="${funcId || ""}">
-                ${horas > 0 ? `<div class="plan-horas">${horas}h</div>` : ""}
+    return `<td class="plan-celula ${excesso.length ? "plan-excesso" : ""}" data-data="${dataStr}">
+                ${excesso.length ? `<div class="plan-aviso" title="Mais de 8h no dia">⚠ ${escapeHtmlPlan(excesso.join(", "))}</div>` : ""}
                 ${cartoes}
-                <button class="plan-add" title="Nova tarefa">+</button>
+                <button class="plan-add" title="Nova tarefa">+ Tarefa</button>
             </td>`;
+}
+
+function planNomeFunc(id) {
+    const f = _planFuncs.find(x => x.id === id);
+    return f ? f.nome : "?";
+}
+
+// "Alcindo Maia" → "AM"; "Ramiro" → "RA"
+function planIniciais(nome) {
+    const partes = String(nome || "").trim().split(/\s+/).filter(Boolean);
+    if (!partes.length) return "?";
+    if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+    return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
 }
 
 // Horas que contam para a carga do dia: as reais, se já foram registadas
@@ -196,14 +201,12 @@ function ligarEventosGrelha() {
     document.querySelectorAll(".plan-cartao").forEach(el => {
         el.addEventListener("dragstart", e => {
             _planDragId = el.dataset.id;
-            _planDragOrigem = el.closest(".plan-celula").dataset.func || null;
             el.classList.add("plan-a-arrastar");
             e.dataTransfer.effectAllowed = "move";
         });
         el.addEventListener("dragend", () => {
             el.classList.remove("plan-a-arrastar");
             _planDragId = null;
-            _planDragOrigem = null;
         });
         el.addEventListener("click", () => abrirModalTarefa(el.dataset.id));
     });
@@ -221,83 +224,45 @@ function ligarEventosGrelha() {
             // Largado em cima de outro cartão → fica antes dele; senão vai para o fim
             const alvo = e.target.closest(".plan-cartao");
             const antesDe = alvo && alvo.dataset.id !== _planDragId ? alvo.dataset.id : null;
-            await moverTarefa(_planDragId, td.dataset.data, _planDragOrigem, td.dataset.func || null, antesDe);
+            await moverTarefa(_planDragId, td.dataset.data, antesDe);
         });
         td.querySelector(".plan-add").addEventListener("click", e => {
             e.stopPropagation();
-            abrirModalTarefa(null, td.dataset.data, td.dataset.func || null);
+            abrirModalTarefa(null, td.dataset.data);
         });
     });
 }
 
 // =======================================================
-// MOVER (arrastar entre dias / funcionários)
+// MOVER (arrastar entre dias / mudar a ordem no dia)
+// As pessoas atribuídas mudam-se no cartão, não ao arrastar.
 // =======================================================
-async function moverTarefa(id, novaData, funcOrigem, funcDestino, antesDe = null) {
+async function moverTarefa(id, novaData, antesDe = null) {
     const t = _planTarefas.find(x => x.id === id);
     if (!t) return;
 
-    const mudouData   = t.data_prevista !== novaData;
-    const mudouPessoa = funcOrigem !== funcDestino;
-    if (!mudouData && !mudouPessoa) {
-        // Mesma célula: só muda a ordem
+    if (t.data_prevista === novaData) {
+        // Mesmo dia: só muda a ordem
         if (antesDe) {
-            await planReordenar(id, novaData, funcDestino, antesDe);
+            await planReordenar(id, novaData, antesDe);
             await carregarPlaneamento();
         }
         return;
     }
 
-    if (mudouData) {
-        const { error } = await SB.from("tarefas")
-            .update({ data_prevista: novaData })
-            .eq("id", id);
-        if (error) { console.error(error); alert("Não foi possível mover a tarefa."); return; }
-    }
+    const { error } = await SB.from("tarefas")
+        .update({ data_prevista: novaData })
+        .eq("id", id);
+    if (error) { console.error(error); alert("Não foi possível mover a tarefa."); return; }
 
-    if (mudouPessoa) {
-        let error = null;
-        if (!funcDestino) {
-            // Largada em "Por atribuir": a tarefa fica sem ninguém
-            ({ error } = await SB.from("tarefa_funcionarios").delete().eq("tarefa_id", id));
-        } else {
-            // Troca só a pessoa da linha de origem; os restantes atribuídos mantêm-se.
-            // Primeiro acrescenta o destino, para nunca ficar sem ninguém se algo falhar.
-            ({ error } = await SB.from("tarefa_funcionarios").upsert(
-                { tarefa_id: id, funcionario_id: funcDestino },
-                { onConflict: "tarefa_id,funcionario_id", ignoreDuplicates: true }
-            ));
-            if (!error && funcOrigem) {
-                ({ error } = await SB.from("tarefa_funcionarios").delete()
-                    .eq("tarefa_id", id).eq("funcionario_id", funcOrigem));
-            }
-            // Se quem saiu era o responsável, a responsabilidade passa para quem entra
-            const eraResp = (t.tarefa_funcionarios || [])
-                .some(tf => tf.funcionario_id === funcOrigem && tf.responsavel);
-            if (!error && funcOrigem && eraResp) {
-                ({ error } = await SB.from("tarefa_funcionarios").update({ responsavel: true })
-                    .eq("tarefa_id", id).eq("funcionario_id", funcDestino));
-            }
-        }
-        if (error) {
-            console.error(error);
-            alert("A tarefa foi movida, mas não foi possível atualizar a atribuição.");
-        }
-    }
-    await planReordenar(id, novaData, funcDestino, antesDe);
+    await planReordenar(id, novaData, antesDe);
     await carregarPlaneamento();
 }
 
-// Renumera a ordem das tarefas da célula de destino, com a tarefa movida
+// Renumera a ordem das tarefas do dia de destino, com a tarefa movida
 // antes de "antesDe" (ou no fim). Só grava as que mudam.
-async function planReordenar(id, data, funcId, antesDe) {
-    const naCelula = _planTarefas.filter(t =>
-        t.id !== id && t.data_prevista === data &&
-        (funcId
-            ? (t.tarefa_funcionarios || []).some(tf => tf.funcionario_id === funcId)
-            : (t.tarefa_funcionarios || []).length === 0)
-    );
-    const ids = naCelula.map(t => t.id);
+async function planReordenar(id, data, antesDe) {
+    const ids = _planTarefas.filter(t => t.id !== id && t.data_prevista === data).map(t => t.id);
     const pos = antesDe ? ids.indexOf(antesDe) : -1;
     ids.splice(pos >= 0 ? pos : ids.length, 0, id);
 
@@ -313,7 +278,7 @@ async function planReordenar(id, data, funcId, antesDe) {
 // =======================================================
 // MODAL
 // =======================================================
-function abrirModalTarefa(id, dataPre = null, funcPre = null) {
+function abrirModalTarefa(id, dataPre = null) {
     _planEditId = id;
     const t = id ? _planTarefas.find(x => x.id === id) : null;
 
@@ -342,7 +307,7 @@ function abrirModalTarefa(id, dataPre = null, funcPre = null) {
     planToggleMorada();
 
     // Funcionários
-    const atribuidos = t ? (t.tarefa_funcionarios || []).map(x => x.funcionario_id) : (funcPre ? [funcPre] : []);
+    const atribuidos = t ? (t.tarefa_funcionarios || []).map(x => x.funcionario_id) : [];
     const respAtual  = t ? ((t.tarefa_funcionarios || []).find(x => x.responsavel) || {}).funcionario_id : null;
     const listaFuncs = document.getElementById("planFuncionarios");
     listaFuncs.innerHTML = _planFuncs
