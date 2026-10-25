@@ -4336,9 +4336,10 @@ async function apagarDocumentoObra(id) {
     const aviso = doc.estado === "registado"
         ? "\n\nO que já foi registado (orçamento ou movimento no Financeiro) fica como está." : "";
     if (!confirm(`Apagar "${doc.nome_ficheiro}"?${aviso}`)) return;
+    const { error } = await SB.from("obra_documentos").delete().eq("id", id);
+    if (error) { msgDocObra("Não foi possível apagar: " + error.message, "err"); return; }
     const rm = await SB.storage.from(BUCKET_DOCS_OBRA).remove([doc.caminho]);
-    if (rm.error) { msgDocObra("Não foi possível apagar o ficheiro: " + rm.error.message, "err"); return; }
-    await SB.from("obra_documentos").delete().eq("id", id);
+    if (rm.error) console.warn("apagarDocumentoObra: ficheiro ficou no bucket:", doc.caminho, rm.error.message);
     await carregarPainelDocumentos();
     msgDocObra("Documento apagado.");
 }
@@ -4353,10 +4354,14 @@ function blobParaBase64(blob) {
 }
 
 // Lê o documento com o assistente e abre a proposta para confirmar.
+let _lendoDocObra = false;
+
 async function tratarDocumentoObra(id, ficheiro = null) {
+    if (_lendoDocObra || _propostaDoc) return;   // um documento de cada vez
     const { data: doc } = await SB.from("obra_documentos").select("*").eq("id", id).single();
     if (!doc) return;
 
+    _lendoDocObra = true;
     try {
         let blob = ficheiro;
         if (!blob) {
@@ -4388,6 +4393,8 @@ async function tratarDocumentoObra(id, ficheiro = null) {
     } catch (e) {
         console.error("tratarDocumentoObra:", e);
         msgDocObra("Não foi possível ler: " + e.message + ' O documento ficou guardado; podes tentar outra vez em "Ler e registar".', "err");
+    } finally {
+        _lendoDocObra = false;
     }
 }
 
@@ -4519,15 +4526,25 @@ function mostrarBlocoProposta() {
 async function guardarClienteDaProposta(v) {
     if (!v.nome) return null;
     const nif = (v.nif || "").replace(/\D/g, "") || null;
-    let existente = null;
-    if (nif) existente = (await SB.from("clientes").select("*").eq("nif", nif).maybeSingle()).data;
-    if (!existente && _painelObraActual?.cliente_id) {
-        existente = (await SB.from("clientes").select("*").eq("id", _painelObraActual.cliente_id).maybeSingle()).data;
-        if (existente?.nif && nif && existente.nif !== nif) existente = null;   // outro cliente
-    }
     const campos = { nome: v.nome, nif, email: v.email || null, telefone: v.telefone || null, morada: v.morada || null };
+    let existente = null, mesmoNif = false;
+    if (nif) {
+        existente = (await SB.from("clientes").select("*").eq("nif", nif).maybeSingle()).data;
+        mesmoNif = !!existente;
+    }
+    // Sem cliente com este NIF: só se usa o cliente da obra se não houver
+    // nada que mostre que é outra pessoa (NIF diferente ou nome diferente).
+    if (!existente && _painelObraActual?.cliente_id) {
+        const daObra = (await SB.from("clientes").select("*").eq("id", _painelObraActual.cliente_id).maybeSingle()).data;
+        const mesmoNome = daObra && daObra.nome.trim().toLowerCase() === v.nome.trim().toLowerCase();
+        if (daObra && !(daObra.nif && nif) && (mesmoNome || !nif)) existente = daObra;
+    }
     if (existente) {
-        const mudar = Object.fromEntries(Object.entries(campos).filter(([k, x]) => x && x !== existente[k]));
+        // Com o mesmo NIF é a mesma pessoa: atualizam-se os contactos. Pelo
+        // cliente da obra só se preenche o que estava vazio, para nunca
+        // escrever por cima dos dados de outro cliente.
+        const mudar = Object.fromEntries(Object.entries(campos).filter(([k, x]) =>
+            x && x !== existente[k] && (mesmoNif ? k !== "nif" : !existente[k])));
         if (Object.keys(mudar).length) {
             const { error } = await SB.from("clientes").update(mudar).eq("id", existente.id);
             if (error) throw new Error("cliente: " + error.message);
@@ -4544,7 +4561,12 @@ async function gravarPropostaDocumento() {
     const { doc, lido } = _propostaDoc;
     const obra = _painelObraActual;
     const val  = id => document.getElementById(id)?.value.trim() || "";
-    const num  = id => { const x = val(id); return x === "" ? null : Number(x.replace(",", ".")); };
+    const num  = id => {
+        let x = val(id).replace(/\s/g, "");
+        if (x === "") return null;
+        if (x.includes(",")) x = x.replace(/\./g, "").replace(",", ".");   // "1.230,50"
+        return Number(x);
+    };
     const erroEl = document.getElementById("propMsg");
     const falha = t => { erroEl.style.display = "block"; erroEl.textContent = t; };
 
@@ -4554,6 +4576,7 @@ async function gravarPropostaDocumento() {
     const semIva = num("propSemIva"), iva = num("propIva"), comIva = num("propComIva");
     const cli = { nome: val("propCliNome"), nif: val("propCliNif"), email: val("propCliEmail"), telefone: val("propCliTel"), morada: val("propCliMorada") };
 
+    if ([semIva, iva, comIva].some(x => x != null && !Number.isFinite(x))) return falha("Há um valor que não é um número.");
     if (tipo !== "recibo") {
         if (!numero) return falha("Falta o número do documento.");
         if (comIva == null) return falha("Falta o total com IVA.");
@@ -4590,7 +4613,11 @@ async function gravarPropostaDocumento() {
 
         if (tipo === "fatura") {
             if (!data) throw new Error("falta a data da fatura.");
-            const { data: mv, error } = await SB.from("movimentos_financeiros").insert({
+            // Se uma tentativa anterior já lançou o movimento e falhou depois,
+            // reaproveita-se em vez de o lançar duas vezes.
+            const { data: ja } = await SB.from("movimentos_financeiros").select("id")
+                .eq("fonte", "documento_obra").eq("fonte_id", doc.id).eq("ativo", true).limit(1);
+            const { data: mv, error } = ja?.[0] ? { data: ja[0], error: null } : await SB.from("movimentos_financeiros").insert({
                 referencia: numero, data_documento: data, tipo: "entrada",
                 cliente_nome: cli.nome, cliente_id: clienteId,
                 categoria_id: val("propCategoria") || null, obra_id: obra.id,
