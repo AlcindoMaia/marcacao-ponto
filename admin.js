@@ -812,7 +812,8 @@ async function carregarRegistos() {
             if (dow !== 0 && dow !== 6 && !feriadoEm(ds)) diasUteis++;
         }
         const diasComRegisto = new Set((data||[]).map(r => r.dia)).size;
-        const assid = diasUteis > 0 ? Math.round(diasComRegisto / diasUteis * 100) : 0;
+        // Dias trabalhados ao fim de semana ou num feriado não passam dos 100%
+        const assid = diasUteis > 0 ? Math.min(100, Math.round(diasComRegisto / diasUteis * 100)) : 0;
         const incompletos = (data||[]).filter(r => r.estado === "Incompleto").length;
 
         // Calcular horas extras (registos com horas > 8)

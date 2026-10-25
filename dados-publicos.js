@@ -84,11 +84,15 @@ async function procurarMorada(texto) {
 async function verificarNif(nif, elInfo, campos = {}) {
     nif = String(nif || "").trim();
     if (!elInfo) return;
+    // Só conta a resposta do último NIF pedido para esta caixa: uma mais
+    // lenta de um NIF anterior não pode preencher dados errados.
+    const pedido = elInfo.dataset.pedido = String(Number(elInfo.dataset.pedido || 0) + 1);
     if (!nif) { elInfo.textContent = ""; return; }
     elInfo.style.color = "";
     elInfo.textContent = "A verificar o NIF…";
     try {
         const r = await dadosPublicos({ acao: "nif", nif });
+        if (elInfo.dataset.pedido !== pedido) return;
         if (!r.valido) {
             elInfo.style.color = "#f87171";
             elInfo.textContent = "⚠ Este NIF não é válido. Confirme se não há um dígito trocado.";
@@ -111,6 +115,6 @@ async function verificarNif(nif, elInfo, campos = {}) {
         }
     } catch (e) {
         console.error("nif:", e);
-        elInfo.textContent = "";
+        if (elInfo.dataset.pedido === pedido) elInfo.textContent = "";
     }
 }
