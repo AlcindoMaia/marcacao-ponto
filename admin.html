@@ -990,13 +990,14 @@
         <div class="form-row">
             <div class="form-group input-sm">
                 <label>NIF Fornecedor</label>
-                <input id="movNif" placeholder="Opcional">
+                <input id="movNif" placeholder="Opcional" onchange="verificarNif(this.value, document.getElementById('movNifInfo'), { nome: 'movFornecedor' })">
             </div>
             <div class="form-group">
                 <label>Nome Fornecedor</label>
                 <input id="movFornecedor">
             </div>
         </div>
+        <div id="movNifInfo" style="font-size:11px;opacity:.8;margin:-6px 0 10px"></div>
 
         <div class="form-row">
             <div class="form-group">
@@ -1371,8 +1372,9 @@
                 <div style="font-family:var(--font-title);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px">Cliente</div>
                 <div class="form-row">
                     <div class="form-group"><label>Nome *</label><input id="orcClienteNome" placeholder="Nome do cliente"></div>
-                    <div class="form-group input-sm"><label>NIF</label><input id="orcClienteNif" placeholder="Opcional"></div>
+                    <div class="form-group input-sm"><label>NIF</label><input id="orcClienteNif" placeholder="Opcional" onchange="verificarNif(this.value, document.getElementById('orcClienteNifInfo'), { nome: 'orcClienteNome', morada: 'orcClienteMorada' })"></div>
                 </div>
+                <div id="orcClienteNifInfo" style="font-size:11px;opacity:.8;margin:-6px 0 10px"></div>
                 <div class="form-row">
                     <div class="form-group"><label>Morada</label><input id="orcClienteMorada" placeholder="Morada"></div>
                 </div>
@@ -1771,6 +1773,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js" integrity="sha384-hStSInNIZ8ljtOVrmrgf7zdHMapaLBWoSnPTtF0nzsybp4+LuhDz6sHuEVpWIX8o" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="config.js"></script>
 <script src="leitor-qr.js"></script>
+<script src="dados-publicos.js"></script>
 <script src="planeamento.js"></script>
 <script src="cotacoes.js"></script>
 <script src="admin.js"></script>
@@ -1858,7 +1861,11 @@ function toggleDark() {
                     <div><label style="font-size:11px;opacity:.6;display:block;margin-bottom:4px">Nome *</label>
                         <input id="editObraNome" style="width:100%;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px"></div>
                     <div style="grid-column:1/-1"><label style="font-size:11px;opacity:.6;display:block;margin-bottom:4px">Morada</label>
-                        <input id="editObraMorada" style="width:100%;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px"></div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap">
+                            <input id="editObraMorada" placeholder="Rua, número, localidade" style="flex:1;min-width:180px;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
+                            <button type="button" onclick="procurarGpsPelaMorada()" class="btn-secondary" style="white-space:nowrap">🔎 GPS pela morada</button>
+                        </div>
+                        <div id="editObraMoradaResultados" style="font-size:12px;margin-top:4px"></div></div>
                     <div><label style="font-size:11px;opacity:.6;display:block;margin-bottom:4px">Estado</label>
                         <select id="editObraEstado" style="width:100%;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
                             <option value="ativa">Ativa</option>
