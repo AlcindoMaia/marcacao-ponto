@@ -131,7 +131,7 @@ function desenharGrelha() {
     // Uma coluna por dia, com os cartões empilhados pela ordem (como no Trello)
     dias.forEach(d => {
         const ds = planDataStr(d);
-        html += colunaHtml(ds, _planTarefas.filter(t => t.data_prevista === ds));
+        html += colunaHtml(ds, planTarefasDoDia(ds));
     });
     html += "</tr></tbody>";
 
@@ -177,6 +177,19 @@ function colunaHtml(dataStr, tarefas) {
                 ${cartoes}
                 <button class="plan-add" title="Nova tarefa">+ Tarefa</button>
             </td>`;
+}
+
+// Cartões do dia ordenados pela hora de início; os que não têm hora
+// ficam no fim, pela ordem em que foram arrastados.
+function planTarefasDoDia(dataStr) {
+    return _planTarefas
+        .filter(t => t.data_prevista === dataStr)
+        .sort((a, b) => {
+            if (a.hora_inicio && b.hora_inicio && a.hora_inicio !== b.hora_inicio)
+                return a.hora_inicio < b.hora_inicio ? -1 : 1;
+            if (!a.hora_inicio !== !b.hora_inicio) return a.hora_inicio ? -1 : 1;
+            return (a.ordem || 0) - (b.ordem || 0);
+        });
 }
 
 function planNomeFunc(id) {
@@ -262,7 +275,7 @@ async function moverTarefa(id, novaData, antesDe = null) {
 // Renumera a ordem das tarefas do dia de destino, com a tarefa movida
 // antes de "antesDe" (ou no fim). Só grava as que mudam.
 async function planReordenar(id, data, antesDe) {
-    const ids = _planTarefas.filter(t => t.id !== id && t.data_prevista === data).map(t => t.id);
+    const ids = planTarefasDoDia(data).filter(t => t.id !== id).map(t => t.id);
     const pos = antesDe ? ids.indexOf(antesDe) : -1;
     ids.splice(pos >= 0 ? pos : ids.length, 0, id);
 
