@@ -4115,14 +4115,13 @@ function idPastaDrive(link) {
     return /^[\w-]{10,}$/.test(link) ? link : null;
 }
 
-function carregarPainelDocumentos() {
-    const el = document.getElementById("painelTab-documentos");
+// HTML das pastas da obra no Google Drive (ficheiros internos da empresa).
+function htmlPastasDrive() {
     const pastas = _painelObraActual?.drive_pastas;
     if (!pastas?.pasta) {
-        el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.6">
+        return `<div style="padding:16px;text-align:center;opacity:.6;font-size:13px">
             Esta obra ainda não tem pasta no Google Drive.<br>
             <span style="font-size:12px">Cria a pasta na Drive e cola o link em ✏️ Editar obra › Pasta no Google Drive.</span></div>`;
-        return;
     }
     const cartao = (icone, nome, dica, id) => `
         <a href="${urlPastaDrive(id)}" target="_blank" rel="noopener" class="card"
@@ -4135,7 +4134,7 @@ function carregarPainelDocumentos() {
             <span style="font-size:11px;color:var(--primary);white-space:nowrap">Abrir ↗</span>
         </a>`;
     const subs = DRIVE_SUBPASTAS.filter(s => pastas[s.chave]);
-    el.innerHTML = `
+    return `
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin:4px 0 12px">
             <div style="font-size:12px;opacity:.6">Para adicionar ficheiros, abre a pasta e usa <b>+ Novo › Carregar</b> (computador) ou <b>+</b> (app Google Drive no telemóvel).</div>
             <a href="${urlPastaDrive(pastas.pasta)}" target="_blank" rel="noopener" class="btn-secondary" style="text-decoration:none;white-space:nowrap">📁 Abrir pasta da obra</a>
@@ -4143,6 +4142,572 @@ function carregarPainelDocumentos() {
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
             ${subs.map(s => cartao(s.icone, s.nome, s.dica, pastas[s.chave])).join("")}
         </div>`;
+}
+
+// ── Documentos carregados na obra (Storage do Supabase) ──────
+// Os PDFs que saem do TOCONLINE (orçamentos, faturas de venda, recibos),
+// fotos e outros documentos. Ficam no bucket privado "obra-documentos", em
+// <obra_id>/<ficheiro>. O assistente lê os PDFs e propõe o registo; nada é
+// gravado sem confirmação. "Visível ao cliente" marca o que a futura Área do
+// cliente vai mostrar.
+const BUCKET_DOCS_OBRA = "obra-documentos";
+const MAX_DOC_OBRA     = 20 * 1024 * 1024;   // limite do bucket
+const MAX_LER_DOC      = 8 * 1024 * 1024;    // limite da leitura pelo assistente
+
+const TIPOS_DOC_OBRA = {
+    orcamento: { icone: "🧾", nome: "Orçamento",       ler: true,  visivel: true  },
+    fatura:    { icone: "💶", nome: "Fatura de venda", ler: true,  visivel: true  },
+    recibo:    { icone: "✅", nome: "Recibo",          ler: true,  visivel: true  },
+    foto:      { icone: "📷", nome: "Foto",            ler: false, visivel: false },
+    outro:     { icone: "📄", nome: "Outro documento", ler: false, visivel: false },
+};
+
+const escDoc = s => String(s ?? "").replace(/[&<>"']/g,
+    c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmtEurDoc = v => v == null || v === "" ? "—" : Number(v).toFixed(2).replace(".", ",") + " €";
+
+function msgDocObra(texto, tipo = "ok") {
+    const el = document.getElementById("docObraMsg");
+    if (!el) return;
+    const cores = { ok: "#4ade80", warn: "#fb923c", err: "#f87171" };
+    el.style.display = texto ? "block" : "none";
+    el.style.color = cores[tipo] || cores.ok;
+    el.textContent = texto || "";
+}
+
+async function carregarPainelDocumentos() {
+    const el = document.getElementById("painelTab-documentos");
+    const obra = _painelObraActual;
+    el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">A carregar...</div>`;
+
+    const [docsRes, cliRes] = await Promise.all([
+        SB.from("obra_documentos").select("*").eq("obra_id", obra.id).order("created_at", { ascending: false }),
+        obra.cliente_id
+            ? SB.from("clientes").select("*").eq("id", obra.cliente_id).maybeSingle()
+            : Promise.resolve({ data: null }),
+    ]);
+    if (_painelObraActual?.id !== obra.id) return;   // mudou de obra entretanto
+
+    const docs    = docsRes.data || [];
+    const cliente = cliRes.data;
+    const erroTabela = docsRes.error
+        ? `<div style="color:#f87171;font-size:12px;margin-bottom:8px">Não foi possível ler os documentos: ${escDoc(docsRes.error.message)}</div>` : "";
+
+    const opcoesTipo = Object.entries(TIPOS_DOC_OBRA)
+        .map(([k, t]) => `<option value="${k}">${t.icone} ${t.nome}</option>`).join("");
+
+    const linha = d => {
+        const t = TIPOS_DOC_OBRA[d.tipo] || TIPOS_DOC_OBRA.outro;
+        const estado = d.estado === "registado"
+            ? `<span style="color:#4ade80;font-size:11px">✓ Registado</span>`
+            : d.estado === "por_tratar"
+                ? `<button class="btn-secondary" style="font-size:11px;padding:4px 8px" onclick="tratarDocumentoObra('${d.id}')">🤖 Ler e registar</button>`
+                : `<span style="opacity:.45;font-size:11px">Guardado</span>`;
+        const info = [d.numero_documento, d.data_documento].filter(Boolean).map(escDoc).join(" · ");
+        return `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap">
+            <span style="font-size:20px">${t.icone}</span>
+            <span style="flex:1;min-width:160px">
+                <a href="#" onclick="abrirDocumentoObra('${d.id}');return false" style="color:inherit;font-weight:600;font-size:13px;word-break:break-all">${escDoc(d.nome_ficheiro)}</a>
+                <span style="display:block;font-size:11px;opacity:.5">${t.nome}${info ? " · " + info : ""} · carregado ${new Date(d.created_at).toLocaleDateString("pt-PT")}</span>
+            </span>
+            ${estado}
+            <label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer;opacity:.85" title="A futura Área do cliente mostra este documento">
+                <input type="checkbox" ${d.visivel_cliente ? "checked" : ""} onchange="alternarVisivelDocObra('${d.id}', this.checked)"> Visível ao cliente
+            </label>
+            <button onclick="apagarDocumentoObra('${d.id}')" title="Apagar" style="background:none;border:none;cursor:pointer;font-size:14px;opacity:.6">🗑</button>
+        </div>`;
+    };
+
+    el.innerHTML = `
+        <div class="card" style="padding:14px;margin:4px 0 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="font-size:20px">👤</span>
+            <span style="flex:1;min-width:160px">
+                <span style="display:block;font-size:11px;opacity:.5;text-transform:uppercase;letter-spacing:1px">Cliente da obra</span>
+                ${cliente
+                    ? `<span style="font-weight:600">${escDoc(cliente.nome)}</span>
+                       <span style="font-size:12px;opacity:.6">${[cliente.nif && "NIF " + cliente.nif, cliente.email, cliente.telefone].filter(Boolean).map(escDoc).join(" · ")}</span>`
+                    : `<span style="opacity:.6;font-size:13px">Sem cliente. Fica ligado ao carregar o primeiro orçamento ou fatura, ou define-o já.</span>`}
+            </span>
+            <button class="btn-secondary" onclick="abrirFichaClienteObra()">${cliente ? "✏️ Editar cliente" : "+ Definir cliente"}</button>
+        </div>
+
+        <div class="card" style="padding:14px;margin:0 0 12px">
+            <div style="font-weight:600;font-size:13px;margin-bottom:10px">⬆ Carregar documento</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <select id="docObraTipo" onchange="document.getElementById('docObraVisivel').checked = TIPOS_DOC_OBRA[this.value].visivel" style="max-width:200px">${opcoesTipo}</select>
+                <input type="file" id="docObraFicheiro" multiple accept="application/pdf,image/*" style="flex:1;min-width:180px">
+                <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer">
+                    <input type="checkbox" id="docObraVisivel" checked> Visível ao cliente
+                </label>
+                <button class="btn-primary" id="btnCarregarDocObra" onclick="carregarDocumentoObra()">Carregar</button>
+            </div>
+            <div style="font-size:11px;opacity:.5;margin-top:8px">Orçamentos, faturas e recibos: o assistente lê o PDF e mostra o que vai registar antes de gravar. Máx. 20 MB por ficheiro.</div>
+            <div id="docObraMsg" style="display:none;font-size:12px;margin-top:8px"></div>
+        </div>
+
+        ${erroTabela}
+        <div class="card" style="padding:0;margin:0 0 20px;overflow:hidden">
+            ${docs.length ? docs.map(linha).join("")
+                : `<div style="padding:20px;text-align:center;opacity:.5;font-size:13px">Ainda não há documentos carregados nesta obra.</div>`}
+        </div>
+
+        <div style="font-family:var(--font-title,sans-serif);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:8px">Pastas da empresa no Google Drive (o cliente não vê)</div>
+        ${htmlPastasDrive()}`;
+}
+
+function nomeSeguroFicheiro(nome) {
+    return (nome || "ficheiro")
+        .normalize("NFD").replace(/[̀-ͯ]/g, "")
+        .replace(/[^\w.\-]+/g, "_").replace(/_+/g, "_").slice(-80);
+}
+
+async function carregarDocumentoObra() {
+    const obra = _painelObraActual;
+    const inp  = document.getElementById("docObraFicheiro");
+    const tipo = document.getElementById("docObraTipo").value;
+    const visivel = document.getElementById("docObraVisivel").checked;
+    const ficheiros = [...(inp.files || [])];
+    if (!ficheiros.length) { msgDocObra("Escolhe primeiro o ficheiro.", "warn"); return; }
+
+    const grandes = ficheiros.filter(f => f.size > MAX_DOC_OBRA);
+    if (grandes.length) { msgDocObra(`"${grandes[0].name}" tem mais de 20 MB.`, "err"); return; }
+
+    const btn = document.getElementById("btnCarregarDocObra");
+    btn.disabled = true; btn.textContent = "⏳ A carregar…";
+    const { data: { session } } = await SB.auth.getSession();
+    const ler = TIPOS_DOC_OBRA[tipo].ler;
+    const criados = [];
+
+    try {
+        for (const f of ficheiros) {
+            msgDocObra(`A carregar "${f.name}"…`, "warn");
+            const caminho = `${obra.id}/${Date.now()}-${nomeSeguroFicheiro(f.name)}`;
+            const up = await SB.storage.from(BUCKET_DOCS_OBRA).upload(caminho, f, { contentType: f.type || undefined });
+            if (up.error) throw new Error(up.error.message);
+
+            const { data: doc, error } = await SB.from("obra_documentos").insert({
+                obra_id: obra.id, tipo, nome_ficheiro: f.name, caminho,
+                mime: f.type || null, tamanho: f.size, visivel_cliente: visivel,
+                estado: ler ? "por_tratar" : "arquivado",
+                criado_por: session?.user?.email || null,
+            }).select().single();
+            if (error) {
+                await SB.storage.from(BUCKET_DOCS_OBRA).remove([caminho]);
+                throw new Error(error.message);
+            }
+            criados.push({ doc, ficheiro: f });
+        }
+    } catch (e) {
+        console.error("carregarDocumentoObra:", e);
+        await carregarPainelDocumentos();
+        msgDocObra("Não foi possível carregar: " + e.message, "err");
+        return;
+    } finally {
+        btn.disabled = false; btn.textContent = "Carregar";
+    }
+
+    await carregarPainelDocumentos();
+    if (ler && criados.length === 1) {
+        await tratarDocumentoObra(criados[0].doc.id, criados[0].ficheiro);
+    } else {
+        msgDocObra(ler
+            ? `${criados.length} documentos carregados. Usa "Ler e registar" em cada um.`
+            : `${criados.length === 1 ? "Documento carregado" : criados.length + " documentos carregados"}.`);
+    }
+}
+
+async function abrirDocumentoObra(id) {
+    const { data: doc } = await SB.from("obra_documentos").select("caminho").eq("id", id).single();
+    if (!doc) return;
+    const { data, error } = await SB.storage.from(BUCKET_DOCS_OBRA).createSignedUrl(doc.caminho, 600);
+    if (error) { msgDocObra("Não foi possível abrir: " + error.message, "err"); return; }
+    window.open(data.signedUrl, "_blank", "noopener");
+}
+
+async function alternarVisivelDocObra(id, visivel) {
+    const { error } = await SB.from("obra_documentos").update({ visivel_cliente: visivel }).eq("id", id);
+    if (error) { msgDocObra("Não foi possível alterar: " + error.message, "err"); carregarPainelDocumentos(); }
+}
+
+async function apagarDocumentoObra(id) {
+    const { data: doc } = await SB.from("obra_documentos").select("*").eq("id", id).single();
+    if (!doc) return;
+    const aviso = doc.estado === "registado"
+        ? "\n\nO que já foi registado (orçamento ou movimento no Financeiro) fica como está." : "";
+    if (!confirm(`Apagar "${doc.nome_ficheiro}"?${aviso}`)) return;
+    const rm = await SB.storage.from(BUCKET_DOCS_OBRA).remove([doc.caminho]);
+    if (rm.error) { msgDocObra("Não foi possível apagar o ficheiro: " + rm.error.message, "err"); return; }
+    await SB.from("obra_documentos").delete().eq("id", id);
+    await carregarPainelDocumentos();
+    msgDocObra("Documento apagado.");
+}
+
+function blobParaBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload  = () => resolve(String(fr.result).split(",")[1]);
+        fr.onerror = () => reject(new Error("Não foi possível abrir o ficheiro."));
+        fr.readAsDataURL(blob);
+    });
+}
+
+// Lê o documento com o assistente e abre a proposta para confirmar.
+async function tratarDocumentoObra(id, ficheiro = null) {
+    const { data: doc } = await SB.from("obra_documentos").select("*").eq("id", id).single();
+    if (!doc) return;
+
+    try {
+        let blob = ficheiro;
+        if (!blob) {
+            const dl = await SB.storage.from(BUCKET_DOCS_OBRA).download(doc.caminho);
+            if (dl.error) throw new Error(dl.error.message);
+            blob = dl.data;
+        }
+        if (blob.size > MAX_LER_DOC) throw new Error("o assistente só lê ficheiros até 8 MB.");
+
+        msgDocObra("🤖 O assistente está a ler o documento… demora alguns segundos.", "warn");
+        const base64 = await blobParaBase64(blob);
+        const { data: { session } } = await SB.auth.getSession();
+        if (!session) throw new Error("Sessão expirada. Volta a entrar.");
+
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/ler-documento-obra`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
+            body: JSON.stringify({
+                ficheiro_base64: base64,
+                tipo: doc.mime || blob.type || "application/pdf",
+                tipo_esperado: doc.tipo,
+                obra_id: doc.obra_id,
+            }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.erro || `Erro ${r.status}`);
+        msgDocObra("");
+        await abrirPropostaDocumento(doc, j.documento);
+    } catch (e) {
+        console.error("tratarDocumentoObra:", e);
+        msgDocObra("Não foi possível ler: " + e.message + ' O documento ficou guardado; podes tentar outra vez em "Ler e registar".', "err");
+    }
+}
+
+// ── Proposta: o que o assistente leu, para confirmar e gravar ─
+let _propostaDoc = null;
+
+function fecharPropostaDocumento() {
+    document.getElementById("modalPropostaDoc")?.remove();
+    _propostaDoc = null;
+}
+
+async function abrirPropostaDocumento(doc, lido) {
+    fecharPropostaDocumento();
+    const tipo = ["orcamento", "fatura", "recibo"].includes(lido.tipo) ? lido.tipo : doc.tipo;
+    const cli  = lido.cliente_conhecido || lido.cliente_da_obra || {};
+    const c    = { ...cli, ...Object.fromEntries(Object.entries(lido.cliente || {}).filter(([, v]) => v)) };
+    _propostaDoc = { doc, lido };
+
+    const { data: cats } = await SB.from("categorias_financeiras").select("id, nome").eq("tipo", "entrada").order("nome");
+    const catDefeito = (cats || []).find(x => /servi/i.test(x.nome))?.id;
+    const ehFR = lido.tipo_documento === "FR";
+
+    const campo = (rot, id, valor, tipoInput = "text", extra = "") => `
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;opacity:.9">${rot}
+            <input id="${id}" type="${tipoInput}" value="${escDoc(valor ?? "")}" ${tipoInput === "number" ? 'step="0.01"' : ""} ${extra}>
+        </label>`;
+
+    const blocoOrc = `
+        <div data-tipo="orcamento" class="prop-bloco" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">
+            ${campo("Validade", "propValidade", lido.validade, "date")}
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:11px">Estado
+                <select id="propEstadoOrc"><option value="enviado">Enviado</option><option value="aceite">Aceite</option></select>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;grid-column:1/-1">
+                <input type="checkbox" id="propRevisao" ${lido.e_revisao_ou_extra ? "checked" : ""}> É uma revisão ou um extra
+            </label>
+        </div>`;
+    const blocoFat = `
+        <div data-tipo="fatura" class="prop-bloco" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:11px">Categoria
+                <select id="propCategoria">${(cats || []).map(x => `<option value="${x.id}" ${x.id === catDefeito ? "selected" : ""}>${escDoc(x.nome)}</option>`).join("")}</select>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:11px">Pagamento
+                <select id="propPagamento">
+                    <option value="por_pagar" ${ehFR ? "" : "selected"}>Por pagar</option>
+                    <option value="pago" ${ehFR ? "selected" : ""}>Pago${ehFR ? " (fatura-recibo)" : ""}</option>
+                </select>
+            </label>
+        </div>`;
+    const encontradas = lido.faturas_encontradas || [];
+    const blocoRec = `
+        <div data-tipo="recibo" class="prop-bloco">
+            <div style="font-size:12px;margin-bottom:6px">Valor recebido: <b>${fmtEurDoc(lido.valor_recebido)}</b>. Marcar como pagas:</div>
+            ${encontradas.length ? encontradas.map(f => `
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;padding:4px 0">
+                    <input type="checkbox" class="propFaturaPaga" value="${f.id}" ${f.estado_pagamento === "pago" ? "" : "checked"}>
+                    Fatura ${escDoc(f.referencia)} de ${escDoc(f.data_documento)}, ${fmtEurDoc(f.valor_total)}${f.estado_pagamento === "pago" ? " (já paga)" : ""}
+                </label>`).join("")
+                : `<div style="font-size:12px;opacity:.6">Nenhuma das faturas deste recibo está na app. O recibo fica guardado na obra sem marcar nada.</div>`}
+        </div>`;
+
+    const avisos = (lido.avisos || []).map(a => `<li>${escDoc(a)}</li>`).join("");
+    const ligarObra = !_painelObraActual?.cliente_id
+        ? `<div style="font-size:12px;opacity:.7;margin-top:6px">Ao gravar, esta obra fica ligada a este cliente.</div>` : "";
+
+    const m = document.createElement("div");
+    m.id = "modalPropostaDoc";
+    m.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1300;display:flex;align-items:center;justify-content:center;padding:16px";
+    m.innerHTML = `
+    <div style="background:#1e1e1e;border-radius:14px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;padding:22px;border:1px solid rgba(255,255,255,.08)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="font-family:var(--font-title,sans-serif);font-size:18px">🤖 O que o assistente leu</div>
+            <button onclick="fecharPropostaDocumento()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer">×</button>
+        </div>
+        <div style="font-size:12px;opacity:.55;margin-bottom:14px">${escDoc(doc.nome_ficheiro)} · confirma ou corrige antes de gravar.</div>
+        ${avisos ? `<ul style="background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.3);color:#fb923c;border-radius:8px;padding:10px 10px 10px 28px;font-size:12px;margin:0 0 14px">${avisos}</ul>` : ""}
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:14px">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:11px">Tipo
+                <select id="propTipo" onchange="mostrarBlocoProposta()">
+                    <option value="orcamento" ${tipo === "orcamento" ? "selected" : ""}>🧾 Orçamento</option>
+                    <option value="fatura" ${tipo === "fatura" ? "selected" : ""}>💶 Fatura de venda</option>
+                    <option value="recibo" ${tipo === "recibo" ? "selected" : ""}>✅ Recibo</option>
+                </select>
+            </label>
+            ${campo("Número", "propNumero", lido.numero_documento)}
+            ${campo("Data", "propData", lido.data, "date")}
+            ${campo("Descrição", "propDescricao", lido.descricao)}
+        </div>
+
+        <div class="prop-totais" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+            ${campo("Total sem IVA (€)", "propSemIva", lido.total_sem_iva, "number")}
+            ${campo("IVA (€)", "propIva", lido.total_iva, "number")}
+            ${campo("Total com IVA (€)", "propComIva", lido.total_com_iva, "number")}
+        </div>
+
+        <div style="margin-bottom:14px">${blocoOrc}${blocoFat}${blocoRec}</div>
+
+        <div style="border-top:1px solid rgba(255,255,255,.08);padding-top:12px">
+            <div style="font-size:12px;font-weight:600;margin-bottom:8px">👤 Cliente${lido.cliente_conhecido ? ' <span style="opacity:.5;font-weight:400">(já existe na app)</span>' : ""}</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">
+                ${campo("Nome", "propCliNome", c.nome)}
+                ${campo("NIF", "propCliNif", c.nif)}
+                ${campo("Email", "propCliEmail", c.email, "email")}
+                ${campo("Telefone", "propCliTel", c.telefone)}
+                ${campo("Morada", "propCliMorada", c.morada)}
+            </div>
+            ${ligarObra}
+        </div>
+
+        <div id="propMsg" style="display:none;color:#f87171;font-size:12px;margin-top:10px"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
+            <button class="btn-secondary" onclick="fecharPropostaDocumento()">Agora não</button>
+            <button class="btn-primary" id="btnGravarProposta" onclick="gravarPropostaDocumento()">✓ Gravar</button>
+        </div>
+    </div>`;
+    document.body.appendChild(m);
+    mostrarBlocoProposta();
+}
+
+function mostrarBlocoProposta() {
+    const tipo = document.getElementById("propTipo").value;
+    document.querySelectorAll("#modalPropostaDoc .prop-bloco").forEach(b => b.style.display = b.dataset.tipo === tipo ? "" : "none");
+    document.querySelector("#modalPropostaDoc .prop-totais").style.display = tipo === "recibo" ? "none" : "grid";
+}
+
+// Encontra ou cria o cliente e devolve o id. Atualiza os contactos com o que
+// foi confirmado, sem apagar o que já lá estava.
+async function guardarClienteDaProposta(v) {
+    if (!v.nome) return null;
+    const nif = (v.nif || "").replace(/\D/g, "") || null;
+    let existente = null;
+    if (nif) existente = (await SB.from("clientes").select("*").eq("nif", nif).maybeSingle()).data;
+    if (!existente && _painelObraActual?.cliente_id) {
+        existente = (await SB.from("clientes").select("*").eq("id", _painelObraActual.cliente_id).maybeSingle()).data;
+        if (existente?.nif && nif && existente.nif !== nif) existente = null;   // outro cliente
+    }
+    const campos = { nome: v.nome, nif, email: v.email || null, telefone: v.telefone || null, morada: v.morada || null };
+    if (existente) {
+        const mudar = Object.fromEntries(Object.entries(campos).filter(([k, x]) => x && x !== existente[k]));
+        if (Object.keys(mudar).length) {
+            const { error } = await SB.from("clientes").update(mudar).eq("id", existente.id);
+            if (error) throw new Error("cliente: " + error.message);
+        }
+        return existente.id;
+    }
+    const { data, error } = await SB.from("clientes").insert(campos).select("id").single();
+    if (error) throw new Error("cliente: " + error.message);
+    return data.id;
+}
+
+async function gravarPropostaDocumento() {
+    if (!_propostaDoc) return;
+    const { doc, lido } = _propostaDoc;
+    const obra = _painelObraActual;
+    const val  = id => document.getElementById(id)?.value.trim() || "";
+    const num  = id => { const x = val(id); return x === "" ? null : Number(x.replace(",", ".")); };
+    const erroEl = document.getElementById("propMsg");
+    const falha = t => { erroEl.style.display = "block"; erroEl.textContent = t; };
+
+    const tipo   = val("propTipo");
+    const numero = val("propNumero");
+    const data   = val("propData") || null;
+    const semIva = num("propSemIva"), iva = num("propIva"), comIva = num("propComIva");
+    const cli = { nome: val("propCliNome"), nif: val("propCliNif"), email: val("propCliEmail"), telefone: val("propCliTel"), morada: val("propCliMorada") };
+
+    if (tipo !== "recibo") {
+        if (!numero) return falha("Falta o número do documento.");
+        if (comIva == null) return falha("Falta o total com IVA.");
+        if (!cli.nome) return falha("Falta o nome do cliente.");
+    }
+
+    const btn = document.getElementById("btnGravarProposta");
+    btn.disabled = true; btn.textContent = "⏳ A gravar…";
+
+    try {
+        const clienteId = await guardarClienteDaProposta(cli);
+        if (clienteId && !obra.cliente_id) {
+            const { error } = await SB.from("obras").update({ cliente_id: clienteId }).eq("id", obra.id);
+            if (error) throw new Error("obra: " + error.message);
+            obra.cliente_id = clienteId;
+        }
+
+        const ligacao = { orcamento_id: null, movimento_id: null };
+
+        if (tipo === "orcamento") {
+            const taxa = semIva && iva != null ? Math.round(iva / semIva * 100) : 23;
+            const notas = "Importado do PDF do TOCONLINE" + (document.getElementById("propRevisao").checked ? " · revisão ou extra" : "");
+            const { data: o, error } = await SB.from("orcamentos").insert({
+                numero, data: data || undefined, validade: val("propValidade") || null,
+                estado: val("propEstadoOrc"),
+                cliente_nome: cli.nome, cliente_nif: cli.nif || null, cliente_morada: cli.morada || null,
+                cliente_email: cli.email || null, cliente_tel: cli.telefone || null, cliente_id: clienteId,
+                obra_id: obra.id, obra_descricao: val("propDescricao") || null, notas,
+                taxa_iva: taxa, total_sem_iva: semIva ?? 0, total_iva: iva ?? 0, total_com_iva: comIva,
+            }).select("id").single();
+            if (error) throw new Error(error.code === "23505" ? `já existe um orçamento com o número ${numero}.` : error.message);
+            ligacao.orcamento_id = o.id;
+        }
+
+        if (tipo === "fatura") {
+            if (!data) throw new Error("falta a data da fatura.");
+            const { data: mv, error } = await SB.from("movimentos_financeiros").insert({
+                referencia: numero, data_documento: data, tipo: "entrada",
+                cliente_nome: cli.nome, cliente_id: clienteId,
+                categoria_id: val("propCategoria") || null, obra_id: obra.id,
+                valor_base: semIva ?? comIva, iva: iva ?? 0, valor_total: comIva,
+                estado_pagamento: val("propPagamento"),
+                observacoes: "Fatura de venda carregada na obra (TOCONLINE)" + (val("propDescricao") ? " · " + val("propDescricao") : ""),
+                ativo: true, fonte: "documento_obra", fonte_id: doc.id,
+            }).select("id").single();
+            if (error) throw new Error(error.message);
+            ligacao.movimento_id = mv.id;
+        }
+
+        if (tipo === "recibo") {
+            const ids = [...document.querySelectorAll("#modalPropostaDoc .propFaturaPaga:checked")].map(x => x.value);
+            if (ids.length) {
+                const { error } = await SB.from("movimentos_financeiros").update({ estado_pagamento: "pago" }).in("id", ids);
+                if (error) throw new Error(error.message);
+                ligacao.movimento_id = ids[0];
+            }
+        }
+
+        const { error: errDoc } = await SB.from("obra_documentos").update({
+            tipo, estado: "registado",
+            numero_documento: numero || null, data_documento: data,
+            dados_lidos: { ...lido, confirmado: { tipo, numero, data, total_sem_iva: semIva, total_iva: iva, total_com_iva: comIva, cliente: cli } },
+            ...ligacao,
+        }).eq("id", doc.id);
+        if (errDoc) throw new Error(errDoc.message);
+
+        fecharPropostaDocumento();
+        await carregarPainelDocumentos();
+        msgDocObra({
+            orcamento: `Orçamento ${numero} registado na obra.`,
+            fatura:    `Fatura ${numero} lançada no Financeiro.`,
+            recibo:    "Recibo registado" + (ligacao.movimento_id ? " e fatura marcada como paga." : "."),
+        }[tipo]);
+    } catch (e) {
+        console.error("gravarPropostaDocumento:", e);
+        falha("Não foi possível gravar: " + e.message);
+        btn.disabled = false; btn.textContent = "✓ Gravar";
+    }
+}
+
+// ── Ficha de cliente da obra ─────────────────────────────────
+async function abrirFichaClienteObra() {
+    const obra = _painelObraActual;
+    const { data: todos } = await SB.from("clientes").select("*").order("nome");
+    const atual = (todos || []).find(x => x.id === obra.cliente_id) || {};
+
+    document.getElementById("modalFichaCliente")?.remove();
+    const m = document.createElement("div");
+    m.id = "modalFichaCliente";
+    m.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1300;display:flex;align-items:center;justify-content:center;padding:16px";
+    const campo = (rot, id, v, t = "text") => `
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:11px">${rot}<input id="${id}" type="${t}" value="${escDoc(v ?? "")}"></label>`;
+    m.innerHTML = `
+    <div style="background:#1e1e1e;border-radius:14px;width:100%;max-width:520px;padding:22px;border:1px solid rgba(255,255,255,.08)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div style="font-family:var(--font-title,sans-serif);font-size:18px">👤 Cliente da obra</div>
+            <button onclick="document.getElementById('modalFichaCliente').remove()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer">×</button>
+        </div>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;margin-bottom:12px">Escolher cliente
+            <select id="fcEscolha" onchange="preencherFichaCliente(this.value)">
+                <option value="">+ Cliente novo</option>
+                ${(todos || []).map(x => `<option value="${x.id}" ${x.id === obra.cliente_id ? "selected" : ""}>${escDoc(x.nome)}${x.nif ? " · " + escDoc(x.nif) : ""}</option>`).join("")}
+            </select>
+        </label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            ${campo("Nome", "fcNome", atual.nome)}
+            ${campo("NIF", "fcNif", atual.nif)}
+            ${campo("Email", "fcEmail", atual.email, "email")}
+            ${campo("Telefone", "fcTel", atual.telefone)}
+        </div>
+        <div style="margin-top:10px">${campo("Morada", "fcMorada", atual.morada)}</div>
+        <div id="fcMsg" style="display:none;color:#f87171;font-size:12px;margin-top:10px"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
+            <button class="btn-secondary" onclick="document.getElementById('modalFichaCliente').remove()">Cancelar</button>
+            <button class="btn-primary" onclick="gravarFichaClienteObra()">Gravar</button>
+        </div>
+    </div>`;
+    m._clientes = todos || [];
+    document.body.appendChild(m);
+}
+
+function preencherFichaCliente(id) {
+    const c = (document.getElementById("modalFichaCliente")._clientes || []).find(x => x.id === id) || {};
+    [["fcNome", "nome"], ["fcNif", "nif"], ["fcEmail", "email"], ["fcTel", "telefone"], ["fcMorada", "morada"]]
+        .forEach(([el, k]) => document.getElementById(el).value = c[k] || "");
+}
+
+async function gravarFichaClienteObra() {
+    const obra = _painelObraActual;
+    const v = id => document.getElementById(id).value.trim();
+    const msg = document.getElementById("fcMsg");
+    const campos = {
+        nome: v("fcNome"), nif: v("fcNif").replace(/\D/g, "") || null,
+        email: v("fcEmail") || null, telefone: v("fcTel") || null, morada: v("fcMorada") || null,
+    };
+    if (!campos.nome) { msg.style.display = "block"; msg.textContent = "Falta o nome."; return; }
+
+    let id = v("fcEscolha");
+    const r = id
+        ? await SB.from("clientes").update(campos).eq("id", id).select("id").single()
+        : await SB.from("clientes").insert(campos).select("id").single();
+    if (r.error) {
+        msg.style.display = "block";
+        msg.textContent = r.error.code === "23505" ? "Já existe um cliente com este NIF: escolhe-o na lista." : r.error.message;
+        return;
+    }
+    id = r.data.id;
+    if (obra.cliente_id !== id) {
+        const { error } = await SB.from("obras").update({ cliente_id: id }).eq("id", obra.id);
+        if (error) { msg.style.display = "block"; msg.textContent = error.message; return; }
+        obra.cliente_id = id;
+    }
+    document.getElementById("modalFichaCliente").remove();
+    await carregarPainelDocumentos();
 }
 
 async function carregarPainelResumo() {
