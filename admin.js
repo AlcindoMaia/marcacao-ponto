@@ -4754,7 +4754,7 @@ function mostrarAcessoCliente(c) {
         <input id="fcLink" readonly value="${escDoc(link)}" onclick="this.select()" style="width:100%;font-size:12px;margin-bottom:8px">
         <div style="display:flex;gap:6px;flex-wrap:wrap">
             ${tel
-                ? `<a class="btn-primary" href="${escDoc(linkWhatsApp(c))}" target="_blank" rel="noopener" style="text-decoration:none">📲 Enviar por WhatsApp</a>`
+                ? `<a class="btn-primary" href="${escDoc(linkWhatsApp(c))}" ${eTelemovel() ? "" : 'target="_blank" rel="noopener"'} style="text-decoration:none">📲 Enviar por WhatsApp</a>`
                 : `<button class="btn-primary" disabled title="Falta o telefone do cliente">📲 Enviar por WhatsApp</button>`}
             <button class="btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById('fcLink').value).then(() => this.textContent = '✓ Copiado')">Copiar</button>
             <a class="btn-secondary" href="${escDoc(link)}" target="_blank" rel="noopener" style="text-decoration:none">Ver como o cliente</a>
@@ -4796,15 +4796,22 @@ async function desligarAcessoCliente(id) {
     await recarregarAcessoCliente(id);
 }
 
-// Link wa.me com a mensagem pronta. É um link normal (<a href>) e não um
-// window.open depois de ir à base de dados: o browser do telemóvel bloqueia
-// janelas abertas fora do toque do utilizador, e o WhatsApp não abria.
+const eTelemovel = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+// Link para o WhatsApp com a mensagem pronta. É um link normal (<a href>) e
+// não um window.open depois de ir à base de dados: o browser do telemóvel
+// bloqueia janelas abertas fora do toque do utilizador. No telemóvel usa-se
+// whatsapp://, que abre logo a app; o wa.me ficava na página do WhatsApp com
+// um botão "Abrir app". No computador fica o wa.me (WhatsApp Web).
 function linkWhatsApp(c) {
     const primeiro = (c.nome || "").trim().split(/\s+/)[0];
     const texto = `Olá ${primeiro}, a Maia Solutions criou a sua Área do cliente. ` +
         `Pode acompanhar a sua obra e consultar orçamentos, faturas, recibos e fotografias neste link:\n` +
         `${linkAreaCliente(c.token_acesso)}\n\nGuarde esta mensagem: o link é pessoal, por favor não o partilhe.`;
-    return `https://wa.me/${telefoneWhatsApp(c.telefone)}?text=${encodeURIComponent(texto)}`;
+    const tel = telefoneWhatsApp(c.telefone), msg = encodeURIComponent(texto);
+    return eTelemovel()
+        ? `whatsapp://send?phone=${tel}&text=${msg}`
+        : `https://wa.me/${tel}?text=${msg}`;
 }
 
 async function gravarFichaClienteObra() {
