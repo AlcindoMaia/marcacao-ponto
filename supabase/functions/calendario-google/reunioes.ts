@@ -134,11 +134,11 @@ export function lerReunioes(ICAL: any, ics: string, de: string, ate: string): Re
         if (!v.hasProperty("rrule") && !v.hasProperty("rdate") && !excecoes[v.getFirstPropertyValue("uid") || ""]) {
             const ini = v.getFirstPropertyValue("dtstart");
             const fim = v.getFirstPropertyValue("dtend");
-            if (!ini || !naJanela(ini, fim)) continue;
+            // Sem DTEND (só DURATION) não se sabe aqui até onde vai: segue para o ICAL.Event
+            if (!ini || (fim || !v.hasProperty("duration")) && !naJanela(ini, fim)) continue;
         }
         const ev = new ICAL.Event(v);
         const uid = ev.uid || "";
-        const temExcecoes = !!excecoes[uid];
         for (const x of excecoes[uid] || []) ev.relateException(x);
         delete excecoes[uid];
 
@@ -147,12 +147,20 @@ export function lerReunioes(ICAL: any, ics: string, de: string, ate: string): Re
             if (naJanela(ev.startDate, ev.endDate)) juntar(uid, ev, ev.startDate, ev.endDate);
             continue;
         }
-        const it = ev.iterator(avancar(ev, deN));
+        // Repetições de vários dias que começam antes da janela ainda a tocam
+        const durDias = Math.ceil(Math.max(0, ev.duration?.toSeconds?.() || 0) / 86_400);
+        let desde = Number(somarDias(de, -2 - durDias).replaceAll("-", ""));
+        // Uma exceção dentro da janela pode vir de uma data antiga da série:
+        // a série tem de começar antes dessa data original
+        for (const x of Object.values<any>(ev.exceptions || {})) {
+            if (naJanela(x.startDate, x.endDate)) desde = Math.min(desde, dia(x.recurrenceId));
+        }
+        const it = ev.iterator(avancar(ev, desde));
         let t, n = 0;
         while ((t = it.next()) && n++ < MAX_REPETICOES) {
             const d = dia(t);
             if (d > ateN) break;
-            if (d < deN && !temExcecoes) continue;   // uma exceção pode trazê-la para a janela
+            if (d < desde) continue;
             const o = ev.getOccurrenceDetails(t);
             if (naJanela(o.startDate, o.endDate)) juntar(uid, o.item, o.startDate, o.endDate);
         }
