@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://npyosbigynxmxdakcymg.supabase.co; connect-src https://npyosbigynxmxdakcymg.supabase.co; object-src 'none'; base-uri 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Área do cliente · Maia Solutions</title>
+<link rel="icon" href="Logo.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500&family=Inter:wght@400;500;600&display=swap">
+<!--
+  Área do cliente (só consulta). O cliente abre cliente.html?t=<código>, o
+  link fixo que recebeu por WhatsApp. Esta página não lê a base de dados: pede
+  tudo à função area-cliente, que só devolve as obras do cliente e os
+  documentos marcados "Visível ao cliente".
+-->
+<style>
+    :root {
+        --bg: #121212; --card: #1e1e1e; --linha: rgba(255,255,255,.08);
+        --texto: #f2f2f2; --suave: rgba(255,255,255,.55); --primary: #f4b942;
+        --ok: #4ade80; --aviso: #fb923c;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--texto); font: 15px/1.5 Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: var(--primary); }
+    .topo { display: flex; align-items: center; gap: 12px; padding: 18px 16px; border-bottom: 1px solid var(--linha); max-width: 860px; margin: 0 auto; }
+    .topo img { height: 40px; }
+    .topo .marca { font-family: Oswald, sans-serif; letter-spacing: 1px; text-transform: uppercase; font-size: 13px; color: var(--primary); }
+    main { max-width: 860px; margin: 0 auto; padding: 20px 16px 48px; }
+    h1 { font-family: Oswald, sans-serif; font-weight: 500; font-size: 26px; margin: 0 0 4px; }
+    h2 { font-family: Oswald, sans-serif; font-weight: 400; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--suave); margin: 22px 0 10px; }
+    .sub { color: var(--suave); margin: 0 0 18px; }
+    .obra { background: var(--card); border: 1px solid var(--linha); border-radius: 16px; padding: 18px; margin-bottom: 20px; }
+    .obra-cab { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: flex-start; }
+    .obra-nome { font-family: Oswald, sans-serif; font-size: 21px; font-weight: 500; }
+    .obra-local { color: var(--suave); font-size: 13px; }
+    .selo { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+    .selo.curso { background: rgba(244,185,66,.14); color: var(--primary); }
+    .selo.feita { background: rgba(74,222,128,.14); color: var(--ok); }
+    .barra { height: 8px; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; margin: 14px 0 6px; }
+    .barra > div { height: 100%; background: var(--primary); border-radius: 99px; }
+    .meta { display: flex; justify-content: space-between; font-size: 13px; color: var(--suave); flex-wrap: wrap; gap: 6px; }
+    .doc { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--linha); text-decoration: none; color: inherit; }
+    .doc:first-child { border-top: none; }
+    .doc .ic { font-size: 22px; width: 28px; text-align: center; }
+    .doc .tx { flex: 1; min-width: 0; }
+    .doc .nm { font-weight: 600; word-break: break-word; }
+    .doc .dt { font-size: 12px; color: var(--suave); }
+    .doc .abrir { font-size: 13px; color: var(--primary); white-space: nowrap; }
+    .estado { font-size: 12px; font-weight: 600; }
+    .estado.ok { color: var(--ok); } .estado.pend { color: var(--aviso); }
+    .fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+    .fotos a { display: block; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: #2a2a2a; }
+    .fotos img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .vazio { color: var(--suave); font-size: 14px; padding: 6px 0; }
+    .centro { text-align: center; padding: 60px 16px; color: var(--suave); }
+    .rodape { text-align: center; color: var(--suave); font-size: 12px; margin-top: 30px; }
+</style>
+</head>
+<body>
+<header class="topo">
+    <img src="Logo.png" alt="Maia Solutions">
+    <span class="marca">Área do cliente</span>
+</header>
+<main id="conteudo"><div class="centro">A carregar…</div></main>
+
+<script>
+const FUNCAO = "https://npyosbigynxmxdakcymg.supabase.co/functions/v1/area-cliente";
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g,
+    c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const dataPT = d => d ? new Date(d + "T12:00:00").toLocaleDateString("pt-PT") : "";
+const euros  = v => v == null ? "" : Number(v).toLocaleString("pt-PT", { style: "currency", currency: "EUR" });
+// Só links do nosso armazenamento; nunca outro endereço vindo da resposta.
+const urlSegura = u => typeof u === "string" && u.startsWith("https://npyosbigynxmxdakcymg.supabase.co/") ? u : "#";
+
+function linhaDoc(d, icone, extra = "") {
+    return `<a class="doc" href="${esc(urlSegura(d.url))}" target="_blank" rel="noopener noreferrer">
+        <span class="ic">${icone}</span>
+        <span class="tx">
+            <span class="nm">${esc(d.numero || d.nome)}</span>
+            <span class="dt">${esc(dataPT(d.data))}${extra ? " · " + extra : ""}</span>
+        </span>
+        <span class="abrir">Abrir ›</span>
+    </a>`;
+}
+
+function seccao(titulo, itens, vazio) {
+    return `<h2>${titulo}</h2>${itens.length ? itens.join("") : `<div class="vazio">${vazio}</div>`}`;
+}
+
+function htmlObra(o, docs) {
+    const pct = Math.max(0, Math.min(100, Number(o.percentagem_conclusao) || 0));
+    const feita = o.estado === "concluida";
+    const de = t => docs.filter(d => d.tipo === t);
+
+    const orcs = de("orcamento").map(d => linhaDoc(d, "🧾",
+        d.estado_orcamento === "aceite" ? `<span class="estado ok">Aceite</span>` : ""));
+    const fats = [...de("fatura"), ...de("recibo")]
+        .sort((a, b) => String(b.data).localeCompare(String(a.data)))
+        .map(d => d.tipo === "recibo"
+            ? linhaDoc(d, "✅", "Recibo")
+            : linhaDoc(d, "💶", [euros(d.total),
+                d.paga == null ? "" : d.paga ? `<span class="estado ok">Paga</span>` : `<span class="estado pend">Por pagar</span>`]
+                .filter(Boolean).join(" · ")));
+    const fotos = de("foto").map(d => `<a href="${esc(urlSegura(d.url))}" target="_blank" rel="noopener noreferrer">
+        <img src="${esc(urlSegura(d.url))}" alt="${esc(d.nome)}" loading="lazy"></a>`);
+    const outros = de("outro").map(d => linhaDoc(d, "📄"));
+
+    return `<section class="obra">
+        <div class="obra-cab">
+            <div>
+                <div class="obra-nome">${esc(o.nome)}</div>
+                ${o.local ? `<div class="obra-local">${esc(o.local)}</div>` : ""}
+            </div>
+            <span class="selo ${feita ? "feita" : "curso"}">${feita ? "✓ Concluída" : "Em curso"}</span>
+        </div>
+        <div class="barra"><div style="width:${pct}%"></div></div>
+        <div class="meta">
+            <span>${pct}% concluída</span>
+            ${o.data_conclusao_prevista && !feita ? `<span>Conclusão prevista: ${esc(dataPT(o.data_conclusao_prevista))}</span>` : ""}
+        </div>
+        ${seccao("Orçamentos", orcs, "Ainda não há orçamentos.")}
+        ${seccao("Faturas e recibos", fats, "Ainda não há faturas.")}
+        ${fotos.length ? `<h2>Fotografias</h2><div class="fotos">${fotos.join("")}</div>` : ""}
+        ${outros.length ? seccao("Outros documentos", outros, "") : ""}
+    </section>`;
+}
+
+async function iniciar() {
+    const el = document.getElementById("conteudo");
+    const token = new URLSearchParams(location.search).get("t") || "";
+    if (!token) {
+        el.innerHTML = `<div class="centro">Este link não está completo.<br>Abra o link que recebeu da Maia Solutions.</div>`;
+        return;
+    }
+    try {
+        const r = await fetch(FUNCAO, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.erro || "Erro " + r.status);
+
+        const obras = j.obras || [], docs = j.documentos || [];
+        const primeiro = String(j.cliente?.nome || "").trim().split(/\s+/)[0];
+        el.innerHTML = `
+            <h1>Olá${primeiro ? ", " + esc(primeiro) : ""}</h1>
+            <p class="sub">Aqui pode acompanhar ${obras.length === 1 ? "a sua obra" : "as suas obras"} e consultar os documentos.</p>
+            ${obras.length
+                ? obras.map(o => htmlObra(o, docs.filter(d => d.obra_id === o.id))).join("")
+                : `<div class="centro">Ainda não há obras associadas.</div>`}
+            <div class="rodape">Os links dos documentos valem 1 hora. Se algum não abrir, atualize a página.<br>Maia Solutions</div>`;
+    } catch (e) {
+        el.innerHTML = `<div class="centro">Não foi possível abrir a Área do cliente.<br>${esc(e.message)}<br><br>Se o problema continuar, contacte a Maia Solutions.</div>`;
+    }
+}
+iniciar();
+</script>
+</body>
+</html>

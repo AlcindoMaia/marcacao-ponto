@@ -4226,10 +4226,11 @@ async function carregarPainelDocumentos() {
                 <span style="display:block;font-size:11px;opacity:.5;text-transform:uppercase;letter-spacing:1px">Cliente da obra</span>
                 ${cliente
                     ? `<span style="font-weight:600">${escDoc(cliente.nome)}</span>
-                       <span style="font-size:12px;opacity:.6">${[cliente.nif && "NIF " + cliente.nif, cliente.email, cliente.telefone].filter(Boolean).map(escDoc).join(" · ")}</span>`
+                       <span style="font-size:12px;opacity:.6">${[cliente.nif && "NIF " + cliente.nif, cliente.email, cliente.telefone].filter(Boolean).map(escDoc).join(" · ")}</span>
+                       <span style="display:block;font-size:11px;margin-top:2px;color:${cliente.acesso_ativo ? "#4ade80" : "rgba(255,255,255,.4)"}">🔗 Área do cliente: ${cliente.acesso_ativo ? "ligada" : "sem link"}</span>`
                     : `<span style="opacity:.6;font-size:13px">Sem cliente. Fica ligado ao carregar o primeiro orçamento ou fatura, ou define-o já.</span>`}
             </span>
-            <button class="btn-secondary" onclick="abrirFichaClienteObra()">${cliente ? "✏️ Editar cliente" : "+ Definir cliente"}</button>
+            <button class="btn-secondary" onclick="abrirFichaClienteObra()">${cliente ? "✏️ Cliente e link" : "+ Definir cliente"}</button>
         </div>
 
         <div class="card" style="padding:14px;margin:0 0 12px">
@@ -4692,6 +4693,7 @@ async function abrirFichaClienteObra() {
             ${campo("Telefone", "fcTel", atual.telefone)}
         </div>
         <div style="margin-top:10px">${campo("Morada", "fcMorada", atual.morada)}</div>
+        <div id="fcAcesso" style="margin-top:16px;border-top:1px solid rgba(255,255,255,.08);padding-top:14px"></div>
         <div id="fcMsg" style="display:none;color:#f87171;font-size:12px;margin-top:10px"></div>
         <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
             <button class="btn-secondary" onclick="document.getElementById('modalFichaCliente').remove()">Cancelar</button>
@@ -4700,12 +4702,106 @@ async function abrirFichaClienteObra() {
     </div>`;
     m._clientes = todos || [];
     document.body.appendChild(m);
+    mostrarAcessoCliente(atual.id ? atual : null);
 }
 
 function preencherFichaCliente(id) {
     const c = (document.getElementById("modalFichaCliente")._clientes || []).find(x => x.id === id) || {};
     [["fcNome", "nome"], ["fcNif", "nif"], ["fcEmail", "email"], ["fcTel", "telefone"], ["fcMorada", "morada"]]
         .forEach(([el, k]) => document.getElementById(el).value = c[k] || "");
+    mostrarAcessoCliente(c.id ? c : null);
+}
+
+// ── Área do cliente: link fixo por cliente ──────────────────
+// cliente.html?t=<código>. O código são 24 bytes aleatórios em base64url (32
+// caracteres): impossível de adivinhar. Desligar corta o acesso logo; gerar
+// novo link invalida o anterior (para quando um link foi reencaminhado).
+function novoCodigoAcesso() {
+    const b = crypto.getRandomValues(new Uint8Array(24));
+    return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function linkAreaCliente(token) {
+    return new URL("cliente.html?t=" + encodeURIComponent(token), location.href).href;
+}
+
+function telefoneWhatsApp(tel) {
+    const d = String(tel || "").replace(/\D/g, "").replace(/^00/, "");
+    if (!d) return "";
+    return d.length === 9 ? "351" + d : d;   // número português sem indicativo
+}
+
+function mostrarAcessoCliente(c) {
+    const el = document.getElementById("fcAcesso");
+    if (!el) return;
+    const titulo = `<div style="font-size:12px;font-weight:600;margin-bottom:8px">🔗 Área do cliente</div>`;
+    if (!c) {
+        el.innerHTML = titulo + `<div style="font-size:12px;opacity:.6">Grava primeiro o cliente para criar o link de acesso.</div>`;
+        return;
+    }
+    if (!c.acesso_ativo || !c.token_acesso) {
+        el.innerHTML = titulo + `
+            <div style="font-size:12px;opacity:.6;margin-bottom:8px">${c.token_acesso ? "O acesso está desligado." : "Este cliente ainda não tem link."}
+                O cliente vê as obras dele e os documentos marcados "Visível ao cliente".</div>
+            <button class="btn-primary" onclick="ativarAcessoCliente('${c.id}', ${c.token_acesso ? "false" : "true"})">${c.token_acesso ? "Voltar a ligar o mesmo link" : "Criar link de acesso"}</button>
+            ${c.token_acesso ? `<button class="btn-secondary" onclick="ativarAcessoCliente('${c.id}', true)">Criar link novo</button>` : ""}`;
+        return;
+    }
+    const link = linkAreaCliente(c.token_acesso);
+    const tel  = telefoneWhatsApp(c.telefone);
+    const ultimo = c.ultimo_acesso ? "Última visita: " + new Date(c.ultimo_acesso).toLocaleString("pt-PT") : "Ainda não abriu o link.";
+    el.innerHTML = titulo + `
+        <input id="fcLink" readonly value="${escDoc(link)}" onclick="this.select()" style="width:100%;font-size:12px;margin-bottom:8px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn-primary" onclick="enviarLinkWhatsApp('${c.id}')" ${tel ? "" : 'disabled title="Falta o telefone do cliente"'}>📲 Enviar por WhatsApp</button>
+            <button class="btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById('fcLink').value).then(() => this.textContent = '✓ Copiado')">Copiar</button>
+            <a class="btn-secondary" href="${escDoc(link)}" target="_blank" rel="noopener" style="text-decoration:none">Ver como o cliente</a>
+            <button class="btn-secondary" onclick="desligarAcessoCliente('${c.id}')">Desligar</button>
+            <button class="btn-secondary" onclick="ativarAcessoCliente('${c.id}', true)">Criar link novo</button>
+        </div>
+        <div style="font-size:11px;opacity:.5;margin-top:8px">${escDoc(ultimo)}${tel ? "" : " · Para enviar por WhatsApp, preenche o telefone e grava."}</div>`;
+}
+
+async function recarregarAcessoCliente(id) {
+    const { data } = await SB.from("clientes").select("*").eq("id", id).maybeSingle();
+    const m = document.getElementById("modalFichaCliente");
+    if (m && data) m._clientes = (m._clientes || []).map(x => x.id === id ? data : x);
+    mostrarAcessoCliente(data);
+}
+
+function erroFichaCliente(t) {
+    const msg = document.getElementById("fcMsg");
+    if (msg) { msg.style.display = "block"; msg.textContent = t; }
+}
+
+async function ativarAcessoCliente(id, novo) {
+    if (novo) {
+        // Só se pergunta quando já havia um link, que deixa de funcionar.
+        const { data } = await SB.from("clientes").select("token_acesso").eq("id", id).single();
+        if (data?.token_acesso && !confirm("Criar um link novo? O link anterior deixa de funcionar.")) return;
+    }
+    const mudar = { acesso_ativo: true };
+    if (novo) { mudar.token_acesso = novoCodigoAcesso(); mudar.acesso_criado_em = new Date().toISOString(); }
+    const { error } = await SB.from("clientes").update(mudar).eq("id", id);
+    if (error) { erroFichaCliente("Não foi possível criar o link: " + error.message); return; }
+    await recarregarAcessoCliente(id);
+}
+
+async function desligarAcessoCliente(id) {
+    if (!confirm("Desligar o acesso? O cliente deixa de conseguir abrir a Área do cliente até voltares a ligar.")) return;
+    const { error } = await SB.from("clientes").update({ acesso_ativo: false }).eq("id", id);
+    if (error) { erroFichaCliente("Não foi possível desligar: " + error.message); return; }
+    await recarregarAcessoCliente(id);
+}
+
+async function enviarLinkWhatsApp(id) {
+    const { data: c } = await SB.from("clientes").select("nome, telefone, token_acesso, acesso_ativo").eq("id", id).single();
+    if (!c?.acesso_ativo || !c.token_acesso) return;
+    const primeiro = (c.nome || "").trim().split(/\s+/)[0];
+    const texto = `Olá ${primeiro}, a Maia Solutions criou a sua Área do cliente. ` +
+        `Pode acompanhar a sua obra e consultar orçamentos, faturas, recibos e fotografias neste link:\n` +
+        `${linkAreaCliente(c.token_acesso)}\n\nGuarde esta mensagem: o link é pessoal, por favor não o partilhe.`;
+    window.open(`https://wa.me/${telefoneWhatsApp(c.telefone)}?text=${encodeURIComponent(texto)}`, "_blank", "noopener");
 }
 
 async function gravarFichaClienteObra() {
