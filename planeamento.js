@@ -9,6 +9,7 @@ let _planSemana   = null;   // segunda-feira da semana visível (Date local)
 let _planFuncs    = [];      // todos, incluindo inativos (para não perder tarefas antigas)
 let _planObras    = [];
 let _planTarefas  = [];
+let _planReunioes = [];     // do Google Calendar, só leitura
 let _planDragId   = null;
 let _planEditId   = null;
 let _planPedido   = 0;      // descarta respostas de semanas antigas
@@ -94,6 +95,7 @@ async function carregarPlaneamento() {
     document.getElementById("planLabelSemana").textContent =
         `${dias[0].toLocaleDateString("pt-PT")} — ${dias[6].toLocaleDateString("pt-PT")}`;
 
+    const pedidoReunioes = planCarregarReunioes(de, ate);
     const { data, error } = await SB.from("tarefas")
         .select(`
             id, descricao, notas, data_prevista, hora_inicio, duracao_horas,
@@ -106,12 +108,44 @@ async function carregarPlaneamento() {
         .lte("data_prevista", ate)
         .order("ordem", { ascending: true })
         .order("hora_inicio", { ascending: true, nullsFirst: true });
+    const reunioes = await pedidoReunioes;
 
     if (pedido !== _planPedido) return;   // entretanto mudou-se de semana
     if (error) { console.error(error); alert("Erro ao carregar tarefas."); return; }
 
-    _planTarefas = data || [];
+    _planTarefas  = data || [];
+    _planReunioes = reunioes.lista;
+    const label = document.getElementById("planLabelSemana");
+    if (reunioes.aviso) {
+        label.textContent += " · ⚠ calendário";
+        label.title = reunioes.aviso;
+    } else {
+        label.title = "";
+    }
     desenharGrelha();
+}
+
+// Reuniões do Google Calendar (função calendario-google). Se falhar, o quadro
+// abre na mesma, só sem reuniões.
+async function planCarregarReunioes(de, ate) {
+    try {
+        const { data: { session } } = await SB.auth.getSession();
+        if (!session) return { lista: [] };
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/calendario-google`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ de, ate }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.erro || `Erro ${r.status}`);
+        return { lista: j.reunioes || [], aviso: (j.falhas || []).join(" ") || null };
+    } catch (e) {
+        console.error("calendario-google:", e);
+        return { lista: [], aviso: "Não foi possível ler as reuniões do Google Calendar." };
+    }
 }
 
 function desenharGrelha() {
@@ -131,7 +165,8 @@ function desenharGrelha() {
     // Uma coluna por dia, com os cartões empilhados pela ordem (como no Trello)
     dias.forEach(d => {
         const ds = planDataStr(d);
-        html += colunaHtml(ds, planTarefasDoDia(ds));
+        html += colunaHtml(ds, planTarefasDoDia(ds),
+                           _planReunioes.filter(r => r.data === ds));
     });
     html += "</tr></tbody>";
 
@@ -139,7 +174,7 @@ function desenharGrelha() {
     ligarEventosGrelha();
 }
 
-function colunaHtml(dataStr, tarefas) {
+function colunaHtml(dataStr, tarefas, reunioes = []) {
     // Quem passa das 8h neste dia (soma das tarefas não canceladas)
     const horasPorFunc = {};
     tarefas.filter(t => t.estado !== "cancelada").forEach(t =>
@@ -172,8 +207,21 @@ function colunaHtml(dataStr, tarefas) {
                 </div>`;
     }).join("");
 
+    // Reuniões no topo do dia, pela hora; não se arrastam (mudam-se no Google)
+    const cartoesReuniao = reunioes.map(r => {
+        const hora = r.dia_inteiro ? "Dia inteiro"
+            : r.hora_inicio + (r.hora_fim ? "–" + r.hora_fim : "");
+        const dica = [r.titulo, hora, r.local, r.notas].filter(Boolean).join("\n");
+        return `<div class="plan-reuniao" title="${escapeHtmlPlan(dica)}">
+                    <strong>📅 ${escapeHtmlPlan(r.titulo)}</strong>
+                    ${r.local ? `<span>${escapeHtmlPlan(r.local)}</span>` : ""}
+                    <span>${escapeHtmlPlan(hora)}</span>
+                </div>`;
+    }).join("");
+
     return `<td class="plan-celula ${excesso.length ? "plan-excesso" : ""}" data-data="${dataStr}">
                 ${excesso.length ? `<div class="plan-aviso" title="Mais de 8h no dia">⚠ ${escapeHtmlPlan(excesso.join(", "))}</div>` : ""}
+                ${cartoesReuniao}
                 ${cartoes}
                 <button class="plan-add" title="Nova tarefa">+ Tarefa</button>
             </td>`;
