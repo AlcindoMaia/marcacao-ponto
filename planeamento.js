@@ -2,7 +2,7 @@
 // PLANEAMENTO OPERACIONAL
 // Quadro semanal estilo Trello: uma coluna por dia, tarefas em cartões.
 // Quem está atribuído aparece em iniciais no canto do cartão.
-// Depende de: config.js (SB global)
+// Depende de: config.js (SB global), dados-publicos.js (feriados e tempo)
 // =======================================================
 
 let _planSemana   = null;   // segunda-feira da semana visível (Date local)
@@ -10,6 +10,7 @@ let _planFuncs    = [];      // todos, incluindo inativos (para não perder tare
 let _planObras    = [];
 let _planTarefas  = [];
 let _planReunioes = [];     // do Google Calendar, só leitura
+let _planTempo    = {};     // previsão do IPMA: { "base" | "t:<id>": { local, dias } }
 let _planDragId   = null;
 let _planEditId   = null;
 let _planPedido   = 0;      // descarta respostas de semanas antigas
@@ -77,7 +78,7 @@ async function carregarPlanFuncionarios() {
 
 async function carregarPlanObras() {
     const { data, error } = await SB.from("obras")
-        .select("id, nome, codigo, morada, estado")
+        .select("id, nome, codigo, morada, estado, latitude, longitude")
         .order("nome");
     if (error) { console.error(error); return; }
     _planObras = data || [];
@@ -96,12 +97,13 @@ async function carregarPlaneamento() {
         `${dias[0].toLocaleDateString("pt-PT")} — ${dias[6].toLocaleDateString("pt-PT")}`;
 
     const pedidoReunioes = planCarregarReunioes(de, ate);
+    const pedidoFeriados = carregarFeriados(dias[0].getFullYear(), dias[6].getFullYear());
     const { data, error } = await SB.from("tarefas")
         .select(`
             id, descricao, notas, data_prevista, hora_inicio, duracao_horas,
             duracao_real_horas, ordem,
             estado, usar_morada_obra, morada, latitude, longitude, obra_id,
-            obras ( nome, codigo, morada ),
+            obras ( nome, codigo, morada, latitude, longitude ),
             tarefa_funcionarios ( funcionario_id, responsavel )
         `)
         .gte("data_prevista", de)
@@ -109,12 +111,14 @@ async function carregarPlaneamento() {
         .order("ordem", { ascending: true })
         .order("hora_inicio", { ascending: true, nullsFirst: true });
     const reunioes = await pedidoReunioes;
+    await pedidoFeriados;
 
     if (pedido !== _planPedido) return;   // entretanto mudou-se de semana
     if (error) { console.error(error); alert("Erro ao carregar tarefas."); return; }
 
     _planTarefas  = data || [];
     _planReunioes = reunioes.lista;
+    _planTempo    = {};
     const label = document.getElementById("planLabelSemana");
     if (reunioes.aviso) {
         label.textContent += " · ⚠ calendário";
@@ -123,6 +127,52 @@ async function carregarPlaneamento() {
         label.title = "";
     }
     desenharGrelha();
+    planCarregarTempo(pedido, dias);
+}
+
+// Previsão do IPMA para os próximos 5 dias. Chega depois do quadro, que se
+// redesenha quando ela vem; se falhar, o quadro fica igual, só sem tempo.
+// O cabeçalho mostra o tempo da zona das obras; cada cartão usa o sítio da
+// tarefa ou da obra, quando tem GPS.
+async function planCarregarTempo(pedido, dias) {
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    const limite = new Date(hoje); limite.setDate(limite.getDate() + 5);
+    if (dias[6] < hoje || dias[0] >= limite) return;
+
+    const pontos = { base: planZonaDasObras() };
+    _planTarefas.forEach(t => {
+        const p = planCoordenadas(t);
+        if (p) pontos["t:" + t.id] = p;
+    });
+    try {
+        const tempo = await previsaoTempo(pontos);
+        if (pedido !== _planPedido) return;
+        _planTempo = tempo;
+        desenharGrelha();
+    } catch (e) {
+        console.error("tempo:", e);
+    }
+}
+
+// Centro das obras ativas com GPS; sem nenhuma, Braga.
+function planZonaDasObras() {
+    const comGps = _planObras.filter(o => o.estado === "ativa" && o.latitude != null && o.longitude != null);
+    if (!comGps.length) return [41.5475, -8.4227];
+    const media = k => comGps.reduce((s, o) => s + Number(o[k]), 0) / comGps.length;
+    return [media("latitude"), media("longitude")];
+}
+
+function planCoordenadas(t) {
+    if (!t.usar_morada_obra && t.latitude != null && t.longitude != null) return [t.latitude, t.longitude];
+    if (t.obras?.latitude != null && t.obras?.longitude != null) return [t.obras.latitude, t.obras.longitude];
+    return null;
+}
+
+function planTempoHtml(dia, local) {
+    if (!dia) return "";
+    const [icone, texto] = tempoIcone(dia.tipo);
+    const dica = `${texto} em ${local} · chuva ${dia.prob}% · ${Math.round(dia.tMin)}–${Math.round(dia.tMax)} °C (IPMA)`;
+    return `<span class="plan-tempo" title="${escapeHtmlPlan(dica)}">${icone} ${Math.round(dia.tMax)}° · 💧${dia.prob}%</span>`;
 }
 
 // Reuniões do Google Calendar (função calendario-google). Se falhar, o quadro
@@ -156,8 +206,12 @@ function desenharGrelha() {
     let html = "<thead><tr>";
     dias.forEach((d, i) => {
         const ds = planDataStr(d);
+        const feriado = feriadoEm(ds);
+        const base = _planTempo.base;
         html += `<th class="${ds === hoje ? "plan-hoje" : ""}">
                     ${PLAN_DIAS[i]}<span>${d.getDate()}/${d.getMonth() + 1}</span>
+                    ${feriado ? `<span class="plan-feriado">🎉 ${escapeHtmlPlan(feriado)}</span>` : ""}
+                    ${base ? planTempoHtml(base.dias[ds], base.local) : ""}
                  </th>`;
     });
     html += "</tr></thead><tbody><tr>";
@@ -188,6 +242,12 @@ function colunaHtml(dataStr, tarefas, reunioes = []) {
         const obra  = t.obras ? (t.obras.codigo || t.obras.nome) : "Sem obra";
         const hora  = t.hora_inicio ? t.hora_inicio.slice(0, 5) + " · " : "";
         const real  = t.duracao_real_horas != null ? ` · real ${Number(t.duracao_real_horas)}h` : "";
+        // Aviso de chuva a partir de 60%, que é quando vale a pena mudar
+        // um trabalho de exterior
+        const tempo = _planTempo["t:" + t.id] || _planTempo.base;
+        const prev  = tempo?.dias[dataStr];
+        const chuva = prev && prev.prob >= 60 && t.estado !== "concluida" && t.estado !== "cancelada"
+            ? `<span class="plan-chuva" title="${escapeHtmlPlan(`Chuva ${prev.prob}% em ${tempo.local} (IPMA)`)}">🌧️ ${prev.prob}%</span> ` : "";
         // Responsável primeiro, depois os restantes por nome
         const atrib = [...(t.tarefa_funcionarios || [])].sort((a, b) =>
             (b.responsavel - a.responsavel) || planNomeFunc(a.funcionario_id).localeCompare(planNomeFunc(b.funcionario_id)));
@@ -201,7 +261,7 @@ function colunaHtml(dataStr, tarefas, reunioes = []) {
                     <strong>${escapeHtmlPlan(t.descricao)}</strong>
                     <span>${escapeHtmlPlan(obra)}</span>
                     <div class="plan-cartao-rodape">
-                        <span>${hora}${Number(t.duracao_horas)}h${real}</span>
+                        <span>${chuva}${hora}${Number(t.duracao_horas)}h${real}</span>
                         <div class="plan-avatares">${iniciais}</div>
                     </div>
                 </div>`;
@@ -219,7 +279,8 @@ function colunaHtml(dataStr, tarefas, reunioes = []) {
                 </div>`;
     }).join("");
 
-    return `<td class="plan-celula ${excesso.length ? "plan-excesso" : ""}" data-data="${dataStr}">
+    const classes = [excesso.length ? "plan-excesso" : "", feriadoEm(dataStr) ? "plan-dia-feriado" : ""].join(" ");
+    return `<td class="plan-celula ${classes}" data-data="${dataStr}">
                 ${excesso.length ? `<div class="plan-aviso" title="Mais de 8h no dia">⚠ ${escapeHtmlPlan(excesso.join(", "))}</div>` : ""}
                 ${cartoesReuniao}
                 ${cartoes}

@@ -433,6 +433,7 @@ function gerarCalendario() {
         const div = document.createElement("div");
         div.classList.add("calendar-day");
         div.textContent = dia;
+        div.dataset.data = `${ano}-${String(mes + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
         div.onclick = () => {
             filtroDia = new Date(ano, mes, dia);
             document.querySelectorAll(".calendar-day").forEach(d => d.classList.remove("active"));
@@ -441,6 +442,11 @@ function gerarCalendario() {
         };
         grid.appendChild(div);
     }
+    // Feriados a vermelho, quando chegarem
+    carregarFeriados(ano).then(() => grid.querySelectorAll(".calendar-day").forEach(el => {
+        const fer = feriadoEm(el.dataset.data);
+        if (fer) { el.style.color = "#f87171"; el.title = `Feriado: ${fer}`; }
+    }));
     title.onclick = () => {
         filtroDia = null;
         document.querySelectorAll(".calendar-day").forEach(d => d.classList.remove("active"));
@@ -524,6 +530,7 @@ async function carregarRegistosAdmin() {
 
     if (error) { raConteudo.innerHTML = `<div style="padding:24px;color:#f87171">Erro: ${error.message}</div>`; return; }
     _raCache = data || [];
+    await carregarFeriados(ano);
 
     // KPIs
     const presMes   = _raCache.filter(r => r.tipo === "presenca");
@@ -576,8 +583,9 @@ function renderRaMapaFuncionario(ano, mes) {
             ${dias.map(d => {
                 const dObj = new Date(d+"T12:00:00");
                 const dow  = dObj.getDay();
-                const isWE = dow===0||dow===6;
-                return `<th style="padding:4px 2px;text-align:center;min-width:28px;font-size:10px;font-weight:500;${isWE?"opacity:.3":""}">${String(dObj.getDate()).padStart(2,"0")}</th>`;
+                const fer  = feriadoEm(d);
+                const isWE = dow===0||dow===6||!!fer;
+                return `<th style="padding:4px 2px;text-align:center;min-width:28px;font-size:10px;font-weight:500;${isWE?"opacity:.3":""}${fer?";color:#dc2626":""}"${fer?` title="Feriado: ${escHtml(fer)}"`:""}>${String(dObj.getDate()).padStart(2,"0")}</th>`;
             }).join("")}
             <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Dias</th>
             <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Horas</th>
@@ -598,10 +606,11 @@ function renderRaMapaFuncionario(ano, mes) {
                 const dObj = new Date(d+"T12:00:00");
                 const dow  = dObj.getDay();
                 const isWE = dow===0||dow===6;
+                const fer  = feriadoEm(d);
                 const reg  = fd.dias[d];
                 let bg2 = "transparent", sym = "", title = "";
                 if (isWE) { bg2="rgba(0,0,0,.03)"; sym=""; }
-                else if (!reg) { sym=""; }
+                else if (!reg) { if (fer) { bg2="rgba(0,0,0,.03)"; title=`Feriado: ${fer}`; } }
                 else if (reg.tipo === "falta") { bg2="rgba(248,113,113,.15)"; sym="✕"; title=reg.obra||"Falta"; }
                 else if (reg.horas > 0) {
                     bg2="rgba(74,222,128,.15)"; sym=reg.horas<8?"½":"✓";
@@ -648,8 +657,9 @@ function renderRaMapaObra(ano, mes) {
             ${dias.map(d => {
                 const dObj = new Date(d+"T12:00:00");
                 const dow  = dObj.getDay();
-                const isWE = dow===0||dow===6;
-                return `<th style="padding:4px 2px;text-align:center;min-width:28px;font-size:10px;font-weight:500;${isWE?"opacity:.3":""}">${String(dObj.getDate()).padStart(2,"0")}</th>`;
+                const fer  = feriadoEm(d);
+                const isWE = dow===0||dow===6||!!fer;
+                return `<th style="padding:4px 2px;text-align:center;min-width:28px;font-size:10px;font-weight:500;${isWE?"opacity:.3":""}${fer?";color:#dc2626":""}"${fer?` title="Feriado: ${escHtml(fer)}"`:""}>${String(dObj.getDate()).padStart(2,"0")}</th>`;
             }).join("")}
             <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Horas</th>
             <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Colabs.</th>
@@ -667,9 +677,11 @@ function renderRaMapaObra(ano, mes) {
                 const dObj = new Date(d+"T12:00:00");
                 const dow  = dObj.getDay();
                 const isWE = dow===0||dow===6;
+                const fer  = feriadoEm(d);
                 const reg  = od.dias[d];
                 let bg2 = "transparent", sym = "", title = "";
                 if (isWE) { bg2="rgba(0,0,0,.03)"; }
+                else if (!reg && fer) { bg2="rgba(0,0,0,.03)"; title=`Feriado: ${fer}`; }
                 else if (reg) {
                     const nFunc = Object.keys(reg).length;
                     const totalH = Object.values(reg).reduce((s,v)=>s+v,0);
@@ -788,17 +800,20 @@ async function carregarRegistos() {
     if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
 
     _todosRegistos = data || [];
+    await carregarFeriados(ano);
 
     // ---- KPIs Assiduidade ----
     if (!filtroDia) {
-        // Dias úteis estimados (sem fins de semana)
+        // Dias úteis: sem fins de semana nem feriados nacionais
         let diasUteis = 0;
         for (let d = 1; d <= ultimoDia; d++) {
             const dow = new Date(ano, mes-1, d).getDay();
-            if (dow !== 0 && dow !== 6) diasUteis++;
+            const ds  = `${ano}-${mesStr}-${String(d).padStart(2, "0")}`;
+            if (dow !== 0 && dow !== 6 && !feriadoEm(ds)) diasUteis++;
         }
         const diasComRegisto = new Set((data||[]).map(r => r.dia)).size;
-        const assid = diasUteis > 0 ? Math.round(diasComRegisto / diasUteis * 100) : 0;
+        // Dias trabalhados ao fim de semana ou num feriado não passam dos 100%
+        const assid = diasUteis > 0 ? Math.min(100, Math.round(diasComRegisto / diasUteis * 100)) : 0;
         const incompletos = (data||[]).filter(r => r.estado === "Incompleto").length;
 
         // Calcular horas extras (registos com horas > 8)
@@ -895,9 +910,10 @@ function renderMapaPresencas() {
             ${dias.map(d => {
                 const dObj = new Date(d + "T12:00:00");
                 const dow = dObj.getDay();
-                const isWeekend = dow === 0 || dow === 6;
+                const fer = feriadoEm(d);
+                const isWeekend = dow === 0 || dow === 6 || !!fer;
                 const label = String(dObj.getDate()).padStart(2,"0");
-                return `<th style="padding:4px 3px;text-align:center;min-width:24px;${isWeekend?"opacity:.35":""}">${label}</th>`;
+                return `<th style="padding:4px 3px;text-align:center;min-width:24px;${isWeekend?"opacity:.35":""}${fer?";color:#f87171":""}"${fer?` title="Feriado: ${escHtml(fer)}"`:""}>${label}</th>`;
             }).join("")}
         </tr></thead>
         <tbody>
@@ -911,6 +927,7 @@ function renderMapaPresencas() {
                     const estado = porFunc[f]?.[d];
                     let bg = "transparent", symbol = "";
                     if (isWeekend) { bg = "rgba(255,255,255,.03)"; symbol = ""; }
+                    else if (!estado && feriadoEm(d)) { bg = "rgba(255,255,255,.03)"; symbol = ""; }
                     else if (estado === "OK") { bg = "rgba(90,214,90,.25)"; symbol = "✓"; }
                     else if (estado === "Incompleto") { bg = "rgba(249,115,22,.25)"; symbol = "⚠"; }
                     else { bg = "rgba(255,122,122,.12)"; symbol = "·"; }
@@ -1873,6 +1890,8 @@ async function editarObra(obra) {
 // conseguiam gravar pela base de dados. O botão "Estou na obra" lê a posição
 // do telemóvel de quem está no local, que é a forma mais fiável de a acertar.
 function mostrarGpsDaObra(lat, lon) {
+    const res = document.getElementById("editObraMoradaResultados");
+    if (res) res.textContent = "";
     const elLat = document.getElementById("editObraLat");
     const elLon = document.getElementById("editObraLon");
     if (!elLat || !elLon) return;
@@ -1917,6 +1936,46 @@ function usarLocalizacaoActualNaObra() {
         },
         { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     );
+}
+
+// Procura a morada no OpenStreetMap (Nominatim) e mostra até 5 sítios para
+// escolher. É uma posição aproximada, por isso o raio sobe para 150 m; o
+// botão "Estou na obra" continua a ser o mais exato.
+let _resultadosMorada = [];
+
+async function procurarGpsPelaMorada() {
+    const caixa  = document.getElementById("editObraMoradaResultados");
+    const texto  = document.getElementById("editObraMorada").value.trim();
+    if (texto.length < 3) { caixa.textContent = "Escreva primeiro a morada da obra."; return; }
+    caixa.textContent = "A procurar…";
+    try {
+        _resultadosMorada = await procurarMorada(texto);
+    } catch (e) {
+        console.error(e);
+        caixa.textContent = "Não foi possível procurar agora. Tente daqui a pouco.";
+        return;
+    }
+    if (!_resultadosMorada.length) {
+        caixa.textContent = "Não encontrei esta morada. Experimente só a rua e a localidade.";
+        return;
+    }
+    caixa.innerHTML = `<div style="opacity:.6;margin-bottom:2px">Escolha o sítio certo:</div>` +
+        _resultadosMorada.map((r, i) =>
+            `<a href="#" onclick="usarResultadoMorada(${i});return false" style="display:block;padding:3px 0;color:var(--primary)">📍 ${escHtml(r.nome)}</a>`
+        ).join("") +
+        `<div style="opacity:.45;font-size:10px;margin-top:2px">Dados © colaboradores do OpenStreetMap</div>`;
+}
+
+function usarResultadoMorada(i) {
+    const r = _resultadosMorada[i];
+    if (!r) return;
+    document.getElementById("editObraLat").value = r.lat.toFixed(7);
+    document.getElementById("editObraLon").value = r.lon.toFixed(7);
+    const elRaio = document.getElementById("editObraRaio");
+    if (elRaio && (parseInt(elRaio.value) || 0) < 150) elRaio.value = 150;
+    document.getElementById("editObraMoradaResultados").textContent =
+        "Posição aproximada pela morada. Confirme no mapa e, quando estiver na obra, use \"Estou na obra\" para a acertar.";
+    actualizarInfoGpsDaObra();
 }
 
 // Devolve { lat, lon } (ambos null quando vazios) ou false se forem inválidos.
@@ -2475,6 +2534,7 @@ function parsearQRFatura(texto) {
         const nifEmit = (c["A"] || "").trim();
         if (nifEmit) {
             document.getElementById("movNif").value = nifEmit;
+            verificarNif(nifEmit, document.getElementById("movNifInfo"), { nome: "movFornecedor" });
             // Buscar nome do fornecedor na BD
             SB.from("fornecedores").select("nome").eq("nif", nifEmit).maybeSingle()
                 .then(({ data: forn }) => {
@@ -2838,6 +2898,7 @@ function preencherMovimentoComFatura(d) {
     set("movTipo", d.tipo_documento === "NC" ? "entrada" : "saida");
     set("movNif", d.fornecedor_nif);
     set("movFornecedor", d.fornecedor_conhecido?.nome || d.fornecedor_nome);
+    if (d.fornecedor_nif) verificarNif(d.fornecedor_nif, document.getElementById("movNifInfo"));
 
     const total = Number(d.total_com_iva);
     const base  = Number(d.total_sem_iva);
@@ -4579,6 +4640,8 @@ async function abrirModalMovimento(mov = null) {
         const el = document.getElementById(id);
         if (el) el.value = "";
     });
+    const movNifInfo = document.getElementById("movNifInfo");
+    if (movNifInfo) movNifInfo.textContent = "";
     const movMsg = document.getElementById("movMsg");
     if (movMsg) movMsg.textContent = "";
 
@@ -5214,6 +5277,7 @@ async function abrirModalOrcamento(id = null) {
         document.getElementById('orcObraDesc').value  = o.obra_descricao || '';
         document.getElementById('orcClienteNome').value   = o.cliente_nome || '';
         document.getElementById('orcClienteNif').value    = o.cliente_nif || '';
+        document.getElementById('orcClienteNifInfo').textContent = '';
         document.getElementById('orcClienteMorada').value = o.cliente_morada || '';
         document.getElementById('orcClienteEmail').value  = o.cliente_email || '';
         document.getElementById('orcClienteTel').value    = o.cliente_tel || '';
@@ -5236,6 +5300,7 @@ async function abrirModalOrcamento(id = null) {
         document.getElementById('orcObraDesc').value  = '';
         ['orcClienteNome','orcClienteNif','orcClienteMorada','orcClienteEmail','orcClienteTel','orcPrazo','orcCondicoes','orcNotas']
             .forEach(id => { document.getElementById(id).value = ''; });
+        document.getElementById('orcClienteNifInfo').textContent = '';
 
         // Adicionar categorias default
         CATEGORIAS_DEFAULT.forEach(nome => adicionarCategoria(nome, []));
