@@ -4212,8 +4212,8 @@ async function carregarPainelDocumentos() {
                 <span style="display:block;font-size:11px;opacity:.5">${t.nome}${info ? " · " + info : ""} · carregado ${new Date(d.created_at).toLocaleDateString("pt-PT")}</span>
             </span>
             ${estado}
-            <label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer;opacity:.85" title="A futura Área do cliente mostra este documento">
-                <input type="checkbox" ${d.visivel_cliente ? "checked" : ""} onchange="alternarVisivelDocObra('${d.id}', this.checked)"> Visível ao cliente
+            <label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer;opacity:.85;color:inherit;text-transform:none;letter-spacing:0;white-space:nowrap;width:auto;margin:0" title="A futura Área do cliente mostra este documento">
+                <input type="checkbox" style="width:auto;margin:0" ${d.visivel_cliente ? "checked" : ""} onchange="alternarVisivelDocObra('${d.id}', this.checked)"> Visível ao cliente
             </label>
             <button onclick="apagarDocumentoObra('${d.id}')" title="Apagar" style="background:none;border:none;cursor:pointer;font-size:14px;opacity:.6">🗑</button>
         </div>`;
@@ -4237,8 +4237,8 @@ async function carregarPainelDocumentos() {
             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
                 <select id="docObraTipo" onchange="document.getElementById('docObraVisivel').checked = TIPOS_DOC_OBRA[this.value].visivel" style="max-width:200px">${opcoesTipo}</select>
                 <input type="file" id="docObraFicheiro" multiple accept="application/pdf,image/*" style="flex:1;min-width:180px">
-                <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer">
-                    <input type="checkbox" id="docObraVisivel" checked> Visível ao cliente
+                <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;color:inherit;text-transform:none;letter-spacing:0;white-space:nowrap;width:auto;margin:0">
+                    <input type="checkbox" id="docObraVisivel" checked style="width:auto;margin:0"> Visível ao cliente
                 </label>
                 <button class="btn-primary" id="btnCarregarDocObra" onclick="carregarDocumentoObra()">Carregar</button>
             </div>
@@ -4258,7 +4258,7 @@ async function carregarPainelDocumentos() {
 
 function nomeSeguroFicheiro(nome) {
     return (nome || "ficheiro")
-        .normalize("NFD").replace(/[̀-ͯ]/g, "")
+        .normalize("NFD").replace(/\p{Diacritic}/gu, "")
         .replace(/[^\w.\-]+/g, "_").replace(/_+/g, "_").slice(-80);
 }
 
@@ -4422,7 +4422,7 @@ async function abrirPropostaDocumento(doc, lido) {
                 <select id="propEstadoOrc"><option value="enviado">Enviado</option><option value="aceite">Aceite</option></select>
             </label>
             <label style="display:flex;align-items:center;gap:6px;font-size:12px;grid-column:1/-1">
-                <input type="checkbox" id="propRevisao" ${lido.e_revisao_ou_extra ? "checked" : ""}> É uma revisão ou um extra
+                <input type="checkbox" style="width:auto;margin:0" id="propRevisao" ${lido.e_revisao_ou_extra ? "checked" : ""}> É uma revisão ou um extra
             </label>
         </div>`;
     const blocoFat = `
@@ -4443,7 +4443,7 @@ async function abrirPropostaDocumento(doc, lido) {
             <div style="font-size:12px;margin-bottom:6px">Valor recebido: <b>${fmtEurDoc(lido.valor_recebido)}</b>. Marcar como pagas:</div>
             ${encontradas.length ? encontradas.map(f => `
                 <label style="display:flex;align-items:center;gap:6px;font-size:13px;padding:4px 0">
-                    <input type="checkbox" class="propFaturaPaga" value="${f.id}" ${f.estado_pagamento === "pago" ? "" : "checked"}>
+                    <input type="checkbox" style="width:auto;margin:0" class="propFaturaPaga" value="${f.id}" ${f.estado_pagamento === "pago" ? "" : "checked"}>
                     Fatura ${escDoc(f.referencia)} de ${escDoc(f.data_documento)}, ${fmtEurDoc(f.valor_total)}${f.estado_pagamento === "pago" ? " (já paga)" : ""}
                 </label>`).join("")
                 : `<div style="font-size:12px;opacity:.6">Nenhuma das faturas deste recibo está na app. O recibo fica guardado na obra sem marcar nada.</div>`}
