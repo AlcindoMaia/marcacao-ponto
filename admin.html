@@ -130,7 +130,6 @@
     <!-- TABS -->
     <div class="tabs">
         <button class="tab active" data-tab="visaogeral">Visão Geral</button>
-        <button class="tab" data-tab="fluxo">Fluxo de Caixa</button>
         <button class="tab" data-tab="financeiro">Financeiro</button>
         <button class="tab" data-tab="orcamentos">Orçamentos</button>
         <button class="tab" data-tab="registos">Registos</button>
@@ -436,25 +435,82 @@
             </div>
         </div>
 
+        <!-- SUB-TAB: FLUXO DE CAIXA (movimentos, antes era uma tab própria) -->
         <div id="finTab-fluxo" class="fin-subtab-content" style="display:none">
-            <div class="card filtros" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">
-                <div style="display:flex;flex-direction:column;gap:4px">
-                    <label style="font-size:11px;opacity:.6">Horizonte</label>
-                    <select id="fluxoHorizonte" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:var(--bg-dark-panel);color:var(--text-light);font-size:13px">
-                        <option value="30">30 dias</option>
-                        <option value="60" selected>60 dias</option>
-                        <option value="90">90 dias</option>
-                    </select>
+
+            <!-- KPIs -->
+            <div class="grid-cards">
+                <div class="card metric">
+                    <h3>Entradas</h3>
+                    <div id="totalEntradas" class="value" style="color:#5ad65a">–</div>
                 </div>
-                <button class="btn-primary" onclick="carregarFluxo()" style="margin-top:18px">Atualizar</button>
+                <div class="card metric">
+                    <h3>Saídas</h3>
+                    <div id="totalSaidas" class="value" style="color:#ff7a7a">–</div>
+                </div>
+                <div class="card metric">
+                    <h3>Saldo</h3>
+                    <div id="saldoFluxo" class="value">–</div>
+                </div>
             </div>
-            <div class="grid-cards" style="margin-bottom:16px">
-                <div class="card metric" style="border-left:3px solid #5ad65a"><h3>Entradas previstas</h3><div id="fluxoEntradas" class="value" style="color:#5ad65a">–</div></div>
-                <div class="card metric" style="border-left:3px solid #ff7a7a"><h3>Saídas previstas</h3><div id="fluxoSaidas" class="value" style="color:#ff7a7a">–</div></div>
-                <div class="card metric"><h3>Saldo previsto</h3><div id="fluxoSaldo" class="value">–</div></div>
-                <div class="card metric" style="border-left:3px solid #f97316"><h3>Em atraso</h3><div id="fluxoAtraso" class="value" style="color:#f97316">–</div></div>
+
+            <!-- Filtros + ações numa linha -->
+            <div class="card" style="margin-bottom:20px">
+                <div class="filtros-linha">
+                    <div class="col">
+                        <label>Obra</label>
+                        <select id="filtroObra"></select>
+                    </div>
+                    <div class="col">
+                        <label>Categoria</label>
+                        <select id="filtroCategoria"></select>
+                    </div>
+                    <div class="col">
+                        <label>Tipo</label>
+                        <select id="filtroTipo">
+                            <option value="">— Todos —</option>
+                            <option value="entrada">Entrada</option>
+                            <option value="saida">Saída</option>
+                        </select>
+                    </div>
+                    <div class="col">
+                        <label>De</label>
+                        <input id="filtroDataInicio" type="date">
+                    </div>
+                    <div class="col">
+                        <label>Até</label>
+                        <input id="filtroDataFim" type="date">
+                    </div>
+                    <div class="col">
+                        <label>Ano</label>
+                        <select id="filtroAnoFluxo"></select>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:flex-end;flex-shrink:0">
+                        <button class="btn-primary" id="btnNovoMovimento">+ Novo</button>
+                        <button class="btn-secondary" id="btnLimparFiltros">Limpar</button>
+                    </div>
+                </div>
             </div>
-            <div class="card"><div id="fluxoTabela"></div></div>
+
+            <!-- Tabela movimentos -->
+            <div class="card" style="overflow-x:auto">
+                <table id="tabelaMovimentos">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Referência</th>
+                            <th>Tipo</th>
+                            <th>Fornecedor</th>
+                            <th>Categoria</th>
+                            <th>Obra</th>
+                            <th style="text-align:right">Total</th>
+                            <th>Estado</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </div>
 
         <div id="finTab-orcado" class="fin-subtab-content" style="display:none">
@@ -790,7 +846,6 @@
     </div>
 </div>
 
-    <!-- ================= TAB FLUXO DE CAIXA ================= -->
 <!-- ================= TAB VISÃO GERAL =================
      O estado da casa num ecrã, e daqui decide-se para onde ir. -->
 <div class="tab-content active" id="tab-visaogeral">
@@ -821,84 +876,6 @@
         <div id="vgAtalhos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px"></div>
 
     </div>
-</div>
-
-<div class="tab-content" id="tab-fluxo">
-
-    <!-- KPIs -->
-    <div class="grid-cards">
-        <div class="card metric">
-            <h3>Entradas</h3>
-            <div id="totalEntradas" class="value" style="color:#5ad65a">–</div>
-        </div>
-        <div class="card metric">
-            <h3>Saídas</h3>
-            <div id="totalSaidas" class="value" style="color:#ff7a7a">–</div>
-        </div>
-        <div class="card metric">
-            <h3>Saldo</h3>
-            <div id="saldoFluxo" class="value">–</div>
-        </div>
-    </div>
-
-    <!-- Filtros + ações numa linha -->
-    <div class="card" style="margin-bottom:20px">
-        <div class="filtros-linha">
-            <div class="col">
-                <label>Obra</label>
-                <select id="filtroObra"></select>
-            </div>
-            <div class="col">
-                <label>Categoria</label>
-                <select id="filtroCategoria"></select>
-            </div>
-            <div class="col">
-                <label>Tipo</label>
-                <select id="filtroTipo">
-                    <option value="">— Todos —</option>
-                    <option value="entrada">Entrada</option>
-                    <option value="saida">Saída</option>
-                </select>
-            </div>
-            <div class="col">
-                <label>De</label>
-                <input id="filtroDataInicio" type="date">
-            </div>
-            <div class="col">
-                <label>Até</label>
-                <input id="filtroDataFim" type="date">
-            </div>
-            <div class="col">
-                <label>Ano</label>
-                <select id="filtroAnoFluxo"></select>
-            </div>
-            <div style="display:flex;gap:8px;align-items:flex-end;flex-shrink:0">
-                <button class="btn-primary" id="btnNovoMovimento">+ Novo</button>
-                <button class="btn-secondary" id="btnLimparFiltros">Limpar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Tabela movimentos -->
-    <div class="card" style="overflow-x:auto">
-        <table id="tabelaMovimentos">
-            <thead>
-                <tr>
-                    <th>Data</th>
-                    <th>Referência</th>
-                    <th>Tipo</th>
-                    <th>Fornecedor</th>
-                    <th>Categoria</th>
-                    <th>Obra</th>
-                    <th style="text-align:right">Total</th>
-                    <th>Estado</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
-    </div>
-
 </div>
 
 
