@@ -146,7 +146,9 @@ function ativarTabs() {
     });
 }
 
-function abrirTab(nome) {
+function abrirTab(nome, subFin) {
+    // O fluxo de caixa passou a ser uma sub-tab do Financeiro.
+    if (nome === "fluxo") { nome = "financeiro"; subFin = "fluxo"; }
     document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
     document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
     // Esconder sub-conteúdos que usam style.display inline (fin-subtab, reg-subtab)
@@ -158,8 +160,7 @@ function abrirTab(nome) {
     tabBtn.classList.add("active");
     tabDiv.classList.add("active");
     if (nome === "visaogeral")   initVisaoGeral();
-    if (nome === "fluxo")        initFluxo();
-    if (nome === "financeiro")   { switchFinTab("ordenados"); }
+    if (nome === "financeiro")   { switchFinTab(subFin || "ordenados"); }
     if (nome === "dashboard")    initDashboard();
     if (nome === "registos")     { switchRegTab("ponto"); }
     if (nome === "funcionarios") initFuncionarios();
@@ -190,7 +191,7 @@ function switchFinTab(tab) {
     if (el) el.style.display = "block";
     if (tab === "ordenados")  carregarFinanceiro();
     if (tab === "dre")        carregarDRE();
-    if (tab === "fluxo")      carregarFluxo();
+    if (tab === "fluxo")      initFluxo();
     if (tab === "orcado")     carregarOrcadoReal();
 }
 
@@ -265,44 +266,6 @@ async function carregarDRE() {
             opt.value = o.id; opt.textContent = o.nome;
             dreObraEl.appendChild(opt);
         });
-    }
-}
-
-async function carregarFluxo() {
-    const horizonte = parseInt(document.getElementById("fluxoHorizonte")?.value || "60");
-    const hoje = new Date();
-    const fim  = new Date(hoje); fim.setDate(fim.getDate() + horizonte);
-    const dHoje = hoje.toISOString().split("T")[0];
-    const dFim  = fim.toISOString().split("T")[0];
-
-    const { data } = await SB.from("movimentos_financeiros")
-        .select("tipo, valor_total, estado_pagamento, data_documento")
-        .gte("data_documento", dHoje).lte("data_documento", dFim)
-        .order("data_documento");
-    if (!data) return;
-
-    const fmt = v => v.toLocaleString("pt-PT", {minimumFractionDigits:2}) + " €";
-    const entradas  = data.filter(m => m.tipo==="entrada").reduce((s,m)=>s+Number(m.valor_total||0),0);
-    const saidas    = data.filter(m => m.tipo==="saida").reduce((s,m)=>s+Number(m.valor_total||0),0);
-    const saldo     = entradas - saidas;
-    const atraso    = data.filter(m => m.estado_pagamento==="por_pagar" && m.data_documento < dHoje);
-    const totAtraso = atraso.reduce((s,m)=>s+Number(m.valor_total||0),0);
-
-    document.getElementById("fluxoEntradas").textContent = fmt(entradas);
-    document.getElementById("fluxoSaidas").textContent   = fmt(saidas);
-    document.getElementById("fluxoSaldo").textContent    = fmt(saldo);
-    document.getElementById("fluxoSaldo").style.color    = saldo >= 0 ? "#5ad65a" : "#ff7a7a";
-    document.getElementById("fluxoAtraso").textContent   = fmt(totAtraso);
-
-    const tabela = document.getElementById("fluxoTabela");
-    if (tabela) {
-        tabela.innerHTML = data.slice(0,30).map(m => `
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
-                <span style="opacity:.6;min-width:90px">${m.data_documento}</span>
-                <span style="flex:1;opacity:.8">${m.tipo==="entrada"?"Entrada":"Saída"}</span>
-                <span style="color:${m.tipo==="entrada"?"#5ad65a":"#ff7a7a"};font-weight:500">${fmt(Number(m.valor_total||0))}</span>
-                <span style="margin-left:8px;font-size:10px;opacity:.5">${m.estado_pagamento==="pago"?"✓":"⏳"}</span>
-            </div>`).join("") || '<div style="opacity:.4;padding:20px;text-align:center">Sem movimentos no período</div>';
     }
 }
 
@@ -4465,7 +4428,11 @@ async function carregarMovimentos() {
     renderMovimentos();
 }
 
+// O fluxo abre sempre que se entra na sub-tab: liga os filtros só uma vez.
+let _filtrosFluxoLigados = false;
 function ligarFiltrosFluxo() {
+    if (_filtrosFluxoLigados) return;
+    _filtrosFluxoLigados = true;
     ["filtroObra","filtroCategoria","filtroTipo","filtroDataInicio","filtroDataFim","filtroAnoFluxo"].forEach(id => {
         document.getElementById(id)?.addEventListener("change", carregarMovimentos);
         document.getElementById(id)?.addEventListener("input",  carregarMovimentos);
@@ -5094,7 +5061,6 @@ function ligarEventosGlobais() {
             document.querySelectorAll(".fin-subtab-content").forEach(c => c.style.display = "none");
             document.getElementById(`finTab-${tab}`).style.display = "block";
             if (tab === "dre")    carregarDRE();
-            if (tab === "fluxo") carregarFluxo();
             if (tab === "orcado") iniciarOrcadoReal();
         });
     });
@@ -6077,55 +6043,6 @@ async function carregarDRE() {
 }
 
 // =======================================================
-// FLUXO DE CAIXA — PREVISÃO
-// =======================================================
-async function carregarFluxo() {
-    const horizonte = parseInt(document.getElementById("fluxoHorizonte")?.value || "60");
-    const hoje = new Date();
-    const fim  = new Date(hoje); fim.setDate(fim.getDate() + horizonte);
-    const hojeStr = hoje.toISOString().split("T")[0];
-    const fimStr  = fim.toISOString().split("T")[0];
-
-    const [prevRes, atrRes] = await Promise.all([
-        SB.from("movimentos_financeiros").select("tipo,valor_total,data_documento,observacoes,fornecedores(nome),obras(nome),referencia")
-          .eq("estado_pagamento","por_pagar").eq("ativo",true).gte("data_documento",hojeStr).lte("data_documento",fimStr).order("data_documento"),
-        SB.from("movimentos_financeiros").select("tipo,valor_total,data_documento,observacoes,fornecedores(nome),obras(nome),referencia")
-          .eq("estado_pagamento","por_pagar").eq("ativo",true).lt("data_documento",hojeStr).order("data_documento")
-    ]);
-
-    const previstos = prevRes.data || [];
-    const atrasados = atrRes.data  || [];
-    const totalEnt  = previstos.filter(m=>m.tipo==="entrada").reduce((s,m)=>s+Number(m.valor_total),0);
-    const totalSai  = previstos.filter(m=>m.tipo==="saida").reduce((s,m)=>s+Number(m.valor_total),0);
-    const totalAtr  = atrasados.reduce((s,m)=>s+Number(m.valor_total),0);
-
-    document.getElementById("fluxoEntradas").textContent = totalEnt.toFixed(2) + " €";
-    document.getElementById("fluxoSaidas").textContent   = totalSai.toFixed(2) + " €";
-    document.getElementById("fluxoAtraso").textContent   = totalAtr.toFixed(2) + " €";
-    const saldoEl = document.getElementById("fluxoSaldo");
-    const saldo = totalEnt - totalSai;
-    saldoEl.textContent = saldo.toFixed(2) + " €";
-    saldoEl.style.color = saldo >= 0 ? "#5ad65a" : "#ff7a7a";
-
-    const tbody = document.getElementById("fluxoTabela");
-    const todos = [...atrasados.map(m=>({...m,atrasado:true})), ...previstos];
-    tbody.innerHTML = todos.length === 0
-        ? `<tr><td colspan="5" style="text-align:center;padding:20px;opacity:.4">Sem movimentos pendentes</td></tr>`
-        : todos.map(m => {
-            const ent = m.tipo==="entrada", atr = m.atrasado;
-            const desc = m.fornecedores?.nome || m.observacoes || m.referencia || "—";
-            return `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
-                <td style="padding:8px;font-size:13px;${atr?"color:#f97316":""}">${escHtml(m.data_documento)}</td>
-                <td style="padding:8px;font-size:13px">${escHtml(desc)}</td>
-                <td style="padding:8px;font-size:13px;opacity:.7">${escHtml(m.obras?.nome||"—")}</td>
-                <td style="padding:8px;font-size:13px;text-align:right;color:${ent?"#5ad65a":"#ff7a7a"};font-weight:600">${ent?"+":"–"}${Number(m.valor_total).toFixed(2)} €</td>
-                <td style="padding:8px;text-align:center"><span style="font-size:11px;padding:2px 8px;border-radius:12px;background:${atr?"rgba(249,115,22,.15)":"rgba(255,255,255,.08)"};color:${atr?"#f97316":"var(--text-muted)"}">
-                    ${atr?"ATRASADO":"Previsto"}</span></td>
-            </tr>`;
-        }).join("");
-}
-
-// =======================================================
 // ORÇADO VS. REAL
 // =======================================================
 async function iniciarOrcadoReal() {
@@ -6240,7 +6157,7 @@ async function carregarNotificacoes() {
             const dias = Math.floor((new Date() - new Date(m.data_documento)) / 86400000);
             html += `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:background .1s"
                 onmouseenter="this.style.background='rgba(0,0,0,.04)'" onmouseleave="this.style.background=''"
-                onclick="activarTab('fluxo')">
+                onclick="abrirTab('fluxo')">
                 <div>
                     <div style="font-size:13px;font-weight:500;color:#1a1a1a">${escHtml(desc)}</div>
                     <div style="font-size:11px;color:#e05c5c;margin-top:2px">${escHtml(m.data_documento)} · ${dias} dia(s) atraso</div>
@@ -6255,7 +6172,7 @@ async function carregarNotificacoes() {
             📦 ${stockAlertas.length} Artigo(s) com Stock Baixo</div>`;
         stockAlertas.forEach(a => {
             html += `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;cursor:pointer"
-                onclick="activarTab('inventario')">
+                onclick="abrirTab('inventario')">
                 <div style="font-size:13px;font-weight:500;color:#1a1a1a">${escHtml(a.descricao)}</div>
                 <div style="font-size:11px;color:#f97316;white-space:nowrap;margin-left:12px">Abaixo do mínimo (${a.stock_minimo})</div>
             </div>`;
