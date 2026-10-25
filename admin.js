@@ -4753,7 +4753,9 @@ function mostrarAcessoCliente(c) {
     el.innerHTML = titulo + `
         <input id="fcLink" readonly value="${escDoc(link)}" onclick="this.select()" style="width:100%;font-size:12px;margin-bottom:8px">
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn-primary" onclick="enviarLinkWhatsApp('${c.id}')" ${tel ? "" : 'disabled title="Falta o telefone do cliente"'}>📲 Enviar por WhatsApp</button>
+            ${tel
+                ? `<a class="btn-primary" href="${escDoc(linkWhatsApp(c))}" target="_blank" rel="noopener" style="text-decoration:none">📲 Enviar por WhatsApp</a>`
+                : `<button class="btn-primary" disabled title="Falta o telefone do cliente">📲 Enviar por WhatsApp</button>`}
             <button class="btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById('fcLink').value).then(() => this.textContent = '✓ Copiado')">Copiar</button>
             <a class="btn-secondary" href="${escDoc(link)}" target="_blank" rel="noopener" style="text-decoration:none">Ver como o cliente</a>
             <button class="btn-secondary" onclick="desligarAcessoCliente('${c.id}')">Desligar</button>
@@ -4794,14 +4796,15 @@ async function desligarAcessoCliente(id) {
     await recarregarAcessoCliente(id);
 }
 
-async function enviarLinkWhatsApp(id) {
-    const { data: c } = await SB.from("clientes").select("nome, telefone, token_acesso, acesso_ativo").eq("id", id).single();
-    if (!c?.acesso_ativo || !c.token_acesso) return;
+// Link wa.me com a mensagem pronta. É um link normal (<a href>) e não um
+// window.open depois de ir à base de dados: o browser do telemóvel bloqueia
+// janelas abertas fora do toque do utilizador, e o WhatsApp não abria.
+function linkWhatsApp(c) {
     const primeiro = (c.nome || "").trim().split(/\s+/)[0];
     const texto = `Olá ${primeiro}, a Maia Solutions criou a sua Área do cliente. ` +
         `Pode acompanhar a sua obra e consultar orçamentos, faturas, recibos e fotografias neste link:\n` +
         `${linkAreaCliente(c.token_acesso)}\n\nGuarde esta mensagem: o link é pessoal, por favor não o partilhe.`;
-    window.open(`https://wa.me/${telefoneWhatsApp(c.telefone)}?text=${encodeURIComponent(texto)}`, "_blank", "noopener");
+    return `https://wa.me/${telefoneWhatsApp(c.telefone)}?text=${encodeURIComponent(texto)}`;
 }
 
 async function gravarFichaClienteObra() {
