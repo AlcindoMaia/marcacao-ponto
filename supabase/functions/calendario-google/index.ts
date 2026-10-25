@@ -60,7 +60,10 @@ Deno.serve(async (req) => {
 
     const links = (Deno.env.get("GOOGLE_CALENDAR_ICS") || "")
         .split(/[\s,]+/).filter(l => l.startsWith("https://"));
-    if (!links.length) return resposta({ configurado: false, reunioes: [] });
+    if (!links.length) {
+        console.log("GOOGLE_CALENDAR_ICS vazio ou sem link https://");
+        return resposta({ configurado: false, reunioes: [] });
+    }
 
     const reunioes = [];
     const falhas: string[] = [];
@@ -68,7 +71,12 @@ Deno.serve(async (req) => {
         try {
             const r = await fetch(link, { signal: AbortSignal.timeout(10_000) });
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            reunioes.push(...lerReunioes(ICAL, await r.text(), de, ate));
+            const ics = await r.text();
+            const lidas = lerReunioes(ICAL, ics, de, ate);
+            // Só contagens: o link e o conteúdo da agenda não vão para os registos
+            console.log(`calendário ${i + 1}: ${ics.length} bytes, ` +
+                `${(ics.match(/BEGIN:VEVENT/g) || []).length} eventos, ${lidas.length} entre ${de} e ${ate}`);
+            reunioes.push(...lidas);
         } catch (e) {
             // Nunca devolver o link: é secreto
             console.error(`calendário ${i + 1}:`, (e as Error).message);
