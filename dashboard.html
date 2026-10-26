@@ -11,7 +11,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-<link rel="stylesheet" href="telemovel.css?v=1">
+<link rel="stylesheet" href="telemovel.css?v=2">
 
 <style>
 /* ============================================================
@@ -674,8 +674,8 @@ body::after {
 
 /* ============================================================
    TELEMÓVEL — sem scroll para o lado
-   A barra lateral passa para cima (botões em várias linhas),
-   o cabeçalho encolhe e as grelhas ficam numa só coluna.
+   A barra lateral abre com o botão ☰, o cabeçalho encolhe e
+   as grelhas ficam numa só coluna.
 ============================================================ */
 @media (max-width: 700px) {
   /* No computador só a .main faz scroll; no telemóvel é a página toda */
@@ -690,33 +690,29 @@ body::after {
     gap: 10px;
     min-height: 56px;
   }
-  .logo { height: 40px; }
+  .header .logo { display: none; }
   .header-title { font-size: 15px; letter-spacing: 1px; text-align: left; min-width: 0; }
   .header-user svg { width: 24px; height: 24px; }
   .header-user span { display: none; }
   .header-actions { gap: 8px; flex-shrink: 0; }
 
+  /* Barra lateral: abre por cima do conteúdo com o botão ☰
+     (o botão e o fundo escuro vêm do telemovel.js/.css) */
   .sidebar {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 6px;
-    padding: 10px 12px;
-    overflow: visible;
+    position: fixed;
+    top: 0; bottom: 0; left: 0;
+    width: min(280px, 82vw);
+    z-index: 1200;
+    background: #ece8e1;
+    padding: 16px 12px;
+    transform: translateX(-105%);
+    visibility: hidden;
+    transition: transform .22s ease, visibility .22s;
   }
-  .sidebar-section,
-  .sidebar-section:first-child {
-    display: contents;
-  }
-  .sidebar-label { display: none; }
-  .sidebar-section[style] { margin: 0 !important; padding: 0 !important; border: none !important; }
-  .nav-btn,
-  .sidebar a.nav-btn {
-    flex: 1 1 calc(50% - 6px);
-    width: auto;
-    margin: 0;
-    padding: 9px 8px;
-    font-size: 11px;
-  }
+  body.menu-aberto .sidebar { transform: none; visibility: visible; }
+  .nav-btn { padding: 9px 12px; font-size: 12px; text-align: left; margin-bottom: 4px; }
+  .sidebar-label { font-size: 11px; }
+  .sidebar-section { margin-top: 10px; }
 
   .main { padding: 12px; overflow: visible; }
   .painel { padding: 14px; }
@@ -803,7 +799,7 @@ body::after {
 </div>
 
 <script src="config.js"></script>
-<script src="telemovel.js"></script>
+<script src="telemovel.js?v=2"></script>
 <script>
 // ============================================================
 // AUTH

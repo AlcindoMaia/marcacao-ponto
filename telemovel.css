@@ -4,6 +4,7 @@
    (data-label) e marca a tabela com .tabela-cartoes; aqui
    cada linha passa a ser um cartão, sem scroll para o lado.
    Usado pelo admin.html e pelo dashboard.html.
+   No fim: o menu lateral (☰) do telemovel.js.
 ======================================================= */
 @media (max-width: 600px) {
     /* ── Tabelas em cartões ── */
@@ -23,8 +24,8 @@
     table.tabela-cartoes > thead { display: none !important; }
     table.tabela-cartoes > tbody > tr,
     table.tabela-cartoes > tfoot > tr {
-        margin: 0 0 10px;
-        padding: 6px 12px;
+        margin: 0 0 6px;
+        padding: 4px 10px;
         border-radius: var(--radius-sm, 8px);
         border: 1px solid rgba(127,127,127,.18);
         background: rgba(255,255,255,.45);
@@ -36,26 +37,28 @@
         display: flex !important;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
+        gap: 10px;
         width: 100% !important;
         min-width: 0 !important;
         max-width: none !important;
-        padding: 7px 0 !important;
+        padding: 3px 0 !important;
+        min-height: 0 !important;
+        height: auto !important;
         border: none !important;
-        border-bottom: 1px solid rgba(127,127,127,.12) !important;
+        font-size: 12.5px !important;
+        line-height: 1.3;
         text-align: right !important;
         white-space: normal !important;
         overflow-wrap: anywhere;
         position: static !important;
     }
-    table.tabela-cartoes > tbody > tr > td:last-child { border-bottom: none !important; }
     table.tabela-cartoes > tbody > tr > td::before,
     table.tabela-cartoes > tfoot > tr > td::before {
         content: attr(data-label);
-        flex: 0 0 38%;
+        flex: 0 0 32%;
         text-align: left;
         font-family: var(--font-title);
-        font-size: 10px;
+        font-size: 9.5px;
         font-weight: 400;
         letter-spacing: 1px;
         text-transform: uppercase;
@@ -67,8 +70,18 @@
     table.tabela-cartoes td:not([data-label])::before { display: none; }
     table.tabela-cartoes td[data-label=""],
     table.tabela-cartoes td:not([data-label]) { justify-content: center; text-align: center !important; }
-    /* A 1.ª coluna é o título do cartão */
-    table.tabela-cartoes > tbody > tr > td:first-child { font-weight: 600; }
+    /* A 1.ª coluna é o título do cartão: sem rótulo, à esquerda,
+       com uma linha a separá-la do resto */
+    table.tabela-cartoes > tbody > tr > td:first-child {
+        font-weight: 600;
+        font-size: 13.5px !important;
+        justify-content: flex-start;
+        text-align: left !important;
+        padding: 5px 0 4px !important;
+        border-bottom: 1px solid rgba(127,127,127,.15) !important;
+        margin-bottom: 2px;
+    }
+    table.tabela-cartoes > tbody > tr > td:first-child::before { display: none; }
     table.tabela-cartoes td:empty { display: none !important; }
     /* Campos e botões dentro das células */
     table.tabela-cartoes td > input:not([type=checkbox]):not([type=radio]),
@@ -87,4 +100,77 @@
     /* Mapas mensais (um dia por coluna): ficam em grelha
        com scroll próprio e a 1.ª coluna fixa. */
     table.tabela-mapa { display: block; overflow-x: auto; white-space: nowrap; }
+}
+
+/* ── Menu lateral (☰) ─────────────────────────────── */
+.menu-botao, .menu-fundo, .menu-lateral, .menu-atual { display: none; }
+
+@media (max-width: 700px) {
+    .menu-botao {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 38px; height: 38px; flex-shrink: 0;
+        border: 1px solid rgba(0,0,0,.12); border-radius: 10px;
+        background: rgba(255,255,255,.55);
+        font-size: 20px; line-height: 1; cursor: pointer; color: #1a1a1a;
+    }
+    .menu-fundo {
+        display: block; position: fixed; inset: 0; z-index: 1190;
+        background: rgba(0,0,0,.35);
+        opacity: 0; pointer-events: none; transition: opacity .2s;
+    }
+    body.menu-aberto .menu-fundo { opacity: 1; pointer-events: auto; }
+    body.menu-aberto { overflow: hidden; }
+
+    /* Painel admin: a barra é montada pelo telemovel.js */
+    .menu-lateral {
+        display: flex; flex-direction: column; gap: 3px;
+        position: fixed; top: 0; bottom: 0; left: 0; z-index: 1200;
+        width: min(270px, 80vw);
+        padding: 14px 10px 24px;
+        overflow-y: auto;
+        background: #ece8e1;
+        box-shadow: 4px 0 24px rgba(0,0,0,.2);
+        transform: translateX(-105%);
+        visibility: hidden;
+        transition: transform .22s ease, visibility .22s;
+    }
+    body.menu-aberto .menu-lateral { transform: none; visibility: visible; }
+    .menu-titulo {
+        font-family: var(--font-title); font-size: 11px; letter-spacing: 1.5px;
+        text-transform: uppercase; color: var(--text-muted, #666);
+        padding: 10px 8px 4px;
+    }
+    .menu-titulo:first-child { padding-top: 0; }
+    .menu-item {
+        display: flex; align-items: center; gap: 6px;
+        width: 100%; padding: 9px 12px;
+        border: none; border-radius: 8px;
+        background: rgba(217,217,217,.6);
+        font-family: var(--font-title); font-size: 13px; letter-spacing: 1px;
+        text-transform: uppercase; text-align: left; color: #1a1a1a; cursor: pointer;
+    }
+    .menu-item.active { background: var(--primary, #f4b942); font-weight: 500; }
+    .menu-item.menu-destaque { background: rgba(244,185,66,.35); }
+    body.dark .menu-lateral { background: #222; }
+    body.dark .menu-item { background: rgba(255,255,255,.08); color: #f0f0f0; }
+    body.dark .menu-item.active { background: var(--primary, #f4b942); color: #1a1000; }
+
+    /* O que passou para o menu sai do ecrã */
+    #adminArea > .tabs,
+    .header > a.btn-secondary,
+    .header > button.btn-secondary,
+    .header > h1 { display: none !important; }
+
+    /* Cabeçalho do painel: ☰ + secção aberta + avisos + modo escuro */
+    .header:has(> .menu-botao) {
+        flex-wrap: nowrap; height: 54px; min-height: 0;
+        padding: 8px 12px; gap: 8px;
+    }
+    .header:has(> .menu-botao) > .logo { display: none; }
+    .menu-atual {
+        display: block; flex: 1; min-width: 0;
+        font-family: var(--font-title); font-size: 16px; letter-spacing: 1px;
+        text-transform: uppercase;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
 }

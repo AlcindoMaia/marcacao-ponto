@@ -77,3 +77,96 @@
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar);
     else iniciar();
 })();
+
+// =======================================================
+// TELEMÓVEL — menu lateral (☰)
+// No telemóvel os separadores do painel e os botões do
+// cabeçalho (Hoje, Registo Diário, Dashboard, Sair) vivem
+// numa barra lateral que abre com o botão ☰, como a barra
+// do Dashboard. No computador nada disto aparece (CSS).
+//
+// Os botões do menu não são cópias com lógica própria:
+// carregam no botão original, por isso abrirTab() e o
+// resto continuam a funcionar como sempre.
+// No Dashboard a barra lateral já existe (.sidebar): só
+// se acrescenta o botão ☰ que a abre e fecha.
+// =======================================================
+(function () {
+    function el(tag, attrs, html) {
+        const e = document.createElement(tag);
+        Object.assign(e, attrs || {});
+        if (html != null) e.innerHTML = html;
+        return e;
+    }
+
+    function iniciar() {
+        const header = document.querySelector("header.header");
+        if (!header || document.getElementById("menuBotao")) return;
+
+        let sincronizar = () => {};   // no painel admin passa a marcar a secção aberta
+        const fundo = el("div", { id: "menuFundo", className: "menu-fundo" });
+        const abrir  = () => { document.body.classList.add("menu-aberto"); sincronizar(); };
+        const fechar = () => document.body.classList.remove("menu-aberto");
+        fundo.onclick = fechar;
+        document.addEventListener("keydown", e => { if (e.key === "Escape") fechar(); });
+
+        const botao = el("button", { id: "menuBotao", className: "menu-botao", type: "button", title: "Menu" }, "☰");
+        botao.setAttribute("aria-label", "Abrir menu");
+        botao.onclick = () => document.body.classList.contains("menu-aberto") ? fechar() : abrir();
+        header.insertBefore(botao, header.firstChild);
+        document.body.appendChild(fundo);
+
+        // ── Dashboard: a barra lateral já existe ──
+        const sidebar = document.querySelector(".sidebar");
+        if (sidebar) {
+            // O fundo escuro fica junto da barra: a .app tem z-index próprio
+            // e, fora dela, o fundo tapava a barra.
+            sidebar.parentNode.insertBefore(fundo, sidebar);
+            sidebar.addEventListener("click", e => { if (e.target.closest(".nav-btn")) fechar(); });
+            return;
+        }
+
+        // ── Painel admin: montar a barra com os separadores e os atalhos ──
+        const tabs = [...document.querySelectorAll(".tabs .tab")];
+        if (!tabs.length) return;
+        const menu = el("nav", { id: "menuLateral", className: "menu-lateral" });
+
+        const titulo = el("div", { className: "menu-titulo" }, "Painel");
+        menu.appendChild(titulo);
+        const itens = tabs.map(t => {
+            const b = el("button", { type: "button", className: "menu-item" }, t.innerHTML);
+            b.dataset.ir = t.dataset.tab;
+            b.onclick = () => { t.click(); fechar(); window.scrollTo(0, 0); };
+            menu.appendChild(b);
+            return b;
+        });
+
+        const atalhos = [...header.querySelectorAll(":scope > a.btn-secondary, :scope > button.btn-secondary")];
+        if (atalhos.length) {
+            menu.appendChild(el("div", { className: "menu-titulo" }, "Atalhos"));
+            atalhos.forEach(a => {
+                const b = el("button", { type: "button", className: "menu-item menu-atalho" }, a.innerHTML);
+                if (a.style.background) b.classList.add("menu-destaque");
+                b.onclick = () => { fechar(); a.click(); };
+                menu.appendChild(b);
+            });
+        }
+        document.body.appendChild(menu);
+
+        // Nome da secção aberta no cabeçalho, ao lado do ☰
+        const atual = el("span", { id: "menuAtual", className: "menu-atual" });
+        header.insertBefore(atual, botao.nextSibling);
+
+        sincronizar = () => {
+            const ativo = tabs.find(t => t.classList.contains("active"));
+            itens.forEach((b, i) => b.classList.toggle("active", tabs[i] === ativo));
+            atual.textContent = ativo ? ativo.textContent.replace(/[⚙\s]+/, " ").trim() : "";
+        };
+        // abrirTab() muda a classe "active" dos separadores originais
+        new MutationObserver(sincronizar).observe(document.querySelector(".tabs"), { attributes: true, subtree: true, attributeFilter: ["class"] });
+        sincronizar();
+    }
+
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar);
+    else iniciar();
+})();
