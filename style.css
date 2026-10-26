@@ -1319,3 +1319,88 @@ body.dark ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); }
     /* Durante o arrastar a coluna não encaixa, para a página poder andar sozinha */
     body.plan-toque-ativo .plan-quadro { scroll-snap-type: none; }
 }
+
+/* =======================================================
+   Filtros, pesquisas e botões compactos
+   (Stock › Movimentos, Financeiro › Ordenados, Registos admin,
+   Orçamentos). Uma linha só de filtros pequenos; "Atualizar"
+   e "Limpar" são ícones.
+   ======================================================= */
+.barra-filtros {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: 6px; margin-bottom: 12px;
+}
+.barra-filtros input, .barra-filtros select {
+    width: auto; min-width: 0; height: 32px;
+    padding: 0 8px; font-size: 12.5px; border-radius: 7px;
+}
+.barra-filtros select { flex: 0 1 auto; max-width: 200px; }
+.barra-filtros .filtro-largo { flex: 1 1 200px; }
+.barra-filtros .filtro-data {
+    display: inline-flex; align-items: center; gap: 4px; margin: 0;
+    font-family: var(--font-body); font-size: 11.5px; letter-spacing: 0; text-transform: none;
+}
+.barra-filtros .filtro-data input { width: 128px; }
+.btn-icone {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 32px; height: 32px; padding: 0;
+    border-radius: 8px; border: 1px solid rgba(181,136,99,.45);
+    background: rgba(181,136,99,.15); color: var(--primary-dk);
+    font-size: 16px; line-height: 1; cursor: pointer;
+}
+.btn-icone:hover { background: rgba(181,136,99,.3); }
+.btn-pequeno {
+    height: 32px; padding: 0 10px; flex-shrink: 0; white-space: nowrap;
+    border-radius: 8px; border: 1px solid rgba(127,127,127,.3);
+    background: rgba(127,127,127,.1); color: var(--text-dark);
+    font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.btn-pequeno:hover { background: rgba(127,127,127,.2); }
+
+/* Pesquisas e botão + mais pequenos */
+.inventario-header { gap: 8px; margin-bottom: 10px; }
+.inventario-header input, .inventario-header .input-lg { padding: 7px 12px; font-size: 13px; }
+.inventario-header .btn-circular { width: 34px !important; height: 34px !important; font-size: 19px !important; }
+
+/* Orçamentos: filtro por estado em botões e ✓ / ✕ rápidos */
+.chips-estado { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 0 10px; }
+.chip-estado {
+    padding: 4px 11px; border-radius: 20px; cursor: pointer;
+    border: 1px solid rgba(127,127,127,.3); background: transparent;
+    color: var(--text-muted); font-size: 12px; font-weight: 600;
+}
+.chip-estado.ativo { background: rgba(181,136,99,.18); border-color: var(--primary); color: var(--primary-dk); }
+.orc-estado { display: inline-flex; align-items: center; gap: 4px; }
+.orc-estado > span { white-space: nowrap; margin-right: 2px; }
+.btn-estado-rapido {
+    width: 24px; height: 24px; padding: 0; flex-shrink: 0;
+    border-radius: 50%; border: 1px solid rgba(127,127,127,.35);
+    background: transparent; color: var(--text-muted);
+    font-size: 12px; line-height: 1; cursor: pointer;
+}
+.btn-estado-rapido.sim:hover, .btn-estado-rapido.sim.ativo { background: rgba(143,191,160,.2); border-color: #8fbfa0; color: #6fae86; }
+.btn-estado-rapido.nao:hover, .btn-estado-rapido.nao.ativo { background: rgba(224,148,134,.2); border-color: #e09486; color: #d07b6c; }
+.orc-subtab { padding: 8px 14px; font-size: 12px; }
+.orc-subtabs { margin-bottom: 12px; }
+.so-largo { display: inline; }
+
+@media (max-width: 600px) {
+    /* Até 4 caixas de números ficam lado a lado */
+    .grid-cards:not(:has(> :nth-child(5))) {
+        grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+    }
+    .grid-cards .card.metric { padding: 7px 8px; }
+    .grid-cards .card.metric h3 { font-size: 8.5px; letter-spacing: .4px; line-height: 1.15; margin-bottom: 4px; }
+    .grid-cards:has(> :nth-child(4)) .card.metric .value { font-size: 15px; }
+
+    .barra-filtros > input, .barra-filtros > select { flex: 1 1 0; max-width: none; }
+    .barra-filtros .filtro-largo { flex-basis: 100%; }
+    .filtros-mov > select { flex-basis: 40%; }
+    .barra-filtros .filtro-data { flex: 1 1 40%; }
+    .barra-filtros .filtro-data input { flex: 1; width: auto; }
+    .orc-subtab { padding: 6px 8px; font-size: 11px; }
+    .so-largo { display: none; }
+}
+
+body.dark #filtroMesFinanceiro { background: #18232e; color: #ece5de; border-color: rgba(255,255,255,.14); }
+.barra-filtros #filtroMesFinanceiro { padding: 0 8px; font-size: 12.5px; }

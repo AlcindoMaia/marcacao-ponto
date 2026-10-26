@@ -188,3 +188,36 @@
 @media (prefers-reduced-motion: reduce) {
     body.desliza-esq .tab-content.active, body.desliza-dir .tab-content.active { animation: none; }
 }
+
+/* ── Cartões mais pequenos (Stock e Orçamentos) ─────────
+   Os ícones de ação ficam na vertical, encostados à direita
+   do cartão; os campos curtos ficam dois por linha
+   (td.largo ocupa a linha toda). */
+@media (max-width: 600px) {
+    table.tabela-cartoes > tbody > tr:has(> td.acoes-td) { position: relative; padding-right: 46px; }
+    table.tabela-cartoes > tbody > tr > td.acoes-td {
+        position: absolute !important;
+        top: 4px; right: 4px; bottom: 4px;
+        width: 36px !important;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 2px;
+        padding: 2px 0 0 !important;
+        border-left: 1px solid rgba(127,127,127,.15) !important;
+    }
+    table.tabela-cartoes > tbody > tr > td.acoes-td::before { display: none; }
+    table.tabela-cartoes td.acoes-td > div { flex-direction: column; flex-wrap: nowrap !important; gap: 2px !important; }
+    table.tabela-cartoes td.acoes-td .btn-acao { padding: 3px 4px; font-size: 14px; }
+
+    table.tabela-cartoes.cartao-compacto > tbody > tr:has(> td + td + td) {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        grid-auto-flow: row dense;
+        column-gap: 12px;
+    }
+    table.cartao-compacto > tbody > tr > td:first-child,
+    table.cartao-compacto > tbody > tr > td.largo { grid-column: 1 / -1; }
+    table.cartao-compacto > tbody > tr > td::before { flex-basis: auto; margin-right: auto; }
+    table.cartao-compacto > tbody > tr > td { padding: 2px 0 !important; }
+}
