@@ -132,12 +132,36 @@ body { background: var(--bg); }
     margin-bottom:14px; line-height:1.5;
 }
 
+/* --- Tema escuro (o de arranque, como no resto da plataforma) --- */
+body.dark {
+    --text-dark:  #f0f0f0;
+    --text-muted: rgba(255,255,255,.55);
+}
+body.dark .hoje-folha,
+body.dark .hoje-painel-folha,
+body.dark .hoje-barra-ia > div { background: #25363f; border-color: rgba(255,255,255,.1); }
+body.dark .hoje-barra-ia { background: linear-gradient(to top, #1c2b3a 65%, rgba(28,43,58,0)); }
+body.dark .hoje-ir     { border-color: rgba(255,255,255,.14); background: rgba(255,255,255,.05); }
+body.dark .hoje-ir:hover, body.dark .hoje-alerta:hover { background: rgba(255,255,255,.06); }
+body.dark .hoje-icone  { background: rgba(255,255,255,.08); }
+body.dark .hoje-pedido { background: none; }
+body.dark .hoje-alerta,
+body.dark .hoje-linha-pedido { border-top-color: rgba(255,255,255,.08); }
+body.dark .hoje-campo select,
+body.dark .hoje-campo input,
+body.dark .hoje-campo textarea { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.14); }
+body.dark .hoje-avisos { color: #e0b98f; }
+body.dark .conf-alta   { color: #8fd18f; }
+body.dark .conf-baixa  { color: #e0b98f; }
+body.dark [style*="rgba(0,0,0,.06)"] { border-color: rgba(255,255,255,.08) !important; }
+
 /* Login, igual ao resto da plataforma */
 #hojeLogin { max-width: 320px; margin: 90px auto; text-align:center; }
 #hojeLogin input { width:100%; margin-bottom:10px; }
 </style>
 </head>
 <body>
+<script>try{if(localStorage.getItem("tema")!=="claro")document.body.classList.add("dark")}catch(e){document.body.classList.add("dark")}</script>
 
 <!-- Pedir entrada quando não há sessão -->
 <div id="hojeLogin" style="display:none">
