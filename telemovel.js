@@ -81,15 +81,14 @@
 // =======================================================
 // TELEMÓVEL — menu lateral (☰)
 // No telemóvel os separadores do painel e os botões do
-// cabeçalho (Hoje, Registo Diário, Dashboard, Sair) vivem
-// numa barra lateral que abre com o botão ☰, como a barra
-// do Dashboard. No computador nada disto aparece (CSS).
+// cabeçalho (Hoje, Registo Diário, Sair) vivem numa barra
+// lateral que abre com o botão ☰. No computador nada disto
+// aparece (CSS).
 //
 // Os botões do menu não são cópias com lógica própria:
 // carregam no botão original, por isso abrirTab() e o
 // resto continuam a funcionar como sempre.
-// No Dashboard a barra lateral já existe (.sidebar): só
-// se acrescenta o botão ☰ que a abre e fecha.
+// No painel, deslizar o dedo para o lado muda de separador.
 // =======================================================
 (function () {
     function el(tag, attrs, html) {
@@ -115,16 +114,6 @@
         botao.onclick = () => document.body.classList.contains("menu-aberto") ? fechar() : abrir();
         header.insertBefore(botao, header.firstChild);
         document.body.appendChild(fundo);
-
-        // ── Dashboard: a barra lateral já existe ──
-        const sidebar = document.querySelector(".sidebar");
-        if (sidebar) {
-            // O fundo escuro fica junto da barra: a .app tem z-index próprio
-            // e, fora dela, o fundo tapava a barra.
-            sidebar.parentNode.insertBefore(fundo, sidebar);
-            sidebar.addEventListener("click", e => { if (e.target.closest(".nav-btn")) fechar(); });
-            return;
-        }
 
         // ── Painel admin: montar a barra com os separadores e os atalhos ──
         const tabs = [...document.querySelectorAll(".tabs .tab")];
@@ -164,9 +153,52 @@
             itens.forEach((b, i) => b.classList.toggle("active", tabs[i] === ativo));
             atual.textContent = ativo ? ativo.textContent.replace(/[⚙\s]+/, " ").trim() : "";
         };
+        ligarDeslizar(tabs, () => document.body.classList.contains("menu-aberto"));
+
         // abrirTab() muda a classe "active" dos separadores originais
         new MutationObserver(sincronizar).observe(document.querySelector(".tabs"), { attributes: true, subtree: true, attributeFilter: ["class"] });
         sincronizar();
+    }
+
+    // ── Deslizar para o lado muda de separador ──
+    // Com o dedo para a esquerda vai para o separador seguinte, para a
+    // direita volta ao anterior (a mesma ordem do menu). Não conta quando
+    // o gesto começa num campo, num mapa com scroll próprio, num cartão do
+    // planeamento (esses arrastam-se) ou com uma janela aberta.
+    function ligarDeslizar(tabs, menuAberto) {
+        const telemovel = window.matchMedia("(max-width: 700px)");
+        const area = document.getElementById("adminArea");
+        if (!area) return;
+        const IGNORAR = "input, textarea, select, button, a, canvas, .tabela-mapa, .plan-cartao, [draggable='true'], .cot-tabela-wrap";
+        let x0 = null, y0 = 0, t0 = 0;
+
+        area.addEventListener("touchstart", e => {
+            x0 = null;
+            if (!telemovel.matches || menuAberto() || e.touches.length !== 1) return;
+            const t = e.touches[0];
+            // Junto às margens o telemóvel usa o gesto para "voltar atrás"
+            if (t.clientX < 24 || t.clientX > window.innerWidth - 24) return;
+            if (e.target.closest(IGNORAR)) return;
+            if (document.querySelector(".modal:not(.hidden), [id^='modal'][style*='display: flex'], #modalFichaCliente")) return;
+            x0 = t.clientX; y0 = t.clientY; t0 = Date.now();
+        }, { passive: true });
+
+        area.addEventListener("touchend", e => {
+            if (x0 === null) return;
+            const t = e.changedTouches[0];
+            const dx = t.clientX - x0, dy = t.clientY - y0;
+            x0 = null;
+            // Gesto claramente na horizontal, com pelo menos 70px e rápido
+            if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8 || Date.now() - t0 > 700) return;
+            const i = tabs.findIndex(b => b.classList.contains("active"));
+            const j = i + (dx < 0 ? 1 : -1);
+            if (i < 0 || j < 0 || j >= tabs.length) return;
+            document.body.classList.remove("desliza-esq", "desliza-dir");
+            void document.body.offsetWidth;   // reiniciar a animação
+            document.body.classList.add(dx < 0 ? "desliza-esq" : "desliza-dir");
+            tabs[j].click();
+            window.scrollTo(0, 0);
+        }, { passive: true });
     }
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar);

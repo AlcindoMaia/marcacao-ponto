@@ -9,16 +9,16 @@
 
 /* ── Tokens ────────────────────────────────────────── */
 :root {
-    /* Cores — idênticas ao dashboard */
-    --bg:          #f5f2ed;
-    --panel:       rgba(217,217,217,0.44);
-    --panel-solid: rgba(217,217,217,0.85);
-    --primary:     #f4b942;
-    --primary-dk:  #d29d36;
-    --primary-lt:  rgba(244,185,66,0.15);
-    --text-dark:   #1a1a1a;
+    /* Cores — paleta "Azul-noite e caramelo" (proposta 2, out. 2026) */
+    --bg:          #efeae5;
+    --panel:       rgba(255,255,255,0.75);
+    --panel-solid: rgba(255,255,255,0.92);
+    --primary:     #b58863;
+    --primary-dk:  #9a7150;
+    --primary-lt:  rgba(181,136,99,0.15);
+    --text-dark:   #1c2b3a;
     --text-light:  #ffffff;
-    --text-muted:  #666;
+    --text-muted:  #5f6b72;
     --shadow:      0 4px 16px rgba(0,0,0,0.1);
     --shadow-lg:   0 8px 32px rgba(0,0,0,0.15);
     --radius:      10px;
@@ -32,12 +32,12 @@
     --font-body:   'Inter', sans-serif;
 
     /* Estados */
-    --color-ok:    #2a8a2a;
-    --color-err:   #c0392b;
-    --color-warn:  #f4a942;
-    --bg-ok:       rgba(42,138,42,0.1);
-    --bg-err:      rgba(192,57,43,0.08);
-    --bg-warn:     rgba(244,169,66,0.12);
+    --color-ok:    #4f7a63;
+    --color-err:   #a5483d;
+    --color-warn:  #c08a52;
+    --bg-ok:       rgba(79,122,99,0.1);
+    --bg-err:      rgba(165,72,61,0.08);
+    --bg-warn:     rgba(192,138,82,0.12);
 }
 
 /* ── Reset ─────────────────────────────────────────── */
@@ -165,7 +165,7 @@ body::after {
 .tab.active {
     background: var(--primary);
     border-color: var(--primary-dk);
-    color: #1a1000;
+    color: #ffffff;
     font-weight: 500;
 }
 
@@ -290,7 +290,7 @@ body::after {
     border-radius: var(--radius-sm);
     border: none;
     background: var(--primary);
-    color: #1a1000;
+    color: #ffffff;
     cursor: pointer;
     transition: background .15s, transform .1s;
     white-space: nowrap;
@@ -358,7 +358,7 @@ table.display thead th,
 #tabelaArtigos thead th,
 #tabelaRegistos thead th {
     background: var(--primary) !important;
-    color: #1a1000 !important;
+    color: #ffffff !important;
     font-family: var(--font-title) !important;
     font-size: 11px !important;
     font-weight: 500 !important;
@@ -389,7 +389,7 @@ table.display tbody tr:hover,
 #tabelaObras tbody tr:hover,
 #tabelaArtigos tbody tr:hover,
 #tabelaRegistos tbody tr:hover {
-    background: rgba(244,185,66,.08) !important;
+    background: rgba(181,136,99,.08) !important;
 }
 
 /* Células editáveis */
@@ -398,21 +398,21 @@ table.display tbody tr:hover,
     border-radius: 4px;
     transition: background .15s;
 }
-.editavel:hover   { background: rgba(244,185,66,.1); }
+.editavel:hover   { background: rgba(181,136,99,.1); }
 .editavel:focus   { outline: 2px solid var(--primary); background: rgba(255,255,255,.8); }
 
 .editavel.editado,
 td.editado {
-    background: rgba(244,185,66,.22) !important;
+    background: rgba(181,136,99,.22) !important;
     color: var(--primary-dk) !important;
-    outline: 2px solid rgba(244,185,66,.45) !important;
+    outline: 2px solid rgba(181,136,99,.45) !important;
     outline-offset: -2px !important;
     font-weight: 600 !important;
 }
 
 #tabelaRegistos tbody tr:hover td.editado,
 #tabelaRegistos tbody tr:hover .editavel.editado {
-    background: rgba(244,185,66,.32) !important;
+    background: rgba(181,136,99,.32) !important;
 }
 
 /* ── Badges de estado ──────────────────────────────── */
@@ -560,7 +560,7 @@ label {
 .modal.hidden { display: none; }
 
 .modal-content {
-    background: #faf8f4;
+    background: #f4f1ec;
     border-radius: var(--radius);
     box-shadow: var(--shadow-lg);
     padding: 28px;
@@ -637,8 +637,8 @@ label {
     font-size: 13px;
     transition: background .12s;
 }
-.calendar-day:hover { background: rgba(244,185,66,.2); }
-.calendar-day.active { background: var(--primary); color: #1a1000; font-weight: 600; }
+.calendar-day:hover { background: rgba(181,136,99,.2); }
+.calendar-day.active { background: var(--primary); color: #ffffff; font-weight: 600; }
 .calendar-day.has-data { font-weight: 600; color: var(--primary-dk); }
 
 /* ── Filtros card ──────────────────────────────────── */
@@ -740,23 +740,23 @@ label {
 
 /* ── Dark mode toggle (mantido para compatibilidade) ── */
 body.dark {
-    background: #1b1b1b;
+    background: #1c2b3a;
     color: #f0f0f0;
 }
 body.dark::before, body.dark::after { display: none; }
 body.dark .header { background: rgba(30,30,30,.95); }
-body.dark .card { background: #262626; box-shadow: 0 4px 16px rgba(0,0,0,.3); }
+body.dark .card { background: #3d4d55; box-shadow: 0 4px 16px rgba(0,0,0,.3); }
 body.dark .card.metric h3 { color: rgba(255,255,255,.5); }
 body.dark .card.metric .value { color: var(--primary); }
 body.dark .tab { background: rgba(255,255,255,.08); color: #f0f0f0; border-color: rgba(255,255,255,.1); }
-body.dark .tab.active { background: var(--primary); color: #1a1000; border-color: var(--primary-dk); }
+body.dark .tab.active { background: var(--primary); color: #ffffff; border-color: var(--primary-dk); }
 body.dark input, body.dark select { background: rgba(255,255,255,.07); color: #f0f0f0; border-color: rgba(255,255,255,.12); }
 body.dark .inventario-header input { background: rgba(255,255,255,.07); color: #f0f0f0; }
 body.dark table thead th { background: var(--primary) !important; }
 body.dark table tbody td { border-bottom-color: rgba(255,255,255,.05); }
-body.dark table tbody tr:hover { background: rgba(244,185,66,.1) !important; }
+body.dark table tbody tr:hover { background: rgba(181,136,99,.1) !important; }
 body.dark .modal { background: rgba(0,0,0,.6); }
-body.dark .modal-content { background: #1e1e1e; }
+body.dark .modal-content { background: #25363f; }
 body.dark .filtros-linha select,
 body.dark .filtros-linha input[type="date"] { background: rgba(255,255,255,.07); color: #f0f0f0; }
 body.dark #loginBox { background: rgba(30,30,30,.95); }
@@ -777,7 +777,7 @@ body.dark label { color: rgba(255,255,255,.45); }
 .plan-grelha th.plan-hoje { color:var(--primary); font-weight:600; }
 .plan-grelha th .plan-tempo   { font-size:.72rem; opacity:.85; cursor:default; }
 .plan-grelha th .plan-feriado { color:var(--color-err); font-weight:600; opacity:1; white-space:normal; }
-.plan-celula.plan-dia-feriado { background:rgba(248,113,113,.08); }
+.plan-celula.plan-dia-feriado { background:rgba(224,148,134,.08); }
 .plan-cartao .plan-chuva { display:inline; color:#60a5fa; font-weight:600; white-space:nowrap; }
 
 .plan-celula         { position:relative; vertical-align:top; height:auto; min-height:320px;
@@ -806,7 +806,7 @@ body.dark label { color: rgba(255,255,255,.45); }
 .plan-avatares       { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:2px; margin-left:auto; }
 .plan-cartao .plan-avatar { display:inline-flex; align-items:center; justify-content:center;
                        width:22px; height:22px; border-radius:50%; font-size:.6rem; font-weight:700;
-                       background:rgba(244,185,66,.3); color:#7a5a12; }
+                       background:rgba(181,136,99,.3); color:#7a5a12; }
 .plan-cartao .plan-avatar-resp { background:var(--primary); color:#fff; }
 .plan-cartao.plan-a-arrastar { opacity:.4; }
 
@@ -1182,4 +1182,35 @@ label.cot-ed-chk input { width: auto !important; min-width: 0 !important; }
     /* A caixa que embrulha uma tabela de cartões não precisa de margem própria */
     .card:has(table.tabela-cartoes) { padding: 6px; }
     table.tabela-cartoes { margin: 0; }
+}
+
+/* Paleta “Azul-noite e caramelo”: cabeçalho azul-noite com texto claro.
+   Os destaques (botões, separador ativo, cabeçalhos das tabelas)
+   usam o caramelo de --primary. */
+:root {
+    --noite:       #1c2b3a;
+    --ardosia:     #3d4d55;
+    --bege-cinza:  #d3c3b9;
+    --pedra:       #a79e9c;
+}
+.header { background: var(--noite); color: #fff; }
+.header h1 { color: #fff; }
+.header .btn-secondary {
+    background: rgba(255,255,255,.1);
+    border-color: rgba(255,255,255,.25);
+    color: #fff;
+}
+.header .btn-secondary:hover { background: rgba(255,255,255,.18); }
+.header .dark-toggle:hover { background: rgba(255,255,255,.12); }
+.tab { border-color: rgba(28,43,58,.12); }
+.tab.active { color: #fff; }
+
+/* Janelas escuras (painel da obra, editar obra, biblioteca): os cartões
+   ficam escuros e translúcidos em vez de brancos. */
+#modalPainelObra .card,
+#modalEditarObra .card,
+#modalBibServico .card {
+    background: rgba(255,255,255,.06);
+    color: rgba(255,255,255,.85);
+    box-shadow: none;
 }
