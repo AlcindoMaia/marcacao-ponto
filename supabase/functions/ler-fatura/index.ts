@@ -121,6 +121,8 @@ Regras:
 - IVA 0% com menção de autoliquidação (M31, "IVA - autoliquidação") é normal
   em serviços de construção: taxa_iva 0 e o motivo em "motivo_isencao_iva".
 - Se um valor não estiver legível, devolve null. NUNCA inventes um número.
+- Nas linhas copia os preços tal como estão impressos. Se a fatura mostrar
+  preço sem IVA e com IVA, usa o SEM IVA.
 - Linhas de portes ou taxas entram como linha própria, com a descrição original.
 - Se o ficheiro não tiver nenhuma fatura ou guia, devolve "documentos": [].`;
 }
@@ -232,7 +234,36 @@ Deno.serve(async (req) => {
     for (const d of documentos) {
         const avisos: string[] = [];
         const linhas = Array.isArray(d.linhas) ? d.linhas : [];
-        const soma = linhas.reduce((s: number, l: any) => s + (Number(l.valor_total) || 0), 0);
+        let soma = linhas.reduce((s: number, l: any) => s + (Number(l.valor_total) || 0), 0);
+
+        // Há faturas (Leroy, talões de "Consumidor Final") que só imprimem os
+        // preços das linhas COM IVA. A fatura está certa, mas as linhas não
+        // batiam com a base e os preços iam para o histórico com IVA. Quando
+        // a soma bate com o total com IVA e não com a base, passa-se tudo a
+        // sem IVA, e o cêntimo de arredondamento que sobrar vai para a
+        // linha maior.
+        const semIva = Number(d.total_sem_iva), comIva = Number(d.total_com_iva);
+        if (linhas.length && semIva > 0 && comIva > semIva &&
+            Math.abs(soma - semIva) > 0.05 && Math.abs(soma - comIva) <= 0.05) {
+            // Com a taxa de cada linha lida, divide-se por essa taxa (uma
+            // fatura pode misturar 6% e 23%); sem ela, a proporção do documento.
+            const comTaxa = linhas.every((l: any) => l.taxa_iva != null && Number(l.taxa_iva) >= 0);
+            const r2 = (v: number) => Math.round(v * 100) / 100;
+            for (const l of linhas) {
+                const f = comTaxa ? 1 / (1 + Number(l.taxa_iva) / 100) : semIva / comIva;
+                if (l.valor_total != null)    l.valor_total    = r2(Number(l.valor_total) * f);
+                if (l.preco_unitario != null) l.preco_unitario = Math.round(Number(l.preco_unitario) * f * 10000) / 10000;
+            }
+            const novaSoma = linhas.reduce((s: number, l: any) => s + (Number(l.valor_total) || 0), 0);
+            const resto = r2(semIva - novaSoma);
+            if (resto && Math.abs(resto) <= 0.05) {
+                const maior = linhas.reduce((a: any, b: any) =>
+                    Math.abs(Number(b.valor_total) || 0) > Math.abs(Number(a.valor_total) || 0) ? b : a);
+                maior.valor_total = r2(Number(maior.valor_total) + resto);
+            }
+            soma = linhas.reduce((s: number, l: any) => s + (Number(l.valor_total) || 0), 0);
+            avisos.push("Os preços das linhas vinham com IVA na fatura; foram passados a sem IVA.");
+        }
 
         if (d.total_sem_iva != null && Math.abs(soma - Number(d.total_sem_iva)) > 0.05) {
             avisos.push(`A soma das linhas (${soma.toFixed(2)} €) não bate com o total sem IVA (${d.total_sem_iva} €).`);

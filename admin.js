@@ -5054,7 +5054,9 @@ async function carregarObrasFluxo() {
     ["movObra", "filtroObra"].forEach(id => {
         const sel = document.getElementById(id);
         if (!sel) return;
-        const placeholder = id.startsWith("filtro") ? "— Todas —" : "— Sem obra —";
+        // No movimento a obra é obrigatória (a base recusa-o sem obra); para
+        // despesas da empresa há a obra GERAL / EMPRESA.
+        const placeholder = id.startsWith("filtro") ? "— Todas —" : "— Escolher obra —";
         sel.innerHTML = `<option value="">${placeholder}</option>`;
         data?.forEach(o => { sel.innerHTML += `<option value="${escHtml(o.id)}">${escHtml(o.nome)}</option>`; });
     });
@@ -5293,6 +5295,14 @@ async function abrirModalMovimento(mov = null) {
     const modal = document.getElementById("modalMovimento");
     if (!modal) return;
 
+    // As listas de Categoria e Obra só se enchiam ao abrir a sub-tab Fluxo.
+    // Vindo do "Hoje" (Ler fatura) abre-se o Financeiro noutra sub-tab, e as
+    // caixas ficavam vazias: não abriam e a gravação falhava sem obra.
+    const semOpcoes = id => (document.getElementById(id)?.options.length || 0) < 2;
+    if (semOpcoes("movCategoria") || semOpcoes("movObra")) {
+        await Promise.all([carregarCategoriasFinanceiras(), carregarObrasFluxo()]);
+    }
+
     movEditId = mov?.id || null;
 
     // Título
@@ -5487,6 +5497,11 @@ async function guardarMovimento() {
 
     if (!dataDoc || isNaN(valor_total) || valor_total === 0) {
         movMsg.textContent = "Data e valor total são obrigatórios.";
+        return;
+    }
+    if (!document.getElementById("movObra")?.value) {
+        movMsg.textContent = "Escolha a obra. Para despesas da empresa use GERAL / EMPRESA.";
+        document.getElementById("movObra")?.focus();
         return;
     }
 
