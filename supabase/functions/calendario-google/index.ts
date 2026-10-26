@@ -58,11 +58,17 @@ Deno.serve(async (req) => {
         return resposta({ erro: `No máximo ${MAX_DIAS} dias de cada vez` }, 400);
     }
 
+    // Aceita o link como o Google o mostra ou como se cola sem querer:
+    // entre aspas, com webcal:// ou http:// em vez de https://
     const links = (Deno.env.get("GOOGLE_CALENDAR_ICS") || "")
-        .split(/[\s,]+/).filter(l => l.startsWith("https://"));
+        .split(/[\s,]+/)
+        .map(l => l.replace(/^["'<]+|["'>]+$/g, "").replace(/^(webcal|http):\/\//i, "https://"))
+        .filter(l => /^https:\/\//i.test(l));
     if (!links.length) {
         console.log("GOOGLE_CALENDAR_ICS vazio ou sem link https://");
-        return resposta({ configurado: false, reunioes: [] });
+        // Vai como falha para o quadro mostrar o aviso "⚠ calendário"
+        return resposta({ configurado: false, reunioes: [],
+            falhas: ["O link do Google Calendar não está guardado no servidor (segredo GOOGLE_CALENDAR_ICS)."] });
     }
 
     const reunioes = [];
