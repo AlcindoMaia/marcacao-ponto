@@ -120,6 +120,7 @@ function inicializarPainel() {
 function tabPedidaNoEndereco() {
     const m = (location.hash || "").match(/^#tab=([a-z-]+)$/);
     if (!m) return null;
+    if (SEPARADOR_ANTIGO[m[1]]) return m[1];
     return document.querySelector(`.tab[data-tab="${m[1]}"]`) ? m[1] : null;
 }
 
@@ -141,11 +142,31 @@ function ativarTabs() {
     document.querySelectorAll(".tab").forEach(btn => {
         btn.onclick = () => abrirTab(btn.dataset.tab);
     });
+    document.querySelectorAll(".sec-subtab").forEach(btn => {
+        btn.onclick = () => abrirTab(btn.dataset.grupo === "func" ? "funcionarios" : "obras", btn.dataset.sub);
+    });
 }
 
-function abrirTab(nome, subFin) {
-    // O fluxo de caixa passou a ser uma sub-tab do Financeiro.
-    if (nome === "fluxo") { nome = "financeiro"; subFin = "fluxo"; }
+// Separadores que passaram a ser sub-separadores de outros.
+// Os nomes antigos continuam a funcionar (atalhos, links do "Hoje").
+const SEPARADOR_ANTIGO = {
+    fluxo:    ["financeiro", "fluxo"],
+    registos: ["funcionarios", "registos"],
+    gerarqr:  ["obras", "qr"],
+};
+
+// Mostra um sub-separador das Obras ("obras") ou dos Funcionários ("func")
+function mostrarSecSub(grupo, sub) {
+    document.querySelectorAll(`.sec-subtab[data-grupo="${grupo}"]`).forEach(b =>
+        b.classList.toggle("active", b.dataset.sub === sub));
+    const prefixo = grupo === "func" ? "funcSub-" : "obrasSub-";
+    document.querySelectorAll(`[id^="${prefixo}"]`).forEach(c =>
+        c.style.display = c.id === prefixo + sub ? "block" : "none");
+}
+
+function abrirTab(nome, sub) {
+    if (SEPARADOR_ANTIGO[nome]) [nome, sub] = SEPARADOR_ANTIGO[nome];
+    const subFin = sub;
     document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
     document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
     // Esconder sub-conteúdos que usam style.display inline (fin-subtab, reg-subtab)
@@ -159,13 +180,19 @@ function abrirTab(nome, subFin) {
     if (nome === "visaogeral")   initVisaoGeral();
     if (nome === "financeiro")   { switchFinTab(subFin || "ordenados"); }
     if (nome === "dashboard")    initDashboard();
-    if (nome === "registos")     { switchRegTab("ponto"); }
-    if (nome === "funcionarios") initFuncionarios();
+    if (nome === "funcionarios") {
+        mostrarSecSub("func", sub || "equipa");
+        if (sub === "registos") switchRegTab("ponto");
+        else initFuncionarios();
+    }
     if (nome === "inventario")   initInventario();
-    if (nome === "obras")        initObras();
+    if (nome === "obras") {
+        mostrarSecSub("obras", sub || "lista");
+        if (sub === "qr") initGerarQr();
+        else initObras();
+    }
     if (nome === "orcamentos")    initOrcamentos();
     if (nome === "config")        initConfig();
-    if (nome === "gerarqr")       initGerarQr();
     if (nome === "planeamento")   initPlaneamento();
 }
 
@@ -719,6 +746,7 @@ async function exportarRegistosAdminExcel() {
 }
 
 // =======================================================
+let _vistaRegistos = "lista";   // "lista" ou "mapa"
 function setVistaRegistos(v) {
     _vistaRegistos = v;
     const btnL = document.getElementById("btnVistaLista");
@@ -1653,6 +1681,27 @@ async function initObras() {
     await carregarObras();
 }
 
+// Pesquisa + "Só as ativas" (é o que abre por defeito) ou "Todas as obras"
+function filtrarObras() {
+    const f      = (document.getElementById("pesquisaObras")?.value || "").toLowerCase();
+    const estado = document.getElementById("filtroEstadoObras")?.value || "";
+    const linhas = [...document.querySelectorAll("#tabelaObras tbody tr[data-estado]")];
+    linhas.forEach(tr => {
+        const ok = (!estado || tr.dataset.estado === estado) && tr.innerText.toLowerCase().includes(f);
+        tr.style.display = ok ? "" : "none";
+    });
+    const tbody = document.querySelector("#tabelaObras tbody");
+    let vazio = tbody?.querySelector(".obras-sem-resultados");
+    if (linhas.length && !linhas.some(tr => tr.style.display !== "none")) {
+        if (!vazio && tbody) {
+            vazio = document.createElement("tr");
+            vazio.className = "obras-sem-resultados";
+            vazio.innerHTML = `<td colspan="7" style="text-align:center;padding:20px;opacity:.6">Nenhuma obra com este filtro.</td>`;
+            tbody.appendChild(vazio);
+        }
+    } else vazio?.remove();
+}
+
 async function carregarObras() {
     const { data, error } = await SB.from("obras").select("*").order("created_at", { ascending: false });
     const tbody = document.querySelector("#tabelaObras tbody");
@@ -1680,6 +1729,7 @@ async function carregarObras() {
     data.forEach(o => {
         const tr = document.createElement("tr");
         const estado = o.estado || "ativa";
+        tr.dataset.estado = estado;
 
         tr.innerHTML = `
             <td style="font-family:monospace;font-size:12px">${o.codigo || "—"}</td>
@@ -1722,6 +1772,7 @@ async function carregarObras() {
         tr.querySelector(".btn-eliminar-obra").onclick = () => eliminarObra(o.id, o.nome);
         tbody.appendChild(tr);
     });
+    filtrarObras();
 }
 
 function abrirModalQR(obra) {
@@ -3513,7 +3564,7 @@ async function vgCarregarAtalhos() {
 
     const atalhos = [
         { ic: "💶", nome: "Financeiro",  sub: plural(docsMes, "documento este mês", "documentos este mês"), tab: "financeiro" },
-        { ic: "📦", nome: "Inventário",  sub: plural(artigos, "artigo", "artigos"),                          tab: "inventario" },
+        { ic: "📦", nome: "Stock",       sub: plural(artigos, "artigo", "artigos"),                          tab: "inventario" },
         { ic: "🗓", nome: "Planeamento", sub: plural(tarefas, "tarefa por fazer", "tarefas por fazer"),      tab: "planeamento" },
         { ic: "🏗", nome: "Obras",       sub: "fichas e serviços",                                           tab: "obras" },
         { ic: "👷", nome: "Funcionários",sub: "fichas e dispositivos",                                       tab: "funcionarios" },
@@ -5754,11 +5805,8 @@ function ligarEventosGlobais() {
     });
 
     // Obras — filtro e eventos
-    document.getElementById("pesquisaObras")?.addEventListener("input", function () {
-        const f = this.value.toLowerCase();
-        document.querySelectorAll("#tabelaObras tbody tr")
-            .forEach(tr => { tr.style.display = tr.innerText.toLowerCase().includes(f) ? "" : "none"; });
-    });
+    document.getElementById("pesquisaObras")?.addEventListener("input", filtrarObras);
+    document.getElementById("filtroEstadoObras")?.addEventListener("change", filtrarObras);
     document.getElementById("btnNovaObra")?.addEventListener("click", () => abrirTab("gerarqr"));
     document.getElementById("modalQR")?.addEventListener("click", e => {
         if (e.target.id === "modalQR") fecharModalQR();

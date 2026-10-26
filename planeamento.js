@@ -330,7 +330,11 @@ function ligarEventosGrelha() {
             el.classList.remove("plan-a-arrastar");
             _planDragId = null;
         });
-        el.addEventListener("click", () => abrirModalTarefa(el.dataset.id));
+        el.addEventListener("click", () => {
+            if (Date.now() - _planToqueFim < 400) return;   // acabou de ser largado com o dedo
+            abrirModalTarefa(el.dataset.id);
+        });
+        ligarArrastarComDedo(el);
     });
 
     document.querySelectorAll(".plan-celula").forEach(td => {
@@ -353,6 +357,99 @@ function ligarEventosGrelha() {
             abrirModalTarefa(null, td.dataset.data);
         });
     });
+}
+
+// =======================================================
+// ARRASTAR COM O DEDO (telemóvel e tablet)
+// O arrastar do computador não funciona no ecrã tátil. Aqui, manter o
+// dedo premido no cartão meio segundo "pega" nele; depois leva-se para
+// outro dia e larga-se. A hora fica a mesma e o dia volta a ordenar-se
+// pela hora (planTarefasDoDia). Se o dedo mexer antes do meio segundo,
+// é só scroll normal.
+// =======================================================
+let _planToqueFim = 0;      // quando terminou o último arrasto com o dedo
+
+function ligarArrastarComDedo(el) {
+    let espera = null, fantasma = null, alvo = null, x0 = 0, y0 = 0, dx = 0, dy = 0, rolar = null;
+
+    const celulaEm = (x, y) => document.elementFromPoint(x, y)?.closest(".plan-celula") || null;
+    const marcarAlvo = td => {
+        if (td === alvo) return;
+        alvo?.classList.remove("plan-alvo");
+        alvo = td;
+        alvo?.classList.add("plan-alvo");
+    };
+    const limpar = () => {
+        clearTimeout(espera); espera = null;
+        cancelAnimationFrame(rolar); rolar = null;
+        fantasma?.remove(); fantasma = null;
+        alvo?.classList.remove("plan-alvo"); alvo = null;
+        el.classList.remove("plan-a-arrastar");
+        el.draggable = true;
+    };
+
+    el.addEventListener("touchstart", e => {
+        if (e.touches.length !== 1) return limpar();
+        const t = e.touches[0];
+        x0 = t.clientX; y0 = t.clientY;
+        // Sem isto o browser pode começar o arrastar dele e cancelar o nosso
+        el.draggable = false;
+        espera = setTimeout(() => {
+            espera = null;
+            const r = el.getBoundingClientRect();
+            dx = x0 - r.left; dy = y0 - r.top;
+            fantasma = el.cloneNode(true);
+            fantasma.classList.add("plan-fantasma");
+            fantasma.style.width = r.width + "px";
+            fantasma.style.left  = r.left + "px";
+            fantasma.style.top   = r.top + "px";
+            document.body.appendChild(fantasma);
+            el.classList.add("plan-a-arrastar");
+            navigator.vibrate?.(25);
+            marcarAlvo(celulaEm(x0, y0));
+        }, 450);
+    }, { passive: true });
+
+    el.addEventListener("touchmove", e => {
+        const t = e.touches[0];
+        if (!fantasma) {
+            // Mexeu antes do tempo: é scroll, não arrastar
+            if (espera && Math.hypot(t.clientX - x0, t.clientY - y0) > 10) limpar();
+            return;
+        }
+        e.preventDefault();   // a página não rola enquanto o cartão está pegado
+        fantasma.style.left = (t.clientX - dx) + "px";
+        fantasma.style.top  = (t.clientY - dy) + "px";
+        marcarAlvo(celulaEm(t.clientX, t.clientY));
+        // Junto ao topo ou ao fundo do ecrã, a página rola sozinha
+        const margem = 70, h = window.innerHeight;
+        const vel = t.clientY < margem ? -12 : t.clientY > h - margem ? 12 : 0;
+        cancelAnimationFrame(rolar); rolar = null;
+        if (vel) {
+            const passo = () => {
+                window.scrollBy(0, vel);
+                marcarAlvo(celulaEm(t.clientX, t.clientY));
+                rolar = requestAnimationFrame(passo);
+            };
+            rolar = requestAnimationFrame(passo);
+        }
+    }, { passive: false });
+
+    el.addEventListener("touchend", async e => {
+        if (!fantasma) return limpar();
+        const t = e.changedTouches[0];
+        const td = celulaEm(t.clientX, t.clientY);
+        const sobre = document.elementFromPoint(t.clientX, t.clientY)?.closest(".plan-cartao");
+        limpar();
+        _planToqueFim = Date.now();
+        if (!td) return;
+        const antesDe = sobre && sobre.dataset.id !== el.dataset.id ? sobre.dataset.id : null;
+        await moverTarefa(el.dataset.id, td.dataset.data, antesDe);
+    });
+
+    el.addEventListener("touchcancel", limpar);
+    // O toque longo abre o menu do browser (copiar, etc.) — aqui não
+    el.addEventListener("contextmenu", e => { if (espera || fantasma) e.preventDefault(); });
 }
 
 // =======================================================

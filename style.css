@@ -1276,3 +1276,8 @@ body.dark .dark-toggle:hover { background: rgba(255,255,255,.1); }
 body.dark .plan-cartao { background: #25363f; color: #ece5de; }
 body.dark .plan-cartao .plan-avatar-resp { color: #131c25; }
 body.dark ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); }
+
+/* Planeamento: cartão pegado com o dedo (telemóvel) */
+.plan-cartao { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.plan-fantasma { position: fixed; z-index: 9999; margin: 0; pointer-events: none; opacity: .92;
+                 transform: rotate(2deg) scale(1.03); box-shadow: 0 10px 28px rgba(0,0,0,.35); }
