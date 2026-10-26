@@ -128,7 +128,7 @@
 
         // ── Painel admin: montar a barra com os separadores e os atalhos ──
         const tabs = [...document.querySelectorAll(".tabs .tab")];
-        if (!tabs.length) return;
+        if (!tabs.length) { botao.remove(); fundo.remove(); return; }
         const menu = el("nav", { id: "menuLateral", className: "menu-lateral" });
 
         const titulo = el("div", { className: "menu-titulo" }, "Painel");
@@ -152,6 +152,8 @@
             });
         }
         document.body.appendChild(menu);
+        // Só agora o CSS esconde os separadores e os botões do cabeçalho
+        document.body.classList.add("tem-menu-lateral");
 
         // Nome da secção aberta no cabeçalho, ao lado do ☰
         const atual = el("span", { id: "menuAtual", className: "menu-atual" });

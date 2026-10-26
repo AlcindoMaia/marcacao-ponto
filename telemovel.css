@@ -156,10 +156,11 @@
     body.dark .menu-item.active { background: var(--primary, #f4b942); color: #1a1000; }
 
     /* O que passou para o menu sai do ecrã */
-    #adminArea > .tabs,
-    .header > a.btn-secondary,
-    .header > button.btn-secondary,
-    .header > h1 { display: none !important; }
+    /* (só quando o telemovel.js montou o menu) */
+    body.tem-menu-lateral #adminArea > .tabs,
+    body.tem-menu-lateral .header > a.btn-secondary,
+    body.tem-menu-lateral .header > button.btn-secondary,
+    body.tem-menu-lateral .header > h1 { display: none !important; }
 
     /* Cabeçalho do painel: ☰ + secção aberta + avisos + modo escuro */
     .header:has(> .menu-botao) {
