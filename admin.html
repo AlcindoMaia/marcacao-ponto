@@ -23,17 +23,26 @@
 .tab-inner { max-width: 1100px; }
 
 /* Gerar QR e Config — compatíveis com modo claro */
-#tab-gerarqr select,
+#obrasSub-qr select,
 #tab-config select,
 #tab-config input {
     background: var(--bg-input, rgba(0,0,0,.05));
     border-color: var(--border-input, rgba(0,0,0,.15));
     color: var(--text-dark);
 }
-#tab-gerarqr .card,
+#obrasSub-qr .card,
 #tab-config .card {
     background: var(--card-bg, rgba(255,255,255,.7));
 }
+/* Sub-separadores das Obras e dos Funcionários */
+.sec-subtabs { display:flex; gap:4px; margin-bottom:16px; border-bottom:1px solid rgba(127,127,127,.18); flex-wrap:wrap; }
+.sec-subtab {
+    background:none; color:var(--text-muted); border:none; border-bottom:2px solid transparent;
+    padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer; border-radius:4px 4px 0 0;
+}
+.sec-subtab.active { background:rgba(181,136,99,.15); color:var(--primary); border-bottom-color:var(--primary); }
+#filtroEstadoObras { width:auto; flex:0 0 auto; }
+
 /* Botão falta uniforme */
 .btn-falta-tab {
     font-size: 12px; font-weight: 600;
@@ -130,14 +139,12 @@
     <!-- TABS -->
     <div class="tabs">
         <button class="tab active" data-tab="visaogeral">Visão Geral</button>
-        <button class="tab" data-tab="financeiro">Financeiro</button>
-        <button class="tab" data-tab="orcamentos">Orçamentos</button>
-        <button class="tab" data-tab="registos">Registos</button>
-        <button class="tab" data-tab="funcionarios">Funcionários</button>
-        <button class="tab" data-tab="inventario">Inventário</button>
-        <button class="tab" data-tab="obras">Obras</button>
         <button class="tab" data-tab="planeamento">Planeamento</button>
-        <button class="tab" data-tab="gerarqr">Gerar QR</button>
+        <button class="tab" data-tab="obras">Obras</button>
+        <button class="tab" data-tab="orcamentos">Orçamentos</button>
+        <button class="tab" data-tab="financeiro">Financeiro</button>
+        <button class="tab" data-tab="funcionarios">Funcionários</button>
+        <button class="tab" data-tab="inventario">Stock</button>
         <button class="tab" data-tab="config">⚙ Config</button>
     </div>
 
@@ -196,138 +203,6 @@
 
 </div>
 
-<!-- ================= TAB REGISTOS ================= -->
-<div class="tab-content" id="tab-registos">
-
-    <!-- SUB-TABS REGISTOS -->
-    <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:0">
-        <button class="reg-subtab active" id="regTab-ponto" onclick="switchRegTab('ponto')"
-            style="background:rgba(181,136,99,.15);color:var(--primary);border:none;border-bottom:2px solid var(--primary);padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600;border-radius:4px 4px 0 0">
-            📍 Ponto QR
-        </button>
-        <button class="reg-subtab" id="regTab-admin" onclick="switchRegTab('admin')"
-            style="background:none;color:var(--text-muted);border:none;border-bottom:2px solid transparent;padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600;border-radius:4px 4px 0 0">
-            📋 Registos Admin
-        </button>
-    </div>
-
-    <!-- SUB-TAB: PONTO QR -->
-    <div id="regTabContent-ponto" style="display:block">
-
-    <!-- KPIs de assiduidade -->
-    <div class="grid-cards" style="margin-bottom:16px" id="registosKpis">
-        <div class="card metric" style="border-left:3px solid #8fbfa0">
-            <h3>Taxa Assiduidade</h3>
-            <div id="kpiAssiduidade" class="value" style="color:#8fbfa0">–</div>
-        </div>
-        <div class="card metric">
-            <h3>Dias com Registo</h3>
-            <div id="kpiDiasRegisto" class="value">–</div>
-        </div>
-        <div class="card metric" style="border-left:3px solid #f97316">
-            <h3>Horas Extras</h3>
-            <div id="kpiHorasExtras" class="value" style="color:#f97316">–</div>
-        </div>
-        <div class="card metric" style="border-left:3px solid #e09486">
-            <h3>Incompletos</h3>
-            <div id="kpiIncompletos" class="value" style="color:#e09486">–</div>
-        </div>
-    </div>
-
-    <!-- Vista: Lista ou Mapa de Presenças -->
-    <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
-        <button id="btnVistaLista" onclick="setVistaRegistos('lista')"
-            style="background:rgba(181,136,99,.15);color:var(--primary);border:1px solid rgba(181,136,99,.4);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">
-            📋 Lista
-        </button>
-        <button id="btnVistaMapa" onclick="setVistaRegistos('mapa')"
-            style="background:rgba(255,255,255,.06);color:var(--text-muted);border:1px solid rgba(0,0,0,.1);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">
-            📅 Mapa de Presenças
-        </button>
-        <button onclick="exportarPontoExcel()"
-            style="margin-left:auto;background:rgba(143,191,160,.12);color:#4f7a63;border:1px solid rgba(143,191,160,.3);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">
-            📥 Exportar Excel
-        </button>
-        <button onclick="fecharMes()"
-            style="background:rgba(181,136,99,.12);color:var(--primary);border:1px solid rgba(181,136,99,.3);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">
-            ✅ Fechar Mês
-        </button>
-    </div>
-
-    <div id="mapaPresencas" class="card" style="display:none;overflow-x:auto;margin-bottom:16px"></div>
-
-    <div id="vistaLista" style="display:block">
-
-    <!-- Calendário compacto centrado -->
-    <div style="display:flex;justify-content:center;margin-bottom:20px">
-        <div class="card" style="width:320px;padding:14px">
-
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-                <button id="prevMonth" style="background:var(--primary);border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700">‹</button>
-                <div id="calendarTitle" style="font-weight:600;font-size:14px;cursor:pointer;text-transform:capitalize"></div>
-                <button id="nextMonth" style="background:var(--primary);border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700">›</button>
-            </div>
-
-            <div id="calendarGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px"></div>
-
-        </div>
-    </div>
-
-    <!-- Tabela registos -->
-    <div class="card">
-<div style="overflow-x:auto"><table id="tabelaRegistos">
-            <thead>
-                <tr>
-                    <th>Funcionário</th>
-                    <th>Obra</th>
-                    <th>Dia</th>
-                    <th>Entrada</th>
-                    <th>Saída</th>
-                    <th>Horas</th>
-                    <th>Estado</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
-</div>
-    </div>
-
-    </div><!-- fim vistaLista -->
-
-    </div><!-- fim regTabContent-ponto -->
-
-    <!-- SUB-TAB: REGISTOS ADMIN -->
-    <div id="regTabContent-admin" style="display:none">
-        <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap">
-            <div>
-                <label style="font-size:11px;opacity:.6;display:block;margin-bottom:3px">Mês</label>
-                <input type="month" id="raFiltroMes" style="padding:6px 10px;border-radius:6px;border:1px solid rgba(0,0,0,.15);background:#fff;color:var(--text-dark);font-size:13px">
-            </div>
-            <div>
-                <label style="font-size:11px;opacity:.6;display:block;margin-bottom:3px">Vista</label>
-                <select id="raFiltroVista" onchange="carregarRegistosAdmin()"
-                    style="padding:6px 10px;border-radius:6px;border:1px solid rgba(0,0,0,.15);background:#fff;color:var(--text-dark);font-size:13px">
-                    <option value="func">Por Funcionário</option>
-                    <option value="obra">Por Obra</option>
-                    <option value="detalhe">Detalhe completo</option>
-                </select>
-            </div>
-            <button onclick="carregarRegistosAdmin()"
-                style="background:var(--primary);border:none;border-radius:6px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;color:#ffffff">
-                🔄 Actualizar
-            </button>
-            <button onclick="exportarRegistosAdminExcel()"
-                style="background:rgba(79,122,99,.1);color:#4f7a63;border:1px solid rgba(79,122,99,.3);border-radius:6px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;margin-left:auto">
-                📥 Excel
-            </button>
-        </div>
-        <div id="raKpis" class="grid-cards" style="margin-bottom:16px"></div>
-        <div id="raConteudo" class="card" style="overflow-x:auto;padding:0">
-            <div style="padding:32px;text-align:center;opacity:.4">Selecciona um mês e clica Actualizar</div>
-        </div>
-    </div><!-- fim regTabContent-admin -->
-
-</div><!-- fim tab-registos -->
 
 <!-- ================= TAB FINANCEIRO ================= -->
     <div class="tab-content" id="tab-financeiro">
@@ -1086,36 +961,14 @@
     </div>
 </div>
 
-    <!-- ================= TAB Gerar QR ================= -->
-    <div class="tab-content" id="tab-gerarqr">
-    <div style="max-width:520px;margin:0 auto">
-        <h2 style="font-family:var(--font-title);font-size:18px;font-weight:600;letter-spacing:.5px;margin-bottom:4px">Gerar QR de Obra</h2>
-        <p style="font-size:13px;opacity:.55;margin-bottom:24px">Cria um QR Code para marcação de ponto em obra</p>
-
-        <div class="card" style="margin-bottom:16px">
-            <div class="form-group">
-                <label>Seleccionar Obra</label>
-                <select id="selectObraQrTab" onchange="gerarQrTab()" style="width:100%">
-                    <option value="">— Escolhe uma obra —</option>
-                </select>
-            </div>
-        </div>
-
-        <div id="qrTabOutput" style="text-align:center;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px">
-            <div style="opacity:.3;font-size:13px">Selecciona uma obra para gerar o QR</div>
-        </div>
-
-        <div style="display:flex;gap:10px;justify-content:center;margin-top:20px">
-            <button onclick="imprimirQrTab()" id="btnImprimirQrTab" disabled class="btn-secondary"
-                style="min-width:120px">🖨️ Imprimir</button>
-            <a href="qr.html" target="_blank" class="btn-secondary"
-                style="min-width:140px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px">
-                🔲 Gerador avançado
-            </a>
-        </div>
-    </div>
-</div>
 <div class="tab-content" id="tab-funcionarios">
+
+    <div class="sec-subtabs">
+        <button type="button" class="sec-subtab active" data-grupo="func" data-sub="equipa">👷 Equipa</button>
+        <button type="button" class="sec-subtab" data-grupo="func" data-sub="registos">📋 Registos</button>
+    </div>
+
+    <div class="sec-sub-conteudo" id="funcSub-equipa">
 
     <!-- Barra superior -->
     <div class="inventario-header">
@@ -1157,15 +1010,161 @@
         </table>
     </div>
 
+    </div><!-- fim funcSub-equipa -->
+
+    <!-- SUB-SEPARADOR: REGISTOS (antes era um separador próprio) -->
+    <div class="sec-sub-conteudo" id="funcSub-registos" style="display:none">
+
+    <!-- SUB-TABS REGISTOS -->
+    <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:0">
+        <button class="reg-subtab active" id="regTab-ponto" onclick="switchRegTab('ponto')"
+            style="background:rgba(181,136,99,.15);color:var(--primary);border:none;border-bottom:2px solid var(--primary);padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600;border-radius:4px 4px 0 0">
+            📍 Ponto QR
+        </button>
+        <button class="reg-subtab" id="regTab-admin" onclick="switchRegTab('admin')"
+            style="background:none;color:var(--text-muted);border:none;border-bottom:2px solid transparent;padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600;border-radius:4px 4px 0 0">
+            📋 Registos Admin
+        </button>
+    </div>
+
+    <!-- SUB-TAB: PONTO QR -->
+    <div id="regTabContent-ponto" style="display:block">
+
+    <!-- KPIs de assiduidade -->
+    <div class="grid-cards" style="margin-bottom:16px" id="registosKpis">
+        <div class="card metric" style="border-left:3px solid #8fbfa0">
+            <h3>Taxa Assiduidade</h3>
+            <div id="kpiAssiduidade" class="value" style="color:#8fbfa0">–</div>
+        </div>
+        <div class="card metric">
+            <h3>Dias com Registo</h3>
+            <div id="kpiDiasRegisto" class="value">–</div>
+        </div>
+        <div class="card metric" style="border-left:3px solid #f97316">
+            <h3>Horas Extras</h3>
+            <div id="kpiHorasExtras" class="value" style="color:#f97316">–</div>
+        </div>
+        <div class="card metric" style="border-left:3px solid #e09486">
+            <h3>Incompletos</h3>
+            <div id="kpiIncompletos" class="value" style="color:#e09486">–</div>
+        </div>
+    </div>
+
+    <!-- Vista: Lista ou Mapa de Presenças -->
+    <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
+        <button id="btnVistaLista" onclick="setVistaRegistos('lista')"
+            style="background:rgba(181,136,99,.15);color:var(--primary);border:1px solid rgba(181,136,99,.4);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">
+            📋 Lista
+        </button>
+        <button id="btnVistaMapa" onclick="setVistaRegistos('mapa')"
+            style="background:rgba(255,255,255,.06);color:var(--text-muted);border:1px solid rgba(0,0,0,.1);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">
+            📅 Mapa de Presenças
+        </button>
+        <button onclick="exportarPontoExcel()"
+            style="margin-left:auto;background:rgba(143,191,160,.12);color:#4f7a63;border:1px solid rgba(143,191,160,.3);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">
+            📥 Exportar Excel
+        </button>
+        <button onclick="fecharMes()"
+            style="background:rgba(181,136,99,.12);color:var(--primary);border:1px solid rgba(181,136,99,.3);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">
+            ✅ Fechar Mês
+        </button>
+    </div>
+
+    <div id="mapaPresencas" class="card" style="display:none;overflow-x:auto;margin-bottom:16px"></div>
+
+    <div id="vistaLista" style="display:block">
+
+    <!-- Calendário compacto centrado -->
+    <div style="display:flex;justify-content:center;margin-bottom:20px">
+        <div class="card" style="width:320px;padding:14px">
+
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                <button id="prevMonth" style="background:var(--primary);border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700">‹</button>
+                <div id="calendarTitle" style="font-weight:600;font-size:14px;cursor:pointer;text-transform:capitalize"></div>
+                <button id="nextMonth" style="background:var(--primary);border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700">›</button>
+            </div>
+
+            <div id="calendarGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px"></div>
+
+        </div>
+    </div>
+
+    <!-- Tabela registos -->
+    <div class="card">
+<div style="overflow-x:auto"><table id="tabelaRegistos">
+            <thead>
+                <tr>
+                    <th>Funcionário</th>
+                    <th>Obra</th>
+                    <th>Dia</th>
+                    <th>Entrada</th>
+                    <th>Saída</th>
+                    <th>Horas</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+</div>
+    </div>
+
+    </div><!-- fim vistaLista -->
+
+    </div><!-- fim regTabContent-ponto -->
+
+    <!-- SUB-TAB: REGISTOS ADMIN -->
+    <div id="regTabContent-admin" style="display:none">
+        <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap">
+            <div>
+                <label style="font-size:11px;opacity:.6;display:block;margin-bottom:3px">Mês</label>
+                <input type="month" id="raFiltroMes" style="padding:6px 10px;border-radius:6px;border:1px solid rgba(0,0,0,.15);background:#fff;color:var(--text-dark);font-size:13px">
+            </div>
+            <div>
+                <label style="font-size:11px;opacity:.6;display:block;margin-bottom:3px">Vista</label>
+                <select id="raFiltroVista" onchange="carregarRegistosAdmin()"
+                    style="padding:6px 10px;border-radius:6px;border:1px solid rgba(0,0,0,.15);background:#fff;color:var(--text-dark);font-size:13px">
+                    <option value="func">Por Funcionário</option>
+                    <option value="obra">Por Obra</option>
+                    <option value="detalhe">Detalhe completo</option>
+                </select>
+            </div>
+            <button onclick="carregarRegistosAdmin()"
+                style="background:var(--primary);border:none;border-radius:6px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;color:#ffffff">
+                🔄 Actualizar
+            </button>
+            <button onclick="exportarRegistosAdminExcel()"
+                style="background:rgba(79,122,99,.1);color:#4f7a63;border:1px solid rgba(79,122,99,.3);border-radius:6px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;margin-left:auto">
+                📥 Excel
+            </button>
+        </div>
+        <div id="raKpis" class="grid-cards" style="margin-bottom:16px"></div>
+        <div id="raConteudo" class="card" style="overflow-x:auto;padding:0">
+            <div style="padding:32px;text-align:center;opacity:.4">Selecciona um mês e clica Actualizar</div>
+        </div>
+    </div><!-- fim regTabContent-admin -->
+
+    </div><!-- fim funcSub-registos -->
+
 </div>
 
 
 <!-- ================= TAB OBRAS ================= -->
 <div class="tab-content" id="tab-obras">
 
+    <div class="sec-subtabs">
+        <button type="button" class="sec-subtab active" data-grupo="obras" data-sub="lista">🏗 Obras</button>
+        <button type="button" class="sec-subtab" data-grupo="obras" data-sub="qr">🔲 Gerar QR</button>
+    </div>
+
+    <div class="sec-sub-conteudo" id="obrasSub-lista">
+
     <div class="inventario-header">
         <input type="text" id="pesquisaObras"
                placeholder="Pesquisar por nome ou código">
+        <select id="filtroEstadoObras" title="Que obras mostrar">
+            <option value="ativa" selected>Só as ativas</option>
+            <option value="">Todas as obras</option>
+        </select>
         <button id="btnNovaObra" class="btn-primary btn-circular">+</button>
     </div>
 
@@ -1199,6 +1198,38 @@
             <tbody></tbody>
         </table>
     </div>
+
+    </div><!-- fim obrasSub-lista -->
+
+    <!-- SUB-SEPARADOR: GERAR QR (antes era um separador próprio) -->
+    <div class="sec-sub-conteudo" id="obrasSub-qr" style="display:none">
+    <div style="max-width:520px;margin:0 auto">
+        <h2 style="font-family:var(--font-title);font-size:18px;font-weight:600;letter-spacing:.5px;margin-bottom:4px">Gerar QR de Obra</h2>
+        <p style="font-size:13px;opacity:.55;margin-bottom:24px">Cria um QR Code para marcação de ponto em obra</p>
+
+        <div class="card" style="margin-bottom:16px">
+            <div class="form-group">
+                <label>Seleccionar Obra</label>
+                <select id="selectObraQrTab" onchange="gerarQrTab()" style="width:100%">
+                    <option value="">— Escolhe uma obra —</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="qrTabOutput" style="text-align:center;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px">
+            <div style="opacity:.3;font-size:13px">Selecciona uma obra para gerar o QR</div>
+        </div>
+
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:20px">
+            <button onclick="imprimirQrTab()" id="btnImprimirQrTab" disabled class="btn-secondary"
+                style="min-width:120px">🖨️ Imprimir</button>
+            <a href="qr.html" target="_blank" class="btn-secondary"
+                style="min-width:140px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px">
+                🔲 Gerador avançado
+            </a>
+        </div>
+    </div>
+</div>
 
 </div>
 
