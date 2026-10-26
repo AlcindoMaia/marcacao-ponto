@@ -14,6 +14,13 @@ let _planTempo    = {};     // previsão do IPMA: { "base" | "t:<id>": { local, 
 let _planDragId   = null;
 let _planEditId   = null;
 let _planPedido   = 0;      // descarta respostas de semanas antigas
+let _planSemanaVista = "";  // semana para onde o quadro já rolou até hoje (telemóvel)
+
+// Telemóvel: o quadro anda para o lado e os cartões arrastam-se com o dedo
+const PLAN_TELEMOVEL = window.matchMedia("(max-width: 700px)");
+// Ecrã só de toque: sem o arrastar do rato, que no iPhone/Android
+// atrapalha o segurar do dedo
+const PLAN_SO_TOQUE = window.matchMedia("(hover: none)");
 
 const PLAN_DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 
@@ -49,6 +56,7 @@ async function initPlaneamento() {
     document.getElementById("planSemanaAnterior").onclick = () => planMudarSemana(-7);
     document.getElementById("planSemanaSeguinte").onclick = () => planMudarSemana(7);
     document.getElementById("planSemanaHoje").onclick     = () => {
+        _planSemanaVista = "";   // voltar ao dia de hoje no telemóvel
         _planSemana = planSegundaDe(new Date());
         carregarPlaneamento();
     };
@@ -226,6 +234,21 @@ function desenharGrelha() {
 
     tabela.innerHTML = html;
     ligarEventosGrelha();
+    planRolarParaHoje(dias);
+}
+
+// No telemóvel vê-se um dia de cada vez: ao abrir uma semana, o quadro
+// começa no dia de hoje (ou na segunda, se hoje não estiver nesta semana).
+// Depois de mover um cartão fica onde estava.
+function planRolarParaHoje(dias) {
+    const semana = planDataStr(dias[0]);
+    if (!PLAN_TELEMOVEL.matches || _planSemanaVista === semana) return;
+    const quadro = document.getElementById("planQuadro");
+    if (!quadro || !quadro.offsetWidth) return;   // separador ainda escondido
+    _planSemanaVista = semana;
+    const i = Math.max(0, dias.findIndex(d => planDataStr(d) === planDataStr(new Date())));
+    const th = document.querySelectorAll("#planGrelha thead th")[i];
+    quadro.scrollLeft = th ? th.offsetLeft - 4 : 0;
 }
 
 function colunaHtml(dataStr, tarefas, reunioes = []) {
@@ -257,7 +280,7 @@ function colunaHtml(dataStr, tarefas, reunioes = []) {
                           title="${escapeHtmlPlan(nome)}${tf.responsavel ? " (responsável)" : ""}">${escapeHtmlPlan(planIniciais(nome))}</span>`;
         }).join("");
         return `<div class="plan-cartao plan-estado-${t.estado}"
-                     draggable="true" data-id="${t.id}">
+                     draggable="${PLAN_SO_TOQUE.matches ? "false" : "true"}" data-id="${t.id}">
                     <strong>${escapeHtmlPlan(t.descricao)}</strong>
                     <span>${escapeHtmlPlan(obra)}</span>
                     <div class="plan-cartao-rodape">
@@ -361,17 +384,19 @@ function ligarEventosGrelha() {
 
 // =======================================================
 // TELEMÓVEL: dedo premido no cartão para o arrastar
-// O arrastar do computador não funciona com o dedo. Aqui, ao
-// segurar o cartão meio segundo sem mexer, ele "solta-se" e
-// segue o dedo; ao largar num dia, a tarefa muda para esse dia
-// (a hora fica igual) e o dia volta a ordenar-se pela hora.
-// Se o dedo mexer antes disso, é só deslizar a página.
+// O arrastar do computador não funciona com o dedo. Aqui, como no
+// Trello, ao segurar o cartão meio segundo sem mexer ele "solta-se"
+// e segue o dedo. Levado até à beira esquerda ou direita, o quadro
+// anda para o dia ao lado; até ao cimo ou ao fundo, a página sobe
+// ou desce. Ao largar num dia, a tarefa muda para esse dia (a hora
+// fica igual) e o dia volta a ordenar-se pela hora.
+// Se o dedo mexer antes disso, é só deslizar o quadro ou a página.
 // =======================================================
 let _planToqueArrastou = false;
 
 function ligarToqueLongo(el) {
     let espera = null, x0 = 0, y0 = 0, fantasma = null, alvo = null, dx = 0, dy = 0;
-    let dedoY = 0, rolar = null;
+    let dedoX = 0, dedoY = 0, rolar = null;
 
     const limpar = () => {
         clearTimeout(espera); espera = null;
@@ -382,7 +407,7 @@ function ligarToqueLongo(el) {
         alvo = null;
         el.classList.remove("plan-a-arrastar");
         document.body.classList.remove("plan-toque-ativo");
-        el.draggable = true;
+        el.draggable = !PLAN_SO_TOQUE.matches;
     };
 
     // Dia (coluna) que está debaixo do dedo
@@ -397,11 +422,17 @@ function ligarToqueLongo(el) {
         alvo = td;
         if (alvo) alvo.classList.add("plan-alvo");
     };
-    // Perto do cimo ou do fundo do ecrã, a página anda sozinha
+    // Perto das beiras do ecrã, o quadro (para o lado) ou a página
+    // (para cima e para baixo) andam sozinhos
+    const veloc = (p, max, margem) =>
+        p < margem ? -(margem - p) / 3 : p > max - margem ? (p - (max - margem)) / 3 : 0;
     const rolarSozinho = () => {
-        const margem = 70, h = window.innerHeight;
-        const v = dedoY < margem ? -(margem - dedoY) / 4 : dedoY > h - margem ? (dedoY - (h - margem)) / 4 : 0;
-        if (v) { window.scrollBy(0, v); marcarAlvo(x0, dedoY); }
+        const quadro = document.getElementById("planQuadro");
+        const vx = veloc(dedoX, window.innerWidth, 50);
+        const vy = veloc(dedoY, window.innerHeight, 70);
+        if (vx && quadro) quadro.scrollLeft += vx;
+        if (vy) window.scrollBy(0, vy);
+        if (vx || vy) marcarAlvo(dedoX, dedoY);
         rolar = requestAnimationFrame(rolarSozinho);
     };
 
@@ -424,7 +455,7 @@ function ligarToqueLongo(el) {
             el.classList.add("plan-a-arrastar");
             document.body.classList.add("plan-toque-ativo");
             if (navigator.vibrate) navigator.vibrate(30);
-            dedoY = y0;
+            dedoX = x0; dedoY = y0;
             marcarAlvo(x0, y0);
             rolar = requestAnimationFrame(rolarSozinho);
         }, 450);
@@ -439,7 +470,7 @@ function ligarToqueLongo(el) {
         }
         if (!fantasma) return;
         e.preventDefault();
-        x0 = t.clientX; dedoY = t.clientY;
+        dedoX = t.clientX; dedoY = t.clientY;
         fantasma.style.left = (t.clientX - dx) + "px";
         fantasma.style.top = (t.clientY - dy) + "px";
         marcarAlvo(t.clientX, t.clientY);

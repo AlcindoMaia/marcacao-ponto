@@ -163,13 +163,14 @@
     // ── Deslizar para o lado muda de separador ──
     // Com o dedo para a esquerda vai para o separador seguinte, para a
     // direita volta ao anterior (a mesma ordem do menu). Não conta quando
-    // o gesto começa num campo, num mapa com scroll próprio, num cartão do
-    // planeamento (esses arrastam-se) ou com uma janela aberta.
+    // o gesto começa num campo, num mapa com scroll próprio, no quadro do
+    // planeamento (lá o dedo anda entre os dias e arrasta cartões) ou com
+    // uma janela aberta.
     function ligarDeslizar(tabs, menuAberto) {
         const telemovel = window.matchMedia("(max-width: 700px)");
         const area = document.getElementById("adminArea");
         if (!area) return;
-        const IGNORAR = "input, textarea, select, button, a, canvas, .tabela-mapa, .plan-cartao, [draggable='true'], .cot-tabela-wrap";
+        const IGNORAR = "input, textarea, select, button, a, canvas, .tabela-mapa, .plan-quadro, .plan-cartao, [draggable='true'], .cot-tabela-wrap";
         let x0 = null, y0 = 0, t0 = 0;
 
         area.addEventListener("touchstart", e => {
