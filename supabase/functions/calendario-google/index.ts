@@ -60,12 +60,19 @@ Deno.serve(async (req) => {
 
     // Aceita o link como o Google o mostra ou como se cola sem querer:
     // entre aspas, com webcal:// ou http:// em vez de https://
-    const links = (Deno.env.get("GOOGLE_CALENDAR_ICS") || "")
-        .split(/[\s,]+/)
-        .map(l => l.replace(/^["'<]+|["'>]+$/g, "").replace(/^(webcal|http):\/\//i, "https://"))
+    // e até sem o https:// à frente
+    const bruto = Deno.env.get("GOOGLE_CALENDAR_ICS") || "";
+    const links = bruto
+        .split(/[\s,;]+/)
+        .map(l => l.replace(/^["'<]+|["'>]+$/g, "")
+                   .replace(/^(webcal|http):\/\//i, "https://")
+                   .replace(/^(?!https:\/\/)(?=calendar\.google\.com\/)/i, "https://"))
         .filter(l => /^https:\/\//i.test(l));
     if (!links.length) {
-        console.log("GOOGLE_CALENDAR_ICS vazio ou sem link https://");
+        // Só a forma do valor, nunca o valor: chega para saber o que foi colado
+        console.log(`GOOGLE_CALENDAR_ICS sem link utilizável: ${bruto.length} caracteres, ` +
+            `começa por "${bruto.slice(0, 6).replace(/[^a-z:/"' ]/gi, "?")}", ` +
+            `google=${bruto.includes("calendar.google.com")}, ical=${bruto.includes("/ical/")}`);
         // Vai como falha para o quadro mostrar o aviso "⚠ calendário"
         return resposta({ configurado: false, reunioes: [],
             falhas: ["O link do Google Calendar não está guardado no servidor (segredo GOOGLE_CALENDAR_ICS)."] });
