@@ -1099,24 +1099,6 @@ label.cot-ed-chk input { width: auto !important; min-width: 0 !important; }
 
     /* Tabelas em cartões: ver telemovel.css */
 
-    /* ── Planeamento: um dia por bloco, uns por baixo dos outros ── */
-    .plan-grelha { min-width: 0 !important; table-layout: auto; }
-    table.tabela-cartoes.plan-grelha > tbody > tr { height: auto; padding: 0; border: none; background: none; box-shadow: none; }
-    table.tabela-cartoes.plan-grelha > tbody > tr > td.plan-celula {
-        display: block !important;
-        min-height: 0;
-        margin-bottom: 10px;
-        padding: 8px !important;
-        text-align: left !important;
-        border-bottom: none !important;
-    }
-    table.tabela-cartoes.plan-grelha > tbody > tr > td.plan-celula::before {
-        display: block;
-        margin-bottom: 6px;
-        font-size: 13px;
-        color: var(--text-dark);
-    }
-    .plan-grelha-wrap, .card:has(> .plan-grelha) { overflow-x: visible !important; }
 
     /* ── Janelas (modais): ecrã inteiro, scroll para baixo ── */
     .modal, #modalPainelObra, #modalEditarObra, #modalBibServico,
@@ -1282,3 +1264,38 @@ body.dark .dark-toggle:hover { background: rgba(255,255,255,.1); }
 body.dark .plan-cartao { background: #25363f; color: #ece5de; }
 body.dark .plan-cartao .plan-avatar-resp { color: #131c25; }
 body.dark ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); }
+
+/* =======================================================
+   Planeamento no telemóvel: como o Trello
+   Um dia por coluna, quase da largura do ecrã; o dedo passa
+   de dia para dia para o lado (é o único sítio com scroll
+   lateral) e a coluna encaixa no ecrã. Para mudar um cartão
+   de dia: segurar, arrastar até à beira e a coluna seguinte
+   aparece (planeamento.js › ligarToqueLongo).
+   ======================================================= */
+@media (max-width: 700px) {
+    .plan-quadro {
+        overflow-x: auto !important;
+        overflow-y: visible;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+        padding: 8px 4px !important;
+    }
+    .tab-content table.plan-grelha {
+        display: table;
+        width: calc(7 * 84vw);
+        max-width: none;
+        min-width: 0 !important;
+        table-layout: fixed;
+        white-space: normal;
+        overflow: visible;
+    }
+    .plan-grelha th, .plan-grelha td.plan-celula { scroll-snap-align: start; scroll-margin-left: 4px; }
+    .plan-grelha tbody tr { height: 60vh; }
+    .plan-grelha th { font-size: .95rem; }
+    .plan-cartao { font-size: .85rem; padding: 8px 9px 7px; }
+    .plan-cartao span { font-size: .78rem; }
+    /* Durante o arrastar a coluna não encaixa, para a página poder andar sozinha */
+    body.plan-toque-ativo .plan-quadro { scroll-snap-type: none; }
+}
