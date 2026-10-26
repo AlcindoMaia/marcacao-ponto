@@ -4,23 +4,19 @@
 // =======================================================
 function toggleDark() {
     const isDark = document.body.classList.toggle('dark');
-    localStorage.setItem('darkMode', isDark);
+    // O tema escuro é o de arranque; só fica guardado quando alguém escolhe o claro
+    localStorage.setItem('tema', isDark ? 'escuro' : 'claro');
     const btn = document.getElementById('darkBtn');
-    if (btn) btn.textContent = isDark ? '☀️' : '🌙';
+    if (btn) { btn.textContent = isDark ? '☀️' : '🌙'; btn.title = isDark ? 'Modo claro' : 'Modo escuro'; }
 }
 
 function iniciarDarkMode() {
-    const saved = localStorage.getItem('darkMode');
-    // Ignorar dark mode guardado — usar sempre o design claro por defeito
-    // (o utilizador pode activar manualmente)
-    if (saved === 'true') {
-        // Não activar automaticamente — reset para claro
-        localStorage.removeItem('darkMode');
-    }
-    document.body.classList.remove('dark');
+    const isDark = localStorage.getItem('tema') !== 'claro';
+    document.body.classList.toggle('dark', isDark);
     const btn = document.getElementById('darkBtn');
-    if (btn) btn.textContent = '🌙';
+    if (btn) { btn.textContent = isDark ? '☀️' : '🌙'; btn.title = isDark ? 'Modo claro' : 'Modo escuro'; }
 }
+iniciarDarkMode();
 
 // =======================================================
 // SUPABASE — vem de config.js (SB já está disponível)
@@ -3393,15 +3389,15 @@ function vgEtiqueta(id, orcamento, gasto, horasOrc, horasReais) {
 
     if (orc > 0) {
         const pc = (g / orc) * 100;
-        if (pc > 100) return et(`Acima ${(pc - 100).toFixed(0)}%`, "rgba(165,72,61,.12)", "#a4332a");
-        if (pc >= 90) return et(`Orçamento a ${pc.toFixed(0)}%`, "rgba(181,136,99,.22)", "#8a5e06");
+        if (pc > 100) return et(`Acima ${(pc - 100).toFixed(0)}%`, "rgba(165,72,61,.14)", "var(--etq-erro,#a4332a)");
+        if (pc >= 90) return et(`Orçamento a ${pc.toFixed(0)}%`, "rgba(181,136,99,.22)", "var(--etq-aviso,#8a5e06)");
     }
     if (ho > 0) {
         const pc = (hr / ho) * 100;
-        if (pc >= 80) return et(`Horas a ${pc.toFixed(0)}%`, "rgba(181,136,99,.22)", "#8a5e06");
+        if (pc >= 80) return et(`Horas a ${pc.toFixed(0)}%`, "rgba(181,136,99,.22)", "var(--etq-aviso,#8a5e06)");
     }
-    if (orc > 0) return et("No orçamento", "rgba(79,122,99,.12)", "#1f6b1f");
-    return et("Sem orçamento", "rgba(0,0,0,.06)", "var(--text-muted)");
+    if (orc > 0) return et("No orçamento", "rgba(79,122,99,.14)", "var(--etq-ok,#1f6b1f)");
+    return et("Sem orçamento", "rgba(128,128,128,.14)", "var(--text-muted)");
 }
 
 // ---------- Para onde ir ----------
@@ -6872,7 +6868,7 @@ async function carregarNotificacoes() {
                 onmouseenter="this.style.background='rgba(0,0,0,.04)'" onmouseleave="this.style.background=''"
                 onclick="abrirTab('fluxo')">
                 <div>
-                    <div style="font-size:13px;font-weight:500;color:#1a1a1a">${escHtml(desc)}</div>
+                    <div style="font-size:13px;font-weight:500;color:var(--text-dark)">${escHtml(desc)}</div>
                     <div style="font-size:11px;color:#e05c5c;margin-top:2px">${escHtml(m.data_documento)} · ${dias} dia(s) atraso</div>
                 </div>
                 <div style="font-size:13px;font-weight:700;color:#e05c5c;white-space:nowrap;margin-left:12px">–${Number(m.valor_total).toFixed(2)} €</div>
@@ -6886,7 +6882,7 @@ async function carregarNotificacoes() {
         stockAlertas.forEach(a => {
             html += `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;cursor:pointer"
                 onclick="abrirTab('inventario')">
-                <div style="font-size:13px;font-weight:500;color:#1a1a1a">${escHtml(a.descricao)}</div>
+                <div style="font-size:13px;font-weight:500;color:var(--text-dark)">${escHtml(a.descricao)}</div>
                 <div style="font-size:11px;color:#f97316;white-space:nowrap;margin-left:12px">Abaixo do mínimo (${a.stock_minimo})</div>
             </div>`;
         });
@@ -6903,7 +6899,7 @@ async function carregarNotificacoes() {
         html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:700;letter-spacing:.05em;opacity:.5;text-transform:uppercase">
             👷 ${semRegisto.length} Colaborador(es) Sem Registo Hoje</div>`;
         semRegisto.forEach(f => {
-            html += `<div style="padding:8px 16px;border-bottom:1px solid rgba(0,0,0,.06);font-size:13px;color:#1a1a1a;opacity:.7">${f.nome}</div>`;
+            html += `<div style="padding:8px 16px;border-bottom:1px solid rgba(0,0,0,.06);font-size:13px;color:var(--text-dark);opacity:.7">${f.nome}</div>`;
         });
         badge.style.display = "flex";
         badge.textContent = Math.min(parseInt(badge.textContent||0) + semRegisto.length, 99);
