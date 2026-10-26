@@ -5,13 +5,14 @@
 function toggleDark() {
     const isDark = document.body.classList.toggle('dark');
     // O tema escuro é o de arranque; só fica guardado quando alguém escolhe o claro
-    localStorage.setItem('tema', isDark ? 'escuro' : 'claro');
+    try { localStorage.setItem('tema', isDark ? 'escuro' : 'claro'); } catch (e) {}
     const btn = document.getElementById('darkBtn');
     if (btn) { btn.textContent = isDark ? '☀️' : '🌙'; btn.title = isDark ? 'Modo claro' : 'Modo escuro'; }
 }
 
 function iniciarDarkMode() {
-    const isDark = localStorage.getItem('tema') !== 'claro';
+    let isDark = true;
+    try { isDark = localStorage.getItem('tema') !== 'claro'; } catch (e) {}
     document.body.classList.toggle('dark', isDark);
     const btn = document.getElementById('darkBtn');
     if (btn) { btn.textContent = isDark ? '☀️' : '🌙'; btn.title = isDark ? 'Modo claro' : 'Modo escuro'; }
@@ -6899,7 +6900,7 @@ async function carregarNotificacoes() {
         html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:700;letter-spacing:.05em;opacity:.5;text-transform:uppercase">
             👷 ${semRegisto.length} Colaborador(es) Sem Registo Hoje</div>`;
         semRegisto.forEach(f => {
-            html += `<div style="padding:8px 16px;border-bottom:1px solid rgba(0,0,0,.06);font-size:13px;color:var(--text-dark);opacity:.7">${f.nome}</div>`;
+            html += `<div style="padding:8px 16px;border-bottom:1px solid rgba(0,0,0,.06);font-size:13px;color:var(--text-dark);opacity:.7">${escHtml(f.nome)}</div>`;
         });
         badge.style.display = "flex";
         badge.textContent = Math.min(parseInt(badge.textContent||0) + semRegisto.length, 99);
