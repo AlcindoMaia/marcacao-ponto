@@ -1072,26 +1072,9 @@ label.cot-ed-chk input { width: auto !important; min-width: 0 !important; }
 */
 @media (max-width: 600px) {
 
-    /* ── Cabeçalho: logo + título em cima, botões numa
-          grelha de 2 colunas por baixo ── */
-    .header { padding: 8px 12px; column-gap: 8px; }
-    .header h1 {
-        flex: 1 1 120px; min-width: 0;
-        font-size: 14px; letter-spacing: .5px;
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .header .logo { height: 32px; }
-    .header > a.btn-secondary,
-    .header > button.btn-secondary {
-        flex: 1 1 40%;
-        justify-content: center;
-        text-align: center;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        padding: 7px 6px !important;
-    }
-    #notifPainel { position: fixed !important; top: 64px !important; left: 8px !important; right: 8px !important; width: auto !important; }
+    /* ── Cabeçalho: os botões passaram para o menu lateral
+          (telemovel.css); aqui só o essencial ── */
+    #notifPainel { position: fixed !important; top: 58px !important; left: 8px !important; right: 8px !important; width: auto !important; }
 
     /* ── Separadores e sub-separadores: várias linhas,
           nunca scroll lateral ── */
@@ -1185,4 +1168,18 @@ label.cot-ed-chk input { width: auto !important; min-width: 0 !important; }
    de fechar. Com uma janela aberta, o #adminArea sobe acima do cabeçalho. */
 #adminArea:has(.modal:not(.hidden), [id^="modal"][style*="display: flex"], [id^="modal"][style*="display:flex"]) {
     z-index: 1000;
+}
+
+/* Telemóvel: menos espaço em branco à volta das coisas */
+@media (max-width: 600px) {
+    .container { padding: 0 10px 24px; }
+    .tabs-wrapper { padding-top: 8px !important; }
+    .card { padding: 10px 12px; }
+    .grid-cards { grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+    .card.metric { padding: 8px 10px; }
+    .card.metric h3 { font-size: 9.5px; letter-spacing: .5px; }
+    .card.metric .value { font-size: 18px; overflow-wrap: anywhere; }
+    /* A caixa que embrulha uma tabela de cartões não precisa de margem própria */
+    .card:has(table.tabela-cartoes) { padding: 6px; }
+    table.tabela-cartoes { margin: 0; }
 }
