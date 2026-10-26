@@ -97,8 +97,12 @@ function iniciarSessao() {
   };
 
   // Header da sessão
-  document.getElementById("sessRota").innerHTML =
-    `<span>${sessao.origem.nome}</span> → <span>${sessao.destino.nome}</span>`;
+  // Nomes vêm da base de dados: montados como texto, não como HTML
+  const rota = document.getElementById("sessRota");
+  rota.replaceChildren(
+    Object.assign(document.createElement("span"), { textContent: sessao.origem.nome }),
+    " → ",
+    Object.assign(document.createElement("span"), { textContent: sessao.destino.nome }));
 
   mostrarEcrã("ecrãSessao");
   iniciarQR();
