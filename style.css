@@ -1267,7 +1267,7 @@ body.dark ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); }
 
 /* =======================================================
    Planeamento no telemóvel: como o Trello
-   Um dia por coluna, quase da largura do ecrã; o dedo passa
+   Um dia por coluna, meio ecrã de largura; o dedo passa
    de dia para dia para o lado (é o único sítio com scroll
    lateral) e a coluna encaixa no ecrã. Para mudar um cartão
    de dia: segurar, arrastar até à beira e a coluna seguinte
@@ -1284,7 +1284,7 @@ body.dark ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); }
     }
     .tab-content table.plan-grelha {
         display: table;
-        width: calc(7 * 84vw);
+        width: calc(7 * 50vw);
         max-width: none;
         min-width: 0 !important;
         table-layout: fixed;
