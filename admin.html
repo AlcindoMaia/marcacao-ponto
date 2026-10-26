@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com https://cdn.datatables.net; style-src 'self' 'unsafe-inline' https://cdn.datatables.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https://npyosbigynxmxdakcymg.supabase.co wss://npyosbigynxmxdakcymg.supabase.co; object-src 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com https://cdn.datatables.net; style-src 'self' 'unsafe-inline' https://cdn.datatables.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https://npyosbigynxmxdakcymg.supabase.co wss://npyosbigynxmxdakcymg.supabase.co; object-src 'none'; base-uri 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <title>Painel Administrativo — Maia Solutions</title>
@@ -350,6 +350,14 @@
                             <option value="">— Todos —</option>
                             <option value="entrada">Entrada</option>
                             <option value="saida">Saída</option>
+                        </select>
+                    </div>
+                    <div class="col">
+                        <label>Estado</label>
+                        <select id="filtroEstadoPag">
+                            <option value="">— Todos —</option>
+                            <option value="por_pagar">Por pagar</option>
+                            <option value="pago">Pago</option>
                         </select>
                     </div>
                     <div class="col">
@@ -1502,26 +1510,26 @@
             </div>
 
             <!-- Separadores -->
-            <div style="display:flex;gap:0;margin-top:16px;overflow-x:auto">
+            <div class="painel-tabs" style="display:flex;gap:0;margin-top:16px;overflow-x:auto">
                 <button class="painel-tab active" data-tab="resumo" onclick="abrirPainelTab('resumo')"
                     style="background:none;border:none;border-bottom:2px solid var(--primary);color:var(--primary);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title,sans-serif);letter-spacing:.5px;white-space:nowrap">
-                    📊 RESUMO
+                    <span class="pt-ic">📊</span><span class="pt-txt">Resumo</span>
                 </button>
                 <button class="painel-tab" data-tab="financeiro" onclick="abrirPainelTab('financeiro')"
                     style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title,sans-serif);letter-spacing:.5px;white-space:nowrap">
-                    💰 FINANCEIRO
+                    <span class="pt-ic">💰</span><span class="pt-txt">Financeiro</span>
                 </button>
                 <button class="painel-tab" data-tab="ponto" onclick="abrirPainelTab('ponto')"
                     style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title,sans-serif);letter-spacing:.5px;white-space:nowrap">
-                    🕐 PONTO
+                    <span class="pt-ic">🕐</span><span class="pt-txt">Ponto</span>
                 </button>
                 <button class="painel-tab" data-tab="stock" onclick="abrirPainelTab('stock')"
                     style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title,sans-serif);letter-spacing:.5px;white-space:nowrap">
-                    📦 STOCK
+                    <span class="pt-ic">📦</span><span class="pt-txt">Stock</span>
                 </button>
                 <button class="painel-tab" data-tab="documentos" onclick="abrirPainelTab('documentos')"
                     style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title,sans-serif);letter-spacing:.5px;white-space:nowrap">
-                    📁 DOCUMENTOS
+                    <span class="pt-ic">📁</span><span class="pt-txt">Documentos</span>
                 </button>
             </div>
         </div>
@@ -1773,6 +1781,7 @@
 <script src="config.js"></script>
 <script src="leitor-qr.js"></script>
 <script src="dados-publicos.js"></script>
+<script src="fotos.js"></script>
 <script src="planeamento.js?v=2"></script>
 <script src="cotacoes.js"></script>
 <script src="admin.js?v=6"></script>

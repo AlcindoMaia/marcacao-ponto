@@ -17,14 +17,17 @@
 -->
 <style>
     :root {
-        --bg: #121212; --card: #1e1e1e; --linha: rgba(255,255,255,.08);
-        --texto: #f2f2f2; --suave: rgba(255,255,255,.55); --primary: #f4b942;
-        --ok: #4ade80; --aviso: #fb923c;
+        /* Paleta da plataforma: azul-noite e caramelo */
+        --bg: #131c25; --topo: #0e151d; --card: #1d2a37; --linha: rgba(255,255,255,.07);
+        --texto: #ece5de; --suave: #a79e9c; --primary: #d0a47f; --caramelo: #b58863;
+        --ok: #8fbfa0; --aviso: #e0b07a;
     }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--texto); font: 15px/1.5 Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    html { background: var(--bg); color-scheme: dark; }
     a { color: var(--primary); }
-    .topo { display: flex; align-items: center; gap: 12px; padding: 18px 16px; border-bottom: 1px solid var(--linha); max-width: 860px; margin: 0 auto; }
+    header { background: var(--topo); border-bottom: 1px solid var(--linha); }
+    .topo { display: flex; align-items: center; gap: 12px; padding: 14px 16px; max-width: 860px; margin: 0 auto; }
     .topo img { height: 40px; }
     .topo .marca { font-family: Oswald, sans-serif; letter-spacing: 1px; text-transform: uppercase; font-size: 13px; color: var(--primary); }
     main { max-width: 860px; margin: 0 auto; padding: 20px 16px 48px; }
@@ -36,10 +39,10 @@
     .obra-nome { font-family: Oswald, sans-serif; font-size: 21px; font-weight: 500; }
     .obra-local { color: var(--suave); font-size: 13px; }
     .selo { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
-    .selo.curso { background: rgba(244,185,66,.14); color: var(--primary); }
-    .selo.feita { background: rgba(74,222,128,.14); color: var(--ok); }
+    .selo.curso { background: rgba(181,136,99,.2); color: var(--primary); }
+    .selo.feita { background: rgba(143,191,160,.16); color: var(--ok); }
     .barra { height: 8px; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; margin: 14px 0 6px; }
-    .barra > div { height: 100%; background: var(--primary); border-radius: 99px; }
+    .barra > div { height: 100%; background: var(--caramelo); border-radius: 99px; }
     .meta { display: flex; justify-content: space-between; font-size: 13px; color: var(--suave); flex-wrap: wrap; gap: 6px; }
     .doc { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--linha); text-decoration: none; color: inherit; }
     .doc:first-child { border-top: none; }
@@ -51,8 +54,13 @@
     .estado { font-size: 12px; font-weight: 600; }
     .estado.ok { color: var(--ok); } .estado.pend { color: var(--aviso); }
     .fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
-    .fotos a { display: block; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: #2a2a2a; }
+    .fotos a { display: block; position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: #25363f; text-decoration: none; }
     .fotos img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    /* Foto que o telemóvel não consegue mostrar (ex.: HEIC no Android) */
+    .fotos .sem-pre { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; text-align: center; color: var(--suave); font-size: 12px; }
+    .fotos .sem-pre b { font-size: 26px; font-weight: 400; }
+    .fotos a.falhou img { display: none; }
+    .fotos a.falhou .sem-pre { display: flex; }
     .vazio { color: var(--suave); font-size: 14px; padding: 6px 0; }
     .centro { text-align: center; padding: 60px 16px; color: var(--suave); }
     .rodape { text-align: center; color: var(--suave); font-size: 12px; margin-top: 30px; }
@@ -104,8 +112,9 @@ function htmlObra(o, docs) {
             : linhaDoc(d, "💶", [euros(d.total),
                 d.paga == null ? "" : d.paga ? `<span class="estado ok">Paga</span>` : `<span class="estado pend">Por pagar</span>`]
                 .filter(Boolean).join(" · ")));
-    const fotos = de("foto").map(d => `<a href="${esc(urlSegura(d.url))}" target="_blank" rel="noopener noreferrer">
-        <img src="${esc(urlSegura(d.url))}" alt="${esc(d.nome)}" loading="lazy"></a>`);
+    const fotos = de("foto").map(d => `<a href="${esc(urlSegura(d.url))}" target="_blank" rel="noopener noreferrer" title="${esc(d.nome)}">
+        <img src="${esc(urlSegura(d.url))}" alt="Fotografia da obra" loading="lazy" onerror="this.parentNode.classList.add('falhou')">
+        <span class="sem-pre"><b>📷</b>Abrir fotografia</span></a>`);
     const outros = de("outro").map(d => linhaDoc(d, "📄"));
 
     return `<section class="obra">
