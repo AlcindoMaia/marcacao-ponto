@@ -18,7 +18,13 @@ let _dataActual = hoje();
 // UTILS
 // =======================================================
 function hoje() {
-    return new Date().toISOString().split("T")[0];
+    return isoLocal(new Date());
+}
+
+// Data AAAA-MM-DD na hora de Portugal. toISOString() usa UTC e, entre a
+// meia-noite e a 1h no verão, ainda dava o dia anterior.
+function isoLocal(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function fmtDataLabel(iso) {
@@ -120,7 +126,7 @@ function navegarDia(delta) {
     const dataEl = document.getElementById("dataRegisto");
     const d = new Date(_dataActual + "T12:00:00");
     d.setDate(d.getDate() + delta);
-    _dataActual = d.toISOString().split("T")[0];
+    _dataActual = isoLocal(d);
     dataEl.value = _dataActual;
     document.getElementById("heroData").textContent = fmtDataLabel(_dataActual);
     carregarParaData();
@@ -169,15 +175,15 @@ function renderFuncionarios(existentes) {
         const isTemp = f.tipo_contrato === 'temporario';
         card.innerHTML = `
             <div class="func-card-header">
-                <div class="func-avatar ${isFalta ? 'avatar-falta' : isTemp ? 'avatar-temp' : ''}">${f.nome.charAt(0).toUpperCase()}</div>
+                <div class="func-avatar ${isFalta ? 'avatar-falta' : isTemp ? 'avatar-temp' : ''}">${escRA(f.nome.charAt(0).toUpperCase())}</div>
                 <div class="func-info">
                     <div class="func-nome">
-                        ${f.nome}
-                        ${isTemp ? '<span style="font-size:9px;font-weight:700;background:rgba(244,185,66,.2);color:var(--primary,#c8901e);padding:1px 6px;border-radius:8px;margin-left:5px;vertical-align:middle">TEMP</span>' : ''}
+                        ${escRA(f.nome)}
+                        ${isTemp ? '<span class="etq-temp">TEMP</span>' : ''}
                     </div>
                     <div class="func-resumo ${isFalta ? 'resumo-falta' : ''}">${isFalta ? '✕ Falta' : resumo}</div>
                 </div>
-                <div style="display:flex;align-items:center;gap:8px">
+                <div class="func-lado">
                     <button class="btn-falta ${isFalta ? 'btn-falta-activo' : ''}"
                         onclick="toggleFalta(event,'${f.id}')"
                         title="${isFalta ? 'Remover falta' : 'Marcar falta'}">
@@ -246,16 +252,16 @@ function reconstruirCartaoTemp(nome, regs, syntheticId) {
     const totalH = regs.reduce((s, r) => s + Number(r.horas || 0), 0);
     card.innerHTML = `
         <div class="func-card-header">
-            <div class="func-avatar avatar-temp">${nome.charAt(0).toUpperCase()}</div>
+            <div class="func-avatar avatar-temp">${escRA(nome.charAt(0).toUpperCase())}</div>
             <div class="func-info">
                 <div class="func-nome">
-                    ${nome}
-                    <span style="font-size:9px;font-weight:700;background:rgba(244,185,66,.2);color:#c8901e;padding:1px 6px;border-radius:8px;margin-left:5px">TEMP</span>
+                    ${escRA(nome)}
+                    <span class="etq-temp">TEMP</span>
                 </div>
                 <div class="func-resumo">${totalH.toFixed(1)}h · ${regs.length} obra(s)</div>
             </div>
-            <div style="display:flex;align-items:center;gap:8px">
-                <button onclick="this.closest('.func-card').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;opacity:.4;line-height:1">×</button>
+            <div class="func-lado">
+                <button class="btn-x" onclick="this.closest('.func-card').remove()" title="Tirar da lista">×</button>
                 <div class="func-toggle">▼</div>
             </div>
         </div>
@@ -308,13 +314,19 @@ function preencherListaTemps() {
         lista.innerHTML = '<div style="padding:8px 0;opacity:.5;font-size:13px">Sem temporários registados</div>';
     } else {
         lista.innerHTML = temps.map(f => `
-            <div class="temp-opcao" data-temp-id="${escRA(f.id)}" data-temp-nome="${escRA(f.nome)}" data-temp-valor="${Number(f.valor_dia)||0}"
-                style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .15s"
-                onmouseover="this.style.background='rgba(244,185,66,.08)'" onmouseout="this.style.background=''">
-                <div style="width:32px;height:32px;border-radius:50%;background:rgba(244,185,66,.2);color:#c8901e;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${escRA(f.nome.charAt(0).toUpperCase())}</div>
+            <div class="temp-opcao" data-temp-id="${escRA(f.id)}" data-temp-nome="${escRA(f.nome)}" data-temp-valor="${Number(f.valor_dia)||0}">
+                <div class="func-avatar avatar-temp" style="width:32px;height:32px;font-size:13px">${escRA(f.nome.charAt(0).toUpperCase())}</div>
                 <span style="font-size:13px;font-weight:500">${escRA(f.nome)}</span>
                 <span style="margin-left:auto;font-size:11px;opacity:.5">${f.valor_dia ? f.valor_dia+'€/dia' : ''}</span>
             </div>`).join('');
+        // Os dados vêm do dataset, não interpolados dentro do onclick.
+        // (Este bloco estava perdido dentro de adicionarLinha(), onde a
+        //  variável "lista" não existe: rebentava logo no primeiro
+        //  colaborador e a lista ficava só com um cartão, sem linhas.)
+        lista.querySelectorAll(".temp-opcao").forEach(d => {
+            d.addEventListener("click", () => adicionarTempExistente(
+                d.dataset.tempId, d.dataset.tempNome, Number(d.dataset.tempValor) || 0));
+        });
     }
 }
 
@@ -335,17 +347,17 @@ function adicionarTempExistente(funcId, nome, valorDia) {
     card.dataset.tempNome = nome;
     card.innerHTML = `
         <div class="func-card-header">
-            <div class="func-avatar avatar-temp">${nome.charAt(0).toUpperCase()}</div>
+            <div class="func-avatar avatar-temp">${escRA(nome.charAt(0).toUpperCase())}</div>
             <div class="func-info">
                 <div class="func-nome">
-                    ${nome}
-                    <span style="font-size:9px;font-weight:700;background:rgba(244,185,66,.2);color:#c8901e;padding:1px 6px;border-radius:8px;margin-left:5px">TEMP</span>
+                    ${escRA(nome)}
+                    <span class="etq-temp">TEMP</span>
                 </div>
                 <div class="func-resumo">Sem registo</div>
             </div>
-            <div style="display:flex;align-items:center;gap:8px">
-                <button class="btn-falta" onclick="toggleFalta(event,'${funcId}')" title="Marcar falta">✕ Falta</button>
-                <button onclick="this.closest('.func-card').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;opacity:.4;line-height:1">×</button>
+            <div class="func-lado">
+                <button class="btn-falta" onclick="toggleFalta(event,'${escRA(funcId)}')" title="Marcar falta">✕ Falta</button>
+                <button class="btn-x" onclick="this.closest('.func-card').remove()" title="Tirar da lista">×</button>
                 <div class="func-toggle">▼</div>
             </div>
         </div>
@@ -361,6 +373,7 @@ function adicionarTempExistente(funcId, nome, valorDia) {
         if (e.target.closest('button')) return;
         card.classList.toggle('aberto');
     });
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function adicionarNovoTemp() {
@@ -376,19 +389,19 @@ function adicionarNovoTemp() {
     card.dataset.temp = '1';
     card.dataset.falta = '0';
     card.innerHTML = `
-        <div class="func-card-header" style="background:rgba(244,185,66,.06);border:1px dashed rgba(244,185,66,.3)">
+        <div class="func-card-header">
             <div class="func-avatar avatar-temp">T</div>
-            <div class="func-info" style="flex:1">
-                <input class="input-temp-nome" placeholder="Nome do trabalhador"
-                    style="background:transparent;border:none;border-bottom:1px solid rgba(0,0,0,.15);font-size:13px;font-weight:600;width:100%;padding:2px 0;outline:none;color:inherit">
-                <div class="func-resumo" style="font-size:11px;opacity:.5;margin-top:2px">Temporário esporádico</div>
+            <div class="func-info">
+                <input class="input-temp-nome" placeholder="Nome do trabalhador">
+                <div class="func-resumo">Temporário esporádico</div>
             </div>
-            <button onclick="this.closest('.func-card').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;opacity:.4">×</button>
+            <button class="btn-x" onclick="this.closest('.func-card').remove()" title="Tirar da lista">×</button>
         </div>
         <div class="func-linhas" id="linhas-${tempId}"></div>
     `;
     lista.appendChild(card);
     adicionarLinha(document.getElementById(`linhas-${tempId}`), tempId);
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setTimeout(() => card.querySelector('.input-temp-nome')?.focus(), 50);
 }
 
@@ -460,13 +473,7 @@ function adicionarLinha(container, funcId, registo = null, btnAdd = null) {
     // Select de obras
     const selectObra = document.createElement("select");
     selectObra.innerHTML = `<option value="">— Obra —</option>` +
-        _obras.map(o => `<option value="${o.id}" ${registo?.obra_id === o.id ? "selected" : ""}>${o.nome}</option>`).join("");
-
-        // Os dados vêm do dataset, não interpolados dentro do onclick.
-        lista.querySelectorAll(".temp-opcao").forEach(d => {
-            d.addEventListener("click", () => adicionarTempExistente(
-                d.dataset.tempId, d.dataset.tempNome, Number(d.dataset.tempValor) || 0));
-        });
+        _obras.map(o => `<option value="${escRA(o.id)}" ${registo?.obra_id === o.id ? "selected" : ""}>${escRA(o.nome)}</option>`).join("");
 
     // Input de horas
     const inputHoras = document.createElement("input");
@@ -577,7 +584,7 @@ async function guardarTudo() {
 async function mostrarComparacao() {
     mostrarEcrã("ecrãComparacao");
     const lista = document.getElementById("compLista");
-    lista.innerHTML = `<div style="padding:32px;text-align:center;opacity:.4;font-size:13px">A carregar…</div>`;
+    lista.innerHTML = `<div class="comp-vazio">A carregar…</div>`;
 
     const data = _dataActual;
 
@@ -595,11 +602,11 @@ async function mostrarComparacao() {
     const ponto = pontoRes.data || [];
 
     if (admin.length === 0) {
-        lista.innerHTML = `<div style="padding:32px;text-align:center;opacity:.4;font-size:13px;font-family:var(--fh);letter-spacing:1px">SEM REGISTO ADMIN PARA ESTA DATA</div>`;
+        lista.innerHTML = `<div class="comp-vazio">SEM REGISTO ADMIN PARA ESTA DATA</div>`;
         return;
     }
 
-    let html = `<div style="font-family:var(--fh);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;opacity:.4;margin-bottom:8px">${fmtDataLabel(data)}</div>`;
+    let html = `<div style="font-family:var(--fh);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:4px 0">${fmtDataLabel(data)}</div>`;
 
     let nOk = 0, nAvisos = 0, nErros = 0;
 
@@ -667,27 +674,18 @@ async function mostrarComparacao() {
 
         html += `
             <div class="comp-item ${divergencia}">
-                <div class="comp-nome">${nomeFunc}</div>
-                <div class="comp-detalhe">${detalhes}</div>
+                <div class="comp-nome">${escRA(nomeFunc)}</div>
+                <div class="comp-detalhe">${escRA(detalhes)}</div>
                 <span class="comp-badge ${badgeClass}">${badgeLabel}</span>
             </div>`;
     });
 
     // Resumo no topo
     const resumo = `
-        <div style="display:flex;gap:8px;margin-bottom:12px">
-            <div style="flex:1;background:rgba(76,175,125,.1);border-radius:8px;padding:10px 12px;text-align:center">
-                <div style="font-family:var(--fh);font-size:22px;font-weight:600;color:var(--green)">${nOk}</div>
-                <div style="font-size:10px;opacity:.5;font-family:var(--fh);letter-spacing:1px;text-transform:uppercase;margin-top:2px">OK</div>
-            </div>
-            <div style="flex:1;background:rgba(244,185,66,.1);border-radius:8px;padding:10px 12px;text-align:center">
-                <div style="font-family:var(--fh);font-size:22px;font-weight:600;color:var(--orange)">${nAvisos}</div>
-                <div style="font-size:10px;opacity:.5;font-family:var(--fh);letter-spacing:1px;text-transform:uppercase;margin-top:2px">Avisos</div>
-            </div>
-            <div style="flex:1;background:rgba(224,92,92,.1);border-radius:8px;padding:10px 12px;text-align:center">
-                <div style="font-family:var(--fh);font-size:22px;font-weight:600;color:var(--red)">${nErros}</div>
-                <div style="font-size:10px;opacity:.5;font-family:var(--fh);letter-spacing:1px;text-transform:uppercase;margin-top:2px">Erros</div>
-            </div>
+        <div class="comp-resumo">
+            <div><b style="color:var(--green)">${nOk}</b><span>OK</span></div>
+            <div><b style="color:var(--orange)">${nAvisos}</b><span>Avisos</span></div>
+            <div><b style="color:var(--red)">${nErros}</b><span>Erros</span></div>
         </div>`;
 
     lista.innerHTML = resumo + html;
@@ -759,21 +757,19 @@ document.addEventListener("DOMContentLoaded", init);
 // TEMA CLARO / ESCURO
 // =======================================================
 function toggleTemaRegisto() {
-    const body = document.body;
-    const isClaro = body.classList.toggle('tema-claro');
-    const btn = document.getElementById('btnTemaRegisto');
-    if (btn) btn.textContent = isClaro ? '☀️' : '🌙';
-    localStorage.setItem('maia_registo_tema', isClaro ? 'claro' : 'escuro');
+    const isClaro = document.body.classList.toggle('tema-claro');
+    try { localStorage.setItem('tema', isClaro ? 'claro' : 'escuro'); } catch (e) {}
+    atualizarBotaoTema();
 }
 
-// Aplicar tema guardado
-(function() {
-    if (localStorage.getItem('maia_registo_tema') === 'claro') {
-        document.body.classList.add('tema-claro');
-        const btn = document.getElementById('btnTemaRegisto');
-        if (btn) btn.textContent = '☀️';
-    }
-})();
+function atualizarBotaoTema() {
+    const isClaro = document.body.classList.contains('tema-claro');
+    const btn = document.getElementById('btnTemaRegisto');
+    if (btn) { btn.textContent = isClaro ? '🌙' : '☀️'; btn.title = isClaro ? 'Modo escuro' : 'Modo claro'; }
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = isClaro ? '#1c2b3a' : '#0e151d';
+}
+atualizarBotaoTema();
 
 // Fechar painel de temporários ao clicar fora
 document.addEventListener('click', e => {

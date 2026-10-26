@@ -5,33 +5,55 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com https://cdn.datatables.net; style-src 'self' 'unsafe-inline' https://cdn.datatables.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https://npyosbigynxmxdakcymg.supabase.co wss://npyosbigynxmxdakcymg.supabase.co; object-src 'none'; base-uri 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#111">
+<meta name="theme-color" content="#0e151d">
 <title>Maia — Registo Diário</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 
 <style>
+/* Paleta “Azul-noite e caramelo”, a mesma do painel. O escuro é o tema
+   de arranque; o claro fica guardado na mesma chave do painel ('tema'). */
 :root {
-  --gold:     #f4b942;
-  --gold-dk:  #d29d36;
-  --bg:       #111;
-  --bg2:      #1a1a1a;
-  --bg3:      #222;
+  --header:   #0e151d;
+  --bg:       #131c25;
+  --bg2:      #1d2a37;
+  --bg3:      #18232e;
   --border:   rgba(255,255,255,.08);
-  --text:     #f0f0f0;
-  --muted:    rgba(255,255,255,.4);
-  --green:    #4caf7d;
-  --red:      #e05c5c;
-  --orange:   #f4a942;
+  --text:     #ece5de;
+  --muted:    #a79e9c;
+  --gold:     #b58863;
+  --gold-dk:  #9a7150;
+  --gold-txt: #d0a47f;
+  --gold-lt:  rgba(181,136,99,.16);
+  --green:    #8fbfa0;
+  --red:      #e09486;
+  --orange:   #e0b07a;
   --radius:   14px;
   --radsm:    10px;
   --fh:       'Oswald', sans-serif;
   --fb:       'Inter', sans-serif;
   --safe-b:   env(safe-area-inset-bottom, 0px);
+  color-scheme: dark;
+}
+body.tema-claro {
+  --header:   #1c2b3a;
+  --bg:       #efeae5;
+  --bg2:      #ffffff;
+  --bg3:      #f7f3ef;
+  --border:   rgba(28,43,58,.12);
+  --text:     #1c2b3a;
+  --muted:    #5f6b72;
+  --gold-txt: #9a7150;
+  --gold-lt:  rgba(181,136,99,.14);
+  --green:    #4f7a63;
+  --red:      #a5483d;
+  --orange:   #c08a52;
+  color-scheme: light;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { height: 100%; }
+html { height: 100%; background: #131c25; }
+html:has(> body.tema-claro) { background: #efeae5; }
 body {
   min-height: 100dvh;
   background: var(--bg);
@@ -40,6 +62,7 @@ body {
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
 }
+button { font: inherit; color: inherit; }
 
 /* ── Loading ── */
 #ecrãLoading {
@@ -54,35 +77,6 @@ body {
 .loading-txt  { font-family: var(--fh); font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--muted); }
 @keyframes pulse { 0%,100%{opacity:.3} 50%{opacity:.8} }
 
-/* ── Bloqueio ── */
-#ecrãBloqueio {
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 28px;
-  text-align: center;
-  gap: 14px;
-}
-.bloqueio-icon   { font-size: 52px; margin-bottom: 4px; }
-.bloqueio-titulo { font-family: var(--fh); font-size: 20px; font-weight: 500; letter-spacing: .8px; }
-.bloqueio-msg    { font-size: 14px; color: var(--muted); line-height: 1.7; max-width: 280px; }
-.btn-login {
-  margin-top: 12px;
-  padding: 12px 28px;
-  border-radius: var(--radsm);
-  border: none;
-  background: var(--gold);
-  color: #1a1000;
-  font-family: var(--fh);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
 /* ── Ecrã principal ── */
 #ecrãPrincipal {
   min-height: 100dvh;
@@ -90,502 +84,311 @@ body {
   flex-direction: column;
   padding-bottom: calc(20px + var(--safe-b));
 }
+.conteudo { width: 100%; max-width: 760px; margin: 0 auto; padding: 0 16px; }
 
-/* Header */
+/* Cabeçalho azul-noite, como o do painel */
 .header {
-  padding: 20px 20px 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  background: var(--header);
+  color: #fff;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  position: sticky; top: 0; z-index: 50;
 }
-.logo { height: 40px; }
-.header-right {
+.header .conteudo {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding-top: 10px; padding-bottom: 10px;
 }
-.btn-comparar {
-  padding: 6px 14px;
-  border-radius: 20px;
-  border: 1px solid rgba(255,255,255,.15);
-  background: transparent;
-  color: var(--text);
-  font-family: var(--fh);
-  font-size: 11px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  cursor: pointer;
+.logo { height: 34px; border-radius: 4px; }
+.header-titulo {
+  font-family: var(--fh); font-size: 15px; font-weight: 400;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 .btn-nav {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.06);
-  color: var(--text);
-  font-size: 16px;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 36px; height: 36px; padding: 0 10px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.08);
+  color: #fff;
+  font-size: 15px;
   text-decoration: none;
   cursor: pointer;
   transition: background .15s;
 }
-.btn-nav:hover { background: rgba(255,255,255,.12); }
-
+.btn-nav:hover { background: rgba(255,255,255,.16); }
 .btn-sair {
-  padding: 6px 14px;
-  border-radius: 20px;
+  height: 36px; padding: 0 14px;
+  border-radius: 18px;
   border: none;
-  background: rgba(255,255,255,.08);
-  color: var(--muted);
-  font-family: var(--fh);
-  font-size: 11px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+  background: transparent;
+  color: rgba(255,255,255,.65);
+  font-family: var(--fh); font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
   cursor: pointer;
 }
+.btn-sair:hover { color: #fff; }
 
-/* Hero */
-.hero {
-  padding: 20px 20px 0;
-}
+/* Título do dia */
+.hero { padding-top: 18px; }
 .hero-data {
-  font-family: var(--fh);
-  font-size: 12px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--gold);
-  margin-bottom: 4px;
+  font-family: var(--fh); font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--gold-txt); margin-bottom: 2px;
 }
-.hero-titulo {
-  font-family: var(--fh);
-  font-size: 22px;
-  font-weight: 500;
-  letter-spacing: .5px;
-  line-height: 1.2;
-}
-.hero-sub {
-  font-size: 13px;
-  color: var(--muted);
-  margin-top: 4px;
-}
+.hero-titulo { font-family: var(--fh); font-size: 22px; font-weight: 500; letter-spacing: .5px; line-height: 1.2; }
+.hero-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
 
-/* Filtro de data */
-.filtro-data {
-  margin: 16px 20px 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.filtro-data input[type="date"] {
-  flex: 1;
-  padding: 10px 14px;
+/* Barra de ferramentas: dia e ações */
+.barra { padding-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.dia-nav { display: flex; align-items: center; gap: 6px; flex: 1 1 260px; min-width: 0; }
+.dia-nav input[type="date"] {
+  flex: 1; min-width: 0;
+  height: 42px; padding: 0 12px;
   border-radius: var(--radsm);
   border: 1px solid var(--border);
   background: var(--bg2);
   color: var(--text);
-  font-family: var(--fh);
-  font-size: 14px;
-  letter-spacing: .5px;
+  font-family: var(--fh); font-size: 15px; letter-spacing: .5px; text-align: center;
 }
-.btn-carregar {
-  padding: 10px 18px;
+.btn-dia {
+  width: 42px; height: 42px; flex-shrink: 0;
   border-radius: var(--radsm);
-  border: none;
-  background: var(--gold);
-  color: #1a1000;
-  font-family: var(--fh);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  color: var(--text);
+  font-size: 20px; line-height: 1;
   cursor: pointer;
-  flex-shrink: 0;
+}
+.btn-dia:hover { border-color: var(--gold); color: var(--gold-txt); }
+.acoes { display: flex; gap: 8px; flex: 0 0 auto; }
+.btn-acao {
+  height: 42px; padding: 0 14px;
+  border-radius: var(--radsm);
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  color: var(--text);
+  font-family: var(--fh); font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.btn-acao:hover { border-color: var(--gold); }
+.btn-acao.destaque { border-color: rgba(181,136,99,.5); background: var(--gold-lt); color: var(--gold-txt); }
+
+/* Painel de temporários */
+.temp-wrap { position: relative; }
+#painelSelecionarTemp {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 200;
+  min-width: 260px; max-width: calc(100vw - 32px);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+.temp-titulo { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; padding: 0 4px; }
+.temp-opcao { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.temp-opcao:hover { background: var(--gold-lt); }
+.temp-novo {
+  width: 100%; margin-top: 8px; padding: 9px;
+  border-radius: 8px; border: 1px dashed rgba(181,136,99,.5);
+  background: transparent; color: var(--gold-txt);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.etq-temp {
+  font-size: 9px; font-weight: 700; letter-spacing: .5px;
+  background: var(--gold-lt); color: var(--gold-txt);
+  padding: 1px 6px; border-radius: 8px; margin-left: 5px; vertical-align: middle;
 }
 
 /* Lista de funcionários */
-.func-lista {
-  margin: 16px 20px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
+.func-lista { padding-top: 14px; display: flex; flex-direction: column; gap: 8px; }
 .func-card {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
 }
-
 .func-card-header {
-  display: flex;
-  align-items: center;
-  padding: 14px 16px;
-  gap: 12px;
-  cursor: pointer;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
 }
-
 .func-avatar {
-  width: 40px; height: 40px;
+  width: 38px; height: 38px; flex-shrink: 0;
   border-radius: 50%;
-  background: var(--gold-dk);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--fh);
-  font-size: 18px;
-  font-weight: 500;
-  color: #1a1000;
-  flex-shrink: 0;
+  background: var(--gold-lt);
+  color: var(--gold-txt);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--fh); font-size: 17px; font-weight: 500;
 }
-
 .func-info { flex: 1; min-width: 0; }
 .func-nome {
-  font-family: var(--fh);
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: .3px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-family: var(--fh); font-size: 15px; font-weight: 500; letter-spacing: .3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.func-resumo {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 2px;
-}
-
-.func-toggle {
-  font-size: 18px;
-  color: var(--muted);
-  transition: transform .2s;
-  flex-shrink: 0;
-}
+.func-resumo { font-size: 12px; color: var(--muted); margin-top: 1px; }
+.func-lado { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.func-toggle { font-size: 13px; color: var(--muted); transition: transform .2s; flex-shrink: 0; }
 .func-card.aberto .func-toggle { transform: rotate(180deg); }
+.btn-x { background: none; border: none; font-size: 20px; line-height: 1; cursor: pointer; color: var(--muted); padding: 0 4px; }
 
-/* Linhas de registo */
+/* Linhas de registo (obra + horas) */
 .func-linhas {
   display: none;
-  padding: 0 16px 14px;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: column; gap: 8px;
+  padding: 12px 14px 14px;
   border-top: 1px solid var(--border);
-  padding-top: 12px;
 }
 .func-card.aberto .func-linhas { display: flex; }
-
-.linha-registo {
-  display: grid;
-  grid-template-columns: 1fr 90px 36px;
-  gap: 8px;
-  align-items: center;
-}
-
+.linha-registo { display: grid; grid-template-columns: minmax(0,1fr) 76px 36px; gap: 8px; align-items: center; }
 .linha-registo select,
 .linha-registo input[type="number"] {
-  padding: 8px 10px;
+  height: 40px; padding: 0 10px; width: 100%;
   border-radius: var(--radsm);
   border: 1px solid var(--border);
   background: var(--bg3);
   color: var(--text);
-  font-family: var(--fb);
-  font-size: 13px;
-  width: 100%;
-  -webkit-appearance: none;
+  font-family: var(--fb); font-size: 14px;
 }
-
-.linha-registo input[type="number"] {
-  text-align: center;
+.linha-registo select {
+  -webkit-appearance: none; appearance: none;
+  padding-right: 28px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%;
+  background-size: 5px 5px; background-repeat: no-repeat;
+  text-overflow: ellipsis;
 }
-
+.linha-registo input[type="number"] { text-align: center; }
+.linha-registo select:focus, .linha-registo input:focus, .dia-nav input:focus { outline: none; border-color: var(--gold); }
 .btn-rm-linha {
-  width: 36px; height: 36px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(224,92,92,.15);
-  color: var(--red);
-  font-size: 18px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  width: 36px; height: 36px; border-radius: 50%; border: none;
+  background: rgba(224,148,134,.14); color: var(--red);
+  font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
 }
-
 .btn-add-linha {
-  margin-top: 4px;
-  padding: 7px 14px;
+  margin-top: 2px; padding: 9px 14px; width: 100%;
   border-radius: var(--radsm);
-  border: 1px dashed rgba(244,185,66,.3);
-  background: transparent;
-  color: var(--gold);
-  font-family: var(--fh);
-  font-size: 12px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+  border: 1px dashed rgba(181,136,99,.45);
+  background: transparent; color: var(--gold-txt);
+  font-family: var(--fh); font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
   cursor: pointer;
-  width: 100%;
+}
+.input-temp-nome {
+  background: transparent; border: none; border-bottom: 1px solid var(--border);
+  font-size: 14px; font-weight: 600; width: 100%; padding: 2px 0; outline: none; color: inherit;
 }
 
-/* Estado guardado */
-.func-card.guardado { border-color: rgba(76,175,125,.4); }
-.func-card.guardado .func-avatar { background: var(--green); }
+/* Estados */
+.func-card.guardado { border-color: rgba(143,191,160,.45); }
+.func-card.guardado .func-avatar { background: rgba(143,191,160,.2); color: var(--green); }
+.func-card-temp { border: 1px dashed rgba(181,136,99,.5) !important; }
+.btn-falta {
+  font-size: 11px; font-weight: 600;
+  padding: 5px 10px; border-radius: 20px;
+  border: 1px solid rgba(224,148,134,.4);
+  background: transparent; color: var(--red);
+  cursor: pointer; white-space: nowrap; transition: background .2s;
+}
+.btn-falta:hover { background: rgba(224,148,134,.12); }
+.btn-falta-activo { background: rgba(224,148,134,.2) !important; border-color: var(--red) !important; }
+.avatar-falta { background: rgba(224,148,134,.2) !important; color: var(--red) !important; }
+.avatar-temp  { background: var(--gold-lt) !important; color: var(--gold-txt) !important; }
+.resumo-falta { color: var(--red) !important; }
 
-/* Botão guardar tudo */
+/* Guardar: fica sempre à mão no fundo do ecrã */
+.rodape {
+  position: sticky; bottom: 0; z-index: 40;
+  padding-top: 12px;
+  padding-bottom: calc(12px + var(--safe-b));
+  background: linear-gradient(to top, var(--bg) 70%, transparent);
+}
 .btn-guardar-tudo {
-  margin: 20px 20px 0;
-  padding: 16px;
-  border-radius: var(--radius);
-  border: none;
-  background: linear-gradient(135deg, var(--gold), var(--gold-dk));
-  color: #1a1000;
-  font-family: var(--fh);
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  text-transform: uppercase;
+  width: 100%; padding: 15px;
+  border-radius: var(--radius); border: none;
+  background: var(--gold); color: #fff;
+  font-family: var(--fh); font-size: 16px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase;
   cursor: pointer;
-  width: calc(100% - 40px);
-  box-shadow: 0 4px 20px rgba(244,185,66,.25);
-  transition: transform .15s, box-shadow .15s;
+  box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  transition: transform .15s, background .15s;
 }
-.btn-guardar-tudo:active {
-  transform: scale(.98);
-  box-shadow: 0 2px 10px rgba(244,185,66,.15);
-}
+.btn-guardar-tudo:hover { background: var(--gold-dk); }
+.btn-guardar-tudo:active { transform: scale(.98); }
 
-/* Feedback */
 .feedback-geral {
-  margin: 12px 20px 0;
-  padding: 12px 16px;
+  margin-top: 10px; padding: 11px 14px;
   border-radius: var(--radsm);
-  font-family: var(--fh);
-  font-size: 13px;
-  letter-spacing: .5px;
-  text-align: center;
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-family: var(--fh); font-size: 13px; letter-spacing: .5px; text-align: center;
 }
 .feedback-geral:empty { display: none; }
-.feedback-geral.ok    { background: rgba(76,175,125,.12); color: var(--green); border: 1px solid rgba(76,175,125,.2); }
-.feedback-geral.erro  { background: rgba(224,92,92,.1);   color: var(--red);   border: 1px solid rgba(224,92,92,.2); }
+.feedback-geral.ok   { background: rgba(143,191,160,.14); color: var(--green); border: 1px solid rgba(143,191,160,.3); }
+.feedback-geral.erro { background: rgba(224,148,134,.12); color: var(--red);   border: 1px solid rgba(224,148,134,.3); }
 
-/* ── PAINEL COMPARAÇÃO ── */
-#ecrãComparacao {
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  padding-bottom: calc(20px + var(--safe-b));
-}
-
-.comp-header {
-  padding: 20px 20px 16px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  border-bottom: 1px solid var(--border);
-}
-.btn-back {
-  background: none;
-  border: none;
-  color: var(--gold);
-  font-size: 22px;
-  cursor: pointer;
-  padding: 0 4px;
-  flex-shrink: 0;
-}
-.comp-titulo {
-  font-family: var(--fh);
-  font-size: 18px;
-  font-weight: 500;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
-
-.comp-lista {
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
+/* ── Comparação ── */
+#ecrãComparacao { min-height: 100dvh; display: flex; flex-direction: column; padding-bottom: calc(20px + var(--safe-b)); }
+.btn-back { background: none; border: none; color: #fff; font-size: 24px; cursor: pointer; padding: 0 6px 0 0; line-height: 1; }
+.comp-lista { padding-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+.comp-resumo { display: flex; gap: 8px; margin-bottom: 8px; }
+.comp-resumo > div { flex: 1; border-radius: 10px; padding: 10px 12px; text-align: center; background: var(--bg2); border: 1px solid var(--border); }
+.comp-resumo b { display: block; font-family: var(--fh); font-size: 22px; font-weight: 500; }
+.comp-resumo span { font-size: 10px; color: var(--muted); font-family: var(--fh); letter-spacing: 1px; text-transform: uppercase; }
 .comp-item {
   background: var(--bg2);
+  border: 1px solid var(--border);
+  border-left: 3px solid transparent;
   border-radius: var(--radsm);
   padding: 12px 14px;
-  border-left: 3px solid transparent;
 }
-.comp-item.ok               { border-left-color: var(--green); }
-.comp-item.horas_diferentes { border-left-color: var(--orange); }
-.comp-item.obra_diferente   { border-left-color: var(--orange); }
-.comp-item.sem_registo_colab{ border-left-color: var(--red); }
+.comp-item.ok                { border-left-color: var(--green); }
+.comp-item.horas_diferentes  { border-left-color: var(--orange); }
+.comp-item.obra_diferente    { border-left-color: var(--orange); }
+.comp-item.sem_registo_colab { border-left-color: var(--red); }
 .comp-item.registo_incompleto{ border-left-color: var(--red); }
-
-.comp-nome {
-  font-family: var(--fh);
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: .3px;
-  margin-bottom: 4px;
-}
-.comp-detalhe {
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.6;
-}
+.comp-nome { font-family: var(--fh); font-size: 14px; font-weight: 500; letter-spacing: .3px; margin-bottom: 3px; }
+.comp-detalhe { font-size: 12px; color: var(--muted); line-height: 1.6; }
 .comp-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .8px;
-  text-transform: uppercase;
-  margin-top: 4px;
+  display: inline-block; margin-top: 5px; padding: 2px 8px; border-radius: 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase;
 }
-.badge-ok       { background: rgba(76,175,125,.15); color: var(--green); }
-.badge-aviso    { background: rgba(244,185,66,.15); color: var(--orange); }
-.badge-erro     { background: rgba(224,92,92,.12); color: var(--red); }
+.badge-ok    { background: rgba(143,191,160,.16); color: var(--green); }
+.badge-aviso { background: rgba(224,176,122,.16); color: var(--orange); }
+.badge-erro  { background: rgba(224,148,134,.14); color: var(--red); }
+.comp-vazio  { padding: 32px; text-align: center; color: var(--muted); font-size: 13px; font-family: var(--fh); letter-spacing: 1px; }
 
-/* Login overlay */
-#ecrãLogin {
-  min-height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px 24px;
-}
-.login-box {
-  width: 100%;
-  max-width: 340px;
-  text-align: center;
-}
+/* ── Login ── */
+#ecrãLogin { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 32px 24px; }
+.login-box { width: 100%; max-width: 340px; text-align: center; }
 .login-logo { height: 64px; margin-bottom: 24px; }
-.login-titulo {
-  font-family: var(--fh);
-  font-size: 18px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  margin-bottom: 24px;
-  color: var(--text);
-}
+.login-titulo { font-family: var(--fh); font-size: 18px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 24px; }
 .login-input {
-  width: 100%;
-  padding: 12px 16px;
-  border-radius: var(--radsm);
-  border: 1px solid var(--border);
-  background: var(--bg2);
-  color: var(--text);
-  font-family: var(--fh);
-  font-size: 14px;
-  letter-spacing: .5px;
-  margin-bottom: 12px;
+  width: 100%; padding: 12px 16px; margin-bottom: 12px;
+  border-radius: var(--radsm); border: 1px solid var(--border);
+  background: var(--bg2); color: var(--text);
+  font-family: var(--fb); font-size: 15px;
 }
 .login-btn {
-  width: 100%;
-  padding: 13px;
-  border-radius: var(--radsm);
-  border: none;
-  background: var(--gold);
-  color: #1a1000;
-  font-family: var(--fh);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
+  width: 100%; padding: 13px;
+  border-radius: var(--radsm); border: none;
+  background: var(--gold); color: #fff;
+  font-family: var(--fh); font-size: 15px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase;
   cursor: pointer;
 }
 .login-msg { font-size: 13px; color: var(--red); margin-top: 10px; min-height: 18px; font-family: var(--fh); }
 
-    /* Botão falta */
-    .btn-falta {
-        font-size: 11px;
-        font-weight: 600;
-        padding: 4px 10px;
-        border-radius: 20px;
-        border: 1px solid rgba(248,113,113,.4);
-        background: rgba(248,113,113,.08);
-        color: #f87171;
-        cursor: pointer;
-        transition: all .2s;
-        white-space: nowrap;
-    }
-    .btn-falta:hover { background: rgba(248,113,113,.2); }
-    .btn-falta-activo {
-        background: rgba(248,113,113,.25) !important;
-        border-color: #f87171 !important;
-    }
-    .avatar-falta { background: rgba(248,113,113,.3) !important; color: #f87171 !important; }
-    .avatar-temp  { background: rgba(244,185,66,.25) !important; color: #c8901e !important; }
-    .func-card-temp-fixed { border-left: 2px solid rgba(244,185,66,.4); }
-    .resumo-falta { color: #f87171 !important; }
-    .func-card-temp { border: 1px dashed rgba(244,185,66,.4) !important; }
+.hidden-painel { display: none !important; }
 
-    /* MODO CLARO */
-    body.tema-claro {
-        --bg: #f5f2ed;
-        --bg-dark: #eae7e1;
-        --bg-dark-panel: #fff;
-        --text-light: #1a1a1a;
-        --text-dark: #1a1a1a;
-        --text-muted: #666;
-        --border: rgba(0,0,0,.1);
-        background: #f5f2ed;
-        color: #1a1a1a;
-    }
-    /* Header mantém-se escuro em modo claro */
-    body.tema-claro header {
-        background: #1a1a1a !important;
-        color: #fff !important;
-    }
-    body.tema-claro header button,
-    body.tema-claro header a {
-        color: rgba(255,255,255,0.85) !important;
-    }
-    body.tema-claro header button:hover {
-        color: #fff !important;
-        background: rgba(255,255,255,0.1) !important;
-    }
-    /* Botões de tema e Temp adaptam-se */
-    body.tema-claro #btnTemaRegisto {
-        background: rgba(255,255,255,0.12) !important;
-        border-color: rgba(255,255,255,0.25) !important;
-        color: #fff !important;
-    }
-    body.tema-claro .func-card {
-        background: #fff;
-        border-color: rgba(0,0,0,.1);
-        color: #1a1a1a;
-    }
-    body.tema-claro .func-card-header { background: rgba(0,0,0,.02); }
-    body.tema-claro .func-nome { color: #1a1a1a; }
-    body.tema-claro .func-resumo { color: #666; }
-    body.tema-claro select, body.tema-claro input {
-        background: #f5f2ed;
-        color: #1a1a1a;
-        border-color: rgba(0,0,0,.15);
-    }
-    body.tema-claro .filtro-data input { background: #fff; color: #1a1a1a; }
-    body.tema-claro .btn-guardar-tudo { background: var(--primary); }
-    body.tema-claro header { background: #1a1a1a; }
-
-    .hidden-painel { display: none !important; }
-    body.tema-claro #painelSelecionarTemp {
-        background: #fff;
-        border-color: rgba(0,0,0,.1);
-        box-shadow: 0 8px 24px rgba(0,0,0,.12);
-        color: #1a1a1a;
-    }
-    /* Fechar painel ao clicar fora */
+@media (max-width: 480px) {
+  .header-titulo { display: none; }
+  .acoes { width: 100%; }
+  .acoes > * { flex: 1; }
+  .acoes .btn-acao { width: 100%; }
+  .btn-falta { padding: 5px 8px; }
+}
 </style>
 </head>
 <body>
+<script>try{if(localStorage.getItem("tema")==="claro")document.body.classList.add("tema-claro")}catch(e){}</script>
 
 <!-- LOGIN -->
 <div id="ecrãLogin" style="display:flex">
@@ -608,71 +411,76 @@ body {
 <!-- ECRÃ PRINCIPAL -->
 <div id="ecrãPrincipal" style="display:none">
 
-  <div class="header">
-    <img src="Logo.png" class="logo" alt="Maia">
-    <div class="header-right">
-      <a href="hoje.html" class="btn-nav" title="Hoje">☀</a>
-      <a href="admin.html" class="btn-nav" title="Admin">⚙</a>
-      <button class="btn-comparar" onclick="mostrarComparacao()">⚖ Comparar</button>
-      <button class="btn-sair" onclick="fazerLogout()">Sair</button>
+  <header class="header">
+    <div class="conteudo">
+      <img src="Logo.png" class="logo" alt="Maia">
+      <div class="header-titulo">Registo diário</div>
+      <div class="header-right">
+        <button class="btn-nav" id="btnTemaRegisto" onclick="toggleTemaRegisto()" title="Modo claro">☀️</button>
+        <a href="hoje.html" class="btn-nav" title="Hoje">☀ Hoje</a>
+        <a href="admin.html" class="btn-nav" title="Painel">⚙</a>
+        <button class="btn-sair" onclick="fazerLogout()">Sair</button>
+      </div>
     </div>
-  </div>
+  </header>
 
-  <div class="hero">
-    <div class="hero-data" id="heroData">—</div>
-    <div class="hero-titulo">Quem trabalhou hoje?</div>
-    <div class="hero-sub">Regista as horas e obras de cada colaborador</div>
-  </div>
+  <div class="conteudo">
+    <div class="hero">
+      <div class="hero-data" id="heroData">—</div>
+      <div class="hero-titulo">Quem trabalhou hoje?</div>
+      <div class="hero-sub">Regista as horas e obras de cada colaborador</div>
+    </div>
 
-  <!-- Filtro de data -->
-  <div class="filtro-data">
-    <button onclick="toggleTemaRegisto()" id="btnTemaRegisto" 
-        style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:16px"
-        title="Modo claro/escuro">🌙</button>
-    <div style="position:relative">
-        <button onclick="adicionarTrabalhadorTemp()"
-            style="background:rgba(244,185,66,.2);border:1px solid rgba(244,185,66,.4);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:600;color:var(--primary)"
-            title="Adicionar trabalhador temporário/esporádico">+ Temp</button>
-        <!-- Painel de seleção de temporários -->
-        <div id="painelSelecionarTemp" class="hidden-painel"
-            style="position:absolute;top:calc(100% + 6px);left:0;z-index:200;background:var(--bg-card,#1e1e1e);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;min-width:260px;box-shadow:0 8px 24px rgba(0,0,0,.3)">
-            <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin-bottom:8px;padding:0 4px">Temporários</div>
+    <div class="barra">
+      <div class="dia-nav">
+        <button class="btn-dia" onclick="navegarDia(-1)" title="Dia anterior">‹</button>
+        <input type="date" id="dataRegisto">
+        <button class="btn-dia" onclick="navegarDia(1)" title="Dia seguinte">›</button>
+      </div>
+      <div class="acoes">
+        <div class="temp-wrap">
+          <button class="btn-acao destaque" onclick="adicionarTrabalhadorTemp()"
+              title="Adicionar trabalhador temporário/esporádico">+ Temporário</button>
+          <!-- Painel de seleção de temporários -->
+          <div id="painelSelecionarTemp" class="hidden-painel">
+            <div class="temp-titulo">Temporários</div>
             <div id="listaTempsExistentes"></div>
-            <div style="border-top:1px solid rgba(255,255,255,.08);margin-top:8px;padding-top:8px">
-                <button onclick="adicionarNovoTemp()"
-                    style="width:100%;padding:8px;border-radius:8px;border:1px dashed rgba(244,185,66,.4);background:rgba(244,185,66,.06);color:var(--primary,#c8901e);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
-                    <span style="font-size:16px">+</span> Novo temporário
-                </button>
-            </div>
+            <button class="temp-novo" onclick="adicionarNovoTemp()">+ Novo temporário</button>
+          </div>
         </div>
+        <button class="btn-acao" onclick="mostrarComparacao()">⚖ Comparar</button>
+      </div>
     </div>
-    <button onclick="navegarDia(-1)" style="background:var(--primary);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:16px;font-weight:700">‹</button>
-    <input type="date" id="dataRegisto">
-    <button onclick="navegarDia(1)" style="background:var(--primary);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:16px;font-weight:700">›</button>
+
+    <!-- Lista de funcionários -->
+    <div class="func-lista" id="funcLista"></div>
+
+    <!-- Botão guardar -->
+    <div class="rodape">
+      <button class="btn-guardar-tudo" onclick="guardarTudo()">✓ Guardar registo</button>
+      <div class="feedback-geral" id="feedbackGeral"></div>
+    </div>
   </div>
-
-  <!-- Lista de funcionários -->
-  <div class="func-lista" id="funcLista"></div>
-
-  <!-- Botão guardar -->
-  <button class="btn-guardar-tudo" onclick="guardarTudo()">✓ Guardar Registo</button>
-  <div class="feedback-geral" id="feedbackGeral"></div>
 
 </div>
 
 <!-- ECRÃ COMPARAÇÃO -->
 <div id="ecrãComparacao" style="display:none">
-  <div class="comp-header">
-    <button class="btn-back" onclick="voltarPrincipal()">‹</button>
-    <div class="comp-titulo">Comparação de Registos</div>
-  </div>
-  <div class="comp-lista" id="compLista">
-    <div style="padding:32px;text-align:center;opacity:.4;font-size:13px">A carregar…</div>
+  <header class="header">
+    <div class="conteudo">
+      <button class="btn-back" onclick="voltarPrincipal()" title="Voltar">‹</button>
+      <div class="header-titulo" style="display:block">Comparação de registos</div>
+    </div>
+  </header>
+  <div class="conteudo">
+    <div class="comp-lista" id="compLista">
+      <div class="comp-vazio">A carregar…</div>
+    </div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="config.js"></script>
-<script src="registo-admin.js"></script>
+<script src="registo-admin.js?v=2"></script>
 </body>
 </html>

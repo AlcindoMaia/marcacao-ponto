@@ -97,8 +97,12 @@ function iniciarSessao() {
   };
 
   // Header da sessão
-  document.getElementById("sessRota").innerHTML =
-    `<span>${sessao.origem.nome}</span> → <span>${sessao.destino.nome}</span>`;
+  // Nomes vêm da base de dados: montados como texto, não como HTML
+  const rota = document.getElementById("sessRota");
+  rota.replaceChildren(
+    Object.assign(document.createElement("span"), { textContent: sessao.origem.nome }),
+    " → ",
+    Object.assign(document.createElement("span"), { textContent: sessao.destino.nome }));
 
   mostrarEcrã("ecrãSessao");
   iniciarQR();
@@ -396,12 +400,12 @@ function imprimirGuia() {
   body { font-family:'Inter',sans-serif; font-size:11pt; color:#222; padding:24px 32px; background:#fff; }
 
   .header { display:flex; justify-content:space-between; align-items:flex-start;
-    padding-bottom:16px; border-bottom:2px solid #f4b942; margin-bottom:20px; }
+    padding-bottom:16px; border-bottom:2px solid #b58863; margin-bottom:20px; }
   .empresa { font-family:'Oswald',sans-serif; font-size:22pt; font-weight:600;
     letter-spacing:2px; text-transform:uppercase; color:#1a1a1a; }
   .empresa-sub { font-size:9pt; color:#888; letter-spacing:1px; text-transform:uppercase; }
   .guia-num { text-align:right; }
-  .guia-num .num { font-family:'Oswald',sans-serif; font-size:16pt; font-weight:600; color:#f4b942; }
+  .guia-num .num { font-family:'Oswald',sans-serif; font-size:16pt; font-weight:600; color:#b58863; }
   .guia-num .data { font-size:10pt; color:#666; margin-top:4px; }
 
   .rota-box { background:#faf8f4; border-radius:8px; padding:16px 20px;
@@ -409,14 +413,14 @@ function imprimirGuia() {
   .rota-local { flex:1; }
   .rota-local label { font-size:9pt; text-transform:uppercase; letter-spacing:1px; color:#a8845c; font-weight:600; }
   .rota-local span { display:block; font-size:14pt; font-weight:700; margin-top:2px; }
-  .rota-seta { font-size:22pt; color:#f4b942; }
+  .rota-seta { font-size:22pt; color:#b58863; }
 
   .info-linha { display:flex; gap:24px; margin-bottom:20px; font-size:10pt; }
   .info-item label { color:#888; font-size:9pt; text-transform:uppercase; letter-spacing:.5px; display:block; }
   .info-item span { font-weight:600; }
 
   table { width:100%; border-collapse:collapse; margin-bottom:24px; }
-  thead th { background:#f4b942; color:#1a1000; padding:8px 10px; text-align:left;
+  thead th { background:#b58863; color:#fff; padding:8px 10px; text-align:left;
     font-family:'Oswald',sans-serif; font-size:10pt; letter-spacing:.5px; text-transform:uppercase; }
   thead th:last-child { text-align:right; }
   tbody tr:nth-child(even) { background:#faf8f4; }

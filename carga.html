@@ -7,15 +7,15 @@
 <title>Carga — Maia Solutions</title>
 <style>
   :root {
-    --primary:    #f4b942;
-    --bg:         #0f0f0f;
-    --surface:    #1a1a1a;
-    --surface2:   #242424;
+    --primary:    #b58863;
+    --bg:         #131c25;
+    --surface:    #1d2a37;
+    --surface2:   #25363f;
     --border:     rgba(255,255,255,.08);
-    --text:       #f0f0f0;
-    --text-muted: #888;
-    --ok:         #5ad65a;
-    --err:        #ff7a7a;
+    --text:       #ece5de;
+    --text-muted: #a79e9c;
+    --ok:         #8fbfa0;
+    --err:        #e09486;
     --radius:     14px;
     --font:       'Inter', system-ui, sans-serif;
   }
@@ -66,7 +66,7 @@
   .seta-ctx { text-align: center; font-size: 28px; color: var(--primary); }
 
   .btn-primary { width: 100%; padding: 16px; border: none; border-radius: var(--radius);
-    background: var(--primary); color: #000; font-size: 16px; font-weight: 800;
+    background: var(--primary); color: #fff; font-size: 16px; font-weight: 800;
     cursor: pointer; transition: opacity .15s; }
   .btn-primary:disabled { opacity: .4; cursor: default; }
   .btn-secondary { padding: 12px 20px; border: 1px solid var(--border);
@@ -82,7 +82,7 @@
   }
   .sess-rota { flex: 1; font-size: 13px; font-weight: 700; }
   .sess-rota span { color: var(--primary); }
-  .btn-terminar { padding: 8px 14px; background: rgba(255,122,122,.15); border: 1px solid rgba(255,122,122,.3);
+  .btn-terminar { padding: 8px 14px; background: rgba(224,148,134,.15); border: 1px solid rgba(224,148,134,.3);
     color: var(--err); border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; }
 
   /* Leitor QR */
@@ -118,7 +118,7 @@
   }
   .manual-area input:focus { border-color: var(--primary); }
   .manual-area button { padding: 10px 16px; background: var(--primary); border: none;
-    border-radius: 8px; color: #000; font-weight: 700; font-size: 13px; cursor: pointer; }
+    border-radius: 8px; color: #fff; font-weight: 700; font-size: 13px; cursor: pointer; }
 
   /* Lista de itens */
   .lista-header {
@@ -159,14 +159,14 @@
   }
   @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
-  .modal-artigo-codigo { display: inline-block; background: var(--primary); color: #000;
+  .modal-artigo-codigo { display: inline-block; background: var(--primary); color: #fff;
     font-weight: 800; font-size: 12px; letter-spacing: 1px; padding: 4px 10px;
     border-radius: 6px; margin-bottom: 8px; }
   .modal-artigo-nome { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
   .modal-artigo-tipo { font-size: 12px; color: var(--text-muted); margin-bottom: 20px;
     text-transform: uppercase; letter-spacing: .5px; }
 
-  .aviso-repetido { background: rgba(244,185,66,.12); border: 1px solid rgba(244,185,66,.3);
+  .aviso-repetido { background: rgba(181,136,99,.12); border: 1px solid rgba(181,136,99,.3);
     border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; font-size: 13px;
     color: var(--primary); font-weight: 600; }
 
@@ -204,8 +204,8 @@
 
   .feedback { padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
     text-align: center; min-height: 36px; }
-  .feedback.ok   { background: rgba(90,214,90,.12);  color: var(--ok); }
-  .feedback.erro { background: rgba(255,122,122,.12); color: var(--err); }
+  .feedback.ok   { background: rgba(143,191,160,.12);  color: var(--ok); }
+  .feedback.erro { background: rgba(224,148,134,.12); color: var(--err); }
   .feedback.info { color: var(--text-muted); }
 </style>
 </head>
@@ -310,7 +310,7 @@
       <button class="btn-primary" id="btnConfirmarArtigo">✓ Confirmar</button>
       <div id="btnAdicionarQtd" style="display:none">
         <button class="btn-primary" id="btnAdicionarAQtd"
-          style="background:rgba(244,185,66,.2);color:var(--primary);border:1px solid rgba(244,185,66,.4)">
+          style="background:rgba(181,136,99,.2);color:var(--primary);border:1px solid rgba(181,136,99,.4)">
           + Adicionar à quantidade existente
         </button>
       </div>
