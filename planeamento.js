@@ -330,7 +330,11 @@ function ligarEventosGrelha() {
             el.classList.remove("plan-a-arrastar");
             _planDragId = null;
         });
-        el.addEventListener("click", () => abrirModalTarefa(el.dataset.id));
+        el.addEventListener("click", () => {
+            if (_planToqueArrastou) { _planToqueArrastou = false; return; }
+            abrirModalTarefa(el.dataset.id);
+        });
+        ligarToqueLongo(el);
     });
 
     document.querySelectorAll(".plan-celula").forEach(td => {
@@ -353,6 +357,112 @@ function ligarEventosGrelha() {
             abrirModalTarefa(null, td.dataset.data);
         });
     });
+}
+
+// =======================================================
+// TELEMÓVEL: dedo premido no cartão para o arrastar
+// O arrastar do computador não funciona com o dedo. Aqui, ao
+// segurar o cartão meio segundo sem mexer, ele "solta-se" e
+// segue o dedo; ao largar num dia, a tarefa muda para esse dia
+// (a hora fica igual) e o dia volta a ordenar-se pela hora.
+// Se o dedo mexer antes disso, é só deslizar a página.
+// =======================================================
+let _planToqueArrastou = false;
+
+function ligarToqueLongo(el) {
+    let espera = null, x0 = 0, y0 = 0, fantasma = null, alvo = null, dx = 0, dy = 0;
+    let dedoY = 0, rolar = null;
+
+    const limpar = () => {
+        clearTimeout(espera); espera = null;
+        cancelAnimationFrame(rolar); rolar = null;
+        if (fantasma) fantasma.remove();
+        fantasma = null;
+        if (alvo) alvo.classList.remove("plan-alvo");
+        alvo = null;
+        el.classList.remove("plan-a-arrastar");
+        document.body.classList.remove("plan-toque-ativo");
+        el.draggable = true;
+    };
+
+    // Dia (coluna) que está debaixo do dedo
+    const diaEm = (x, y) => {
+        const sob = document.elementFromPoint(x, y);
+        return sob ? sob.closest(".plan-celula") : null;
+    };
+    const marcarAlvo = (x, y) => {
+        const td = diaEm(x, y);
+        if (td === alvo) return;
+        if (alvo) alvo.classList.remove("plan-alvo");
+        alvo = td;
+        if (alvo) alvo.classList.add("plan-alvo");
+    };
+    // Perto do cimo ou do fundo do ecrã, a página anda sozinha
+    const rolarSozinho = () => {
+        const margem = 70, h = window.innerHeight;
+        const v = dedoY < margem ? -(margem - dedoY) / 4 : dedoY > h - margem ? (dedoY - (h - margem)) / 4 : 0;
+        if (v) { window.scrollBy(0, v); marcarAlvo(x0, dedoY); }
+        rolar = requestAnimationFrame(rolarSozinho);
+    };
+
+    el.addEventListener("touchstart", e => {
+        if (e.touches.length !== 1) return limpar();
+        const t = e.touches[0];
+        x0 = t.clientX; y0 = t.clientY;
+        // Enquanto o dedo está no cartão, o arrastar nativo fica desligado
+        el.draggable = false;
+        espera = setTimeout(() => {
+            espera = null;
+            const r = el.getBoundingClientRect();
+            dx = x0 - r.left; dy = y0 - r.top;
+            fantasma = el.cloneNode(true);
+            fantasma.classList.add("plan-fantasma");
+            fantasma.style.width = r.width + "px";
+            fantasma.style.left = r.left + "px";
+            fantasma.style.top = r.top + "px";
+            document.body.appendChild(fantasma);
+            el.classList.add("plan-a-arrastar");
+            document.body.classList.add("plan-toque-ativo");
+            if (navigator.vibrate) navigator.vibrate(30);
+            dedoY = y0;
+            marcarAlvo(x0, y0);
+            rolar = requestAnimationFrame(rolarSozinho);
+        }, 450);
+    }, { passive: true });
+
+    el.addEventListener("touchmove", e => {
+        const t = e.touches[0];
+        if (espera) {
+            // Mexeu antes do tempo: é para deslizar a página
+            if (Math.hypot(t.clientX - x0, t.clientY - y0) > 10) limpar();
+            return;
+        }
+        if (!fantasma) return;
+        e.preventDefault();
+        x0 = t.clientX; dedoY = t.clientY;
+        fantasma.style.left = (t.clientX - dx) + "px";
+        fantasma.style.top = (t.clientY - dy) + "px";
+        marcarAlvo(t.clientX, t.clientY);
+    }, { passive: false });
+
+    el.addEventListener("touchend", async e => {
+        if (!fantasma) return limpar();
+        e.preventDefault();
+        const t = e.changedTouches[0];
+        const td = diaEm(t.clientX, t.clientY);
+        // Largado em cima de outro cartão → fica antes dele (se não tiver hora)
+        const sob = document.elementFromPoint(t.clientX, t.clientY);
+        const cartao = sob && sob.closest(".plan-cartao");
+        const antesDe = cartao && cartao.dataset.id !== el.dataset.id ? cartao.dataset.id : null;
+        limpar();
+        _planToqueArrastou = true;
+        setTimeout(() => { _planToqueArrastou = false; }, 400);
+        if (td) await moverTarefa(el.dataset.id, td.dataset.data, antesDe);
+    });
+
+    el.addEventListener("touchcancel", limpar);
+    // Sem o menu do "toque longo" (copiar, abrir imagem…)
+    el.addEventListener("contextmenu", e => e.preventDefault());
 }
 
 // =======================================================
