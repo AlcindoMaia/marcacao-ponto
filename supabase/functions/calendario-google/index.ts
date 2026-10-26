@@ -61,7 +61,14 @@ Deno.serve(async (req) => {
     // Aceita o link como o Google o mostra ou como se cola sem querer:
     // entre aspas, com webcal:// ou http:// em vez de https://
     // e até sem o https:// à frente
-    const bruto = Deno.env.get("GOOGLE_CALENDAR_ICS") || "";
+    // Se o nome do segredo ficou ligeiramente diferente (espaço, minúsculas,
+    // outra grafia), usa o que parecer ser o do calendário
+    const nomes = Object.keys(Deno.env.toObject())
+        .filter(k => !k.startsWith("SUPABASE_") && /CAL|ICS|GOOGLE|ICAL/i.test(k));
+    const nome = Deno.env.get("GOOGLE_CALENDAR_ICS") ? "GOOGLE_CALENDAR_ICS"
+        : nomes.find(k => /calendar\.google\.com|\.ics/i.test(Deno.env.get(k) || "")) || "GOOGLE_CALENDAR_ICS";
+    const bruto = Deno.env.get(nome) || "";
+    if (nome !== "GOOGLE_CALENDAR_ICS") console.log(`a usar o segredo "${nome}"`);
     const links = bruto
         .split(/[\s,;]+/)
         .map(l => l.replace(/^["'<]+|["'>]+$/g, "")
@@ -71,6 +78,7 @@ Deno.serve(async (req) => {
     if (!links.length) {
         // Só a forma do valor, nunca o valor: chega para saber o que foi colado
         console.log(`GOOGLE_CALENDAR_ICS sem link utilizável: ${bruto.length} caracteres, ` +
+            `segredos parecidos: [${nomes.join(", ")}], ` +
             `começa por "${bruto.slice(0, 6).replace(/[^a-z:/"' ]/gi, "?")}", ` +
             `google=${bruto.includes("calendar.google.com")}, ical=${bruto.includes("/ical/")}`);
         // Vai como falha para o quadro mostrar o aviso "⚠ calendário"
