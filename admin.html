@@ -7,8 +7,8 @@
 
 <title>Painel Administrativo — Maia Solutions</title>
 
-<link rel="stylesheet" href="style.css?v=5">
-<link rel="stylesheet" href="telemovel.css?v=3">
+<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="telemovel.css?v=4">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
 <!-- jQuery -->
@@ -38,13 +38,13 @@
 .btn-falta-tab {
     font-size: 12px; font-weight: 600;
     padding: 5px 12px; border-radius: 20px;
-    border: 1px solid rgba(248,113,113,.4);
-    background: rgba(248,113,113,.08);
-    color: #dc2626; cursor: pointer;
+    border: 1px solid rgba(224,148,134,.4);
+    background: rgba(224,148,134,.08);
+    color: #a5483d; cursor: pointer;
 }
 .btn-falta-tab.activo {
-    background: rgba(248,113,113,.2);
-    border-color: #dc2626;
+    background: rgba(224,148,134,.2);
+    border-color: #a5483d;
 }
 
 /* Todas as tabs fora do adminArea — container próprio */
@@ -86,7 +86,7 @@
                        border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:700;
                        align-items:center;justify-content:center;font-family:var(--font-body)">0</span>
         </button>
-        <div style="position:absolute;top:calc(100% + 8px);right:0;width:320px;background:#faf8f4;
+        <div style="position:absolute;top:calc(100% + 8px);right:0;width:320px;background:#f4f1ec;
                     border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.08);
                     z-index:999;display:none;max-height:420px;overflow-y:auto" id="notifPainel">
         </div>
@@ -96,9 +96,7 @@
     <!-- HOJE — o que precisa de decisão -->
     <a href="hoje.html" class="btn-secondary" style="font-size:13px;padding:6px 14px;margin-left:8px;text-decoration:none">☀ Hoje</a>
     <!-- REGISTO DIÁRIO -->
-    <a href="registo-admin.html" class="btn-secondary" style="font-size:13px;padding:6px 14px;margin-left:8px;text-decoration:none;background:var(--primary);color:#000;font-weight:600">📋 Registo Diário</a>
-    <!-- DASHBOARD -->
-    <a href="dashboard.html" class="btn-secondary" style="font-size:13px;padding:6px 14px;margin-left:8px;text-decoration:none">⬅ Dashboard</a>
+    <a href="registo-admin.html" class="btn-secondary" style="font-size:13px;padding:6px 14px;margin-left:8px;text-decoration:none;background:var(--primary);color:#fff;font-weight:600">📋 Registo Diário</a>
     <!-- LOGOUT -->
     <button class="btn-secondary" onclick="fazerLogout()" style="font-size:13px;padding:6px 14px;margin-left:8px">Sair</button>
 </header>
@@ -161,11 +159,11 @@
     <div class="grid-cards">
         <div class="card metric">
             <h3>Receita</h3>
-            <div id="dashReceita" class="value" style="color:#5ad65a">–</div>
+            <div id="dashReceita" class="value" style="color:#8fbfa0">–</div>
         </div>
         <div class="card metric">
             <h3>Despesa</h3>
-            <div id="dashDespesa" class="value" style="color:#ff7a7a">–</div>
+            <div id="dashDespesa" class="value" style="color:#e09486">–</div>
         </div>
         <div class="card metric">
             <h3>Saldo</h3>
@@ -203,7 +201,7 @@
     <!-- SUB-TABS REGISTOS -->
     <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:0">
         <button class="reg-subtab active" id="regTab-ponto" onclick="switchRegTab('ponto')"
-            style="background:rgba(244,185,66,.15);color:var(--primary);border:none;border-bottom:2px solid var(--primary);padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600;border-radius:4px 4px 0 0">
+            style="background:rgba(181,136,99,.15);color:var(--primary);border:none;border-bottom:2px solid var(--primary);padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600;border-radius:4px 4px 0 0">
             📍 Ponto QR
         </button>
         <button class="reg-subtab" id="regTab-admin" onclick="switchRegTab('admin')"
@@ -217,9 +215,9 @@
 
     <!-- KPIs de assiduidade -->
     <div class="grid-cards" style="margin-bottom:16px" id="registosKpis">
-        <div class="card metric" style="border-left:3px solid #5ad65a">
+        <div class="card metric" style="border-left:3px solid #8fbfa0">
             <h3>Taxa Assiduidade</h3>
-            <div id="kpiAssiduidade" class="value" style="color:#5ad65a">–</div>
+            <div id="kpiAssiduidade" class="value" style="color:#8fbfa0">–</div>
         </div>
         <div class="card metric">
             <h3>Dias com Registo</h3>
@@ -229,16 +227,16 @@
             <h3>Horas Extras</h3>
             <div id="kpiHorasExtras" class="value" style="color:#f97316">–</div>
         </div>
-        <div class="card metric" style="border-left:3px solid #ff7a7a">
+        <div class="card metric" style="border-left:3px solid #e09486">
             <h3>Incompletos</h3>
-            <div id="kpiIncompletos" class="value" style="color:#ff7a7a">–</div>
+            <div id="kpiIncompletos" class="value" style="color:#e09486">–</div>
         </div>
     </div>
 
     <!-- Vista: Lista ou Mapa de Presenças -->
     <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
         <button id="btnVistaLista" onclick="setVistaRegistos('lista')"
-            style="background:rgba(244,185,66,.15);color:var(--primary);border:1px solid rgba(244,185,66,.4);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">
+            style="background:rgba(181,136,99,.15);color:var(--primary);border:1px solid rgba(181,136,99,.4);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">
             📋 Lista
         </button>
         <button id="btnVistaMapa" onclick="setVistaRegistos('mapa')"
@@ -246,11 +244,11 @@
             📅 Mapa de Presenças
         </button>
         <button onclick="exportarPontoExcel()"
-            style="margin-left:auto;background:rgba(90,214,90,.12);color:#16a34a;border:1px solid rgba(90,214,90,.3);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">
+            style="margin-left:auto;background:rgba(143,191,160,.12);color:#4f7a63;border:1px solid rgba(143,191,160,.3);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">
             📥 Exportar Excel
         </button>
         <button onclick="fecharMes()"
-            style="background:rgba(244,185,66,.12);color:var(--primary);border:1px solid rgba(244,185,66,.3);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">
+            style="background:rgba(181,136,99,.12);color:var(--primary);border:1px solid rgba(181,136,99,.3);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer">
             ✅ Fechar Mês
         </button>
     </div>
@@ -314,11 +312,11 @@
                 </select>
             </div>
             <button onclick="carregarRegistosAdmin()"
-                style="background:var(--primary);border:none;border-radius:6px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;color:#1a1000">
+                style="background:var(--primary);border:none;border-radius:6px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;color:#ffffff">
                 🔄 Actualizar
             </button>
             <button onclick="exportarRegistosAdminExcel()"
-                style="background:rgba(22,163,74,.1);color:#16a34a;border:1px solid rgba(22,163,74,.3);border-radius:6px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;margin-left:auto">
+                style="background:rgba(79,122,99,.1);color:#4f7a63;border:1px solid rgba(79,122,99,.3);border-radius:6px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;margin-left:auto">
                 📥 Excel
             </button>
         </div>
@@ -336,7 +334,7 @@
         <!-- SUB-TABS FINANCEIRO -->
         <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:0">
             <button class="fin-subtab active" data-fintab="ordenados" onclick="switchFinTab('ordenados')"
-                style="background:rgba(244,185,66,.15);color:var(--primary);border:none;border-bottom:2px solid var(--primary);padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600">
+                style="background:rgba(181,136,99,.15);color:var(--primary);border:none;border-bottom:2px solid var(--primary);padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600">
                 👥 Ordenados
             </button>
             <button class="fin-subtab" data-fintab="dre" onclick="switchFinTab('dre')"
@@ -425,14 +423,14 @@
                 <button class="btn-primary" onclick="carregarDRE()" style="margin-top:18px">Calcular</button>
             </div>
             <div class="grid-cards" style="margin-bottom:16px">
-                <div class="card metric" style="border-left:3px solid #5ad65a"><h3>Total Receitas</h3><div id="dreReceitas" class="value" style="color:#5ad65a">–</div></div>
-                <div class="card metric" style="border-left:3px solid #ff7a7a"><h3>Total Custos</h3><div id="dreCustos" class="value" style="color:#ff7a7a">–</div></div>
+                <div class="card metric" style="border-left:3px solid #8fbfa0"><h3>Total Receitas</h3><div id="dreReceitas" class="value" style="color:#8fbfa0">–</div></div>
+                <div class="card metric" style="border-left:3px solid #e09486"><h3>Total Custos</h3><div id="dreCustos" class="value" style="color:#e09486">–</div></div>
                 <div class="card metric primary"><h3>Resultado</h3><div id="dreResultado" class="value">–</div></div>
                 <div class="card metric" style="border-left:3px solid #a78bfa"><h3>Margem</h3><div id="dreMargem" class="value" style="color:#a78bfa">–</div></div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-                <div class="card"><h3 style="color:#5ad65a;margin-bottom:12px">📥 RECEITAS</h3><div id="dreDetalheReceitas"></div></div>
-                <div class="card"><h3 style="color:#ff7a7a;margin-bottom:12px">📤 CUSTOS</h3><div id="dreDetalheCustos"></div></div>
+                <div class="card"><h3 style="color:#8fbfa0;margin-bottom:12px">📥 RECEITAS</h3><div id="dreDetalheReceitas"></div></div>
+                <div class="card"><h3 style="color:#e09486;margin-bottom:12px">📤 CUSTOS</h3><div id="dreDetalheCustos"></div></div>
             </div>
         </div>
 
@@ -443,11 +441,11 @@
             <div class="grid-cards">
                 <div class="card metric">
                     <h3>Entradas</h3>
-                    <div id="totalEntradas" class="value" style="color:#5ad65a">–</div>
+                    <div id="totalEntradas" class="value" style="color:#8fbfa0">–</div>
                 </div>
                 <div class="card metric">
                     <h3>Saídas</h3>
-                    <div id="totalSaidas" class="value" style="color:#ff7a7a">–</div>
+                    <div id="totalSaidas" class="value" style="color:#e09486">–</div>
                 </div>
                 <div class="card metric">
                     <h3>Saldo</h3>
@@ -526,14 +524,14 @@
             </div>
             <div class="grid-cards" style="margin-bottom:16px">
                 <div class="card metric"><h3>Orçado total</h3><div id="orcadoTotal" class="value">–</div></div>
-                <div class="card metric" style="border-left:3px solid #ff7a7a"><h3>Custo real</h3><div id="orcadoReal" class="value" style="color:#ff7a7a">–</div></div>
+                <div class="card metric" style="border-left:3px solid #e09486"><h3>Custo real</h3><div id="orcadoReal" class="value" style="color:#e09486">–</div></div>
                 <div class="card metric"><h3>Desvio</h3><div id="orcadoDesvio" class="value">–</div></div>
                 <div class="card metric" style="border-left:3px solid #a78bfa"><h3>% consumido</h3><div id="orcadoPercent" class="value" style="color:#a78bfa">–</div></div>
             </div>
             <div class="card">
                 <div id="orcadoBarLabel" style="font-size:12px;opacity:.6;margin-bottom:6px">–</div>
                 <div style="background:rgba(255,255,255,.08);border-radius:6px;height:12px;overflow:hidden">
-                    <div id="orcadoBar" style="height:100%;width:0%;background:#5ad65a;transition:width .5s"></div>
+                    <div id="orcadoBar" style="height:100%;width:0%;background:#8fbfa0;transition:width .5s"></div>
                 </div>
                 <div id="orcadoTabela" style="margin-top:16px"></div>
             </div>
@@ -568,7 +566,7 @@
                placeholder="Pesquisar por código, descrição ou tipo">
 
         <button id="btnImprimirLote"
-                style="background:rgba(244,185,66,.12);border:1px solid rgba(244,185,66,.3);color:var(--primary);padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;opacity:.4;white-space:nowrap;flex-shrink:0">
+                style="background:rgba(181,136,99,.12);border:1px solid rgba(181,136,99,.3);color:var(--primary);padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;opacity:.4;white-space:nowrap;flex-shrink:0">
             🖨️ Imprimir Lote
         </button>
 
@@ -796,7 +794,7 @@
                 <button class="btn-secondary" onclick="fecharModalArtigo()">Cancelar</button>
                 <button class="btn-primary" id="guardarArtigoBtn">Guardar</button>
             </div>
-            <div id="modalArtigoMsg" style="margin-top:8px;font-size:13px;color:#ff7a7a"></div>
+            <div id="modalArtigoMsg" style="margin-top:8px;font-size:13px;color:#e09486"></div>
 
         </div>
     </div>
@@ -812,7 +810,7 @@
         </div>
 
         <!-- Info artigo -->
-        <div style="background:rgba(244,185,66,.08);border:1px solid rgba(244,185,66,.2);border-radius:10px;padding:12px 16px;margin-bottom:18px">
+        <div style="background:rgba(181,136,99,.08);border:1px solid rgba(181,136,99,.2);border-radius:10px;padding:12px 16px;margin-bottom:18px">
             <div style="font-size:11px;opacity:.5;font-family:var(--font-title);letter-spacing:.5px;margin-bottom:4px">ARTIGO</div>
             <div id="etqArtigoNome" style="font-weight:700;font-size:15px"></div>
             <div id="etqArtigoCodigo" style="font-size:12px;opacity:.6;font-family:monospace;margin-top:2px"></div>
@@ -895,7 +893,7 @@
                 </button>
                 <!-- Leitura do documento inteiro: PDF ou foto -->
                 <button id="btnLerFatura" title="Ler PDF ou foto da fatura"
-                    style="background:rgba(244,185,66,.15);border:1px solid rgba(244,185,66,.4);color:var(--primary-dk,#a06d00);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">
+                    style="background:rgba(181,136,99,.15);border:1px solid rgba(181,136,99,.4);color:var(--primary-dk,#a06d00);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">
                     📄 Ler Fatura
                 </button>
                 <input type="file" id="ficheiroFatura" accept="image/*,application/pdf" multiple style="display:none">
@@ -918,11 +916,11 @@
 
                 <!-- Moldura: o admin.js pisca-a quando lê um código -->
                 <div id="qrMoldura" style="position:absolute;top:calc(50% - 130px);left:calc(50% - 130px);width:260px;height:260px">
-                    <div style="position:absolute;top:0;left:0;width:36px;height:36px;border-top:3px solid var(--primary,#f4b942);border-left:3px solid var(--primary,#f4b942);border-radius:2px 0 0 0"></div>
-                    <div style="position:absolute;top:0;right:0;width:36px;height:36px;border-top:3px solid var(--primary,#f4b942);border-right:3px solid var(--primary,#f4b942);border-radius:0 2px 0 0"></div>
-                    <div style="position:absolute;bottom:0;left:0;width:36px;height:36px;border-bottom:3px solid var(--primary,#f4b942);border-left:3px solid var(--primary,#f4b942);border-radius:0 0 0 2px"></div>
-                    <div style="position:absolute;bottom:0;right:0;width:36px;height:36px;border-bottom:3px solid var(--primary,#f4b942);border-right:3px solid var(--primary,#f4b942);border-radius:0 0 2px 0"></div>
-                    <div id="qrScanLine" style="position:absolute;left:4px;right:4px;height:2px;background:linear-gradient(90deg,transparent,var(--primary,#f4b942),transparent);top:50%"></div>
+                    <div style="position:absolute;top:0;left:0;width:36px;height:36px;border-top:3px solid var(--primary,#b58863);border-left:3px solid var(--primary,#b58863);border-radius:2px 0 0 0"></div>
+                    <div style="position:absolute;top:0;right:0;width:36px;height:36px;border-top:3px solid var(--primary,#b58863);border-right:3px solid var(--primary,#b58863);border-radius:0 2px 0 0"></div>
+                    <div style="position:absolute;bottom:0;left:0;width:36px;height:36px;border-bottom:3px solid var(--primary,#b58863);border-left:3px solid var(--primary,#b58863);border-radius:0 0 0 2px"></div>
+                    <div style="position:absolute;bottom:0;right:0;width:36px;height:36px;border-bottom:3px solid var(--primary,#b58863);border-right:3px solid var(--primary,#b58863);border-radius:0 0 2px 0"></div>
+                    <div id="qrScanLine" style="position:absolute;left:4px;right:4px;height:2px;background:linear-gradient(90deg,transparent,var(--primary,#b58863),transparent);top:50%"></div>
                 </div>
             </div>
 
@@ -939,7 +937,7 @@
                 <div id="qrStatusText" style="color:#fff;font-size:14px;margin-bottom:8px">Aponte o QR Code da fatura para a moldura</div>
                 <div style="display:flex;gap:8px;justify-content:center">
                     <button id="btnTorch" onclick="toggleTorch()" style="display:none;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px">🔦 Lanterna</button>
-                    <button onclick="colarQRManual()" style="background:rgba(244,185,66,.2);border:1px solid rgba(244,185,66,.4);color:var(--primary,#f4b942);border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px">✏️ Introduzir manual</button>
+                    <button onclick="colarQRManual()" style="background:rgba(181,136,99,.2);border:1px solid rgba(181,136,99,.4);color:var(--primary,#b58863);border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px">✏️ Introduzir manual</button>
                 </div>
             </div>
         </div>
@@ -1050,7 +1048,7 @@
         <!-- Imputação a serviços da obra: só aparece quando a obra
              escolhida tem serviços definidos -->
         <div id="imputacaoServicosContainer">
-            <div id="imputacaoServicosWrap" style="display:none;margin-top:4px;padding:12px;background:rgba(244,185,66,.05);border:1px solid rgba(244,185,66,.15);border-radius:8px">
+            <div id="imputacaoServicosWrap" style="display:none;margin-top:4px;padding:12px;background:rgba(181,136,99,.05);border:1px solid rgba(181,136,99,.15);border-radius:8px">
                 <div id="imputacaoLinhas"></div>
             </div>
         </div>
@@ -1059,7 +1057,7 @@
             <button class="btn-secondary" id="fecharModalMovBtnAlt" onclick="fecharModalMovimento()">Cancelar</button>
             <button class="btn-primary" id="btnGuardarMov">Guardar</button>
         </div>
-        <div id="movMsg" style="margin-top:8px;font-size:13px;color:#ff7a7a"></div>
+        <div id="movMsg" style="margin-top:8px;font-size:13px;color:#e09486"></div>
     </div>
 </div>
 
@@ -1109,11 +1107,11 @@
         </div>
         <div class="card metric">
             <h3>Ativos</h3>
-            <div id="funcKpiAtivos" class="value" style="color:#5ad65a">–</div>
+            <div id="funcKpiAtivos" class="value" style="color:#8fbfa0">–</div>
         </div>
         <div class="card metric">
             <h3>Inativos</h3>
-            <div id="funcKpiInativos" class="value" style="color:#ff7a7a">–</div>
+            <div id="funcKpiInativos" class="value" style="color:#e09486">–</div>
         </div>
     </div>
 
@@ -1153,11 +1151,11 @@
         </div>
         <div class="card metric">
             <h3>Ativas</h3>
-            <div id="obrasKpiAtivas" class="value" style="color:#5ad65a">–</div>
+            <div id="obrasKpiAtivas" class="value" style="color:#8fbfa0">–</div>
         </div>
         <div class="card metric">
             <h3>Concluídas</h3>
-            <div id="obrasKpiConcluidas" class="value" style="color:#f4b942">–</div>
+            <div id="obrasKpiConcluidas" class="value" style="color:#b58863">–</div>
         </div>
     </div>
 
@@ -1403,7 +1401,7 @@
         </div>
 
         <!-- Totais -->
-        <div class="card" style="background:rgba(244,185,66,.06);border:1px solid rgba(244,185,66,.2);margin-bottom:20px">
+        <div class="card" style="background:rgba(181,136,99,.06);border:1px solid rgba(181,136,99,.2);margin-bottom:20px">
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;text-align:center">
                 <div>
                     <div style="font-family:var(--font-title);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Mão de Obra</div>
@@ -1418,7 +1416,7 @@
                     <div id="totalOutros" style="font-family:var(--font-title);font-size:18px;font-weight:500">0.00 €</div>
                 </div>
             </div>
-            <div style="border-top:1px solid rgba(244,185,66,.2);margin-top:14px;padding-top:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;text-align:center">
+            <div style="border-top:1px solid rgba(181,136,99,.2);margin-top:14px;padding-top:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;text-align:center">
                 <div>
                     <div style="font-family:var(--font-title);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Subtotal s/ IVA</div>
                     <div id="totalSemIva" style="font-family:var(--font-title);font-size:18px;font-weight:500">0.00 €</div>
@@ -1466,13 +1464,13 @@
 <!-- Painel escuro de propósito: as cores das linhas e dos KPIs são
      geradas no admin.js em claro sobre escuro. -->
 <div id="modalPainelObra" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1100;align-items:center;justify-content:center;padding:20px">
-    <div style="background:#1e1e1e;border-radius:18px;width:100%;max-width:960px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.07);overflow:hidden">
+    <div style="background:#25363f;border-radius:18px;width:100%;max-width:960px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.07);overflow:hidden">
 
         <!-- Cabeçalho -->
-        <div style="background:linear-gradient(135deg,#1e1e1e 0%,#252018 100%);padding:24px 28px 0;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0">
+        <div style="background:linear-gradient(135deg,#25363f 0%,#1c2b3a 100%);padding:24px 28px 0;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0">
             <div style="display:flex;justify-content:space-between;align-items:flex-start">
                 <div>
-                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--primary,#f4b942);font-family:var(--font-title,sans-serif);margin-bottom:6px;opacity:.8">Painel da Obra</div>
+                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--primary,#b58863);font-family:var(--font-title,sans-serif);margin-bottom:6px;opacity:.8">Painel da Obra</div>
                     <div id="painelObraNome" style="font-family:var(--font-title,sans-serif);font-size:26px;font-weight:500;letter-spacing:.5px;color:#fff;line-height:1.1"></div>
                     <div id="painelObraMeta" style="font-size:12px;color:rgba(255,255,255,.35);margin-top:6px;display:flex;gap:12px;align-items:center"></div>
                 </div>
@@ -1639,7 +1637,7 @@
         </div>
 
         <!-- Código de inscrição: substitui o nome como credencial no cadastro -->
-        <div id="funcSemDispositivo" style="display:none;margin-top:12px;padding:12px;border-radius:8px;background:rgba(244,185,66,.08);border:1px solid rgba(244,185,66,.2);font-size:13px">
+        <div id="funcSemDispositivo" style="display:none;margin-top:12px;padding:12px;border-radius:8px;background:rgba(181,136,99,.08);border:1px solid rgba(181,136,99,.2);font-size:13px">
             <div style="opacity:.6;font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Sem dispositivo associado</div>
             <p style="margin:0 0 10px;font-size:12px;opacity:.75;line-height:1.5">
                 Para associar o telemóvel, esta pessoa precisa de um código de
@@ -1651,7 +1649,7 @@
                 Gerar código de inscrição
             </button>
             <div id="funcCodigoGerado" style="display:none;margin-top:10px">
-                <div style="font-family:ui-monospace,monospace;font-size:26px;letter-spacing:.18em;font-weight:700;color:var(--primary,#f4b942);text-align:center;padding:10px;background:rgba(0,0,0,.2);border-radius:8px"></div>
+                <div style="font-family:ui-monospace,monospace;font-size:26px;letter-spacing:.18em;font-weight:700;color:var(--primary,#b58863);text-align:center;padding:10px;background:rgba(0,0,0,.2);border-radius:8px"></div>
                 <p style="margin:8px 0 0;font-size:11px;opacity:.6;line-height:1.5">
                     Anota-o agora: não volta a ser mostrado. Se se perder,
                     gera outro — o anterior deixa de servir.
@@ -1663,7 +1661,7 @@
             <button class="btn-secondary" onclick="fecharModalFuncionario()">Cancelar</button>
             <button class="btn-primary" id="guardarFuncionarioBtn">Guardar</button>
         </div>
-        <div id="modalFuncMsg" style="margin-top:8px;font-size:13px;color:#ff7a7a"></div>
+        <div id="modalFuncMsg" style="margin-top:8px;font-size:13px;color:#e09486"></div>
 
     </div>
 </div>
@@ -1755,7 +1753,7 @@
 <script src="planeamento.js"></script>
 <script src="cotacoes.js"></script>
 <script src="admin.js"></script>
-<script src="telemovel.js?v=3"></script>
+<script src="telemovel.js?v=4"></script>
 
 <script>
 function toggleDark() {
@@ -1768,7 +1766,7 @@ function toggleDark() {
 
 <!-- MODAL EDITAR SERVIÇO DA BIBLIOTECA -->
 <div id="modalBibServico" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1200;align-items:center;justify-content:center;padding:16px">
-    <div style="background:var(--bg-dark-panel,#2a2a2a);border-radius:16px;width:100%;max-width:620px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.6)">
+    <div style="background:var(--bg-dark-panel,#3d4d55);border-radius:16px;width:100%;max-width:620px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.6)">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 24px 0">
             <h3 id="modalBibTitulo" style="color:#fff">Novo Serviço</h3>
             <button onclick="fecharModalBibServico()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;opacity:.5">×</button>
@@ -1805,7 +1803,7 @@ function toggleDark() {
                 <span></span>
             </div>
             <div id="bibMatLinhas" style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px"></div>
-            <button onclick="adicionarLinhaBibMat()" style="background:rgba(244,185,66,.1);border:1px solid rgba(244,185,66,.2);color:var(--primary,#f4b942);border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px">+ Adicionar material</button>
+            <button onclick="adicionarLinhaBibMat()" style="background:rgba(181,136,99,.1);border:1px solid rgba(181,136,99,.2);color:var(--primary,#b58863);border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px">+ Adicionar material</button>
         </div>
         <div style="padding:16px 24px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:flex-end;gap:10px">
             <button onclick="fecharModalBibServico()" class="btn-secondary">Cancelar</button>
@@ -1815,14 +1813,14 @@ function toggleDark() {
 </div>
 <!-- MODAL EDITAR OBRA -->
 <div id="modalEditarObra" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1100;align-items:center;justify-content:center;padding:16px">
-    <div style="background:var(--bg-dark-panel,#2a2a2a);border-radius:16px;width:100%;max-width:640px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.5)">
+    <div style="background:var(--bg-dark-panel,#3d4d55);border-radius:16px;width:100%;max-width:640px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.5)">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:22px 24px 0">
             <h3 id="editObraTitulo" style="color:var(--text-light,#fff)">✏️ Editar Obra</h3>
             <button onclick="document.getElementById('modalEditarObra').style.display='none'" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;opacity:.5">×</button>
         </div>
         <div style="display:flex;gap:4px;padding:16px 24px 0;border-bottom:1px solid rgba(255,255,255,.08)">
             <button class="obra-tab-btn active" id="obraTab-detalhes" onclick="switchObraTab('detalhes')"
-                style="background:rgba(244,185,66,.15);color:var(--primary,#f4b942);border:none;border-bottom:2px solid var(--primary,#f4b942);padding:7px 16px;font-size:13px;cursor:pointer;font-weight:600;border-radius:4px 4px 0 0">
+                style="background:rgba(181,136,99,.15);color:var(--primary,#b58863);border:none;border-bottom:2px solid var(--primary,#b58863);padding:7px 16px;font-size:13px;cursor:pointer;font-weight:600;border-radius:4px 4px 0 0">
                 🏗️ Detalhes
             </button>
             <button class="obra-tab-btn" id="obraTab-servicos" onclick="switchObraTab('servicos')"

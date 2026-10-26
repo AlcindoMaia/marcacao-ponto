@@ -3,7 +3,7 @@
    O telemovel.js põe em cada célula o nome da sua coluna
    (data-label) e marca a tabela com .tabela-cartoes; aqui
    cada linha passa a ser um cartão, sem scroll para o lado.
-   Usado pelo admin.html e pelo dashboard.html.
+   Usado pelo admin.html.
    No fim: o menu lateral (☰) do telemovel.js.
 ======================================================= */
 @media (max-width: 600px) {
@@ -109,9 +109,9 @@
     .menu-botao {
         display: inline-flex; align-items: center; justify-content: center;
         width: 38px; height: 38px; flex-shrink: 0;
-        border: 1px solid rgba(0,0,0,.12); border-radius: 10px;
-        background: rgba(255,255,255,.55);
-        font-size: 20px; line-height: 1; cursor: pointer; color: #1a1a1a;
+        border: 1px solid rgba(255,255,255,.25); border-radius: 10px;
+        background: rgba(255,255,255,.1);
+        font-size: 20px; line-height: 1; cursor: pointer; color: #fff;
     }
     .menu-fundo {
         display: block; position: fixed; inset: 0; z-index: 1190;
@@ -125,10 +125,12 @@
     .menu-lateral {
         display: flex; flex-direction: column; gap: 3px;
         position: fixed; top: 0; bottom: 0; left: 0; z-index: 1200;
-        width: min(270px, 80vw);
+        width: max-content;          /* só a largura do texto mais comprido */
+        min-width: 170px;
+        max-width: 80vw;
         padding: 14px 10px 24px;
         overflow-y: auto;
-        background: #ece8e1;
+        background: #efeae5;
         box-shadow: 4px 0 24px rgba(0,0,0,.2);
         transform: translateX(-105%);
         visibility: hidden;
@@ -143,17 +145,17 @@
     .menu-titulo:first-child { padding-top: 0; }
     .menu-item {
         display: flex; align-items: center; gap: 6px;
-        width: 100%; padding: 9px 12px;
+        width: 100%; padding: 8px 14px 8px 12px;
         border: none; border-radius: 8px;
-        background: rgba(217,217,217,.6);
+        background: rgba(255,255,255,.7);
         font-family: var(--font-title); font-size: 13px; letter-spacing: 1px;
-        text-transform: uppercase; text-align: left; color: #1a1a1a; cursor: pointer;
+        text-transform: uppercase; text-align: left; color: var(--text-dark, #1c2b3a); cursor: pointer;
     }
-    .menu-item.active { background: var(--primary, #f4b942); font-weight: 500; }
-    .menu-item.menu-destaque { background: rgba(244,185,66,.35); }
+    .menu-item.active { background: var(--primary, #b58863); color: #fff; font-weight: 500; }
+    .menu-item.menu-destaque { background: rgba(181,136,99,.25); }
     body.dark .menu-lateral { background: #222; }
     body.dark .menu-item { background: rgba(255,255,255,.08); color: #f0f0f0; }
-    body.dark .menu-item.active { background: var(--primary, #f4b942); color: #1a1000; }
+    body.dark .menu-item.active { background: var(--primary, #b58863); color: #ffffff; }
 
     /* O que passou para o menu sai do ecrã */
     /* (só quando o telemovel.js montou o menu) */
@@ -174,4 +176,15 @@
         text-transform: uppercase;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
+}
+
+/* ── Deslizar entre separadores: o novo entra pelo lado do gesto ── */
+@media (max-width: 700px) {
+    body.desliza-esq .tab-content.active { animation: entraDaDireita .22s ease; }
+    body.desliza-dir .tab-content.active { animation: entraDaEsquerda .22s ease; }
+}
+@keyframes entraDaDireita  { from { opacity: .3; transform: translateX(40px); }  to { opacity: 1; transform: none; } }
+@keyframes entraDaEsquerda { from { opacity: .3; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+    body.desliza-esq .tab-content.active, body.desliza-dir .tab-content.active { animation: none; }
 }

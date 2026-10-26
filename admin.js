@@ -84,7 +84,7 @@ async function fazerLogin() {
 
     if (error) {
         msg.textContent = "Credenciais inválidas.";
-        msg.style.color = "#ff7a7a";
+        msg.style.color = "#e09486";
         return;
     }
 
@@ -135,7 +135,7 @@ function tratarAccaoNoEndereco() {
         const btn = document.getElementById("btnLerFatura");
         if (!btn) return;
         btn.style.transition = "box-shadow .3s";
-        btn.style.boxShadow  = "0 0 0 4px rgba(244,185,66,.5)";
+        btn.style.boxShadow  = "0 0 0 4px rgba(181,136,99,.5)";
         setTimeout(() => { btn.style.boxShadow = ""; }, 2500);
     }, 400);
 }
@@ -182,7 +182,7 @@ function abrirTab(nome, subFin) {
 function switchFinTab(tab) {
     document.querySelectorAll(".fin-subtab").forEach(btn => {
         const active = btn.dataset.fintab === tab;
-        btn.style.background   = active ? "rgba(244,185,66,.15)" : "none";
+        btn.style.background   = active ? "rgba(181,136,99,.15)" : "none";
         btn.style.color        = active ? "var(--primary)" : "var(--text-muted)";
         btn.style.borderBottom = active ? "2px solid var(--primary)" : "2px solid transparent";
     });
@@ -234,7 +234,7 @@ async function carregarDRE() {
     document.getElementById("dreReceitas").textContent  = fmt(totRec);
     document.getElementById("dreCustos").textContent    = fmt(totCust);
     document.getElementById("dreResultado").textContent = fmt(resultado);
-    document.getElementById("dreResultado").style.color = resultado >= 0 ? "#5ad65a" : "#ff7a7a";
+    document.getElementById("dreResultado").style.color = resultado >= 0 ? "#8fbfa0" : "#e09486";
     document.getElementById("dreMargem").textContent    = margem.toFixed(1) + "%";
 
     // Detalhes por categoria
@@ -248,13 +248,13 @@ async function carregarDRE() {
     document.getElementById("dreDetalheReceitas").innerHTML = Object.entries(porCat)
         .filter(([,v]) => v.entrada > 0).sort(([,a],[,b]) => b.entrada-a.entrada)
         .map(([cat,v]) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
-            <span style="opacity:.8">${cat}</span><span style="color:#5ad65a">${fmt(v.entrada)}</span>
+            <span style="opacity:.8">${cat}</span><span style="color:#8fbfa0">${fmt(v.entrada)}</span>
         </div>`).join("") || '<div style="opacity:.4;font-size:13px">Sem receitas</div>';
 
     document.getElementById("dreDetalheCustos").innerHTML = Object.entries(porCat)
         .filter(([,v]) => v.saida > 0).sort(([,a],[,b]) => b.saida-a.saida)
         .map(([cat,v]) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
-            <span style="opacity:.8">${cat}</span><span style="color:#ff7a7a">${fmt(v.saida)}</span>
+            <span style="opacity:.8">${cat}</span><span style="color:#e09486">${fmt(v.saida)}</span>
         </div>`).join("") || '<div style="opacity:.4;font-size:13px">Sem custos</div>';
 
     // Preencher select de obras se vazio
@@ -291,13 +291,13 @@ async function carregarOrcadoReal() {
     document.getElementById("orcadoTotal").textContent   = fmt(totalOrcado);
     document.getElementById("orcadoReal").textContent    = fmt(totalReal);
     document.getElementById("orcadoDesvio").textContent  = fmt(desvio);
-    document.getElementById("orcadoDesvio").style.color  = desvio >= 0 ? "#5ad65a" : "#ff7a7a";
+    document.getElementById("orcadoDesvio").style.color  = desvio >= 0 ? "#8fbfa0" : "#e09486";
     document.getElementById("orcadoPercent").textContent = pct.toFixed(1) + "%";
 
     const bar = document.getElementById("orcadoBar");
     const barLabel = document.getElementById("orcadoBarLabel");
     if (bar) bar.style.width = Math.min(pct, 100) + "%";
-    if (bar) bar.style.background = pct > 100 ? "#ff7a7a" : pct > 80 ? "#f97316" : "#5ad65a";
+    if (bar) bar.style.background = pct > 100 ? "#e09486" : pct > 80 ? "#f97316" : "#8fbfa0";
     if (barLabel) barLabel.textContent = pct.toFixed(0) + "% do orçamento consumido";
 
     // Preencher select obras
@@ -408,7 +408,7 @@ function gerarCalendario() {
     // Feriados a vermelho, quando chegarem
     carregarFeriados(ano).then(() => grid.querySelectorAll(".calendar-day").forEach(el => {
         const fer = feriadoEm(el.dataset.data);
-        if (fer) { el.style.color = "#f87171"; el.title = `Feriado: ${fer}`; }
+        if (fer) { el.style.color = "#e09486"; el.title = `Feriado: ${fer}`; }
     }));
     title.onclick = () => {
         filtroDia = null;
@@ -437,7 +437,7 @@ function switchRegTab(tab) {
         const cont = document.getElementById(`regTabContent-${t}`);
         const active = t === tab;
         if (btn) {
-            btn.style.background   = active ? "rgba(244,185,66,.15)" : "none";
+            btn.style.background   = active ? "rgba(181,136,99,.15)" : "none";
             btn.style.color        = active ? "var(--primary)" : "var(--text-muted)";
             btn.style.borderBottom = active ? "2px solid var(--primary)" : "2px solid transparent";
         }
@@ -491,7 +491,7 @@ async function carregarRegistosAdmin() {
         .gte("data", inicio).lte("data", fim)
         .order("data").order("funcionarios(nome)");
 
-    if (error) { raConteudo.innerHTML = `<div style="padding:24px;color:#f87171">Erro: ${error.message}</div>`; return; }
+    if (error) { raConteudo.innerHTML = `<div style="padding:24px;color:#e09486">Erro: ${error.message}</div>`; return; }
     _raCache = data || [];
     await carregarFeriados(ano);
 
@@ -505,7 +505,7 @@ async function carregarRegistosAdmin() {
     document.getElementById("raKpis").innerHTML = [
         { label:"Dias com registo", val: new Set(presMes.map(r=>r.data)).size, cor:"" },
         { label:"Total horas", val: totalH.toFixed(0)+"h", cor:"" },
-        { label:"Faltas registadas", val: faltasMes.length, cor:"#dc2626" },
+        { label:"Faltas registadas", val: faltasMes.length, cor:"#a5483d" },
         { label:"Obras activas", val: obrasUniq, cor:"" },
     ].map(k => `<div class="card metric">
         <h3>${k.label}</h3>
@@ -548,7 +548,7 @@ function renderRaMapaFuncionario(ano, mes) {
                 const dow  = dObj.getDay();
                 const fer  = feriadoEm(d);
                 const isWE = dow===0||dow===6||!!fer;
-                return `<th style="padding:4px 2px;text-align:center;min-width:28px;font-size:10px;font-weight:500;${isWE?"opacity:.3":""}${fer?";color:#dc2626":""}"${fer?` title="Feriado: ${escHtml(fer)}"`:""}>${String(dObj.getDate()).padStart(2,"0")}</th>`;
+                return `<th style="padding:4px 2px;text-align:center;min-width:28px;font-size:10px;font-weight:500;${isWE?"opacity:.3":""}${fer?";color:#a5483d":""}"${fer?` title="Feriado: ${escHtml(fer)}"`:""}>${String(dObj.getDate()).padStart(2,"0")}</th>`;
             }).join("")}
             <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Dias</th>
             <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Horas</th>
@@ -574,16 +574,16 @@ function renderRaMapaFuncionario(ano, mes) {
                 let bg2 = "transparent", sym = "", title = "";
                 if (isWE) { bg2="rgba(0,0,0,.03)"; sym=""; }
                 else if (!reg) { if (fer) { bg2="rgba(0,0,0,.03)"; title=`Feriado: ${fer}`; } }
-                else if (reg.tipo === "falta") { bg2="rgba(248,113,113,.15)"; sym="✕"; title=reg.obra||"Falta"; }
+                else if (reg.tipo === "falta") { bg2="rgba(224,148,134,.15)"; sym="✕"; title=reg.obra||"Falta"; }
                 else if (reg.horas > 0) {
-                    bg2="rgba(74,222,128,.15)"; sym=reg.horas<8?"½":"✓";
+                    bg2="rgba(143,191,160,.15)"; sym=reg.horas<8?"½":"✓";
                     title = `${reg.obra||""} ${reg.horas}h`;
                 }
                 return `<td style="text-align:center;padding:3px 2px;background:${bg2};border:1px solid rgba(0,0,0,.05);font-size:11px" title="${escHtml(title)}">${sym}</td>`;
             }).join("")}
             <td style="padding:7px 10px;text-align:right;font-weight:600">${fd.totalDias}</td>
             <td style="padding:7px 10px;text-align:right">${fd.totalH.toFixed(1)}h</td>
-            <td style="padding:7px 10px;text-align:right;color:#16a34a;font-weight:600">${val}</td>
+            <td style="padding:7px 10px;text-align:right;color:#4f7a63;font-weight:600">${val}</td>
         </tr>`;
     });
 
@@ -622,7 +622,7 @@ function renderRaMapaObra(ano, mes) {
                 const dow  = dObj.getDay();
                 const fer  = feriadoEm(d);
                 const isWE = dow===0||dow===6||!!fer;
-                return `<th style="padding:4px 2px;text-align:center;min-width:28px;font-size:10px;font-weight:500;${isWE?"opacity:.3":""}${fer?";color:#dc2626":""}"${fer?` title="Feriado: ${escHtml(fer)}"`:""}>${String(dObj.getDate()).padStart(2,"0")}</th>`;
+                return `<th style="padding:4px 2px;text-align:center;min-width:28px;font-size:10px;font-weight:500;${isWE?"opacity:.3":""}${fer?";color:#a5483d":""}"${fer?` title="Feriado: ${escHtml(fer)}"`:""}>${String(dObj.getDate()).padStart(2,"0")}</th>`;
             }).join("")}
             <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Horas</th>
             <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Colabs.</th>
@@ -648,7 +648,7 @@ function renderRaMapaObra(ano, mes) {
                 else if (reg) {
                     const nFunc = Object.keys(reg).length;
                     const totalH = Object.values(reg).reduce((s,v)=>s+v,0);
-                    bg2 = `rgba(74,222,128,.${Math.min(10+nFunc*6,30)})`;
+                    bg2 = `rgba(143,191,160,.${Math.min(10+nFunc*6,30)})`;
                     sym = nFunc.toString();
                     title = Object.entries(reg).map(([f,h])=>`${f}: ${h}h`).join(", ");
                 }
@@ -692,11 +692,11 @@ function renderRaDetalhe() {
             <td style="padding:7px 12px;opacity:.7">${escHtml(r.obras?.nome||"—")}</td>
             <td style="padding:7px 12px;text-align:center">
                 ${r.tipo==="presenca"
-                    ? `<span style="background:rgba(74,222,128,.15);color:#16a34a;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">Presente</span>`
-                    : `<span style="background:rgba(248,113,113,.15);color:#dc2626;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">Falta</span>`}
+                    ? `<span style="background:rgba(143,191,160,.15);color:#4f7a63;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">Presente</span>`
+                    : `<span style="background:rgba(224,148,134,.15);color:#a5483d;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">Falta</span>`}
             </td>
             <td style="padding:7px 12px;text-align:right">${r.tipo==="presenca"?Number(r.horas||0).toFixed(1)+"h":"—"}</td>
-            <td style="padding:7px 12px;text-align:right;color:#16a34a">${val}</td>
+            <td style="padding:7px 12px;text-align:right;color:#4f7a63">${val}</td>
         </tr>`;
     });
 
@@ -727,14 +727,14 @@ function setVistaRegistos(v) {
     const btnL = document.getElementById("btnVistaLista");
     const btnM = document.getElementById("btnVistaMapa");
     if (btnL) {
-        btnL.style.background = v==="lista" ? "rgba(244,185,66,.15)" : "rgba(255,255,255,.06)";
+        btnL.style.background = v==="lista" ? "rgba(181,136,99,.15)" : "rgba(255,255,255,.06)";
         btnL.style.color      = v==="lista" ? "var(--primary)"        : "var(--text-muted)";
-        btnL.style.borderColor= v==="lista" ? "rgba(244,185,66,.4)"  : "rgba(255,255,255,.1)";
+        btnL.style.borderColor= v==="lista" ? "rgba(181,136,99,.4)"  : "rgba(255,255,255,.1)";
     }
     if (btnM) {
-        btnM.style.background = v==="mapa" ? "rgba(244,185,66,.15)" : "rgba(255,255,255,.06)";
+        btnM.style.background = v==="mapa" ? "rgba(181,136,99,.15)" : "rgba(255,255,255,.06)";
         btnM.style.color      = v==="mapa" ? "var(--primary)"       : "var(--text-muted)";
-        btnM.style.borderColor= v==="mapa" ? "rgba(244,185,66,.4)" : "rgba(255,255,255,.1)";
+        btnM.style.borderColor= v==="mapa" ? "rgba(181,136,99,.4)" : "rgba(255,255,255,.1)";
     }
     document.getElementById("vistaLista").style.display  = v==="lista" ? "block" : "none";
     document.getElementById("mapaPresencas").style.display = v==="mapa"  ? "block" : "none";
@@ -791,7 +791,7 @@ async function carregarRegistos() {
         });
 
         document.getElementById("kpiAssiduidade").textContent = assid + "%";
-        document.getElementById("kpiAssiduidade").style.color = assid >= 80 ? "#5ad65a" : assid >= 60 ? "#f97316" : "#ff7a7a";
+        document.getElementById("kpiAssiduidade").style.color = assid >= 80 ? "#8fbfa0" : assid >= 60 ? "#f97316" : "#e09486";
         document.getElementById("kpiDiasRegisto").textContent  = diasComRegisto + " / " + diasUteis;
         document.getElementById("kpiHorasExtras").textContent  = totalExtras.toFixed(1) + "h";
         document.getElementById("kpiIncompletos").textContent  = incompletos;
@@ -809,7 +809,7 @@ async function carregarRegistos() {
         const incompleto = r.estado === "Incompleto";
 
         // Highlight visual para registos incompletos
-        if (incompleto) tr.style.borderLeft = "3px solid #ff7a7a";
+        if (incompleto) tr.style.borderLeft = "3px solid #e09486";
 
         // Calcular horas extras (>8h) — destacar a laranja
         let horasNum = 0;
@@ -869,20 +869,20 @@ function renderMapaPresencas() {
 
     let html = `<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11px;width:100%">
         <thead><tr>
-            <th style="padding:6px 10px;text-align:left;position:sticky;left:0;background:var(--bg-dark-panel,#2a2a2a);z-index:2;min-width:120px">Funcionário</th>
+            <th style="padding:6px 10px;text-align:left;position:sticky;left:0;background:var(--bg-dark-panel,#3d4d55);z-index:2;min-width:120px">Funcionário</th>
             ${dias.map(d => {
                 const dObj = new Date(d + "T12:00:00");
                 const dow = dObj.getDay();
                 const fer = feriadoEm(d);
                 const isWeekend = dow === 0 || dow === 6 || !!fer;
                 const label = String(dObj.getDate()).padStart(2,"0");
-                return `<th style="padding:4px 3px;text-align:center;min-width:24px;${isWeekend?"opacity:.35":""}${fer?";color:#f87171":""}"${fer?` title="Feriado: ${escHtml(fer)}"`:""}>${label}</th>`;
+                return `<th style="padding:4px 3px;text-align:center;min-width:24px;${isWeekend?"opacity:.35":""}${fer?";color:#e09486":""}"${fer?` title="Feriado: ${escHtml(fer)}"`:""}>${label}</th>`;
             }).join("")}
         </tr></thead>
         <tbody>
         ${funcs.map(f => `
             <tr>
-                <td style="padding:6px 10px;position:sticky;left:0;background:var(--bg-dark-panel,#2a2a2a);z-index:1;font-weight:500;white-space:nowrap">${f}</td>
+                <td style="padding:6px 10px;position:sticky;left:0;background:var(--bg-dark-panel,#3d4d55);z-index:1;font-weight:500;white-space:nowrap">${f}</td>
                 ${dias.map(d => {
                     const dObj = new Date(d + "T12:00:00");
                     const dow = dObj.getDay();
@@ -891,16 +891,16 @@ function renderMapaPresencas() {
                     let bg = "transparent", symbol = "";
                     if (isWeekend) { bg = "rgba(255,255,255,.03)"; symbol = ""; }
                     else if (!estado && feriadoEm(d)) { bg = "rgba(255,255,255,.03)"; symbol = ""; }
-                    else if (estado === "OK") { bg = "rgba(90,214,90,.25)"; symbol = "✓"; }
+                    else if (estado === "OK") { bg = "rgba(143,191,160,.25)"; symbol = "✓"; }
                     else if (estado === "Incompleto") { bg = "rgba(249,115,22,.25)"; symbol = "⚠"; }
-                    else { bg = "rgba(255,122,122,.12)"; symbol = "·"; }
+                    else { bg = "rgba(224,148,134,.12)"; symbol = "·"; }
                     return `<td style="text-align:center;padding:4px 2px;background:${bg};border:1px solid rgba(255,255,255,.05)">${symbol}</td>`;
                 }).join("")}
             </tr>`).join("")}
         </tbody>
     </table></div>
     <div style="display:flex;gap:16px;margin-top:10px;font-size:11px;opacity:.7">
-        <span>✓ <span style="color:rgba(90,214,90,.8)">Presente</span></span>
+        <span>✓ <span style="color:rgba(143,191,160,.8)">Presente</span></span>
         <span>⚠ <span style="color:rgba(249,115,22,.8)">Incompleto</span></span>
         <span>· Ausente</span>
     </div>`;
@@ -953,7 +953,7 @@ async function guardarEdicaoRegisto(tr, tdEditado) {
     const reHora = /^([01]\d|2[0-3]):([0-5]\d)$/;
     const novaHora = tdEditado.textContent.trim();
     if (novaHora && !reHora.test(novaHora)) {
-        tdEditado.style.color = "#ff7a7a";
+        tdEditado.style.color = "#e09486";
         tdEditado.title = "Formato inválido — use HH:MM";
         return;
     }
@@ -1006,7 +1006,7 @@ async function guardarEdicaoRegisto(tr, tdEditado) {
 
     if (erros.length > 0) {
         console.error(erros);
-        tdEditado.style.color = "#ff7a7a";
+        tdEditado.style.color = "#e09486";
         return;
     }
 
@@ -1031,7 +1031,7 @@ async function guardarEdicaoRegisto(tr, tdEditado) {
 
     // Destacar células editadas — fica sempre amarelo
     tdEditado.classList.add("editado");
-    tdEditado.style.cssText += "; background: rgba(244,185,66,0.25) !important; color: #f4b942 !important; outline: 2px solid rgba(244,185,66,0.4) !important; outline-offset: -2px !important;";
+    tdEditado.style.cssText += "; background: rgba(181,136,99,0.25) !important; color: #b58863 !important; outline: 2px solid rgba(181,136,99,0.4) !important; outline-offset: -2px !important;";
     tdEditado.title = "";
 }
 
@@ -1090,7 +1090,7 @@ function renderKpisDash(movs) {
     document.getElementById("dashDespesa").textContent = despesa.toFixed(2) + " €";
     const saldoEl = document.getElementById("dashSaldo");
     saldoEl.textContent = saldo.toFixed(2) + " €";
-    saldoEl.style.color = saldo >= 0 ? "#5ad65a" : "#ff7a7a";
+    saldoEl.style.color = saldo >= 0 ? "#8fbfa0" : "#e09486";
 }
 
 function renderChartLinhas(movs, ano) {
@@ -1116,8 +1116,8 @@ function renderChartLinhas(movs, ano) {
                 {
                     label: "Entradas",
                     data: entradas,
-                    borderColor: "#5ad65a",
-                    backgroundColor: "rgba(90,214,90,.08)",
+                    borderColor: "#8fbfa0",
+                    backgroundColor: "rgba(143,191,160,.08)",
                     tension: 0.4,
                     fill: true,
                     pointRadius: 3
@@ -1125,8 +1125,8 @@ function renderChartLinhas(movs, ano) {
                 {
                     label: "Saídas",
                     data: saidas,
-                    borderColor: "#ff7a7a",
-                    backgroundColor: "rgba(255,122,122,.08)",
+                    borderColor: "#e09486",
+                    backgroundColor: "rgba(224,148,134,.08)",
                     tension: 0.4,
                     fill: true,
                     pointRadius: 3
@@ -1159,7 +1159,7 @@ function renderChartObras(movs) {
     const valores = Object.values(porObra);
 
     const cores = [
-        "#f4b942","#5ad65a","#7b9cff","#ff7a7a","#c084fc",
+        "#b58863","#8fbfa0","#7b9cff","#e09486","#c084fc",
         "#34d399","#fb923c","#60a5fa","#f472b6","#a3e635"
     ];
 
@@ -1237,7 +1237,7 @@ function renderChartFuncionarios(registos) {
             datasets: [{
                 label: "Horas",
                 data: valores,
-                backgroundColor: "#f4b942",
+                backgroundColor: "#b58863",
                 borderRadius: 6,
                 borderSkipped: false
             }]
@@ -1275,7 +1275,7 @@ async function carregarFuncionarios() {
 
     if (error) {
         console.error("carregarArtigos error:", error);
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#ff7a7a">Erro: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#e09486">Erro: ${error.message}</td></tr>`;
         return;
     }
 
@@ -1300,13 +1300,13 @@ async function carregarFuncionarios() {
 
         const tr = document.createElement("tr");
         tr.style.opacity = ativo ? "1" : ".45";
-        if (!temDevice) tr.style.borderLeft = "3px solid #f4b942";
+        if (!temDevice) tr.style.borderLeft = "3px solid #b58863";
 
         tr.innerHTML = `
             <td style="font-weight:500">
                 ${f.nome || "—"}
-                ${!temDevice ? '<span style="font-size:10px;color:#f4b942;margin-left:4px">⚠ sem QR</span>' : ""}
-                ${f.tipo_contrato === 'temporario' ? '<span style="font-size:9px;font-weight:700;background:rgba(244,185,66,.15);color:#c8901e;padding:1px 6px;border-radius:8px;margin-left:4px">TEMP</span>' : ""}
+                ${!temDevice ? '<span style="font-size:10px;color:#b58863;margin-left:4px">⚠ sem QR</span>' : ""}
+                ${f.tipo_contrato === 'temporario' ? '<span style="font-size:9px;font-weight:700;background:rgba(181,136,99,.15);color:#c8901e;padding:1px 6px;border-radius:8px;margin-left:4px">TEMP</span>' : ""}
             </td>
             <td style="font-size:12px;opacity:.7">${f.codigo || "—"}</td>
             <td>
@@ -1318,7 +1318,7 @@ async function carregarFuncionarios() {
             </td>
             <td class="acoes-td">
                 <button class="btn-acao btn-hist-func" title="Histórico">📊</button>
-                <button class="btn-acao btn-stock-func" title="${f.acesso_stock ? 'Revogar Stock' : 'Dar Stock'}" style="font-size:11px;color:${f.acesso_stock ? '#5ad65a' : '#888'}">📦</button>
+                <button class="btn-acao btn-stock-func" title="${f.acesso_stock ? 'Revogar Stock' : 'Dar Stock'}" style="font-size:11px;color:${f.acesso_stock ? '#8fbfa0' : '#888'}">📦</button>
                 <button class="btn-acao btn-edit-func" title="Editar">✏️</button>
                 <button class="btn-acao btn-toggle-func" title="${ativo ? "Desativar" : "Ativar"}">${ativo ? "🔴" : "🟢"}</button>
             </td>`;
@@ -1464,7 +1464,7 @@ async function abrirHistoricoFuncionario(func) {
         const div = document.createElement("div");
         div.id = "modalHistFuncionario";
         div.style.cssText = "display:flex;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1100;align-items:center;justify-content:center";
-        div.innerHTML = `<div id="modalHistFuncContent" style="background:var(--bg-dark-panel,#2a2a2a);border-radius:16px;padding:28px;width:100%;max-width:520px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.5)"></div>`;
+        div.innerHTML = `<div id="modalHistFuncContent" style="background:var(--bg-dark-panel,#3d4d55);border-radius:16px;padding:28px;width:100%;max-width:520px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.5)"></div>`;
         div.addEventListener("click", e => { if (e.target === div) div.remove(); });
         document.body.appendChild(div);
     }
@@ -1509,7 +1509,7 @@ async function abrirHistoricoFuncionario(func) {
           ).join("")}
 
         <button id="btnPDFFuncionario"
-            style="margin-top:16px;width:100%;background:rgba(244,185,66,.12);border:1px solid rgba(244,185,66,.3);color:var(--primary,#f4b942);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;font-weight:600">
+            style="margin-top:16px;width:100%;background:rgba(181,136,99,.12);border:1px solid rgba(181,136,99,.3);color:var(--primary,#b58863);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;font-weight:600">
             📄 Exportar PDF do Mês
         </button>`;
 
@@ -1555,7 +1555,7 @@ function exportarPDFFuncionario(func, registos) {
         .kpi .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; }
         .kpi .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
         table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-        th { background: #f4b942; color: #1a1000; padding: 8px 10px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+        th { background: #b58863; color: #ffffff; padding: 8px 10px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
         td { padding: 7px 10px; border-bottom: 1px solid #eee; }
         tr:nth-child(even) td { background: #fafafa; }
         .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #eee; font-size: 10px; color: #aaa; text-align: center; }
@@ -1566,7 +1566,7 @@ function exportarPDFFuncionario(func, registos) {
         <div class="kpi"><div class="label">Dias</div><div class="value">${totalDias}</div></div>
         <div class="kpi"><div class="label">Horas</div><div class="value">${totalH.toFixed(1)}h</div></div>
         ${func.valor_dia ? `<div class="kpi"><div class="label">Valor/dia</div><div class="value">${Number(func.valor_dia).toFixed(2)}€</div></div>` : ""}
-        ${totalGanho != null ? `<div class="kpi"><div class="label">Total</div><div class="value" style="color:#c0392b">${totalGanho.toFixed(2)}€</div></div>` : ""}
+        ${totalGanho != null ? `<div class="kpi"><div class="label">Total</div><div class="value" style="color:#a5483d">${totalGanho.toFixed(2)}€</div></div>` : ""}
     </div>
     <table>
         <thead><tr><th>Dia</th><th>Obra</th><th>Horas</th></tr></thead>
@@ -1618,7 +1618,7 @@ async function gerarCodigoInscricao() {
     if (error || !codigo) {
         console.error(error);
         msgEl.textContent = "Não foi possível gerar o código.";
-        msgEl.style.color = "#ff7a7a";
+        msgEl.style.color = "#e09486";
         return;
     }
 
@@ -1645,7 +1645,7 @@ async function revogarDispositivoFuncionario() {
     const _cod = document.getElementById("funcCodigoGerado");
     if (_cod) _cod.style.display = "none";
     document.getElementById("modalFuncMsg").textContent = "Dispositivo revogado. Gere um código de inscrição para esta pessoa se registar de novo.";
-    document.getElementById("modalFuncMsg").style.color = "#5ad65a";
+    document.getElementById("modalFuncMsg").style.color = "#8fbfa0";
     await carregarFuncionarios();
 }
 
@@ -1662,7 +1662,7 @@ async function carregarObras() {
     if (!tbody) return;
 
     if (error) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#ff7a7a">Erro: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#e09486">Erro: ${error.message}</td></tr>`;
         return;
     }
 
@@ -1698,7 +1698,7 @@ async function carregarObras() {
                 ${o.percentagem_conclusao != null ? `
                 <div style="display:flex;align-items:center;gap:6px">
                     <div style="flex:1;background:rgba(255,255,255,.1);border-radius:4px;height:6px;overflow:hidden">
-                        <div style="width:${Math.min(o.percentagem_conclusao,100)}%;height:100%;background:${o.percentagem_conclusao>=100?"#5ad65a":o.percentagem_conclusao>=75?"var(--primary)":"#a78bfa"};border-radius:4px"></div>
+                        <div style="width:${Math.min(o.percentagem_conclusao,100)}%;height:100%;background:${o.percentagem_conclusao>=100?"#8fbfa0":o.percentagem_conclusao>=75?"var(--primary)":"#a78bfa"};border-radius:4px"></div>
                     </div>
                     <span style="font-size:11px;opacity:.7;white-space:nowrap">${o.percentagem_conclusao}%</span>
                 </div>
@@ -1761,9 +1761,9 @@ function switchObraTab(tab) {
         const cont = document.getElementById(`obraTabContent-${t}`);
         const active = t === tab;
         if (btn) {
-            btn.style.background   = active ? "rgba(244,185,66,.15)" : "none";
-            btn.style.color        = active ? "var(--primary,#f4b942)" : "rgba(255,255,255,.5)";
-            btn.style.borderBottom = active ? "2px solid var(--primary,#f4b942)" : "2px solid transparent";
+            btn.style.background   = active ? "rgba(181,136,99,.15)" : "none";
+            btn.style.color        = active ? "var(--primary,#b58863)" : "rgba(255,255,255,.5)";
+            btn.style.borderBottom = active ? "2px solid var(--primary,#b58863)" : "2px solid transparent";
         }
         if (cont) cont.style.display = active ? "block" : "none";
     });
@@ -2023,13 +2023,13 @@ async function carregarServicosModal() {
         const hR  = horasP[s.id]||0;
         const mR  = matP[s.id]||0;
         const pct = s.horas_orcamento > 0 ? Math.min(Math.round(hR/s.horas_orcamento*100),100) : null;
-        const barCol = s.concluido ? "#4ade80" : pct>=75 ? "#fb923c" : "var(--primary,#f4b942)";
-        return `<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;border:1px solid ${s.concluido?"rgba(74,222,128,.2)":"rgba(255,255,255,.06)"}">
+        const barCol = s.concluido ? "#8fbfa0" : pct>=75 ? "#fb923c" : "var(--primary,#b58863)";
+        return `<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;border:1px solid ${s.concluido?"rgba(143,191,160,.2)":"rgba(255,255,255,.06)"}">
             <div style="flex:1;min-width:0">
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
                     <span style="font-size:13px;font-weight:600">${escHtml(s.nome)}</span>
                     ${s.extra?`<span style="font-size:10px;background:rgba(251,146,60,.15);color:#fb923c;padding:1px 6px;border-radius:10px">Extra</span>`:""}
-                    ${s.concluido?`<span style="font-size:10px;background:rgba(74,222,128,.15);color:#4ade80;padding:1px 6px;border-radius:10px">✓ Concluído</span>`:""}
+                    ${s.concluido?`<span style="font-size:10px;background:rgba(143,191,160,.15);color:#8fbfa0;padding:1px 6px;border-radius:10px">✓ Concluído</span>`:""}
                 </div>
                 <div style="display:flex;gap:14px;font-size:11px;opacity:.6">
                     <span>🕐 ${hR.toFixed(1)}h${s.horas_orcamento?` / ${s.horas_orcamento}h`:""}</span>
@@ -2038,8 +2038,8 @@ async function carregarServicosModal() {
                 ${pct!==null?`<div style="margin-top:6px;background:rgba(255,255,255,.1);border-radius:3px;height:3px"><div style="width:${pct}%;height:100%;background:${barCol};border-radius:3px"></div></div>`:""}
             </div>
             <div style="display:flex;gap:4px;flex-shrink:0">
-                <button onclick="toggleServicoConcluido('${s.id}',${s.concluido})" style="background:${s.concluido?"rgba(74,222,128,.15)":"rgba(255,255,255,.07)"};border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px" title="${s.concluido?"Reabrir":"Concluir"}">${s.concluido?"↩":"✓"}</button>
-                <button data-servico-id="${escHtml(s.id)}" data-servico-nome="${escHtml(s.nome)}" class="btn-elim-servico" style="background:rgba(248,113,113,.1);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;opacity:.6">🗑</button>
+                <button onclick="toggleServicoConcluido('${s.id}',${s.concluido})" style="background:${s.concluido?"rgba(143,191,160,.15)":"rgba(255,255,255,.07)"};border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px" title="${s.concluido?"Reabrir":"Concluir"}">${s.concluido?"↩":"✓"}</button>
+                <button data-servico-id="${escHtml(s.id)}" data-servico-nome="${escHtml(s.nome)}" class="btn-elim-servico" style="background:rgba(224,148,134,.1);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;opacity:.6">🗑</button>
             </div>
         </div>`;
     }).join("");
@@ -2090,8 +2090,8 @@ async function abrirPainelObra(obra) {
     // Meta: data prevista + estado
     const metaEl = document.getElementById("painelObraMeta");
     const estadoBadge = obra.estado === "concluida"
-        ? `<span style="background:rgba(74,222,128,.15);color:#4ade80;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600">✓ Concluída</span>`
-        : `<span style="background:rgba(244,185,66,.12);color:var(--primary,#f4b942);padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600">Em curso</span>`;
+        ? `<span style="background:rgba(143,191,160,.15);color:#8fbfa0;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600">✓ Concluída</span>`
+        : `<span style="background:rgba(181,136,99,.12);color:var(--primary,#b58863);padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600">Em curso</span>`;
     metaEl.innerHTML = `${estadoBadge}${obra.data_conclusao_prevista
         ? `<span style="color:rgba(255,255,255,.35)">📅 ${obra.data_conclusao_prevista}</span>` : ""}`;
 
@@ -2164,29 +2164,29 @@ async function abrirPainelObra(obra) {
             label: "Horas Orçadas",
             val: totHOrç > 0 ? totHOrç.toFixed(0)+"h" : "—",
             sub: totHReal > 0 ? `${totHReal.toFixed(1)}h realizadas` : "Sem registos",
-            cor: totHReal > totHOrç && totHOrç > 0 ? "#fb923c" : totHReal > 0 ? "#4ade80" : "rgba(255,255,255,.6)",
-            accent: "#f4b942"
+            cor: totHReal > totHOrç && totHOrç > 0 ? "#fb923c" : totHReal > 0 ? "#8fbfa0" : "rgba(255,255,255,.6)",
+            accent: "#b58863"
         },
         {
             label: "Custo Mão de Obra",
             val: totMO > 0 ? totMO.toFixed(0)+"€" : "—",
             sub: totMat > 0 ? `+${totMat.toFixed(0)}€ material` : "Sem material",
-            cor: "#f87171",
-            accent: "#f87171"
+            cor: "#e09486",
+            accent: "#e09486"
         },
         {
             label: "Orçamento Total",
             val: totVOrç > 0 ? totVOrç.toFixed(0)+"€" : "—",
             sub: totDesvio !== null ? (totDesvio > 0 ? `▲ +${totDesvio.toFixed(0)}€ desvio` : `▼ ${totDesvio.toFixed(0)}€ dentro`) : "Sem orçamento",
-            cor: totDesvio > 0 ? "#f87171" : "#4ade80",
+            cor: totDesvio > 0 ? "#e09486" : "#8fbfa0",
             accent: "#a78bfa"
         },
         {
             label: "Serviços",
             val: `${concluidosCount}/${(servicos||[]).length}`,
             sub: "concluídos",
-            cor: concluidosCount === (servicos||[]).length ? "#4ade80" : "rgba(255,255,255,.7)",
-            accent: "#4ade80"
+            cor: concluidosCount === (servicos||[]).length ? "#8fbfa0" : "rgba(255,255,255,.7)",
+            accent: "#8fbfa0"
         },
     ];
 
@@ -2202,7 +2202,7 @@ async function abrirPainelObra(obra) {
     if (progEl) {
         const pctGeral = totHOrç > 0 ? Math.min(Math.round(totHReal/totHOrç*100),100) : null;
         progEl.innerHTML = pctGeral !== null
-            ? `<span style="color:rgba(255,255,255,.5)">Progresso geral:</span> <span style="color:var(--primary,#f4b942);font-weight:600">${pctGeral}%</span>`
+            ? `<span style="color:rgba(255,255,255,.5)">Progresso geral:</span> <span style="color:var(--primary,#b58863);font-weight:600">${pctGeral}%</span>`
             : "";
     }
 
@@ -2215,10 +2215,10 @@ async function abrirPainelObra(obra) {
         const totR  = moR + matR;
         const desvio= s.valor_orcamento ? totR - s.valor_orcamento : null;
         const pct   = s.horas_orcamento > 0 ? Math.round(hR/s.horas_orcamento*100) : null;
-        const barCol= s.concluido ? "#4ade80" : pct>=100 ? "#f87171" : pct>=75 ? "#fb923c" : "var(--primary,#f4b942)";
+        const barCol= s.concluido ? "#8fbfa0" : pct>=100 ? "#e09486" : pct>=75 ? "#fb923c" : "var(--primary,#b58863)";
 
         const estadoBadge = s.concluido
-            ? `<span style="background:rgba(74,222,128,.15);color:#4ade80;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap">✓ Feito</span>`
+            ? `<span style="background:rgba(143,191,160,.15);color:#8fbfa0;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap">✓ Feito</span>`
             : `<span style="background:rgba(255,255,255,.07);color:rgba(255,255,255,.4);padding:2px 9px;border-radius:10px;font-size:10px;white-space:nowrap">Em curso</span>`;
 
         const extraBadge = s.extra
@@ -2240,10 +2240,10 @@ async function abrirPainelObra(obra) {
             </div>
             <div style="color:rgba(255,255,255,.45);font-size:12px">${s.horas_orcamento ? s.horas_orcamento+"h" : "—"}</div>
             <div style="color:${hR>(s.horas_orcamento||9999)?"#fb923c":"rgba(255,255,255,.85)"};font-size:13px">${hR>0?hR.toFixed(1)+"h":"—"}</div>
-            <div style="color:#f87171;font-size:13px">${moR>0?moR.toFixed(0)+"€":"—"}</div>
-            <div style="color:#f87171;font-size:13px">${matR>0?matR.toFixed(0)+"€":"—"}</div>
+            <div style="color:#e09486;font-size:13px">${moR>0?moR.toFixed(0)+"€":"—"}</div>
+            <div style="color:#e09486;font-size:13px">${matR>0?matR.toFixed(0)+"€":"—"}</div>
             <div style="color:rgba(255,255,255,.45);font-size:12px">${s.valor_orcamento?s.valor_orcamento.toFixed(0)+"€":"—"}</div>
-            <div style="font-weight:600;font-size:13px;color:${desvio===null?"rgba(255,255,255,.3)":desvio>0?"#f87171":"#4ade80"}">
+            <div style="font-weight:600;font-size:13px;color:${desvio===null?"rgba(255,255,255,.3)":desvio>0?"#e09486":"#8fbfa0"}">
                 ${desvio===null?"—":(desvio>0?"+":"")+desvio.toFixed(0)+"€"}
             </div>
             <div style="text-align:center">${estadoBadge}</div>
@@ -2415,7 +2415,7 @@ async function toggleTorch() {
         await track.applyConstraints({ advanced: [{ torch: qrTorchOn }] });
         const btn = document.getElementById("btnTorch");
         if (btn) btn.style.background = qrTorchOn
-            ? "rgba(244,185,66,.4)"
+            ? "rgba(181,136,99,.4)"
             : "rgba(255,255,255,.15)";
     } catch(e) { console.warn("Torch:", e); }
 }
@@ -2716,8 +2716,8 @@ function actualizarBarraFila() {
     if (!barra) {
         barra = document.createElement("div");
         barra.id = "filaFaturasBarra";
-        barra.style.cssText = "display:none;align-items:center;gap:10px;background:rgba(244,185,66,.12);" +
-            "border:1px solid rgba(244,185,66,.35);border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:12px";
+        barra.style.cssText = "display:none;align-items:center;gap:10px;background:rgba(181,136,99,.12);" +
+            "border:1px solid rgba(181,136,99,.35);border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:12px";
         const modal = document.getElementById("modalMovimento");
         const conteudo = modal?.querySelector(".modal-content, .modal-body") || modal;
         conteudo?.insertBefore(barra, conteudo.firstChild);
@@ -2935,7 +2935,7 @@ async function mostrarLinhasFatura(d) {
             </td>
             <td style="padding:3px 6px;text-align:center">
                 <button type="button" onclick="this.closest('tr').remove(); actualizarResumoLinhas()"
-                    style="background:rgba(248,113,113,.1);border:none;border-radius:5px;padding:3px 6px;cursor:pointer;font-size:12px">✕</button>
+                    style="background:rgba(224,148,134,.1);border:none;border-radius:5px;padding:3px 6px;cursor:pointer;font-size:12px">✕</button>
             </td>
         </tr>`).join("");
 
@@ -3109,9 +3109,9 @@ function mostrarFeedbackQR(msg, tipo) {
         conteudo?.insertBefore(el, conteudo.firstChild);
     }
     const cores = {
-        ok:   { bg: "rgba(74,222,128,.15)",  border: "rgba(74,222,128,.3)",  color: "#4ade80" },
+        ok:   { bg: "rgba(143,191,160,.15)",  border: "rgba(143,191,160,.3)",  color: "#8fbfa0" },
         warn: { bg: "rgba(251,146,60,.15)",   border: "rgba(251,146,60,.3)",  color: "#fb923c" },
-        err:  { bg: "rgba(248,113,113,.15)",  border: "rgba(248,113,113,.3)", color: "#f87171" },
+        err:  { bg: "rgba(224,148,134,.15)",  border: "rgba(224,148,134,.3)", color: "#e09486" },
     };
     const c = cores[tipo] || cores.warn;
     el.style.background   = c.bg;
@@ -3217,7 +3217,7 @@ async function vgPrecosSubiram() {
     if (!subidas.length) return null;
 
     subidas.sort((x, y) => y.pc - x.pc);
-    return { icone: "📄", cor: "rgba(244,185,66,.22)",
+    return { icone: "📄", cor: "rgba(181,136,99,.22)",
              titulo: subidas.length === 1 ? "Preço acima do anterior" : `${subidas.length} preços acima do anterior`,
              sub: `+${subidas[0].pc.toFixed(0)}% em ${subidas[0].nome}`, tab: "inventario" };
 }
@@ -3238,7 +3238,7 @@ async function vgFaturasPorPagar() {
         .neq("estado_pagamento", "pago").eq("tipo", "saida").eq("ativo", true).limit(200);
     if (!count) return null;
     const soma = (data || []).reduce((s, m) => s + Number(m.valor_total || 0), 0);
-    return { icone: "💶", cor: "rgba(192,57,43,.10)",
+    return { icone: "💶", cor: "rgba(165,72,61,.10)",
              titulo: count === 1 ? "1 fatura por pagar" : `${count} faturas por pagar`,
              sub: vgEuros(soma), tab: "financeiro" };
 }
@@ -3271,7 +3271,7 @@ async function vgTarefasAtrasadas() {
         .select("descricao, obras(nome)", { count: "exact" })
         .lt("data_prevista", hoje).neq("estado", "concluida").limit(5);
     if (!count) return null;
-    return { icone: "⏰", cor: "rgba(244,185,66,.22)",
+    return { icone: "⏰", cor: "rgba(181,136,99,.22)",
              titulo: count === 1 ? "1 tarefa atrasada" : `${count} tarefas atrasadas`,
              sub: data?.[0]?.obras?.nome || "sem obra", tab: "planeamento" };
 }
@@ -3393,14 +3393,14 @@ function vgEtiqueta(id, orcamento, gasto, horasOrc, horasReais) {
 
     if (orc > 0) {
         const pc = (g / orc) * 100;
-        if (pc > 100) return et(`Acima ${(pc - 100).toFixed(0)}%`, "rgba(192,57,43,.12)", "#a4332a");
-        if (pc >= 90) return et(`Orçamento a ${pc.toFixed(0)}%`, "rgba(244,185,66,.22)", "#8a5e06");
+        if (pc > 100) return et(`Acima ${(pc - 100).toFixed(0)}%`, "rgba(165,72,61,.12)", "#a4332a");
+        if (pc >= 90) return et(`Orçamento a ${pc.toFixed(0)}%`, "rgba(181,136,99,.22)", "#8a5e06");
     }
     if (ho > 0) {
         const pc = (hr / ho) * 100;
-        if (pc >= 80) return et(`Horas a ${pc.toFixed(0)}%`, "rgba(244,185,66,.22)", "#8a5e06");
+        if (pc >= 80) return et(`Horas a ${pc.toFixed(0)}%`, "rgba(181,136,99,.22)", "#8a5e06");
     }
-    if (orc > 0) return et("No orçamento", "rgba(42,138,42,.12)", "#1f6b1f");
+    if (orc > 0) return et("No orçamento", "rgba(79,122,99,.12)", "#1f6b1f");
     return et("Sem orçamento", "rgba(0,0,0,.06)", "var(--text-muted)");
 }
 
@@ -3538,7 +3538,7 @@ async function carregarArtigos() {
     const tbody = document.querySelector("#tabelaArtigos tbody");
     if (!tbody) return;
     if (error) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#ff7a7a">Erro: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#e09486">Erro: ${error.message}</td></tr>`;
         return;
     }
     tbody.innerHTML = "";
@@ -3690,7 +3690,7 @@ async function abrirHistoricoStock(artigoId, descricao) {
     comSaldo.reverse();
 
     const labels = { entrada: "Entrada", saida: "Saída", ajuste: "Ajuste", inicial: "Inicial" };
-    const cores  = { entrada: "#5ad65a", saida: "#ff7a7a", ajuste: "#f4b942", inicial: "#85B7EB" };
+    const cores  = { entrada: "#8fbfa0", saida: "#e09486", ajuste: "#b58863", inicial: "#85B7EB" };
 
     tbody.innerHTML = comSaldo.map(m => {
         const cor   = cores[m.tipo_movimento] || "#888";
@@ -3912,7 +3912,7 @@ function gerarPaginaImpressao(itens) {
     padding-bottom: 1mm;
     margin-bottom: 1.5mm;
   }
-  .etq-empresa { font-size: 5pt; font-weight: 700; letter-spacing: .5pt; color: #f4b942; }
+  .etq-empresa { font-size: 5pt; font-weight: 700; letter-spacing: .5pt; color: #b58863; }
   .etq-tipo    { font-size: 4pt; color: #999; text-transform: uppercase; letter-spacing: .3pt; }
   .etq-body    { display: flex; flex: 1; align-items: center; gap: 2mm; }
   .etq-qr      { flex-shrink: 0; }
@@ -3986,7 +3986,7 @@ async function carregarMovimentosStock() {
     if (filtroFim)    query = query.lte("data_movimento", filtroFim);
 
     const { data, error } = await query;
-    if (error) { tbody.innerHTML = `<tr><td colspan="8" style="color:#ff7a7a;text-align:center;padding:16px">Erro: ${error.message}</td></tr>`; return; }
+    if (error) { tbody.innerHTML = `<tr><td colspan="8" style="color:#e09486;text-align:center;padding:16px">Erro: ${error.message}</td></tr>`; return; }
 
     let lista = data || [];
 
@@ -4009,7 +4009,7 @@ async function carregarMovimentosStock() {
     }
 
     const tipoLabel = { entrada: "Entrada", saida: "Saída", ajuste_entrada: "Ajuste +", ajuste_saida: "Ajuste −", inicial: "Inicial" };
-    const tipoCor   = { entrada: "#5ad65a", saida: "#ff7a7a", ajuste_entrada: "#f4b942", ajuste_saida: "#f4b942", inicial: "#85b7eb" };
+    const tipoCor   = { entrada: "#8fbfa0", saida: "#e09486", ajuste_entrada: "#b58863", ajuste_saida: "#b58863", inicial: "#85b7eb" };
 
     lista.forEach(m => {
         const cor    = tipoCor[m.tipo_movimento]   || "#888";
@@ -4169,7 +4169,7 @@ const fmtEurDoc = v => v == null || v === "" ? "—" : Number(v).toFixed(2).repl
 function msgDocObra(texto, tipo = "ok") {
     const el = document.getElementById("docObraMsg");
     if (!el) return;
-    const cores = { ok: "#4ade80", warn: "#fb923c", err: "#f87171" };
+    const cores = { ok: "#8fbfa0", warn: "#fb923c", err: "#e09486" };
     el.style.display = texto ? "block" : "none";
     el.style.color = cores[tipo] || cores.ok;
     el.textContent = texto || "";
@@ -4191,7 +4191,7 @@ async function carregarPainelDocumentos() {
     const docs    = docsRes.data || [];
     const cliente = cliRes.data;
     const erroTabela = docsRes.error
-        ? `<div style="color:#f87171;font-size:12px;margin-bottom:8px">Não foi possível ler os documentos: ${escDoc(docsRes.error.message)}</div>` : "";
+        ? `<div style="color:#e09486;font-size:12px;margin-bottom:8px">Não foi possível ler os documentos: ${escDoc(docsRes.error.message)}</div>` : "";
 
     const opcoesTipo = Object.entries(TIPOS_DOC_OBRA)
         .map(([k, t]) => `<option value="${k}">${t.icone} ${t.nome}</option>`).join("");
@@ -4199,7 +4199,7 @@ async function carregarPainelDocumentos() {
     const linha = d => {
         const t = TIPOS_DOC_OBRA[d.tipo] || TIPOS_DOC_OBRA.outro;
         const estado = d.estado === "registado"
-            ? `<span style="color:#4ade80;font-size:11px">✓ Registado</span>`
+            ? `<span style="color:#8fbfa0;font-size:11px">✓ Registado</span>`
             : d.estado === "por_tratar"
                 ? `<button class="btn-secondary" style="font-size:11px;padding:4px 8px" onclick="tratarDocumentoObra('${d.id}')">🤖 Ler e registar</button>`
                 : `<span style="opacity:.45;font-size:11px">Guardado</span>`;
@@ -4227,7 +4227,7 @@ async function carregarPainelDocumentos() {
                 ${cliente
                     ? `<span style="font-weight:600">${escDoc(cliente.nome)}</span>
                        <span style="font-size:12px;opacity:.6">${[cliente.nif && "NIF " + cliente.nif, cliente.email, cliente.telefone].filter(Boolean).map(escDoc).join(" · ")}</span>
-                       <span style="display:block;font-size:11px;margin-top:2px;color:${cliente.acesso_ativo ? "#4ade80" : "rgba(255,255,255,.4)"}">🔗 Área do cliente: ${cliente.acesso_ativo ? "ligada" : "sem link"}</span>`
+                       <span style="display:block;font-size:11px;margin-top:2px;color:${cliente.acesso_ativo ? "#8fbfa0" : "rgba(255,255,255,.4)"}">🔗 Área do cliente: ${cliente.acesso_ativo ? "ligada" : "sem link"}</span>`
                     : `<span style="opacity:.6;font-size:13px">Sem cliente. Fica ligado ao carregar o primeiro orçamento ou fatura, ou define-o já.</span>`}
             </span>
             <button class="btn-secondary" onclick="abrirFichaClienteObra()">${cliente ? "✏️ Cliente e link" : "+ Definir cliente"}</button>
@@ -4465,7 +4465,7 @@ async function abrirPropostaDocumento(doc, lido) {
     m.id = "modalPropostaDoc";
     m.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1300;display:flex;align-items:center;justify-content:center;padding:16px";
     m.innerHTML = `
-    <div style="background:#1e1e1e;border-radius:14px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;padding:22px;border:1px solid rgba(255,255,255,.08)">
+    <div style="background:#25363f;border-radius:14px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;padding:22px;border:1px solid rgba(255,255,255,.08)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
             <div style="font-family:var(--font-title,sans-serif);font-size:18px">🤖 O que o assistente leu</div>
             <button onclick="fecharPropostaDocumento()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer">×</button>
@@ -4506,7 +4506,7 @@ async function abrirPropostaDocumento(doc, lido) {
             ${ligarObra}
         </div>
 
-        <div id="propMsg" style="display:none;color:#f87171;font-size:12px;margin-top:10px"></div>
+        <div id="propMsg" style="display:none;color:#e09486;font-size:12px;margin-top:10px"></div>
         <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
             <button class="btn-secondary" onclick="fecharPropostaDocumento()">Agora não</button>
             <button class="btn-primary" id="btnGravarProposta" onclick="gravarPropostaDocumento()">✓ Gravar</button>
@@ -4675,7 +4675,7 @@ async function abrirFichaClienteObra() {
     const campo = (rot, id, v, t = "text") => `
         <label style="display:flex;flex-direction:column;gap:4px;font-size:11px">${rot}<input id="${id}" type="${t}" value="${escDoc(v ?? "")}"></label>`;
     m.innerHTML = `
-    <div style="background:#1e1e1e;border-radius:14px;width:100%;max-width:520px;padding:22px;border:1px solid rgba(255,255,255,.08)">
+    <div style="background:#25363f;border-radius:14px;width:100%;max-width:520px;padding:22px;border:1px solid rgba(255,255,255,.08)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
             <div style="font-family:var(--font-title,sans-serif);font-size:18px">👤 Cliente da obra</div>
             <button onclick="document.getElementById('modalFichaCliente').remove()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer">×</button>
@@ -4694,7 +4694,7 @@ async function abrirFichaClienteObra() {
         </div>
         <div style="margin-top:10px">${campo("Morada", "fcMorada", atual.morada)}</div>
         <div id="fcAcesso" style="margin-top:16px;border-top:1px solid rgba(255,255,255,.08);padding-top:14px"></div>
-        <div id="fcMsg" style="display:none;color:#f87171;font-size:12px;margin-top:10px"></div>
+        <div id="fcMsg" style="display:none;color:#e09486;font-size:12px;margin-top:10px"></div>
         <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
             <button class="btn-secondary" onclick="document.getElementById('modalFichaCliente').remove()">Cancelar</button>
             <button class="btn-primary" onclick="gravarFichaClienteObra()">Gravar</button>
@@ -4879,17 +4879,17 @@ async function carregarPainelResumo() {
     const totalHoras = horasRegistos || horasPonto;
 
     const fmt = v => Number(v).toFixed(2) + " €";
-    const corMargem = margem >= 0 ? "#5ad65a" : "#ff7a7a";
+    const corMargem = margem >= 0 ? "#8fbfa0" : "#e09486";
 
     el.innerHTML = `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
             <div class="card" style="padding:16px;text-align:center">
                 <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">RECEBIDO</div>
-                <div style="font-size:20px;font-weight:800;color:#5ad65a">${fmt(totalEntradas)}</div>
+                <div style="font-size:20px;font-weight:800;color:#8fbfa0">${fmt(totalEntradas)}</div>
             </div>
             <div class="card" style="padding:16px;text-align:center">
                 <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">GASTO</div>
-                <div style="font-size:20px;font-weight:800;color:#ff7a7a">${fmt(totalSaidas)}</div>
+                <div style="font-size:20px;font-weight:800;color:#e09486">${fmt(totalSaidas)}</div>
                 <div style="font-size:11px;opacity:.55;margin-top:4px">${fmt(totalFaturas)} faturas · ${fmt(custoMaoObra)} mão de obra</div>
             </div>
             <div class="card" style="padding:16px;text-align:center">
@@ -4909,13 +4909,13 @@ async function carregarPainelResumo() {
             <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Orçamento aceite</span><span style="font-weight:700">${fmt(totalOrc)}</span></div>
             <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Faturas</span><span style="font-weight:700">${fmt(totalFaturas)}</span></div>
             <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Mão de obra (${horasRegistos.toFixed(0)}h)</span><span style="font-weight:700">${fmt(custoMaoObra)}</span></div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Gasto real</span><span style="font-weight:700;color:#ff7a7a">${fmt(totalSaidas)}</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Gasto real</span><span style="font-weight:700;color:#e09486">${fmt(totalSaidas)}</span></div>
             <div style="border-top:1px solid var(--border);margin:8px 0;padding-top:8px;display:flex;justify-content:space-between;font-size:14px">
                 <span style="font-weight:600">Desvio</span>
-                <span style="font-weight:800;color:${desvio >= 0 ? "#5ad65a" : "#ff7a7a"}">${desvio >= 0 ? "+" : ""}${fmt(desvio)}</span>
+                <span style="font-weight:800;color:${desvio >= 0 ? "#8fbfa0" : "#e09486"}">${desvio >= 0 ? "+" : ""}${fmt(desvio)}</span>
             </div>
             <div style="background:rgba(255,255,255,.08);border-radius:4px;height:8px;margin-top:10px;overflow:hidden">
-                <div style="height:100%;border-radius:4px;background:${totalSaidas <= totalOrc ? "#5ad65a" : "#ff7a7a"};width:${Math.min((totalSaidas/totalOrc)*100,100).toFixed(0)}%"></div>
+                <div style="height:100%;border-radius:4px;background:${totalSaidas <= totalOrc ? "#8fbfa0" : "#e09486"};width:${Math.min((totalSaidas/totalOrc)*100,100).toFixed(0)}%"></div>
             </div>
             <div style="font-size:11px;opacity:.5;margin-top:4px;text-align:right">${((totalSaidas/totalOrc)*100).toFixed(0)}% do orçamento utilizado</div>
         </div>` : `<div class="card" style="padding:14px;opacity:.5;font-size:13px;text-align:center;margin-bottom:12px">Sem orçamento aceite associado.</div>`}
@@ -4940,15 +4940,15 @@ async function carregarPainelFinanceiro() {
     });
     el.innerHTML = Object.entries(porCat).map(([cat, d]) => `
         <div class="card" style="margin-bottom:10px;padding:0;overflow:hidden">
-            <div style="padding:10px 14px;background:rgba(244,185,66,.08);display:flex;justify-content:space-between;align-items:center">
+            <div style="padding:10px 14px;background:rgba(181,136,99,.08);display:flex;justify-content:space-between;align-items:center">
                 <span style="font-family:var(--font-title);font-size:11px;letter-spacing:.5px;text-transform:uppercase">${cat}</span>
-                <span style="font-size:13px;font-weight:700;color:${d.saidas > 0 ? "#ff7a7a" : "#5ad65a"}">
+                <span style="font-size:13px;font-weight:700;color:${d.saidas > 0 ? "#e09486" : "#8fbfa0"}">
                     ${d.entradas > 0 ? "+" + d.entradas.toFixed(2) + " € " : ""}${d.saidas > 0 ? "−" + d.saidas.toFixed(2) + " €" : ""}
                 </span>
             </div>
             ${d.items.map(m => `<div style="padding:8px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12px">
                 <div><div style="opacity:.6">${escHtml(m.data_documento)}</div><div style="font-weight:500">${escHtml(m.fornecedores?.nome || m.observacoes || m.referencia || "—")}</div></div>
-                <div style="font-weight:700;color:${m.tipo === "entrada" ? "#5ad65a" : "#ff7a7a"}">${m.tipo === "entrada" ? "+" : "−"}${Number(m.valor_total).toFixed(2)} €</div>
+                <div style="font-weight:700;color:${m.tipo === "entrada" ? "#8fbfa0" : "#e09486"}">${m.tipo === "entrada" ? "+" : "−"}${Number(m.valor_total).toFixed(2)} €</div>
             </div>`).join("")}
         </div>`).join("");
 }
@@ -4970,7 +4970,7 @@ async function carregarPainelPonto() {
     const fmt = iso => iso ? iso.substring(11,16) : "—";
     el.innerHTML = `
         <div class="card" style="margin-bottom:12px;padding:0;overflow:hidden">
-            <div style="padding:10px 14px;background:rgba(244,185,66,.08);font-family:var(--font-title);font-size:11px;letter-spacing:.5px;text-transform:uppercase">Por Funcionário</div>
+            <div style="padding:10px 14px;background:rgba(181,136,99,.08);font-family:var(--font-title);font-size:11px;letter-spacing:.5px;text-transform:uppercase">Por Funcionário</div>
             ${Object.entries(porFunc).sort((a,b) => b[1].horas - a[1].horas).map(([nome, d]) => `
             <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border)">
                 <span style="font-weight:600;font-size:13px">${nome}</span>
@@ -4999,7 +4999,7 @@ async function carregarPainelStock() {
         .or(`obra_origem_id.eq.${_painelObraActual.id},obra_destino_id.eq.${_painelObraActual.id}`)
         .order("data_movimento", { ascending: false });
     if (!data?.length) { el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">Sem movimentos de stock.</div>`; return; }
-    const tipoCor = { entrada:"#5ad65a", saida:"#ff7a7a", ajuste_entrada:"#f4b942", ajuste_saida:"#f4b942" };
+    const tipoCor = { entrada:"#8fbfa0", saida:"#e09486", ajuste_entrada:"#b58863", ajuste_saida:"#b58863" };
     const tipoLabel = { entrada:"Entrada", saida:"Saída", ajuste_entrada:"Ajuste +", ajuste_saida:"Ajuste −" };
     el.innerHTML = `<div class="card" style="overflow-x:auto;padding:0">
         <table class="display" style="margin:0">
@@ -5086,7 +5086,7 @@ function actualizarKpisFluxo(lista) {
     document.getElementById("totalEntradas").textContent = entradas.toFixed(2) + " €";
     document.getElementById("totalSaidas").textContent   = saidas.toFixed(2) + " €";
     const sEl = document.getElementById("saldoFluxo");
-    if (sEl) { sEl.textContent = saldo.toFixed(2) + " €"; sEl.style.color = saldo >= 0 ? "#5ad65a" : "#ff7a7a"; }
+    if (sEl) { sEl.textContent = saldo.toFixed(2) + " €"; sEl.style.color = saldo >= 0 ? "#8fbfa0" : "#e09486"; }
 }
 
 async function carregarMovimentos() {
@@ -5167,7 +5167,7 @@ function renderMovimentos() {
             <td>${escHtml(m.fornecedores?.nome || "—")}</td>
             <td>${escHtml(m.categorias_financeiras?.nome || "—")}</td>
             <td>${escHtml(m.obras?.nome || "—")}</td>
-            <td style="text-align:right;font-weight:500;color:${ent ? "#5ad65a" : "#ff7a7a"}">${ent ? "+" : "–"}${Number(m.valor_total).toFixed(2)} €</td>
+            <td style="text-align:right;font-weight:500;color:${ent ? "#8fbfa0" : "#e09486"}">${ent ? "+" : "–"}${Number(m.valor_total).toFixed(2)} €</td>
             <td><span class="badge-estado ${m.estado_pagamento}">${m.estado_pagamento === "pago" ? "Pago" : "Por pagar"}</span></td>
             <td class="acoes-td">
                 <button class="btn-acao" title="Editar">✏️</button>
@@ -5182,7 +5182,7 @@ function renderMovimentos() {
         const tr = document.createElement("tr");
         tr.innerHTML = `<td colspan="9" style="text-align:center;padding:12px">
             <button onclick="_paginaFluxo++;renderMovimentos()" 
-                style="background:rgba(244,185,66,.15);color:var(--primary,#b8860b);border:1px solid rgba(244,185,66,.3);
+                style="background:rgba(181,136,99,.15);color:var(--primary,#b8860b);border:1px solid rgba(181,136,99,.3);
                        border-radius:20px;padding:7px 20px;cursor:pointer;font-size:13px;font-weight:600">
                 Ver mais (${movimentos.length - fim} restantes)
             </button>
@@ -5230,7 +5230,7 @@ async function carregarServicosImputacao(obraId, movId = null) {
         </div>
         <div id="imputLinhasInner"></div>
         <button type="button" id="btnAddImput"
-            style="background:rgba(244,185,66,.1);border:1px solid rgba(244,185,66,.2);color:var(--primary,#f4b942);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;margin-top:6px">
+            style="background:rgba(181,136,99,.1);border:1px solid rgba(181,136,99,.2);color:var(--primary,#b58863);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;margin-top:6px">
             + Adicionar serviço
         </button>`;
 
@@ -5258,7 +5258,7 @@ function adicionarLinhaImput(servs, servicoId = null, valor = null) {
         </select>
         <input class="imput-serv-val" type="number" step="0.01" min="0" placeholder="€"
             style="width:80px;padding:6px 8px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:13px">
-        <button type="button" onclick="this.parentElement.remove()" style="background:rgba(248,113,113,.1);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>`;
+        <button type="button" onclick="this.parentElement.remove()" style="background:rgba(224,148,134,.1);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>`;
     inner.appendChild(div);
 
     if (servicoId) div.querySelector(".imput-serv-sel").value = servicoId;
@@ -5435,8 +5435,8 @@ function activarLeituraBarcode() {
                 const refEl = document.getElementById("movReferencia");
                 if (refEl) {
                     refEl.value = codigo;
-                    refEl.style.background = "rgba(74,222,128,.1)";
-                    refEl.style.borderColor = "rgba(74,222,128,.4)";
+                    refEl.style.background = "rgba(143,191,160,.1)";
+                    refEl.style.borderColor = "rgba(143,191,160,.4)";
                     setTimeout(() => { refEl.style.background = ""; refEl.style.borderColor = ""; }, 1500);
                 }
                 setTimeout(() => document.getElementById("movNif")?.focus(), 50);
@@ -5718,9 +5718,9 @@ function ligarEventosGlobais() {
                 b.style.color = "var(--text-muted)";
                 b.style.borderColor = "rgba(255,255,255,.1)";
             });
-            btn.style.background = "rgba(244,185,66,.15)";
+            btn.style.background = "rgba(181,136,99,.15)";
             btn.style.color = "var(--primary)";
-            btn.style.borderColor = "rgba(244,185,66,.4)";
+            btn.style.borderColor = "rgba(181,136,99,.4)";
             const estado = btn.dataset.estado;
             filtrarPorEstado(estado);
         });
@@ -5847,9 +5847,9 @@ function renderTabelaOrc(lista) {
 
     const estadoStyle = {
         rascunho: { bg:'rgba(180,180,180,.12)', cor:'#999',    label:'Rascunho' },
-        enviado:  { bg:'rgba(244,185,66,.15)',  cor:'#c8901e', label:'Enviado'  },
-        aceite:   { bg:'rgba(42,138,42,.12)',   cor:'#2a8a2a', label:'Aceite'   },
-        recusado: { bg:'rgba(229,92,92,.12)',   cor:'#c0392b', label:'Recusado' },
+        enviado:  { bg:'rgba(181,136,99,.15)',  cor:'#c8901e', label:'Enviado'  },
+        aceite:   { bg:'rgba(79,122,99,.12)',   cor:'#4f7a63', label:'Aceite'   },
+        recusado: { bg:'rgba(229,92,92,.12)',   cor:'#a5483d', label:'Recusado' },
         cancelado:{ bg:'rgba(229,92,92,.08)',   cor:'#999',    label:'Cancelado'},
     };
 
@@ -5863,7 +5863,7 @@ function renderTabelaOrc(lista) {
 
         const tr = document.createElement('tr');
         tr.style.cursor = 'pointer';
-        tr.onmouseenter = () => tr.style.background = 'rgba(244,185,66,.04)';
+        tr.onmouseenter = () => tr.style.background = 'rgba(181,136,99,.04)';
         tr.onmouseleave = () => tr.style.background = '';
         tr.innerHTML =
             `<td style="font-family:monospace;font-size:12px;font-weight:600;white-space:nowrap;width:100px;padding:10px 12px">${o.numero || '—'}</td>` +
@@ -5877,9 +5877,9 @@ function renderTabelaOrc(lista) {
             </td>` +
             `<td style="width:120px;padding:10px 12px">
                 <span style="background:${est.bg};color:${est.cor};padding:3px 12px;border-radius:20px;font-size:11px;font-weight:600">${est.label}</span>
-                ${vencido ? '<div style="font-size:10px;color:#dc2626;margin-top:3px">⚠ Vencido</div>' : ''}
+                ${vencido ? '<div style="font-size:10px;color:#a5483d;margin-top:3px">⚠ Vencido</div>' : ''}
             </td>` +
-            `<td style="font-size:12px;white-space:nowrap;width:90px;padding:10px 12px;${vencido ? 'color:#dc2626' : 'opacity:.5'}">${dataFmt(o.validade)}</td>` +
+            `<td style="font-size:12px;white-space:nowrap;width:90px;padding:10px 12px;${vencido ? 'color:#a5483d' : 'opacity:.5'}">${dataFmt(o.validade)}</td>` +
             `<td style="white-space:nowrap;width:120px;padding:8px 12px">
                 <div style="display:flex;gap:4px;justify-content:flex-end">
                     <button class="btn-acao btn-e" title="Editar">✏️</button>
@@ -5991,7 +5991,7 @@ function adicionarCategoria(nome = '', linhas = [], catDbId = null) {
 
     const nomeEsc = nome.replace(/"/g, '&quot;');
     div.innerHTML =
-        '<div style="background:rgba(244,185,66,.12);padding:10px 14px;display:flex;align-items:center;gap:10px">' +
+        '<div style="background:rgba(181,136,99,.12);padding:10px 14px;display:flex;align-items:center;gap:10px">' +
             '<input value="' + nomeEsc + '" placeholder="Nome da categoria" data-cid="' + cid + '" ' +
                 'style="flex:1;border:none;background:transparent;font-family:var(--font-title);font-size:13px;font-weight:500;letter-spacing:.5px;text-transform:uppercase;outline:none;color:var(--text-dark)">' +
             '<span class="cat-subtotal" style="font-family:var(--font-title);font-size:13px;font-weight:600;color:var(--primary-dk,#c8901e);white-space:nowrap;min-width:80px;text-align:right"></span>' +
@@ -6017,14 +6017,14 @@ function adicionarLinha(cid, tipo = 'material', dados = null) {
     const lid = ++_linhaCounter;
 
     const tipoCor = {
-        mao_obra: 'rgba(42,138,42,.07)',
+        mao_obra: 'rgba(79,122,99,.07)',
         material: 'rgba(74,144,226,.07)',
-        outro:    'rgba(244,185,66,.07)'
+        outro:    'rgba(181,136,99,.07)'
     };
     const tipoBadge = {
-        mao_obra: { label:'Mão Obra', cor:'#4ade80' },
+        mao_obra: { label:'Mão Obra', cor:'#8fbfa0' },
         material: { label:'Material', cor:'#60a5fa' },
-        outro:    { label:'Outro',    cor:'#f4b942' }
+        outro:    { label:'Outro',    cor:'#b58863' }
     };
 
     const div = document.createElement('div');
@@ -6061,7 +6061,7 @@ function adicionarLinha(cid, tipo = 'material', dados = null) {
                 style="background:none;border:none;cursor:pointer;opacity:.25;font-size:16px;padding:0;text-align:center">×</button>
         </div>
         <div style="padding:1px 14px 4px 48px;display:flex;gap:6px;align-items:center">
-            <span style="font-size:10px;background:rgba(74,222,128,.15);color:#4ade80;padding:1px 7px;border-radius:6px;font-weight:600;letter-spacing:.3px">MO</span>
+            <span style="font-size:10px;background:rgba(143,191,160,.15);color:#8fbfa0;padding:1px 7px;border-radius:6px;font-weight:600;letter-spacing:.3px">MO</span>
             <span style="font-size:10px;color:rgba(0,0,0,.3)">Pessoas × Horas × €/hora</span>
         </div>`;
     } else {
@@ -6397,46 +6397,46 @@ async function exportarPDFOrcamento(id) {
   body { font-family:'Inter',sans-serif; font-size:11px; color:#222; background:#fff; padding:28px 32px; }
 
   /* Header */
-  .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:28px; padding-bottom:20px; border-bottom:2px solid #f4b942; }
+  .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:28px; padding-bottom:20px; border-bottom:2px solid #b58863; }
   .logo-area { }
   .empresa-nome { font-family:'Oswald',sans-serif; font-size:22px; font-weight:500; letter-spacing:2px; text-transform:uppercase; color:#1a1a1a; }
   .empresa-sub  { font-size:10px; color:#888; letter-spacing:1px; text-transform:uppercase; margin-top:2px; }
   .orc-info { text-align:right; }
-  .orc-numero { font-family:'Oswald',sans-serif; font-size:20px; font-weight:600; color:#f4b942; letter-spacing:1px; }
-  .orc-estado { display:inline-block; padding:2px 10px; border-radius:4px; font-size:10px; font-weight:600; letter-spacing:1px; text-transform:uppercase; margin-top:4px; background:rgba(244,185,66,.15); color:#a8845c; }
+  .orc-numero { font-family:'Oswald',sans-serif; font-size:20px; font-weight:600; color:#b58863; letter-spacing:1px; }
+  .orc-estado { display:inline-block; padding:2px 10px; border-radius:4px; font-size:10px; font-weight:600; letter-spacing:1px; text-transform:uppercase; margin-top:4px; background:rgba(181,136,99,.15); color:#9a7150; }
   .orc-datas  { font-size:10px; color:#888; margin-top:6px; line-height:1.6; }
 
   /* Cliente + Obra */
   .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px; }
-  .info-box  { background:#faf8f4; border-radius:6px; padding:12px 16px; }
-  .info-box h3 { font-family:'Oswald',sans-serif; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:#a8845c; margin-bottom:8px; }
+  .info-box  { background:#f4f1ec; border-radius:6px; padding:12px 16px; }
+  .info-box h3 { font-family:'Oswald',sans-serif; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:#9a7150; margin-bottom:8px; }
   .info-box p  { font-size:11px; line-height:1.7; color:#333; }
   .info-box .destaque { font-weight:600; font-size:12px; color:#1a1a1a; }
 
   /* Tabela de trabalhos */
   .tabela-titulo { font-family:'Oswald',sans-serif; font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:#888; margin-bottom:8px; }
   table { width:100%; border-collapse:collapse; margin-bottom:20px; }
-  thead th { font-family:'Oswald',sans-serif; font-size:10px; letter-spacing:1px; text-transform:uppercase; background:#f4b942; color:#1a1000; padding:7px 10px; text-align:left; }
+  thead th { font-family:'Oswald',sans-serif; font-size:10px; letter-spacing:1px; text-transform:uppercase; background:#b58863; color:#ffffff; padding:7px 10px; text-align:left; }
   thead th.num { text-align:right; }
-  .cat-header td { font-family:'Oswald',sans-serif; font-size:11px; font-weight:500; letter-spacing:.8px; background:#f5f2ed; color:#a8845c; padding:6px 10px; border-bottom:1px solid rgba(0,0,0,.06); }
+  .cat-header td { font-family:'Oswald',sans-serif; font-size:11px; font-weight:500; letter-spacing:.8px; background:#f5f2ed; color:#9a7150; padding:6px 10px; border-bottom:1px solid rgba(0,0,0,.06); }
   tbody tr td { padding:5px 10px; border-bottom:1px solid rgba(0,0,0,.05); font-size:11px; vertical-align:middle; }
   tbody tr:last-child td { border-bottom:none; }
   .num { text-align:right; }
   .tipo-badge { font-size:9px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; padding:1px 5px; border-radius:3px; white-space:nowrap; }
-  .tipo-mao_obra  { background:rgba(42,138,42,.12);  color:#2a8a2a; }
+  .tipo-mao_obra  { background:rgba(79,122,99,.12);  color:#4f7a63; }
   .tipo-material  { background:rgba(74,144,226,.12); color:#2a5eb0; }
-  .tipo-outro     { background:rgba(244,185,66,.15); color:#a8845c; }
+  .tipo-outro     { background:rgba(181,136,99,.15); color:#9a7150; }
 
   /* Totais */
   .totais-wrap { display:grid; grid-template-columns:1fr 280px; gap:20px; margin-bottom:24px; }
-  .condicoes { background:#faf8f4; border-radius:6px; padding:14px 16px; }
-  .condicoes h3 { font-family:'Oswald',sans-serif; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:#a8845c; margin-bottom:8px; }
+  .condicoes { background:#f4f1ec; border-radius:6px; padding:14px 16px; }
+  .condicoes h3 { font-family:'Oswald',sans-serif; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:#9a7150; margin-bottom:8px; }
   .condicoes p { font-size:11px; line-height:1.7; color:#333; margin-bottom:6px; }
   .totais-box { }
   .totais-linha { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(0,0,0,.06); font-size:11px; }
-  .totais-linha.final { border-bottom:none; border-top:2px solid #f4b942; margin-top:4px; padding-top:8px; }
+  .totais-linha.final { border-bottom:none; border-top:2px solid #b58863; margin-top:4px; padding-top:8px; }
   .totais-linha.final .label { font-family:'Oswald',sans-serif; font-size:14px; font-weight:600; letter-spacing:.5px; }
-  .totais-linha.final .valor { font-family:'Oswald',sans-serif; font-size:16px; font-weight:600; color:#a8845c; }
+  .totais-linha.final .valor { font-family:'Oswald',sans-serif; font-size:16px; font-weight:600; color:#9a7150; }
   .totais-linha .label { color:#555; }
   .totais-linha .valor { font-weight:600; }
 
@@ -6589,7 +6589,7 @@ function gerarQrTab() {
         });
         if (btnImprimir) btnImprimir.disabled = false;
     } catch(e) {
-        output.innerHTML = '<div style="color:#f87171;font-size:13px">Erro ao gerar QR. Tenta o gerador avançado.</div>';
+        output.innerHTML = '<div style="color:#e09486;font-size:13px">Erro ao gerar QR. Tenta o gerador avançado.</div>';
     }
 }
 
@@ -6715,21 +6715,21 @@ async function carregarDRE() {
     document.getElementById("dreCustos").title         = `Fornecedores: ${totalCus.toFixed(2)}€ + Mão obra: ${custoMO.toFixed(2)}€`;
     const resEl = document.getElementById("dreResultado");
     resEl.textContent = resultado.toFixed(2) + " €";
-    resEl.style.color = resultado >= 0 ? "#5ad65a" : "#ff7a7a";
+    resEl.style.color = resultado >= 0 ? "#8fbfa0" : "#e09486";
     document.getElementById("dreMargem").textContent = margem.toFixed(1) + "%";
 
     const recByCat = {};
     receitas.forEach(m => { const c = m.categorias_financeiras?.nome || "Sem categoria"; recByCat[c] = (recByCat[c]||0) + Number(m.valor_total); });
     document.getElementById("dreDetalheReceitas").innerHTML = Object.entries(recByCat).sort((a,b)=>b[1]-a[1]).map(([cat,val]) =>
         `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
-            <span style="opacity:.8">${cat}</span><span style="color:#5ad65a;font-weight:600">${val.toFixed(2)} €</span></div>`
+            <span style="opacity:.8">${cat}</span><span style="color:#8fbfa0;font-weight:600">${val.toFixed(2)} €</span></div>`
     ).join("") || "<p style='opacity:.4;font-size:13px'>Sem receitas no período</p>";
 
     const cusByCat = {};
     custos.forEach(m => { const c = m.categorias_financeiras?.nome || "Sem categoria"; cusByCat[c] = (cusByCat[c]||0) + Number(m.valor_total); });
     document.getElementById("dreDetalheCustos").innerHTML = Object.entries(cusByCat).sort((a,b)=>b[1]-a[1]).map(([cat,val]) =>
         `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
-            <span style="opacity:.8">${cat}</span><span style="color:#ff7a7a;font-weight:600">${val.toFixed(2)} €</span></div>`
+            <span style="opacity:.8">${cat}</span><span style="color:#e09486;font-weight:600">${val.toFixed(2)} €</span></div>`
     ).join("") || "<p style='opacity:.4;font-size:13px'>Sem custos no período</p>";
 
     // Popular select de obras no DRE
@@ -6770,13 +6770,13 @@ async function carregarOrcadoReal() {
     document.getElementById("orcadoReal").textContent    = totalReal.toFixed(2) + " €";
     const devEl = document.getElementById("orcadoDesvio");
     devEl.textContent = (desvio>=0?"+":"")+desvio.toFixed(2)+" €";
-    devEl.style.color = desvio<=0 ? "#5ad65a" : "#ff7a7a";
+    devEl.style.color = desvio<=0 ? "#8fbfa0" : "#e09486";
     document.getElementById("orcadoPercent").textContent = percent.toFixed(1)+"%";
 
     const pct = Math.min(percent,100);
     const bar = document.getElementById("orcadoBar");
     bar.style.width      = pct+"%";
-    bar.style.background = pct<80?"var(--primary)":pct<100?"#f97316":"#ff7a7a";
+    bar.style.background = pct<80?"var(--primary)":pct<100?"#f97316":"#e09486";
     document.getElementById("orcadoBarLabel").textContent = percent.toFixed(1)+"% executado";
 
     const catMap = {};
@@ -6784,7 +6784,7 @@ async function carregarOrcadoReal() {
     document.getElementById("orcadoTabela").innerHTML = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).map(([cat,val]) =>
         `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
             <td style="padding:8px;font-size:13px">${cat}</td>
-            <td style="padding:8px;font-size:13px;text-align:right;color:#ff7a7a;font-weight:600">${val.toFixed(2)} €</td>
+            <td style="padding:8px;font-size:13px;text-align:right;color:#e09486;font-weight:600">${val.toFixed(2)} €</td>
             <td style="padding:8px;font-size:13px;text-align:right;opacity:.6">${totalReal>0?(val/totalReal*100).toFixed(1):0}%</td>
         </tr>`).join("") || `<tr><td colspan="3" style="padding:20px;text-align:center;opacity:.4">Sem gastos registados</td></tr>`;
 }
@@ -6935,7 +6935,7 @@ function switchCfgTab(tab) {
         const cont = document.getElementById(`cfgTabContent-${t}`);
         const active = t === tab;
         if (btn) {
-            btn.style.background   = active ? "rgba(244,185,66,.15)" : "none";
+            btn.style.background   = active ? "rgba(181,136,99,.15)" : "none";
             btn.style.color        = active ? "var(--primary)" : "var(--text-muted)";
             btn.style.borderBottom = active ? "2px solid var(--primary)" : "2px solid transparent";
         }
@@ -6996,7 +6996,7 @@ function renderBiblioteca() {
                             <div style="font-weight:600;font-size:13px;margin-bottom:4px;display:flex;align-items:center;gap:8px">
                                 ${s.nome}
                                 <span style="font-size:10px;background:rgba(0,0,0,.06);padding:1px 7px;border-radius:8px;color:var(--text-muted);font-weight:400">${s.unidade}</span>
-                                ${!s.ativo ? '<span style="font-size:10px;color:#dc2626;background:rgba(248,113,113,.1);padding:1px 7px;border-radius:8px">Inactivo</span>' : ''}
+                                ${!s.ativo ? '<span style="font-size:10px;color:#a5483d;background:rgba(224,148,134,.1);padding:1px 7px;border-radius:8px">Inactivo</span>' : ''}
                             </div>
                             <div style="font-size:11px;opacity:.5">
                                 ${s.rendimento_mo ? `⚡ ${s.rendimento_mo} ${s.unidade}/dia · ` : ''}
@@ -7051,7 +7051,7 @@ function adicionarLinhaBibMat(mat = null) {
             style="padding:6px 4px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:12px">
             ${["kg","L","m²","ml","m³","un","saco","rolo","cx"].map(u=>`<option ${u===(mat?.unidade||'un')?'selected':''}>${u}</option>`).join("")}
         </select>
-        <button onclick="this.closest('.bib-mat-linha').remove()" style="background:rgba(220,38,38,.1);border:none;border-radius:6px;padding:5px;cursor:pointer;font-size:14px;opacity:.7">×</button>`;
+        <button onclick="this.closest('.bib-mat-linha').remove()" style="background:rgba(165,72,61,.1);border:none;border-radius:6px;padding:5px;cursor:pointer;font-size:14px;opacity:.7">×</button>`;
     cont.appendChild(div);
 }
 
@@ -7121,13 +7121,13 @@ function ligarAutocompleteBiblioteca(inputEl, cid) {
         if (!matches.length) { removePopup(); return; }
         removePopup();
         popup = document.createElement("div");
-        popup.style.cssText = "position:fixed;z-index:9999;background:#1e1e1e;border:1px solid rgba(255,255,255,.12);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.6);min-width:320px;max-width:420px;overflow:hidden";
+        popup.style.cssText = "position:fixed;z-index:9999;background:#25363f;border:1px solid rgba(255,255,255,.12);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.6);min-width:320px;max-width:420px;overflow:hidden";
         const rect = inputEl.getBoundingClientRect();
         popup.style.top  = (rect.bottom + 4) + "px";
         popup.style.left = rect.left + "px";
         popup.innerHTML =
             '<div style="padding:6px 12px;font-size:10px;letter-spacing:1px;text-transform:uppercase;opacity:.4;border-bottom:1px solid rgba(255,255,255,.06)">🔧 Biblioteca</div>' +
-            matches.map(s => `<div class="bib-pp" data-id="${s.id}" style="padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.04)" onmouseenter="this.style.background='rgba(244,185,66,.1)'" onmouseleave="this.style.background=''"><div><div style="font-size:13px;font-weight:500">${s.nome}</div><div style="font-size:11px;opacity:.4">${s.categoria}${s.rendimento_mo?' · '+s.rendimento_mo+' '+s.unidade+'/dia':''}</div></div><span style="font-size:10px;background:rgba(255,255,255,.08);padding:2px 8px;border-radius:8px;color:rgba(255,255,255,.5);margin-left:8px;flex-shrink:0">${s.unidade}</span></div>`).join("");
+            matches.map(s => `<div class="bib-pp" data-id="${s.id}" style="padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.04)" onmouseenter="this.style.background='rgba(181,136,99,.1)'" onmouseleave="this.style.background=''"><div><div style="font-size:13px;font-weight:500">${s.nome}</div><div style="font-size:11px;opacity:.4">${s.categoria}${s.rendimento_mo?' · '+s.rendimento_mo+' '+s.unidade+'/dia':''}</div></div><span style="font-size:10px;background:rgba(255,255,255,.08);padding:2px 8px;border-radius:8px;color:rgba(255,255,255,.5);margin-left:8px;flex-shrink:0">${s.unidade}</span></div>`).join("");
         document.body.appendChild(popup);
         popup.querySelectorAll(".bib-pp").forEach(el => {
             el.addEventListener("mousedown", e => {
@@ -7156,7 +7156,7 @@ async function aplicarServicoBiblioteca(servicoId, inputDescricao, cid) {
     if (!linhasDiv) return;
     mats.forEach(m => adicionarLinha(cid, "material", { descricao: `${m.descricao}  [${m.quantidade} ${m.unidade}/un]`, unidade: m.unidade, quantidade: 1, preco_unitario: "" }));
     const info = document.createElement("div");
-    info.style.cssText = "background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);border-radius:8px;padding:8px 14px;font-size:12px;color:#4ade80;margin:6px 0";
+    info.style.cssText = "background:rgba(143,191,160,.1);border:1px solid rgba(143,191,160,.2);border-radius:8px;padding:8px 14px;font-size:12px;color:#8fbfa0;margin:6px 0";
     info.innerHTML = `✓ <strong>${mats.length} material${mats.length>1?'is':''}</strong> adicionado${mats.length>1?'s':''} da biblioteca. Ajusta a quantidade total do serviço.`;
     linhasDiv.insertBefore(info, linhasDiv.firstChild);
     setTimeout(() => info.remove(), 5000);

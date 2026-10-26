@@ -132,7 +132,7 @@ async function alertaPrecosSubiram() {
     subidas.sort((x, y) => y.pc - x.pc);
     const pior = subidas[0];
     return {
-        icone: "📄", cor: "rgba(244,185,66,.22)",
+        icone: "📄", cor: "rgba(181,136,99,.22)",
         titulo: subidas.length === 1 ? "Preço acima do anterior" : `${subidas.length} preços acima do anterior`,
         sub: `Financeiro · +${pior.pc.toFixed(0)}% em ${pior.nome}`,
         ir: `${HOJE_ADMIN}#tab=inventario`,
@@ -161,7 +161,7 @@ async function alertaPorPagar() {
     if (!count) return null;
     const soma = (data || []).reduce((s, m) => s + Number(m.valor_total || 0), 0);
     return {
-        icone: "💶", cor: "rgba(192,57,43,.10)",
+        icone: "💶", cor: "rgba(165,72,61,.10)",
         titulo: count === 1 ? "1 fatura por pagar" : `${count} faturas por pagar`,
         sub: `Financeiro · ${euros(soma)}`,
         ir: `${HOJE_ADMIN}#tab=financeiro`,
@@ -203,7 +203,7 @@ async function alertaTarefasAtrasadas() {
         .lt("data_prevista", hoje).neq("estado", "concluida").limit(5);
     if (!count) return null;
     return {
-        icone: "⏰", cor: "rgba(244,185,66,.22)",
+        icone: "⏰", cor: "rgba(181,136,99,.22)",
         titulo: count === 1 ? "1 tarefa atrasada" : `${count} tarefas atrasadas`,
         sub: `Planeamento · ${data?.[0]?.obras?.nome || "sem obra"}`,
         ir: `${HOJE_ADMIN}#tab=planeamento`,

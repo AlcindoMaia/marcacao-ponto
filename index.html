@@ -9,14 +9,14 @@
   // Para onde vai quem abre a aplicação:
   //   com ?obra=...  -> a marcação de ponto do funcionário
   //   no telemóvel   -> o ecrã Hoje, com a visão geral e os atalhos
-  //   no computador  -> o dashboard de sempre
+  //   no computador  -> o painel administrativo
   const params = window.location.search;
 
   if (params.includes('obra=')) {
     window.location.replace('app.html' + params);
   } else {
     const telemovel = window.matchMedia('(max-width: 820px)').matches;
-    window.location.replace(telemovel ? 'hoje.html' : 'dashboard.html');
+    window.location.replace(telemovel ? 'hoje.html' : 'admin.html');
   }
 </script>
 </head>
