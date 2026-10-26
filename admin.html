@@ -7,8 +7,8 @@
 
 <title>Painel Administrativo — Maia Solutions</title>
 
-<link rel="stylesheet" href="style.css?v=9">
-<link rel="stylesheet" href="telemovel.css?v=5">
+<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="telemovel.css?v=6">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
 <!-- jQuery -->
@@ -259,13 +259,10 @@
         </div>
 
         <!-- AÇÕES + FILTRO MÊS -->
-        <div class="card filtros" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <div style="display:flex;flex-direction:column;gap:4px">
-                <label style="font-size:11px;opacity:.6;text-transform:uppercase;letter-spacing:.05em">Mês</label>
-                <input type="month" id="filtroMesFinanceiro" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:var(--bg-dark-panel);color:var(--text-light);font-size:13px">
-            </div>
-            <button class="btn-primary" id="btnRefreshFinanceiro" style="margin-top:18px">Atualizar</button>
-            <button class="btn-secondary" id="btnExportExcel" style="margin-top:18px">Exportar Excel</button>
+        <div class="barra-filtros">
+            <input type="month" id="filtroMesFinanceiro" title="Mês" aria-label="Mês">
+            <button class="btn-icone" id="btnRefreshFinanceiro" title="Atualizar" aria-label="Atualizar">⟳</button>
+            <button class="btn-pequeno" id="btnExportExcel" title="Exportar Excel">📥 Excel</button>
         </div>
 
         <!-- TABELA FINANCEIRA -->
@@ -443,23 +440,22 @@
     <!-- Barra superior -->
     <div class="inventario-header">
 
-        <input type="text"
+        <input type="search"
                id="pesquisaInventario"
-               class="input-lg"
-               placeholder="Pesquisar por código, descrição ou tipo">
+               placeholder="🔍 Código, descrição ou tipo">
 
         <button id="btnImprimirLote"
                 style="background:rgba(181,136,99,.12);border:1px solid rgba(181,136,99,.3);color:var(--primary);padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;opacity:.4;white-space:nowrap;flex-shrink:0">
-            🖨️ Imprimir Lote
+            🖨️ <span class="so-largo">Imprimir </span>Lote
         </button>
 
-        <button id="btnNovoArtigo" class="btn-primary" style="width:42px;height:42px;font-size:22px;border-radius:50%;padding:0;flex-shrink:0">+</button>
+        <button id="btnNovoArtigo" class="btn-primary btn-circular" title="Novo artigo">+</button>
 
     </div>
 
     <!-- Tabela -->
     <div class="card">
-        <table id="tabelaArtigos" class="display">
+        <table id="tabelaArtigos" class="display cartao-compacto">
             <thead>
                 <tr>
                     <th>Código</th>
@@ -481,44 +477,22 @@
     <div id="invTab-movimentos" class="inv-subtab-content" style="display:none">
 
         <!-- Filtros -->
-        <div class="card" style="margin-bottom:12px;padding:14px 16px">
-            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
-                <div style="flex:1;min-width:150px">
-                    <label style="font-size:11px;opacity:.6;display:block;margin-bottom:3px">Artigo</label>
-                    <input id="filtroMovArtigo" placeholder="Código ou descrição"
-                           style="width:100%;padding:6px 10px;border-radius:6px;border:1px solid rgba(0,0,0,.15);background:#fff;color:var(--text-dark);font-size:13px">
-                </div>
-                <div style="flex:1;min-width:150px">
-                    <label style="font-size:11px;opacity:.6;display:block;margin-bottom:3px">Funcionário</label>
-                    <select id="filtroMovFunc"
-                            style="width:100%;padding:6px 10px;border-radius:6px;border:1px solid rgba(0,0,0,.15);background:#fff;color:var(--text-dark);font-size:13px">
-                        <option value="">— Todos —</option>
-                    </select>
-                </div>
-                <div style="flex:1;min-width:150px">
-                    <label style="font-size:11px;opacity:.6;display:block;margin-bottom:3px">Obra</label>
-                    <select id="filtroMovObra"
-                            style="width:100%;padding:6px 10px;border-radius:6px;border:1px solid rgba(0,0,0,.15);background:#fff;color:var(--text-dark);font-size:13px">
-                        <option value="">— Todas —</option>
-                    </select>
-                </div>
-                <div style="min-width:130px">
-                    <label style="font-size:11px;opacity:.6;display:block;margin-bottom:3px">De</label>
-                    <input id="filtroMovInicio" type="date"
-                           style="width:100%;padding:6px 10px;border-radius:6px;border:1px solid rgba(0,0,0,.15);background:#fff;color:var(--text-dark);font-size:13px">
-                </div>
-                <div style="min-width:130px">
-                    <label style="font-size:11px;opacity:.6;display:block;margin-bottom:3px">Até</label>
-                    <input id="filtroMovFim" type="date"
-                           style="width:100%;padding:6px 10px;border-radius:6px;border:1px solid rgba(0,0,0,.15);background:#fff;color:var(--text-dark);font-size:13px">
-                </div>
-                <button id="btnLimparFiltrosMov" class="btn-secondary" style="white-space:nowrap">Limpar</button>
-            </div>
+        <div class="barra-filtros filtros-mov">
+            <input id="filtroMovArtigo" type="search" placeholder="🔍 Artigo (código ou descrição)" class="filtro-largo">
+            <select id="filtroMovFunc" title="Funcionário">
+                <option value="">Funcionário: todos</option>
+            </select>
+            <select id="filtroMovObra" title="Obra">
+                <option value="">Obra: todas</option>
+            </select>
+            <label class="filtro-data">De <input id="filtroMovInicio" type="date"></label>
+            <label class="filtro-data">Até <input id="filtroMovFim" type="date"></label>
+            <button id="btnLimparFiltrosMov" class="btn-icone" title="Limpar filtros" aria-label="Limpar filtros">✕</button>
         </div>
 
         <!-- Tabela movimentos -->
         <div class="card" style="overflow-x:auto">
-            <table id="tabelaMovStock" class="display">
+            <table id="tabelaMovStock" class="display cartao-compacto">
                 <thead>
                     <tr>
                         <th>Data</th>
@@ -1121,32 +1095,19 @@
 
     <!-- SUB-TAB: REGISTOS ADMIN -->
     <div id="regTabContent-admin" style="display:none">
-        <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap">
-            <div>
-                <label style="font-size:11px;opacity:.6;display:block;margin-bottom:3px">Mês</label>
-                <input type="month" id="raFiltroMes" style="padding:6px 10px;border-radius:6px;border:1px solid rgba(0,0,0,.15);background:#fff;color:var(--text-dark);font-size:13px">
-            </div>
-            <div>
-                <label style="font-size:11px;opacity:.6;display:block;margin-bottom:3px">Vista</label>
-                <select id="raFiltroVista" onchange="carregarRegistosAdmin()"
-                    style="padding:6px 10px;border-radius:6px;border:1px solid rgba(0,0,0,.15);background:#fff;color:var(--text-dark);font-size:13px">
-                    <option value="func">Por Funcionário</option>
-                    <option value="obra">Por Obra</option>
-                    <option value="detalhe">Detalhe completo</option>
-                </select>
-            </div>
-            <button onclick="carregarRegistosAdmin()"
-                style="background:var(--primary);border:none;border-radius:6px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;color:#ffffff">
-                🔄 Actualizar
-            </button>
-            <button onclick="exportarRegistosAdminExcel()"
-                style="background:rgba(79,122,99,.1);color:#4f7a63;border:1px solid rgba(79,122,99,.3);border-radius:6px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;margin-left:auto">
-                📥 Excel
-            </button>
+        <div class="barra-filtros">
+            <input type="month" id="raFiltroMes" title="Mês" aria-label="Mês">
+            <select id="raFiltroVista" onchange="carregarRegistosAdmin()" title="Vista" aria-label="Vista">
+                <option value="func">Por funcionário</option>
+                <option value="obra">Por obra</option>
+                <option value="detalhe">Detalhe completo</option>
+            </select>
+            <button class="btn-icone" onclick="carregarRegistosAdmin()" title="Atualizar" aria-label="Atualizar">⟳</button>
+            <button class="btn-pequeno" onclick="exportarRegistosAdminExcel()" title="Exportar Excel">📥 Excel</button>
         </div>
         <div id="raKpis" class="grid-cards" style="margin-bottom:16px"></div>
         <div id="raConteudo" class="card" style="overflow-x:auto;padding:0">
-            <div style="padding:32px;text-align:center;opacity:.4">Selecciona um mês e clica Actualizar</div>
+            <div style="padding:32px;text-align:center;opacity:.4">Escolhe um mês e carrega em ⟳</div>
         </div>
     </div><!-- fim regTabContent-admin -->
 
@@ -1303,17 +1264,17 @@
 
     <!-- Barra superior -->
     <div class="inventario-header">
-        <input type="text" id="pesquisaOrcamentos" placeholder="Pesquisar por número, cliente ou obra">
-        <div style="display:flex;gap:8px;flex-shrink:0">
-            <select id="filtroEstadoOrc" style="height:40px;padding:0 10px;border-radius:var(--radius-sm);border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.6);font-size:13px">
-                <option value="">— Todos —</option>
-                <option value="rascunho">Rascunho</option>
-                <option value="enviado">Enviado</option>
-                <option value="aceite">Aceite</option>
-                <option value="recusado">Recusado</option>
-            </select>
-            <button id="btnNovoOrcamento" class="btn-primary btn-circular">+</button>
-        </div>
+        <input type="search" id="pesquisaOrcamentos" placeholder="🔍 Número, cliente ou obra">
+        <button id="btnNovoOrcamento" class="btn-primary btn-circular" title="Novo orçamento">+</button>
+    </div>
+
+    <!-- Filtro por estado (o valor fica no #filtroEstadoOrc escondido) -->
+    <input type="hidden" id="filtroEstadoOrc" value="">
+    <div class="chips-estado" id="chipsEstadoOrc">
+        <button type="button" class="chip-estado ativo" data-estado="">Todos</button>
+        <button type="button" class="chip-estado" data-estado="aceite">✓ Só aceites</button>
+        <button type="button" class="chip-estado" data-estado="pendentes">Pendentes</button>
+        <button type="button" class="chip-estado" data-estado="recusado">✕ Não aceites</button>
     </div>
 
     <!-- KPIs -->
@@ -1331,20 +1292,19 @@
             <div id="orcKpiPendentes" class="value" style="color:var(--color-warn)">–</div>
         </div>
         <div class="card metric">
-            <h3>Valor Total</h3>
+            <h3>Valor aceite</h3>
             <div id="orcKpiValor" class="value">–</div>
         </div>
     </div>
 
     <!-- Tabela -->
     <div class="card" style="overflow-x:auto">
-        <table id="tabelaOrcamentos">
+        <table id="tabelaOrcamentos" class="cartao-compacto">
             <thead>
                 <tr>
                     <th>Número</th>
                     <th>Data</th>
-                    <th>Cliente</th>
-                    <th>Obra</th>
+                    <th>Cliente / obra</th>
                     <th style="text-align:right">Total c/ IVA</th>
                     <th>Estado</th>
                     <th>Validade</th>
@@ -1815,7 +1775,7 @@
 <script src="dados-publicos.js"></script>
 <script src="planeamento.js?v=2"></script>
 <script src="cotacoes.js"></script>
-<script src="admin.js?v=5"></script>
+<script src="admin.js?v=6"></script>
 <script src="telemovel.js?v=5"></script>
 
 

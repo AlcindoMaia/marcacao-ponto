@@ -3683,12 +3683,11 @@ async function carregarArtigos() {
         const stockBaixo = a.stock_minimo && a.quantidade < a.stock_minimo;
         tr.innerHTML = `
             <td>${escHtml(a.codigo || "")}</td>
-            <td>${escHtml(a.descricao || "")}</td>
+            <td class="largo">${escHtml(a.descricao || "")}</td>
             <td>${escHtml(a.tipo_artigo || "")}</td>
             <td>${Number(a.preco_atual || 0).toFixed(2)} €</td>
             <td style="color:${stockBaixo ? "#f97316" : "inherit"};font-weight:${stockBaixo ? "700" : "400"}">
-                ${a.quantidade ?? 0}${stockBaixo ? " ⚠️" : ""}
-                ${a.stock_minimo ? `<span style="font-size:10px;opacity:.5;margin-left:4px">(mín: ${a.stock_minimo})</span>` : ""}
+                <span>${a.quantidade ?? 0}${stockBaixo ? " ⚠️" : ""}${a.stock_minimo ? `<span style="font-size:10px;opacity:.5;margin-left:4px">(mín: ${a.stock_minimo})</span>` : ""}</span>
             </td>
             <td>${escHtml(a.local_armazenamento || "")}</td>
             <td class="acoes-td">
@@ -4150,17 +4149,17 @@ async function carregarMovimentosStock() {
         const destino = m.obra_destino?.nome || (m.observacoes?.includes("Armazém") ? "Armazém" : "—");
         const tr = document.createElement("tr");
         tr.innerHTML = `
-            <td style="font-size:12px;opacity:.7">${escHtml(m.data_movimento || "—")}</td>
-            <td>
+            <td style="font-size:12px;opacity:.7">${m.data_movimento ? escHtml(String(m.data_movimento).slice(0, 10).split("-").reverse().join("/")) : "—"}</td>
+            <td class="largo"><div>
                 <div style="font-weight:600;font-size:13px">${escHtml(m.artigos?.descricao || "—")}</div>
                 <div style="font-size:11px;opacity:.5;font-family:monospace">${escHtml(m.artigos?.codigo || "")}</div>
-            </td>
+            </div></td>
             <td><span style="color:${cor};font-weight:700;font-size:12px">${label}</span></td>
             <td style="text-align:right;font-weight:600">${m.quantidade ?? "—"}</td>
             <td style="font-size:13px">${escHtml(m.funcionarios?.nome || "—")}</td>
             <td style="font-size:12px;opacity:.8">${escHtml(origem)}</td>
             <td style="font-size:12px;opacity:.8">${escHtml(destino)}</td>
-            <td style="font-size:11px;opacity:.6">${escHtml(m.observacoes || "—")}</td>`;
+            <td class="largo" style="font-size:11px;opacity:.6">${escHtml(m.observacoes || "")}</td>`;
         tbody.appendChild(tr);
     });
 }
@@ -5949,8 +5948,21 @@ async function initOrcamentos() {
 
     // Ligar eventos
     document.getElementById('pesquisaOrcamentos')?.addEventListener('input', filtrarTabelaOrc);
-    document.getElementById('filtroEstadoOrc')?.addEventListener('change', filtrarTabelaOrc);
+    document.querySelectorAll('#chipsEstadoOrc .chip-estado').forEach(b => b.onclick = () => {
+        document.getElementById('filtroEstadoOrc').value = b.dataset.estado;
+        document.querySelectorAll('#chipsEstadoOrc .chip-estado').forEach(c => c.classList.toggle('ativo', c === b));
+        filtrarTabelaOrc();
+    });
     document.getElementById('btnNovoOrcamento')?.addEventListener('click', () => abrirModalOrcamento());
+}
+
+// Botões rápidos ✓ / ✕ do cartão: marcam o orçamento como aceite ou
+// não aceite (recusado). Carregar outra vez no mesmo botão volta a "enviado".
+async function mudarEstadoOrcamento(o, novo) {
+    const estado = o.estado === novo ? 'enviado' : novo;
+    const { error } = await SB.from('orcamentos').update({ estado }).eq('id', o.id);
+    if (error) { alert('Não foi possível mudar o estado: ' + error.message); return; }
+    await carregarOrcamentos();
 }
 
 // Sub-separadores: orçamentos a clientes · comparar fornecedores (cotacoes.js)
@@ -5982,7 +5994,7 @@ async function carregarOrcamentos() {
     document.getElementById('orcKpiTotal').textContent    = total;
     document.getElementById('orcKpiAceites').textContent  = aceites;
     document.getElementById('orcKpiPendentes').textContent= pendentes;
-    document.getElementById('orcKpiValor').textContent    = valor.toFixed(2) + ' €';
+    document.getElementById('orcKpiValor').textContent    = Math.round(valor).toLocaleString('pt-PT') + ' €';
 
     // Respeita a pesquisa já escrita (a Visão geral escreve o nome da obra)
     filtrarTabelaOrc();
@@ -6021,19 +6033,23 @@ function renderTabelaOrc(lista) {
         tr.innerHTML =
             `<td style="font-family:monospace;font-size:12px;font-weight:600;white-space:nowrap;width:100px;padding:10px 12px">${o.numero || '—'}</td>` +
             `<td style="font-size:12px;opacity:.65;white-space:nowrap;width:90px;padding:10px 12px">${dataFmt(o.data)}</td>` +
-            `<td style="padding:10px 12px">
-                <div style="font-weight:600;font-size:13px;margin-bottom:2px">${o.cliente_nome || '—'}</div>
-                ${nomeObra ? `<div style="font-size:11px;opacity:.45;margin-top:1px">🏗 ${nomeObra}</div>` : ''}
-            </td>` +
+            `<td class="largo" style="padding:10px 12px"><div>
+                <div style="font-weight:600;font-size:13px;margin-bottom:2px">${escHtml(o.cliente_nome || '—')}</div>
+                ${nomeObra ? `<div style="font-size:11px;opacity:.45;margin-top:1px">🏗 ${escHtml(nomeObra)}</div>` : ''}
+            </div></td>` +
             `<td style="text-align:right;font-weight:700;font-size:14px;white-space:nowrap;width:120px;padding:10px 12px">
                 ${total > 0 ? total.toLocaleString('pt-PT', {minimumFractionDigits:2}) + ' €' : '—'}
             </td>` +
-            `<td style="width:120px;padding:10px 12px">
-                <span style="background:${est.bg};color:${est.cor};padding:3px 12px;border-radius:20px;font-size:11px;font-weight:600">${est.label}</span>
+            `<td class="largo" style="width:170px;padding:10px 12px">
+                <div class="orc-estado">
+                    <span style="background:${est.bg};color:${est.cor};padding:3px 12px;border-radius:20px;font-size:11px;font-weight:600">${est.label}</span>
+                    <button class="btn-estado-rapido sim${o.estado === 'aceite' ? ' ativo' : ''}" title="${o.estado === 'aceite' ? 'Tirar aceite' : 'Marcar como aceite'}">✓</button>
+                    <button class="btn-estado-rapido nao${o.estado === 'recusado' ? ' ativo' : ''}" title="${o.estado === 'recusado' ? 'Tirar não aceite' : 'Marcar como não aceite'}">✕</button>
+                </div>
                 ${vencido ? '<div style="font-size:10px;color:#a5483d;margin-top:3px">⚠ Vencido</div>' : ''}
             </td>` +
             `<td style="font-size:12px;white-space:nowrap;width:90px;padding:10px 12px;${vencido ? 'color:#a5483d' : 'opacity:.5'}">${dataFmt(o.validade)}</td>` +
-            `<td style="white-space:nowrap;width:120px;padding:8px 12px">
+            `<td class="acoes-td" style="white-space:nowrap;width:120px;padding:8px 12px">
                 <div style="display:flex;gap:4px;justify-content:flex-end">
                     <button class="btn-acao btn-e" title="Editar">✏️</button>
                     <button class="btn-acao btn-d" title="Duplicar">📋</button>
@@ -6045,6 +6061,8 @@ function renderTabelaOrc(lista) {
         tr.querySelector('.btn-d').onclick = e => { e.stopPropagation(); duplicarOrcamento(o.id); };
         tr.querySelector('.btn-p').onclick = e => { e.stopPropagation(); exportarPDFOrcamento(o.id); };
         tr.querySelector('.btn-x').onclick = e => { e.stopPropagation(); apagarOrcamento(o.id, o.numero); };
+        tr.querySelector('.btn-estado-rapido.sim').onclick = e => { e.stopPropagation(); mudarEstadoOrcamento(o, 'aceite'); };
+        tr.querySelector('.btn-estado-rapido.nao').onclick = e => { e.stopPropagation(); mudarEstadoOrcamento(o, 'recusado'); };
         tr.ondblclick = () => abrirModalOrcamento(o.id);
         tbody.appendChild(tr);
     });
@@ -6055,7 +6073,7 @@ function filtrarTabelaOrc() {
     const estado = document.getElementById('filtroEstadoOrc')?.value || '';
     const filtrado = _orcamentos.filter(o =>
         (!q || (o.numero||'').toLowerCase().includes(q) || (o.cliente_nome||'').toLowerCase().includes(q) || (o.obra_descricao||'').toLowerCase().includes(q) || (o.obras?.nome||'').toLowerCase().includes(q)) &&
-        (!estado || o.estado === estado)
+        (!estado || o.estado === estado || (estado === 'pendentes' && ['rascunho','enviado'].includes(o.estado)))
     );
     renderTabelaOrc(filtrado);
 }
