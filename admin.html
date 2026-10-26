@@ -101,10 +101,17 @@
                     z-index:999;display:none;max-height:420px;overflow-y:auto" id="notifPainel">
         </div>
     </div>
+    <!-- ASSISTENTE — atalhos para o que ele sabe fazer -->
+    <div id="assistWrap" style="position:relative;display:inline-flex;align-items:center">
+        <button onclick="toggleAssistente()" title="Assistente"
+            style="background:none;border:none;cursor:pointer;font-size:20px;padding:6px 10px;opacity:.8;transition:opacity .15s"
+            onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity='.8'">
+            ✨
+        </button>
+        <div id="assistPainel" class="assist-painel" style="display:none"></div>
+    </div>
     <!-- BOTÃO DARK MODE -->
     <button class="dark-toggle" id="darkBtn" onclick="toggleDark()" title="Modo escuro">🌙</button>
-    <!-- HOJE — o que precisa de decisão -->
-    <a href="hoje.html" class="btn-secondary" style="font-size:13px;padding:6px 14px;margin-left:8px;text-decoration:none">☀ Hoje</a>
     <!-- REGISTO DIÁRIO -->
     <a href="registo-admin.html" class="btn-secondary" style="font-size:13px;padding:6px 14px;margin-left:8px;text-decoration:none;background:var(--primary);color:#fff;font-weight:600">📋 Registo Diário</a>
     <!-- LOGOUT -->
@@ -1808,7 +1815,7 @@
 <script src="dados-publicos.js"></script>
 <script src="planeamento.js?v=2"></script>
 <script src="cotacoes.js"></script>
-<script src="admin.js?v=4"></script>
+<script src="admin.js?v=5"></script>
 <script src="telemovel.js?v=5"></script>
 
 

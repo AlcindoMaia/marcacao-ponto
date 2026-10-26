@@ -676,6 +676,25 @@ label {
 }
 .notif-section-title:first-child { border-top: none; }
 
+/* Atalhos do assistente (botão ao lado do sino) */
+.assist-painel {
+    position: absolute; top: calc(100% + 8px); right: 0; width: 260px;
+    background: #f4f1ec; color: var(--text-dark);
+    border-radius: 14px; box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    border: 1px solid rgba(255,255,255,.08); z-index: 999; padding: 6px 0;
+}
+.assist-item {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    padding: 10px 16px; background: none; border: none; text-align: left;
+    font: inherit; font-size: 13.5px; color: inherit; cursor: pointer; text-decoration: none;
+}
+.assist-item:hover { background: rgba(0,0,0,.04); }
+.assist-item > span:first-child { width: 20px; text-align: center; }
+.assist-abrir { font-weight: 600; border-bottom: 1px solid rgba(0,0,0,.07); margin-bottom: 4px; }
+body.dark .assist-painel { background: #25363f; color: #f0f0f0; }
+body.dark .assist-item:hover { background: rgba(255,255,255,.06); }
+body.dark .assist-abrir { border-bottom-color: rgba(255,255,255,.1); }
+
 .notif-item {
     display: flex;
     align-items: center;
@@ -1081,6 +1100,7 @@ label.cot-ed-chk input { width: auto !important; min-width: 0 !important; }
     /* ── Cabeçalho: os botões passaram para o menu lateral
           (telemovel.css); aqui só o essencial ── */
     #notifPainel { position: fixed !important; top: 58px !important; left: 8px !important; right: 8px !important; width: auto !important; }
+    #assistPainel { position: fixed !important; top: 58px !important; left: 8px !important; right: 8px !important; width: auto !important; }
 
     /* ── Separadores e sub-separadores: várias linhas,
           nunca scroll lateral ── */

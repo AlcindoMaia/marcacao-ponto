@@ -115,7 +115,7 @@ function inicializarPainel() {
     tratarAccaoNoEndereco();
 }
 
-// O ecrã "Hoje" manda para aqui com #tab=financeiro ou #ler-fatura.
+// O assistente manda para aqui com #tab=financeiro ou #ler-fatura.
 // Sem hash, nada muda: abre o fluxo como sempre.
 function tabPedidaNoEndereco() {
     const m = (location.hash || "").match(/^#tab=([a-z-]+)$/);
@@ -3231,8 +3231,8 @@ async function vgCarregarAlertas() {
                 <div style="font-weight:600;font-size:14.5px">${escHtml(a.titulo)}</div>
                 <div style="font-size:12.5px;opacity:.65;margin-top:1px">${escHtml(a.sub)}</div>
             </div>
-            ${a.tab ? `<button class="btn-secondary" style="font-size:12px;padding:4px 12px;flex-shrink:0"
-                        onclick="abrirTab('${a.tab}')">Ver</button>` : ""}
+            ${a.tab || a.ir ? `<button class="btn-secondary" style="font-size:12px;padding:4px 12px;flex-shrink:0"
+                        onclick="${a.tab ? `abrirTab('${a.tab}')` : `location.href='${a.ir}'`}">Ver</button>` : ""}
         </div>`).join("");
 }
 
@@ -3241,7 +3241,7 @@ async function vgPedidosPorValidar() {
     if (!count) return null;
     return { icone: "🛒", cor: "rgba(0,0,0,.06)",
              titulo: count === 1 ? "1 pedido de material por validar" : `${count} pedidos de material por validar`,
-             sub: "Vieram do assistente e estão à espera de ti", tab: null };
+             sub: "Vieram do assistente e estão à espera de ti", ir: "assistente.html?f=pedidos" };
 }
 
 async function vgPrecosSubiram() {
@@ -3570,7 +3570,7 @@ async function vgCarregarAtalhos() {
         { ic: "👷", nome: "Funcionários",sub: "fichas e dispositivos",                                       tab: "funcionarios" },
         { ic: "📊", nome: "Fluxo de caixa", sub: "entradas e saídas",                                        tab: "fluxo" },
         { ic: "📋", nome: "Registo diário", sub: plural(registosHoje, "registo hoje", "registos hoje"),      ir: "registo-admin.html" },
-        { ic: "☀", nome: "Hoje",         sub: "o ecrã do telemóvel",                                         ir: "hoje.html" },
+        { ic: "✨", nome: "Assistente",   sub: "faturas, material, planos",                                   ir: "assistente.html" },
     ];
 
     cont.innerHTML = atalhos.map(a => {
@@ -7057,14 +7057,57 @@ function toggleNotificacoes() {
     painel.style.display = visivel ? "none" : "block";
 }
 
-// Fechar painel ao clicar fora
+// Fechar painéis ao clicar fora
 document.addEventListener("click", e => {
-    const wrap = document.getElementById("notifWrap");
-    if (wrap && !wrap.contains(e.target)) {
-        const painel = document.getElementById("notifPainel");
-        if (painel) painel.style.display = "none";
+    for (const [wrapId, painelId] of [["notifWrap", "notifPainel"], ["assistWrap", "assistPainel"]]) {
+        const wrap = document.getElementById(wrapId);
+        if (wrap && !wrap.contains(e.target)) {
+            const painel = document.getElementById(painelId);
+            if (painel) painel.style.display = "none";
+        }
     }
 });
+
+// =======================================================
+// BOTÃO DO ASSISTENTE (ao lado do sino)
+// Atalhos para o que o assistente sabe fazer. Ler fatura faz-se aqui
+// mesmo; o resto abre a página do assistente já no sítio certo.
+// =======================================================
+const ATALHOS_ASSISTENTE = [
+    { id: "fatura",   ic: "📷", nome: "Ler fatura" },
+    { id: "material", ic: "🛒", nome: "Pedir material" },
+    { id: "pedidos",  ic: "✅", nome: "Pedidos por validar" },
+    { id: "nota",     ic: "📝", nome: "Contar como está uma obra" },
+    { id: "plano",    ic: "🗓", nome: "Planear uma obra" },
+    { id: "pergunta", ic: "❓", nome: "Perguntar" },
+    { id: "obras",    ic: "🏗", nome: "O que sei de cada obra" },
+];
+
+function toggleAssistente() {
+    const painel = document.getElementById("assistPainel");
+    if (!painel) return;
+    if (painel.style.display === "block") { painel.style.display = "none"; return; }
+
+    painel.innerHTML = `
+        <a class="assist-item assist-abrir" href="assistente.html">
+            <span>✨</span><span>Falar com o assistente</span>
+        </a>` +
+        ATALHOS_ASSISTENTE.map(a => `
+        <button class="assist-item" onclick="usarAtalhoAssistente('${a.id}')">
+            <span>${a.ic}</span><span>${escHtml(a.nome)}</span>
+        </button>`).join("");
+    painel.style.display = "block";
+}
+
+function usarAtalhoAssistente(id) {
+    document.getElementById("assistPainel").style.display = "none";
+    if (id === "fatura") {
+        location.hash = "#ler-fatura";
+        tratarAccaoNoEndereco();
+        return;
+    }
+    location.href = `assistente.html?f=${encodeURIComponent(id)}`;
+}
 
 // =======================================================
 // autorizarTOC — versão definitiva (usa Edge Function para obter URL)
