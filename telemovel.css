@@ -1,0 +1,90 @@
+/* =======================================================
+   TELEMÓVEL (até 600px) — tabelas em cartões
+   O telemovel.js põe em cada célula o nome da sua coluna
+   (data-label) e marca a tabela com .tabela-cartoes; aqui
+   cada linha passa a ser um cartão, sem scroll para o lado.
+   Usado pelo admin.html e pelo dashboard.html.
+======================================================= */
+@media (max-width: 600px) {
+    /* ── Tabelas em cartões ── */
+    table.tabela-cartoes,
+    table.tabela-cartoes > tbody,
+    table.tabela-cartoes > tfoot,
+    table.tabela-cartoes > tbody > tr,
+    table.tabela-cartoes > tfoot > tr {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        overflow: visible !important;
+        white-space: normal !important;
+    }
+    table.tabela-cartoes { border-collapse: separate; }
+    table.tabela-cartoes > thead { display: none !important; }
+    table.tabela-cartoes > tbody > tr,
+    table.tabela-cartoes > tfoot > tr {
+        margin: 0 0 10px;
+        padding: 6px 12px;
+        border-radius: var(--radius-sm, 8px);
+        border: 1px solid rgba(127,127,127,.18);
+        background: rgba(255,255,255,.45);
+        box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    table.tabela-cartoes > tbody > tr > td,
+    table.tabela-cartoes > tfoot > tr > td,
+    table.tabela-cartoes > tbody > tr > th {
+        display: flex !important;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        padding: 7px 0 !important;
+        border: none !important;
+        border-bottom: 1px solid rgba(127,127,127,.12) !important;
+        text-align: right !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+        position: static !important;
+    }
+    table.tabela-cartoes > tbody > tr > td:last-child { border-bottom: none !important; }
+    table.tabela-cartoes > tbody > tr > td::before,
+    table.tabela-cartoes > tfoot > tr > td::before {
+        content: attr(data-label);
+        flex: 0 0 38%;
+        text-align: left;
+        font-family: var(--font-title);
+        font-size: 10px;
+        font-weight: 400;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        opacity: .9;
+    }
+    /* Célula sem nome de coluna (ex.: "Sem registos", totais): largura toda */
+    table.tabela-cartoes td[data-label=""]::before,
+    table.tabela-cartoes td:not([data-label])::before { display: none; }
+    table.tabela-cartoes td[data-label=""],
+    table.tabela-cartoes td:not([data-label]) { justify-content: center; text-align: center !important; }
+    /* A 1.ª coluna é o título do cartão */
+    table.tabela-cartoes > tbody > tr > td:first-child { font-weight: 600; }
+    table.tabela-cartoes td:empty { display: none !important; }
+    /* Campos e botões dentro das células */
+    table.tabela-cartoes td > input:not([type=checkbox]):not([type=radio]),
+    table.tabela-cartoes td > select,
+    table.tabela-cartoes td > textarea { flex: 1 1 auto; min-width: 0 !important; width: auto !important; }
+    table.tabela-cartoes td > div,
+    table.tabela-cartoes td > span { min-width: 0; }
+    table.tabela-cartoes td button { flex-shrink: 0; }
+
+    body.dark table.tabela-cartoes > tbody > tr { background: rgba(255,255,255,.04); }
+    #modalPainelObra table.tabela-cartoes > tbody > tr,
+    #modalEditarObra table.tabela-cartoes > tbody > tr,
+    #modalBibServico table.tabela-cartoes > tbody > tr { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.08); }
+    #modalPainelObra table.tabela-cartoes td::before { color: rgba(255,255,255,.45); }
+
+    /* Mapas mensais (um dia por coluna): ficam em grelha
+       com scroll próprio e a 1.ª coluna fixa. */
+    table.tabela-mapa { display: block; overflow-x: auto; white-space: nowrap; }
+}

@@ -11,6 +11,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
+<link rel="stylesheet" href="telemovel.css?v=1">
+
 <style>
 /* ============================================================
    TOKENS
@@ -669,6 +671,63 @@ body::after {
   }
   .visao-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* ============================================================
+   TELEMÓVEL — sem scroll para o lado
+   A barra lateral passa para cima (botões em várias linhas),
+   o cabeçalho encolhe e as grelhas ficam numa só coluna.
+============================================================ */
+@media (max-width: 700px) {
+  /* No computador só a .main faz scroll; no telemóvel é a página toda */
+  html, body { height: auto; overflow-x: hidden; overflow-y: auto; }
+  .app {
+    display: block !important; /* o JS mostra a app com display:grid */
+    height: auto;
+    min-height: 100vh;
+  }
+  .header {
+    padding: 8px 12px;
+    gap: 10px;
+    min-height: 56px;
+  }
+  .logo { height: 40px; }
+  .header-title { font-size: 15px; letter-spacing: 1px; text-align: left; min-width: 0; }
+  .header-user svg { width: 24px; height: 24px; }
+  .header-user span { display: none; }
+  .header-actions { gap: 8px; flex-shrink: 0; }
+
+  .sidebar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 12px;
+    overflow: visible;
+  }
+  .sidebar-section,
+  .sidebar-section:first-child {
+    display: contents;
+  }
+  .sidebar-label { display: none; }
+  .sidebar-section[style] { margin: 0 !important; padding: 0 !important; border: none !important; }
+  .nav-btn,
+  .sidebar a.nav-btn {
+    flex: 1 1 calc(50% - 6px);
+    width: auto;
+    margin: 0;
+    padding: 9px 8px;
+    font-size: 11px;
+  }
+
+  .main { padding: 12px; overflow: visible; }
+  .painel { padding: 14px; }
+  .visao-grid,
+  .form-row,
+  .form-row.triple { grid-template-columns: 1fr; }
+  .main [style*="grid-template-columns:1fr 1fr"],
+  .main [style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
+  .main input, .main select, .main textarea { max-width: 100%; min-width: 0; }
+  img, canvas { max-width: 100%; }
+}
 </style>
 </head>
 
@@ -744,6 +803,7 @@ body::after {
 </div>
 
 <script src="config.js"></script>
+<script src="telemovel.js"></script>
 <script>
 // ============================================================
 // AUTH

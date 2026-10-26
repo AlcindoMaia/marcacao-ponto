@@ -1061,3 +1061,128 @@ label.cot-ed-chk input { width: auto !important; min-width: 0 !important; }
     .container, .card, .tab-content { max-width: 100%; }
     .filtros-linha { grid-template-columns: 1fr 1fr !important; }
 }
+
+/* ══════════════════════════════════════════════
+   TELEMÓVEL (até 600px) — sem scroll para o lado
+   ══════════════════════════════════════════════
+   As tabelas passam a cartões (o telemovel.js põe o
+   nome da coluna em cada célula), os separadores
+   passam para a linha de baixo e as janelas ocupam o
+   ecrã todo, com scroll para baixo.
+*/
+@media (max-width: 600px) {
+
+    /* ── Cabeçalho: logo + título em cima, botões numa
+          grelha de 2 colunas por baixo ── */
+    .header { padding: 8px 12px; column-gap: 8px; }
+    .header h1 {
+        flex: 1 1 120px; min-width: 0;
+        font-size: 14px; letter-spacing: .5px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .header .logo { height: 32px; }
+    .header > a.btn-secondary,
+    .header > button.btn-secondary {
+        flex: 1 1 40%;
+        justify-content: center;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding: 7px 6px !important;
+    }
+    #notifPainel { position: fixed !important; top: 64px !important; left: 8px !important; right: 8px !important; width: auto !important; }
+
+    /* ── Separadores e sub-separadores: várias linhas,
+          nunca scroll lateral ── */
+    .tabs { flex-wrap: wrap; overflow-x: visible; padding-top: 12px; }
+    .tab  { flex: 1 1 auto; text-align: center; padding: 7px 10px; }
+    .orc-subtabs, .cot-vistas,
+    .reg-subtab, .fin-subtab, .inv-subtab { white-space: normal; }
+    .orc-subtabs, .cot-vistas { flex-wrap: wrap; overflow-x: visible; }
+    .orc-subtab, .cot-vista { flex: 1 1 auto; padding: 8px 10px; }
+    .tab-content.active { padding-left: 0; padding-right: 0; }
+
+    /* Linhas de ações (pesquisar + botões) passam para baixo */
+    .tab-content [style*="display:flex"],
+    .tab-content [style*="display: flex"] { flex-wrap: wrap; }
+    .tab-content input, .tab-content select, .tab-content textarea { max-width: 100%; }
+
+    /* Tabelas em cartões: ver telemovel.css */
+
+    /* ── Planeamento: um dia por bloco, uns por baixo dos outros ── */
+    .plan-grelha { min-width: 0 !important; table-layout: auto; }
+    table.tabela-cartoes.plan-grelha > tbody > tr { height: auto; padding: 0; border: none; background: none; box-shadow: none; }
+    table.tabela-cartoes.plan-grelha > tbody > tr > td.plan-celula {
+        display: block !important;
+        min-height: 0;
+        margin-bottom: 10px;
+        padding: 8px !important;
+        text-align: left !important;
+        border-bottom: none !important;
+    }
+    table.tabela-cartoes.plan-grelha > tbody > tr > td.plan-celula::before {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 13px;
+        color: var(--text-dark);
+    }
+    .plan-grelha-wrap, .card:has(> .plan-grelha) { overflow-x: visible !important; }
+
+    /* ── Janelas (modais): ecrã inteiro, scroll para baixo ── */
+    .modal, #modalPainelObra, #modalEditarObra, #modalBibServico,
+    #modalFichaCliente, #modalHistFunc, [id^="modal"][style*="position:fixed"] {
+        align-items: flex-start !important;
+        overflow-y: auto !important;
+        padding: 8px !important;
+    }
+    .modal-content { width: 100% !important; max-width: 100% !important; max-height: none !important; margin: 0 !important; }
+
+    /* Painel da obra */
+    #modalPainelObra > div { max-height: none !important; border-radius: 14px !important; }
+    #modalPainelObra > div > div:first-child { padding: 16px 14px 0 !important; }
+    #painelObraNome { font-size: 20px !important; overflow-wrap: anywhere; }
+    #painelObraMeta { flex-wrap: wrap; }
+    #modalPainelObra .painel-tab:first-child { margin-left: 0; }
+    #modalPainelObra div:has(> .painel-tab) { flex-wrap: wrap; overflow-x: visible !important; }
+    #modalPainelObra .painel-tab { padding: 8px 10px !important; font-size: 11px !important; flex: 1 1 auto; }
+    #modalPainelObra .painel-tab-content > div,
+    #modalPainelObra .painel-tab-content [style*="grid-template-columns"] { min-width: 0 !important; }
+    #modalPainelObra .painel-tab-content [style*="grid-template-columns:1fr 1fr"],
+    #modalPainelObra .painel-tab-content [style*="grid-template-columns: 1fr 1fr"],
+    #modalPainelObra .painel-tab-content [style*="grid-template-columns:repeat(3"],
+    #modalPainelObra .painel-tab-content [style*="grid-template-columns:repeat(4"] { grid-template-columns: 1fr !important; }
+    #modalPainelObra .serv-row,
+    #modalPainelObra .serv-thead { grid-template-columns: 1fr 64px 64px; padding-left: 10px; padding-right: 10px; }
+    #modalPainelObra .serv-row > div:nth-child(n+4),
+    #modalPainelObra .serv-thead span:nth-child(n+4) { display: none; }
+    #modalPainelObra .painel-kpi { padding: 12px 14px; }
+    #modalPainelObra .painel-kpi .kpi-val { font-size: 18px; overflow-wrap: anywhere; }
+
+    /* Ficha de cliente e outras janelas escuras criadas pelo admin.js */
+    #modalFichaCliente > div { color: rgba(255,255,255,.85); padding: 16px !important; }
+    #modalFichaCliente [style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+    #modalFichaCliente input, #modalFichaCliente select { width: 100%; min-width: 0; }
+
+    /* Janelas escuras: grelhas de 2/3 colunas passam a 1 */
+    #modalEditarObra [style*="grid-template-columns:1fr 1fr"],
+    #modalBibServico [style*="grid-template-columns:1fr 1fr"],
+    .modal-content [style*="grid-template-columns:1fr 1fr"],
+    .modal-content [style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
+
+    /* Nada mais largo do que o ecrã */
+    img, video, iframe { max-width: 100%; }
+    [style*="min-width:1"], [style*="min-width:2"], [style*="min-width:3"],
+    [style*="min-width: 1"], [style*="min-width: 2"], [style*="min-width: 3"] { min-width: 0 !important; }
+}
+
+/* A cor do texto da ficha de cliente (fundo escuro) — também no computador */
+#modalFichaCliente > div { color: rgba(255,255,255,.85); }
+#modalFichaCliente label { color: rgba(255,255,255,.55); }
+
+/* As janelas do painel vivem dentro do #adminArea (z-index 1), por isso o
+   cabeçalho (z-index 100) ficava por cima delas e tapava o título e o botão
+   de fechar. Com uma janela aberta, o #adminArea sobe acima do cabeçalho. */
+#adminArea:has(.modal:not(.hidden), [id^="modal"][style*="display: flex"], [id^="modal"][style*="display:flex"]) {
+    z-index: 1000;
+}
