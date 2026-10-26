@@ -809,6 +809,12 @@ body.dark label { color: rgba(255,255,255,.45); }
                        background:rgba(181,136,99,.3); color:#7a5a12; }
 .plan-cartao .plan-avatar-resp { background:var(--primary); color:#fff; }
 .plan-cartao.plan-a-arrastar { opacity:.4; }
+/* Telemóvel: cartão a seguir o dedo depois de o segurar */
+.plan-cartao         { -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+.plan-fantasma       { position:fixed; z-index:9999; pointer-events:none; margin:0;
+                       transform:rotate(2deg) scale(1.03); opacity:.95;
+                       box-shadow:0 8px 20px rgba(0,0,0,.35); }
+body.plan-toque-ativo { overscroll-behavior:none; }
 
 /* Reuniões vindas do Google Calendar: só leitura */
 .plan-reuniao        { background:rgba(66,133,244,.10); border-left:3px solid #4285f4;
