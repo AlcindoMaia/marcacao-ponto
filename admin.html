@@ -7,8 +7,8 @@
 
 <title>Painel Administrativo — Maia Solutions</title>
 
-<link rel="stylesheet" href="style.css?v=6">
-<link rel="stylesheet" href="telemovel.css?v=4">
+<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="telemovel.css?v=5">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
 <!-- jQuery -->
@@ -71,6 +71,7 @@
 
 
 <body>
+<script>try{if(localStorage.getItem("tema")!=="claro")document.body.classList.add("dark")}catch(e){document.body.classList.add("dark")}</script>
 
 <header class="header">
     <img src="Logo.png" class="logo">
@@ -1752,16 +1753,9 @@
 <script src="dados-publicos.js"></script>
 <script src="planeamento.js"></script>
 <script src="cotacoes.js"></script>
-<script src="admin.js"></script>
+<script src="admin.js?v=2"></script>
 <script src="telemovel.js?v=4"></script>
 
-<script>
-function toggleDark() {
-    document.body.classList.toggle("dark");
-    document.getElementById("darkBtn").textContent =
-        document.body.classList.contains("dark") ? "☀️" : "🌙";
-}
-</script>
 
 
 <!-- MODAL EDITAR SERVIÇO DA BIBLIOTECA -->

@@ -1214,3 +1214,65 @@ label.cot-ed-chk input { width: auto !important; min-width: 0 !important; }
     color: rgba(255,255,255,.85);
     box-shadow: none;
 }
+
+/* ── Tema escuro “Azul-noite e caramelo” (arranca por defeito) ──
+   Fundo azul-noite profundo, cartões um tom acima, texto bege claro
+   e caramelo nos destaques. Os tokens mudam aqui, por isso tudo o que
+   usa var(--text-dark), var(--panel)… acompanha sozinho. */
+html:has(> body.dark) { background: #131c25; color-scheme: dark; }
+body.dark {
+    --bg:          #131c25;
+    --panel:       #1d2a37;
+    --panel-solid: #223241;
+    --text-dark:   #ece5de;
+    --text-muted:  #a79e9c;
+    --primary-dk:  #d0a47f;
+    --primary-lt:  rgba(181,136,99,.22);
+    --color-ok:    #8fbfa0;
+    --color-err:   #e09486;
+    --color-warn:  #e0b07a;
+    --etq-aviso:   #e8bf93;
+    --etq-erro:    #f0a89c;
+    --etq-ok:      #9fd0b0;
+    background: #131c25;
+    color: #ece5de;
+}
+body.dark .header {
+    background: #0e151d;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+}
+body.dark .card {
+    background: #1d2a37;
+    border: 1px solid rgba(255,255,255,.06);
+    box-shadow: 0 2px 10px rgba(0,0,0,.25);
+}
+body.dark .card.metric h3 { color: #a79e9c; }
+body.dark .card.metric .value { color: #d0a47f; }
+body.dark h1, body.dark h2, body.dark h3, body.dark h4 { color: #ece5de; }
+body.dark .tab { background: #1d2a37; color: #d3c3b9; border-color: rgba(255,255,255,.08); }
+body.dark .tab:hover { background: #25363f; }
+body.dark .tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+body.dark .btn-secondary {
+    background: rgba(255,255,255,.07);
+    border-color: rgba(255,255,255,.14);
+    color: #ece5de;
+}
+body.dark .btn-secondary:hover { background: rgba(255,255,255,.13); }
+body.dark .btn-primary:hover { background: #9a7150; }
+body.dark input, body.dark select, body.dark textarea {
+    background: #18232e;
+    color: #ece5de;
+    border-color: rgba(255,255,255,.14);
+}
+body.dark input::placeholder, body.dark textarea::placeholder { color: rgba(236,229,222,.4); }
+body.dark label { color: #a79e9c; }
+body.dark table thead th { background: #25363f !important; color: #d3c3b9; }
+body.dark table tbody td { border-bottom-color: rgba(255,255,255,.06); }
+body.dark table tbody tr:hover { background: rgba(181,136,99,.08) !important; }
+body.dark .modal { background: rgba(5,10,15,.7); }
+body.dark .modal-content { background: #1d2a37; color: #ece5de; border: 1px solid rgba(255,255,255,.08); }
+body.dark #loginBox { background: #1d2a37; color: #ece5de; }
+body.dark .dark-toggle:hover { background: rgba(255,255,255,.1); }
+body.dark .plan-cartao { background: #25363f; color: #ece5de; }
+body.dark .plan-cartao .plan-avatar-resp { color: #131c25; }
+body.dark ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); }

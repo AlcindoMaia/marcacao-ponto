@@ -91,7 +91,7 @@
     table.tabela-cartoes td > span { min-width: 0; }
     table.tabela-cartoes td button { flex-shrink: 0; }
 
-    body.dark table.tabela-cartoes > tbody > tr { background: rgba(255,255,255,.04); }
+    body.dark table.tabela-cartoes > tbody > tr { background: #1d2a37; border-color: rgba(255,255,255,.06); }
     #modalPainelObra table.tabela-cartoes > tbody > tr,
     #modalEditarObra table.tabela-cartoes > tbody > tr,
     #modalBibServico table.tabela-cartoes > tbody > tr { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.08); }
@@ -153,8 +153,8 @@
     }
     .menu-item.active { background: var(--primary, #b58863); color: #fff; font-weight: 500; }
     .menu-item.menu-destaque { background: rgba(181,136,99,.25); }
-    body.dark .menu-lateral { background: #222; }
-    body.dark .menu-item { background: rgba(255,255,255,.08); color: #f0f0f0; }
+    body.dark .menu-lateral { background: #0e151d; border-right: 1px solid rgba(255,255,255,.06); }
+    body.dark .menu-item { background: #1d2a37; color: #ece5de; }
     body.dark .menu-item.active { background: var(--primary, #b58863); color: #ffffff; }
 
     /* O que passou para o menu sai do ecrã */
