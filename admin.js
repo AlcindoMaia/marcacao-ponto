@@ -3330,8 +3330,10 @@ async function vgCarregarObras() {
     const cont = document.getElementById("vgObras");
     if (!cont) return;
 
+    // Tudo da obra: os atalhos da gaveta abrem o painel, que precisa da
+    // ficha inteira (pastas da Drive, datas, GPS).
     const { data: obras } = await SB.from("obras")
-        .select("id, nome, codigo, local, percentagem_conclusao")
+        .select("*")
         .eq("estado", "ativa").order("nome");
 
     if (!obras?.length) {
@@ -3362,9 +3364,10 @@ async function vgCarregarObras() {
         const pc  = Math.max(0, Math.min(100, Number(o.percentagem_conclusao) || 0));
         const sub = [fase[o.id] || o.local || o.codigo, pc ? `${pc}%` : null].filter(Boolean).join(" · ");
         const g   = gasto[o.id] || 0, orc = orcamento[o.id] || 0;
-        return `<div style="padding:12px 0;${i ? "border-top:1px solid rgba(0,0,0,.07)" : ""}">
+        return `<div class="vg-obra" style="${i ? "border-top:1px solid rgba(0,0,0,.07)" : ""}">
+            <div class="vg-obra-linha" role="button" tabindex="0" aria-expanded="false" data-id="${escHtml(o.id)}">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-                <div style="min-width:0">
+                <div style="min-width:0;flex:1">
                     <div style="font-weight:600;font-size:14.5px">${escHtml(o.nome)}</div>
                     <div style="font-size:12.5px;opacity:.65;margin-top:1px">${escHtml(sub || "sem fase definida")}</div>
                 </div>
@@ -3373,12 +3376,93 @@ async function vgCarregarObras() {
                     ${orc > 0 ? `<div style="font-size:11.5px;opacity:.6">de ${vgEuros(orc)}</div>` : ""}
                 </div>
                 ${vgEtiqueta(o.id, orcamento, gasto, horasOrc, horasReais)}
+                <span class="vg-obra-seta" aria-hidden="true">▾</span>
             </div>
             <div style="height:5px;border-radius:3px;background:rgba(0,0,0,.08);margin-top:9px;overflow:hidden">
                 <i style="display:block;height:100%;width:${pc}%;background:var(--text-dark);border-radius:3px"></i>
             </div>
+            </div>
+            <div class="vg-gaveta"><div class="vg-gaveta-dentro">${vgAtalhosObra(o)}</div></div>
         </div>`;
     }).join("");
+
+    const porId = Object.fromEntries(obras.map(o => [String(o.id), o]));
+    cont.querySelectorAll(".vg-obra-linha").forEach(linha => {
+        const alternar = () => vgAlternarGaveta(linha);
+        linha.addEventListener("click", alternar);
+        linha.addEventListener("keydown", e => {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); alternar(); }
+        });
+    });
+    cont.querySelectorAll(".vg-atalho-obra").forEach(b => {
+        b.addEventListener("click", () => vgIrParaObra(b.dataset.acao, porId[b.dataset.id]));
+    });
+}
+
+// ---------- Gaveta de atalhos de cada obra ----------
+// Tocar na linha abre por baixo os caminhos para essa obra. Só uma gaveta
+// aberta de cada vez, para a lista não crescer sem se dar por isso.
+function vgAlternarGaveta(linha) {
+    const abrir = linha.getAttribute("aria-expanded") !== "true";
+    document.querySelectorAll("#vgObras .vg-obra-linha[aria-expanded='true']").forEach(l => {
+        l.setAttribute("aria-expanded", "false");
+        l.parentElement.classList.remove("aberta");
+    });
+    if (abrir) {
+        linha.setAttribute("aria-expanded", "true");
+        linha.parentElement.classList.add("aberta");
+    }
+}
+
+function vgAtalhosObra(o) {
+    const temDrive = !!o.drive_pastas?.pasta;
+    const temGps   = o.latitude != null && o.longitude != null;
+    const atalhos = [
+        { acao: "painel",     ic: "📊", nome: "Painel da obra" },
+        { acao: "movimentos", ic: "💶", nome: "Movimentos" },
+        { acao: "orcamentos", ic: "🧾", nome: "Orçamentos" },
+        { acao: "tarefa",     ic: "🗓", nome: "Nova tarefa" },
+        { acao: "drive",      ic: "📁", nome: "Pasta Drive", off: !temDrive },
+        { acao: "mapa",       ic: "📍", nome: "Ver no mapa", off: !temGps },
+    ];
+    return atalhos.map(a => `
+        <button type="button" class="vg-atalho-obra${a.off ? " off" : ""}" data-acao="${a.acao}" data-id="${escHtml(o.id)}">
+            <span aria-hidden="true">${a.ic}</span>${a.nome}
+        </button>`).join("");
+}
+
+// Pedidos que outro separador aplica quando acaba de carregar as listas.
+let _fluxoObraPedida = null;
+
+async function vgIrParaObra(acao, o) {
+    if (!o) return;
+    if (acao === "painel") return abrirPainelObra(o);
+    if (acao === "drive") {
+        if (!o.drive_pastas?.pasta) return alert("Esta obra ainda não tem pasta no Google Drive. Edita a obra e cola o link da pasta.");
+        return window.open(urlPastaDrive(o.drive_pastas.pasta), "_blank");
+    }
+    if (acao === "mapa") {
+        if (o.latitude == null || o.longitude == null) return alert("Esta obra ainda não tem localização GPS. Edita a obra para a marcar.");
+        return window.open(`https://www.google.com/maps?q=${encodeURIComponent(o.latitude)},${encodeURIComponent(o.longitude)}`, "_blank");
+    }
+    if (acao === "movimentos") {
+        _fluxoObraPedida = String(o.id);
+        return abrirTab("financeiro", "fluxo");
+    }
+    if (acao === "orcamentos") {
+        const pesq = document.getElementById("pesquisaOrcamentos");
+        if (pesq) pesq.value = o.nome || "";
+        abrirTab("orcamentos");
+        if (typeof switchOrcSub === "function") switchOrcSub("clientes");
+        return;
+    }
+    if (acao === "tarefa") {
+        abrirTab("planeamento");
+        if (!_planObras.length) await carregarPlanObras();
+        abrirModalTarefa(null);
+        const sel = document.getElementById("planObra");
+        if (sel) { sel.value = String(o.id); sel.dispatchEvent(new Event("change")); }
+    }
 }
 
 function vgEtiqueta(id, orcamento, gasto, horasOrc, horasReais) {
@@ -5019,6 +5103,14 @@ async function initFluxo() {
     preencherAnosFluxo();
     await Promise.all([carregarCategoriasFinanceiras(), carregarObrasFluxo()]);
     ligarFiltrosFluxo();
+    // Vindo de uma obra da Visão geral: só essa obra, de todos os anos.
+    if (_fluxoObraPedida) {
+        const sel = document.getElementById("filtroObra");
+        if (sel) sel.value = _fluxoObraPedida;
+        const ano = document.getElementById("filtroAnoFluxo");
+        if (ano) ano.value = "";
+        _fluxoObraPedida = null;
+    }
     await carregarMovimentos();
 }
 
@@ -5844,7 +5936,8 @@ async function carregarOrcamentos() {
     document.getElementById('orcKpiPendentes').textContent= pendentes;
     document.getElementById('orcKpiValor').textContent    = valor.toFixed(2) + ' €';
 
-    renderTabelaOrc(_orcamentos);
+    // Respeita a pesquisa já escrita (a Visão geral escreve o nome da obra)
+    filtrarTabelaOrc();
 }
 
 function renderTabelaOrc(lista) {
@@ -5913,7 +6006,7 @@ function filtrarTabelaOrc() {
     const q      = document.getElementById('pesquisaOrcamentos')?.value.toLowerCase() || '';
     const estado = document.getElementById('filtroEstadoOrc')?.value || '';
     const filtrado = _orcamentos.filter(o =>
-        (!q || (o.numero||'').toLowerCase().includes(q) || (o.cliente_nome||'').toLowerCase().includes(q) || (o.obra_descricao||'').toLowerCase().includes(q)) &&
+        (!q || (o.numero||'').toLowerCase().includes(q) || (o.cliente_nome||'').toLowerCase().includes(q) || (o.obra_descricao||'').toLowerCase().includes(q) || (o.obras?.nome||'').toLowerCase().includes(q)) &&
         (!estado || o.estado === estado)
     );
     renderTabelaOrc(filtrado);

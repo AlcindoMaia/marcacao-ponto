@@ -869,6 +869,30 @@
         <h2 style="font-family:var(--font-title);font-size:18px;font-weight:400;letter-spacing:1px;text-transform:uppercase;margin:24px 0 10px">
             Obras activas</h2>
         <div id="vgObras" class="card" style="padding:6px 18px"></div>
+        <!-- Gaveta de atalhos por obra. Fica aqui e não no style.css
+             para não mexer nos estilos gerais. -->
+        <style>
+            #vgObras .vg-obra-linha { padding: 12px 0; cursor: pointer; border-radius: var(--radius-sm); outline: none;
+                -webkit-tap-highlight-color: transparent; }
+            #vgObras .vg-obra-linha:focus-visible { box-shadow: 0 0 0 2px var(--primary); }
+            #vgObras .vg-obra-seta { font-size: 14px; color: var(--primary); transition: transform .2s; flex-shrink: 0; }
+            #vgObras .vg-obra.aberta .vg-obra-seta { transform: rotate(180deg); }
+            #vgObras .vg-gaveta { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s ease; }
+            #vgObras .vg-obra.aberta .vg-gaveta { grid-template-rows: 1fr; }
+            #vgObras .vg-gaveta-dentro { overflow: hidden; display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+            #vgObras .vg-obra.aberta .vg-gaveta-dentro { padding: 2px 0 14px; }
+            #vgObras .vg-atalho-obra { display: flex; align-items: center; gap: 8px; min-width: 0;
+                padding: 9px 12px; border-radius: var(--radius-sm); cursor: pointer;
+                background: var(--primary-lt); border: 1px solid rgba(181,136,99,.35);
+                color: var(--text-dark); font: 600 13px var(--font-body); text-align: left; }
+            #vgObras .vg-atalho-obra:hover { border-color: var(--primary); }
+            #vgObras .vg-atalho-obra.off { opacity: .45; }
+            @media (max-width: 600px) {
+                #vgObras .vg-gaveta-dentro { grid-template-columns: 1fr 1fr; }
+                #vgObras .vg-atalho-obra { padding: 11px 10px; font-size: 12.5px; }
+            }
+        </style>
 
         <!-- Para onde ir -->
         <h2 style="font-family:var(--font-title);font-size:18px;font-weight:400;letter-spacing:1px;text-transform:uppercase;margin:24px 0 10px">
@@ -1753,7 +1777,7 @@
 <script src="dados-publicos.js"></script>
 <script src="planeamento.js"></script>
 <script src="cotacoes.js"></script>
-<script src="admin.js?v=3"></script>
+<script src="admin.js?v=4"></script>
 <script src="telemovel.js?v=4"></script>
 
 
