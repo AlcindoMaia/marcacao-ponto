@@ -6212,8 +6212,9 @@ async function criarServicosDoOrcamento(orcId) {
         .select('id, orcamento_id, ordem').eq('obra_id', o.obra_id);
     if ((daObra || []).some(s => s.orcamento_id === o.id)) return { criados: 0 };   // já criados antes
 
-    // Extra: a obra já tinha serviços de outro orçamento, ou o PDF veio marcado como revisão/extra
-    const extra = (daObra || []).some(s => s.orcamento_id) || /revisão ou extra/.test(o.notas || '');
+    // Extra só quando o PDF veio marcado como revisão ou extra: uma obra pode
+    // ter vários orçamentos normais (ex.: telhado e capoto em separado)
+    const extra = /revisão ou extra/.test(o.notas || '');
     let ordem = Math.max(0, ...(daObra || []).map(s => s.ordem || 0)) + 1;
 
     const { data: cats } = await SB.from('orcamento_categorias')
