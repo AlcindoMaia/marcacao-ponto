@@ -228,7 +228,7 @@ function abrirTab(nome, sub) {
     tabDiv.classList.add("active");
     guardarSitio({ tab: nome, sub: sub || null });
     if (nome === "visaogeral")   initVisaoGeral();
-    if (nome === "financeiro")   { switchFinTab(subFin || "ordenados"); }
+    if (nome === "financeiro")   { switchFinTab(subFin || "fluxo"); }
     if (nome === "dashboard")    initDashboard();
     if (nome === "funcionarios") {
         mostrarSecSub("func", sub || "equipa");
@@ -259,9 +259,32 @@ function abrirTab(nome, sub) {
 // =======================================================
 
 // =======================================================
-// FINANCEIRO — sub-tabs switch + DRE + Fluxo + Orçado Real
+// VALORES SEM IVA
+// Margens, resultados e o painel da obra contam tudo sem IVA, nas entradas
+// e nas compras: o IVA das compras deduz-se, não é custo. O Fluxo de caixa
+// continua com IVA porque é o dinheiro que passa pelo banco.
+// O IVA tira-se de valor_total − valor_base e não da coluna iva, porque os
+// movimentos gravados à mão até 2026-10 tinham lá a taxa e não o valor.
+// =======================================================
+function semIva(m)   { return Number(m.valor_base ?? m.valor_total ?? 0); }
+function ivaMov(m)   { return Number(m.valor_total || 0) - semIva(m); }
+function taxaIvaMov(m) {
+    const base = Number(m.valor_base || 0);
+    return base > 0 ? Math.round(ivaMov(m) / base * 100) : 0;
+}
+// Orçamento sem IVA; nos importados de PDF pode faltar o total sem IVA
+function orcSemIva(o) {
+    const sem = Number(o.total_sem_iva || 0);
+    if (sem > 0) return sem;
+    return Number(o.total_com_iva || 0) / (1 + Number(o.taxa_iva ?? 23) / 100);
+}
+
+// =======================================================
+// FINANCEIRO — sub-tabs: Fluxo de caixa · DRE · Ordenados
 // =======================================================
 function switchFinTab(tab) {
+    // Uma sub-tab lembrada que já não existe (ex.: Orçado vs Real) abre o Fluxo
+    if (!document.getElementById("finTab-" + tab)) tab = "fluxo";
     document.querySelectorAll(".fin-subtab").forEach(btn => {
         const active = btn.dataset.fintab === tab;
         btn.style.background   = active ? "rgba(181,136,99,.15)" : "none";
@@ -275,124 +298,6 @@ function switchFinTab(tab) {
     if (tab === "ordenados")  carregarFinanceiro();
     if (tab === "dre")        carregarDRE();
     if (tab === "fluxo")      initFluxo();
-    if (tab === "orcado")     carregarOrcadoReal();
-}
-
-async function carregarDRE() {
-    const periodo = document.getElementById("drePeriodo")?.value || "ano";
-    const obraId  = document.getElementById("dreObra")?.value || "";
-
-    // Calcular datas
-    const hoje = new Date();
-    let dInicio, dFim;
-    if (periodo === "mes") {
-        dInicio = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,"0")}-01`;
-        dFim    = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,"0")}-${new Date(hoje.getFullYear(), hoje.getMonth()+1, 0).getDate()}`;
-    } else if (periodo === "trimestre") {
-        const q = Math.floor(hoje.getMonth() / 3);
-        dInicio = `${hoje.getFullYear()}-${String(q*3+1).padStart(2,"0")}-01`;
-        dFim    = `${hoje.getFullYear()}-${String(q*3+3).padStart(2,"0")}-${new Date(hoje.getFullYear(), q*3+3, 0).getDate()}`;
-    } else if (periodo === "ano") {
-        dInicio = `${hoje.getFullYear()}-01-01`;
-        dFim    = `${hoje.getFullYear()}-12-31`;
-    } else {
-        dInicio = "2000-01-01"; dFim = "2099-12-31";
-    }
-
-    let q = SB.from("movimentos_financeiros")
-        .select("tipo, valor_total, categorias_financeiras(nome)")
-        .gte("data_documento", dInicio).lte("data_documento", dFim);
-    if (obraId) q = q.eq("obra_id", obraId);
-    const { data } = await q;
-    if (!data) return;
-
-    const receitas = data.filter(m => m.tipo === "entrada");
-    const custos   = data.filter(m => m.tipo === "saida");
-    const totRec   = receitas.reduce((s,m) => s+Number(m.valor_total||0), 0);
-    const totCust  = custos.reduce((s,m)   => s+Number(m.valor_total||0), 0);
-    const resultado = totRec - totCust;
-    const margem    = totRec > 0 ? (resultado / totRec * 100) : 0;
-
-    const fmt = v => v.toLocaleString("pt-PT", {minimumFractionDigits:2, maximumFractionDigits:2}) + " €";
-    document.getElementById("dreReceitas").textContent  = fmt(totRec);
-    document.getElementById("dreCustos").textContent    = fmt(totCust);
-    document.getElementById("dreResultado").textContent = fmt(resultado);
-    document.getElementById("dreResultado").style.color = resultado >= 0 ? "#8fbfa0" : "#e09486";
-    document.getElementById("dreMargem").textContent    = margem.toFixed(1) + "%";
-
-    // Detalhes por categoria
-    const porCat = {};
-    data.forEach(m => {
-        const cat = m.categorias_financeiras?.nome || "Sem categoria";
-        if (!porCat[cat]) porCat[cat] = { entrada:0, saida:0 };
-        porCat[cat][m.tipo] += Number(m.valor_total||0);
-    });
-
-    document.getElementById("dreDetalheReceitas").innerHTML = Object.entries(porCat)
-        .filter(([,v]) => v.entrada > 0).sort(([,a],[,b]) => b.entrada-a.entrada)
-        .map(([cat,v]) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
-            <span style="opacity:.8">${cat}</span><span style="color:#8fbfa0">${fmt(v.entrada)}</span>
-        </div>`).join("") || '<div style="opacity:.4;font-size:13px">Sem receitas</div>';
-
-    document.getElementById("dreDetalheCustos").innerHTML = Object.entries(porCat)
-        .filter(([,v]) => v.saida > 0).sort(([,a],[,b]) => b.saida-a.saida)
-        .map(([cat,v]) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
-            <span style="opacity:.8">${cat}</span><span style="color:#e09486">${fmt(v.saida)}</span>
-        </div>`).join("") || '<div style="opacity:.4;font-size:13px">Sem custos</div>';
-
-    // Preencher select de obras se vazio
-    const dreObraEl = document.getElementById("dreObra");
-    if (dreObraEl && dreObraEl.options.length <= 1) {
-        const { data: obras } = await SB.from("obras").select("id,nome").order("nome");
-        (obras||[]).forEach(o => {
-            const opt = document.createElement("option");
-            opt.value = o.id; opt.textContent = o.nome;
-            dreObraEl.appendChild(opt);
-        });
-    }
-}
-
-async function carregarOrcadoReal() {
-    const obraId = document.getElementById("orcadoObra")?.value || "";
-    const fmt = v => v.toLocaleString("pt-PT", {minimumFractionDigits:2}) + " €";
-
-    // Orçamento aprovado
-    let qOrc = SB.from("orcamentos").select("valor_total").in("estado", ["aceite","enviado"]);
-    if (obraId) qOrc = qOrc.eq("obra_id", obraId);
-    const { data: orcs } = await qOrc;
-    const totalOrcado = (orcs||[]).reduce((s,o)=>s+Number(o.valor_total||0),0);
-
-    // Custos reais
-    let qCusto = SB.from("movimentos_financeiros").select("valor_total").eq("tipo","saida");
-    if (obraId) qCusto = qCusto.eq("obra_id", obraId);
-    const { data: custos } = await qCusto;
-    const totalReal = (custos||[]).reduce((s,m)=>s+Number(m.valor_total||0),0);
-
-    const desvio = totalOrcado - totalReal;
-    const pct    = totalOrcado > 0 ? (totalReal/totalOrcado*100) : 0;
-
-    document.getElementById("orcadoTotal").textContent   = fmt(totalOrcado);
-    document.getElementById("orcadoReal").textContent    = fmt(totalReal);
-    document.getElementById("orcadoDesvio").textContent  = fmt(desvio);
-    document.getElementById("orcadoDesvio").style.color  = desvio >= 0 ? "#8fbfa0" : "#e09486";
-    document.getElementById("orcadoPercent").textContent = pct.toFixed(1) + "%";
-
-    const bar = document.getElementById("orcadoBar");
-    const barLabel = document.getElementById("orcadoBarLabel");
-    if (bar) bar.style.width = Math.min(pct, 100) + "%";
-    if (bar) bar.style.background = pct > 100 ? "#e09486" : pct > 80 ? "#f97316" : "#8fbfa0";
-    if (barLabel) barLabel.textContent = pct.toFixed(0) + "% do orçamento consumido";
-
-    // Preencher select obras
-    const orcObraEl = document.getElementById("orcadoObra");
-    if (orcObraEl && orcObraEl.options.length <= 1) {
-        const { data: obras } = await SB.from("obras").select("id,nome").order("nome");
-        (obras||[]).forEach(o => {
-            const opt = document.createElement("option");
-            opt.value = o.id; opt.textContent = o.nome;
-            orcObraEl.appendChild(opt);
-        });
-    }
 }
 
 async function carregarFinanceiro() {
@@ -5193,8 +5098,8 @@ async function carregarPainelResumo() {
     el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">A carregar...</div>`;
 
     const [movsRes, orcRes, pontoRes, regRes] = await Promise.all([
-        SB.from("movimentos_financeiros").select("tipo, valor_total, categorias_financeiras(nome)").eq("obra_id", obraId).eq("ativo", true),
-        SB.from("orcamentos").select("numero, estado, total_com_iva, total_sem_iva, subtotal_mao_obra, subtotal_materiais").eq("obra_id", obraId),
+        SB.from("movimentos_financeiros").select("tipo, valor_base, valor_total, categorias_financeiras(nome)").eq("obra_id", obraId).eq("ativo", true),
+        SB.from("orcamentos").select("numero, estado, taxa_iva, total_com_iva, total_sem_iva, subtotal_mao_obra, subtotal_materiais").eq("obra_id", obraId),
         SB.from("vw_registos_ponto").select("funcionario, horas, dia").eq("obra", _painelObraActual.nome),
         // registos_admin é a fonte de verdade das horas pagas (é daí que
         // saem os salários), por isso é daí que sai o custo de mão de obra.
@@ -5206,15 +5111,16 @@ async function carregarPainelResumo() {
     const ponto = pontoRes.data || [];
     const regs  = regRes.data   || [];
 
-    const totalEntradas = movs.filter(m => m.tipo === "entrada").reduce((s,m) => s + Number(m.valor_total), 0);
-    const totalFaturas  = movs.filter(m => m.tipo === "saida").reduce((s,m) => s + Number(m.valor_total), 0);
+    // Tudo sem IVA (ver semIva): recebido, faturas de compra e orçamento
+    const totalEntradas = movs.filter(m => m.tipo === "entrada").reduce((s,m) => s + semIva(m), 0);
+    const totalFaturas  = movs.filter(m => m.tipo === "saida").reduce((s,m) => s + semIva(m), 0);
     const horasRegistos = regs.reduce((s,r) => s + Number(r.horas || 0), 0);
     const custoMaoObra  = regs.reduce((s,r) => s + Number(r.horas || 0) * Number(r.funcionarios?.valor_dia || 0) / 8, 0);
     const totalSaidas   = totalFaturas + custoMaoObra;
     const margem        = totalEntradas - totalSaidas;
     const margemPct     = totalEntradas > 0 ? ((margem / totalEntradas) * 100).toFixed(1) : null;
     const orcAceite     = orcs.filter(o => o.estado === "aceite");
-    const totalOrc      = orcAceite.reduce((s,o) => s + Number(o.total_com_iva||0), 0);
+    const totalOrc      = orcAceite.reduce((s,o) => s + orcSemIva(o), 0);
     const desvio        = totalOrc > 0 ? totalOrc - totalSaidas : null;
     let horasPonto = 0;
     ponto.forEach(r => {
@@ -5228,11 +5134,11 @@ async function carregarPainelResumo() {
     el.innerHTML = `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
             <div class="card" style="padding:16px;text-align:center">
-                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">RECEBIDO</div>
+                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">RECEBIDO S/ IVA</div>
                 <div style="font-size:20px;font-weight:800;color:#8fbfa0">${fmt(totalEntradas)}</div>
             </div>
             <div class="card" style="padding:16px;text-align:center">
-                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">GASTO</div>
+                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">GASTO S/ IVA</div>
                 <div style="font-size:20px;font-weight:800;color:#e09486">${fmt(totalSaidas)}</div>
                 <div style="font-size:11px;opacity:.55;margin-top:4px">${fmt(totalFaturas)} faturas · ${fmt(custoMaoObra)} mão de obra</div>
             </div>
@@ -5250,8 +5156,8 @@ async function carregarPainelResumo() {
         ${totalOrc > 0 ? `
         <div class="card" style="padding:16px;margin-bottom:12px">
             <div style="font-size:11px;opacity:.5;margin-bottom:12px;font-family:var(--font-title);letter-spacing:.5px">ORÇAMENTO VS REAL</div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Orçamento aceite</span><span style="font-weight:700">${fmt(totalOrc)}</span></div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Faturas</span><span style="font-weight:700">${fmt(totalFaturas)}</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Orçamento aceite (s/ IVA)</span><span style="font-weight:700">${fmt(totalOrc)}</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Faturas (s/ IVA)</span><span style="font-weight:700">${fmt(totalFaturas)}</span></div>
             <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Mão de obra (${horasRegistos.toFixed(0)}h)</span><span style="font-weight:700">${fmt(custoMaoObra)}</span></div>
             <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Gasto real</span><span style="font-weight:700;color:#e09486">${fmt(totalSaidas)}</span></div>
             <div style="border-top:1px solid var(--border);margin:8px 0;padding-top:8px;display:flex;justify-content:space-between;font-size:14px">
@@ -5263,7 +5169,7 @@ async function carregarPainelResumo() {
             </div>
             <div style="font-size:11px;opacity:.5;margin-top:4px;text-align:right">${((totalSaidas/totalOrc)*100).toFixed(0)}% do orçamento utilizado</div>
         </div>` : `<div class="card" style="padding:14px;opacity:.5;font-size:13px;text-align:center;margin-bottom:12px">Sem orçamento aceite associado.</div>`}
-        ${orcs.length > 0 ? `<div class="card" style="padding:14px"><div style="font-size:11px;opacity:.5;margin-bottom:10px;font-family:var(--font-title);letter-spacing:.5px">ORÇAMENTOS</div>${orcs.map(o => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;font-family:monospace">${o.numero}</span><span class="badge-estado ${o.estado === "aceite" ? "pago" : "por_pagar"}" style="font-size:10px">${o.estado}</span><span style="font-size:13px;font-weight:700">${fmt(o.total_com_iva)}</span></div>`).join("")}</div>` : ""}`;
+        ${orcs.length > 0 ? `<div class="card" style="padding:14px"><div style="font-size:11px;opacity:.5;margin-bottom:10px;font-family:var(--font-title);letter-spacing:.5px">ORÇAMENTOS</div>${orcs.map(o => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;font-family:monospace">${o.numero}</span><span class="badge-estado ${o.estado === "aceite" ? "pago" : "por_pagar"}" style="font-size:10px">${o.estado}</span><span style="font-size:13px;font-weight:700" title="${fmt(o.total_com_iva)} com IVA">${fmt(orcSemIva(o))} <span style="font-size:10px;font-weight:400;opacity:.6">s/ IVA</span></span></div>`).join("")}</div>` : ""}`;
 }
 
 async function carregarPainelFinanceiro() {
@@ -5475,6 +5381,19 @@ function actualizarKpisFluxo(lista) {
     const entradas = lista.filter(m => m.tipo === "entrada").reduce((s,m) => s + Number(m.valor_total), 0);
     const saidas   = lista.filter(m => m.tipo === "saida").reduce((s,m)   => s + Number(m.valor_total), 0);
     const saldo    = entradas - saidas;
+    // IVA a pôr de parte: o das faturas da Maia Solutions menos o das compras.
+    // As notas de crédito entram com o sinal certo por serem do tipo contrário.
+    const ivaVendas  = lista.filter(m => m.tipo === "entrada").reduce((s,m) => s + ivaMov(m), 0);
+    const ivaCompras = lista.filter(m => m.tipo === "saida").reduce((s,m)   => s + ivaMov(m), 0);
+    const ivaParte   = ivaVendas - ivaCompras;
+    const ivaEl = document.getElementById("ivaPorDeParte");
+    if (ivaEl) {
+        ivaEl.textContent = Math.max(ivaParte, 0).toFixed(2) + " €";
+        const sub = document.getElementById("ivaPorDeParteSub");
+        if (sub) sub.textContent = ivaParte < 0
+            ? `IVA a recuperar: ${(-ivaParte).toFixed(2)} €`
+            : `${ivaVendas.toFixed(2)} € nas vendas − ${ivaCompras.toFixed(2)} € nas compras`;
+    }
     document.getElementById("totalEntradas").textContent = entradas.toFixed(2) + " €";
     document.getElementById("totalSaidas").textContent   = saidas.toFixed(2) + " €";
     const sEl = document.getElementById("saldoFluxo");
@@ -5502,6 +5421,7 @@ async function carregarMovimentos() {
                  valor_base, iva, valor_total, estado_pagamento, observacoes,
                  obra_id, categoria_id, fornecedor_id, cliente_nome,
                  fornecedores(id, nome, nif), categorias_financeiras(id, nome), obras(id, nome)`)
+        .eq("ativo", true)   // os inativos são duplicados retirados; o DRE e o painel já os ignoravam
         .order("data_documento", { ascending: false });
 
     if (obra === SEM_OBRA) query = query.is("obra_id", null);
@@ -5735,7 +5655,8 @@ async function abrirModalMovimento(mov = null) {
         set("movData",       mov.data_documento);
         set("movTipo",       mov.tipo);
         set("movTotal",      mov.valor_total);
-        set("movIva",        mov.iva);
+        // O campo mostra a taxa; a coluna iva guarda o valor em euros
+        set("movIva",        taxaIvaMov(mov));
         set("movBase",       mov.valor_base);
         set("movEstado",     mov.estado_pagamento);
         set("movCategoria",  mov.categoria_id);
@@ -5951,11 +5872,13 @@ async function guardarMovimento() {
         categoria_id:     document.getElementById("movCategoria")?.value || null,
         obra_id:          document.getElementById("movObra")?.value || null,
         valor_base:       Number(document.getElementById("movBase")?.value) || 0,
-        iva:              Number(document.getElementById("movIva")?.value) || 0,
         valor_total,
         estado_pagamento: document.getElementById("movEstado")?.value,
         observacoes:      document.getElementById("movObs")?.value?.trim() || null
     };
+    // O campo IVA do ecrã é a taxa (%). Gravava-se a taxa na coluna iva, que
+    // nos outros registos é o valor em euros: grava-se agora o valor.
+    payload.iva = Math.round(((Number(valor_total) || 0) - payload.valor_base) * 100) / 100;
     if (_movEmitidaPorNos) {
         payload.cliente_nome = nome || null;
         // Não há coluna para o NIF do cliente: fica nas observações
@@ -6188,7 +6111,6 @@ function ligarEventosGlobais() {
             document.querySelectorAll(".fin-subtab-content").forEach(c => c.style.display = "none");
             document.getElementById(`finTab-${tab}`).style.display = "block";
             if (tab === "dre")    carregarDRE();
-            if (tab === "orcado") iniciarOrcadoReal();
         });
     });
     // Definir mês actual por defeito
@@ -7131,7 +7053,7 @@ async function carregarDRE() {
     } else { inicio = "2000-01-01"; fim = "2099-12-31"; }
 
     let query = SB.from("movimentos_financeiros")
-        .select("tipo, valor_total, categoria_id, categorias_financeiras(nome), estado_pagamento")
+        .select("tipo, valor_base, valor_total, categoria_id, categorias_financeiras(nome), estado_pagamento")
         .eq("ativo", true).gte("data_documento", inicio).lte("data_documento", fim);
     if (obraId) query = query.eq("obra_id", obraId);
     const { data } = await query;
@@ -7139,8 +7061,8 @@ async function carregarDRE() {
 
     const receitas  = data.filter(m => m.tipo === "entrada");
     const custos    = data.filter(m => m.tipo === "saida");
-    const totalRec  = receitas.reduce((s,m) => s + Number(m.valor_total), 0);
-    const totalCus  = custos.reduce((s,m) => s + Number(m.valor_total), 0);
+    const totalRec  = receitas.reduce((s,m) => s + semIva(m), 0);
+    const totalCus  = custos.reduce((s,m) => s + semIva(m), 0);
 
     // Custo mão de obra dos registos_admin no mesmo período
     const { data: regAdmin } = await SB.from("registos_admin")
@@ -7169,14 +7091,14 @@ async function carregarDRE() {
     document.getElementById("dreMargem").textContent = margem.toFixed(1) + "%";
 
     const recByCat = {};
-    receitas.forEach(m => { const c = m.categorias_financeiras?.nome || "Sem categoria"; recByCat[c] = (recByCat[c]||0) + Number(m.valor_total); });
+    receitas.forEach(m => { const c = m.categorias_financeiras?.nome || "Sem categoria"; recByCat[c] = (recByCat[c]||0) + semIva(m); });
     document.getElementById("dreDetalheReceitas").innerHTML = Object.entries(recByCat).sort((a,b)=>b[1]-a[1]).map(([cat,val]) =>
         `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
             <span style="opacity:.8">${cat}</span><span style="color:#8fbfa0;font-weight:600">${val.toFixed(2)} €</span></div>`
     ).join("") || "<p style='opacity:.4;font-size:13px'>Sem receitas no período</p>";
 
     const cusByCat = {};
-    custos.forEach(m => { const c = m.categorias_financeiras?.nome || "Sem categoria"; cusByCat[c] = (cusByCat[c]||0) + Number(m.valor_total); });
+    custos.forEach(m => { const c = m.categorias_financeiras?.nome || "Sem categoria"; cusByCat[c] = (cusByCat[c]||0) + semIva(m); });
     document.getElementById("dreDetalheCustos").innerHTML = Object.entries(cusByCat).sort((a,b)=>b[1]-a[1]).map(([cat,val]) =>
         `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
             <span style="opacity:.8">${cat}</span><span style="color:#e09486;font-weight:600">${val.toFixed(2)} €</span></div>`
@@ -7188,55 +7110,6 @@ async function carregarDRE() {
         const { data: obras } = await SB.from("obras").select("id, nome").eq("ativo", true).order("nome");
         (obras||[]).forEach(o => { const opt = document.createElement("option"); opt.value=o.id; opt.textContent=o.nome; dreObraEl.appendChild(opt); });
     }
-}
-
-// =======================================================
-// ORÇADO VS. REAL
-// =======================================================
-async function iniciarOrcadoReal() {
-    const sel = document.getElementById("orcadoObra");
-    if (sel && sel.options.length <= 1) {
-        const { data: obras } = await SB.from("obras").select("id, nome").eq("ativo", true).order("nome");
-        (obras||[]).forEach(o => { const opt = document.createElement("option"); opt.value=o.id; opt.textContent=o.nome; sel.appendChild(opt); });
-    }
-}
-
-async function carregarOrcadoReal() {
-    const obraId = document.getElementById("orcadoObra")?.value;
-    if (!obraId) { alert("Seleciona uma obra"); return; }
-
-    const [orcRes, gastosRes] = await Promise.all([
-        SB.from("orcamentos").select("valor_total").eq("obra_id",obraId).eq("ativo",true).order("criado_em",{ascending:false}).limit(1).maybeSingle(),
-        SB.from("movimentos_financeiros").select("valor_total,categoria_id,categorias_financeiras(nome)").eq("obra_id",obraId).eq("tipo","saida").eq("ativo",true)
-    ]);
-
-    const totalOrcado = orcRes.data?.valor_total || 0;
-    const gastos      = gastosRes.data || [];
-    const totalReal   = gastos.reduce((s,m) => s+Number(m.valor_total), 0);
-    const desvio      = totalReal - totalOrcado;
-    const percent     = totalOrcado > 0 ? (totalReal / totalOrcado * 100) : 0;
-
-    document.getElementById("orcadoTotal").textContent   = totalOrcado > 0 ? totalOrcado.toFixed(2)+" €" : "Sem orçamento";
-    document.getElementById("orcadoReal").textContent    = totalReal.toFixed(2) + " €";
-    const devEl = document.getElementById("orcadoDesvio");
-    devEl.textContent = (desvio>=0?"+":"")+desvio.toFixed(2)+" €";
-    devEl.style.color = desvio<=0 ? "#8fbfa0" : "#e09486";
-    document.getElementById("orcadoPercent").textContent = percent.toFixed(1)+"%";
-
-    const pct = Math.min(percent,100);
-    const bar = document.getElementById("orcadoBar");
-    bar.style.width      = pct+"%";
-    bar.style.background = pct<80?"var(--primary)":pct<100?"#f97316":"#e09486";
-    document.getElementById("orcadoBarLabel").textContent = percent.toFixed(1)+"% executado";
-
-    const catMap = {};
-    gastos.forEach(m => { const c=m.categorias_financeiras?.nome||"Sem categoria"; catMap[c]=(catMap[c]||0)+Number(m.valor_total); });
-    document.getElementById("orcadoTabela").innerHTML = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).map(([cat,val]) =>
-        `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
-            <td style="padding:8px;font-size:13px">${cat}</td>
-            <td style="padding:8px;font-size:13px;text-align:right;color:#e09486;font-weight:600">${val.toFixed(2)} €</td>
-            <td style="padding:8px;font-size:13px;text-align:right;opacity:.6">${totalReal>0?(val/totalReal*100).toFixed(1):0}%</td>
-        </tr>`).join("") || `<tr><td colspan="3" style="padding:20px;text-align:center;opacity:.4">Sem gastos registados</td></tr>`;
 }
 
 // =======================================================

@@ -216,26 +216,22 @@
 
         <!-- SUB-TABS FINANCEIRO -->
         <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:0">
-            <button class="fin-subtab active" data-fintab="ordenados" onclick="switchFinTab('ordenados')"
+            <button class="fin-subtab active" data-fintab="fluxo" onclick="switchFinTab('fluxo')"
                 style="background:rgba(181,136,99,.15);color:var(--primary);border:none;border-bottom:2px solid var(--primary);padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600">
-                👥 Ordenados
+                💰 Fluxo de Caixa
             </button>
             <button class="fin-subtab" data-fintab="dre" onclick="switchFinTab('dre')"
                 style="background:none;color:var(--text-muted);border:none;border-bottom:2px solid transparent;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600">
                 📊 DRE
             </button>
-            <button class="fin-subtab" data-fintab="fluxo" onclick="switchFinTab('fluxo')"
+            <button class="fin-subtab" data-fintab="ordenados" onclick="switchFinTab('ordenados')"
                 style="background:none;color:var(--text-muted);border:none;border-bottom:2px solid transparent;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600">
-                💰 Fluxo de Caixa
-            </button>
-            <button class="fin-subtab" data-fintab="orcado" onclick="switchFinTab('orcado')"
-                style="background:none;color:var(--text-muted);border:none;border-bottom:2px solid transparent;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600">
-                🎯 Orçado vs Real
+                👥 Ordenados
             </button>
         </div>
 
         <!-- SUB-TAB: ORDENADOS -->
-        <div id="finTab-ordenados" class="fin-subtab-content" style="display:block">
+        <div id="finTab-ordenados" class="fin-subtab-content" style="display:none">
 
 
         <!-- KPIs -->
@@ -303,8 +299,8 @@
                 <button class="btn-primary" onclick="carregarDRE()" style="margin-top:18px">Calcular</button>
             </div>
             <div class="grid-cards" style="margin-bottom:16px">
-                <div class="card metric" style="border-left:3px solid #8fbfa0"><h3>Total Receitas</h3><div id="dreReceitas" class="value" style="color:#8fbfa0">–</div></div>
-                <div class="card metric" style="border-left:3px solid #e09486"><h3>Total Custos</h3><div id="dreCustos" class="value" style="color:#e09486">–</div></div>
+                <div class="card metric" style="border-left:3px solid #8fbfa0"><h3>Receitas s/ IVA</h3><div id="dreReceitas" class="value" style="color:#8fbfa0">–</div></div>
+                <div class="card metric" style="border-left:3px solid #e09486"><h3>Custos s/ IVA</h3><div id="dreCustos" class="value" style="color:#e09486">–</div></div>
                 <div class="card metric primary"><h3>Resultado</h3><div id="dreResultado" class="value">–</div></div>
                 <div class="card metric" style="border-left:3px solid #a78bfa"><h3>Margem</h3><div id="dreMargem" class="value" style="color:#a78bfa">–</div></div>
             </div>
@@ -315,7 +311,7 @@
         </div>
 
         <!-- SUB-TAB: FLUXO DE CAIXA (movimentos, antes era uma tab própria) -->
-        <div id="finTab-fluxo" class="fin-subtab-content" style="display:none">
+        <div id="finTab-fluxo" class="fin-subtab-content" style="display:block">
 
             <!-- KPIs -->
             <div class="grid-cards">
@@ -330,6 +326,11 @@
                 <div class="card metric">
                     <h3>Saldo</h3>
                     <div id="saldoFluxo" class="value">–</div>
+                </div>
+                <div class="card metric" title="IVA das faturas da Maia Solutions menos o IVA das faturas de compra, nos movimentos da lista">
+                    <h3>IVA a pôr de parte</h3>
+                    <div id="ivaPorDeParte" class="value" style="color:#a78bfa">–</div>
+                    <div id="ivaPorDeParteSub" style="font-size:11px;opacity:.55;margin-top:4px"></div>
                 </div>
             </div>
 
@@ -397,31 +398,6 @@
                     </thead>
                     <tbody></tbody>
                 </table>
-            </div>
-        </div>
-
-        <div id="finTab-orcado" class="fin-subtab-content" style="display:none">
-            <div class="card filtros" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">
-                <div style="display:flex;flex-direction:column;gap:4px">
-                    <label style="font-size:11px;opacity:.6">Obra</label>
-                    <select id="orcadoObra" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:var(--bg-dark-panel);color:var(--text-light);font-size:13px">
-                        <option value="">Todas as obras</option>
-                    </select>
-                </div>
-                <button class="btn-primary" onclick="carregarOrcadoReal()" style="margin-top:18px">Calcular</button>
-            </div>
-            <div class="grid-cards" style="margin-bottom:16px">
-                <div class="card metric"><h3>Orçado total</h3><div id="orcadoTotal" class="value">–</div></div>
-                <div class="card metric" style="border-left:3px solid #e09486"><h3>Custo real</h3><div id="orcadoReal" class="value" style="color:#e09486">–</div></div>
-                <div class="card metric"><h3>Desvio</h3><div id="orcadoDesvio" class="value">–</div></div>
-                <div class="card metric" style="border-left:3px solid #a78bfa"><h3>% consumido</h3><div id="orcadoPercent" class="value" style="color:#a78bfa">–</div></div>
-            </div>
-            <div class="card">
-                <div id="orcadoBarLabel" style="font-size:12px;opacity:.6;margin-bottom:6px">–</div>
-                <div style="background:rgba(255,255,255,.08);border-radius:6px;height:12px;overflow:hidden">
-                    <div id="orcadoBar" style="height:100%;width:0%;background:#8fbfa0;transition:width .5s"></div>
-                </div>
-                <div id="orcadoTabela" style="margin-top:16px"></div>
             </div>
         </div>
 
@@ -1828,7 +1804,7 @@
 <script src="fotos.js"></script>
 <script src="planeamento.js?v=3"></script>
 <script src="cotacoes.js"></script>
-<script src="admin.js?v=10"></script>
+<script src="admin.js?v=11"></script>
 <script src="telemovel.js?v=5"></script>
 
 
