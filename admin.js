@@ -1722,7 +1722,7 @@ async function carregarObras() {
 
     tbody.innerHTML = "";
     if (!data || data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;opacity:.6">Sem obras. Use "Gerar QR" para criar uma obra.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;opacity:.6">Sem obras. Use o botão + para criar uma obra.</td></tr>`;
         return;
     }
 
@@ -3231,8 +3231,9 @@ async function vgCarregarAlertas() {
                 <div style="font-weight:600;font-size:14.5px">${escHtml(a.titulo)}</div>
                 <div style="font-size:12.5px;opacity:.65;margin-top:1px">${escHtml(a.sub)}</div>
             </div>
-            ${a.tab || a.ir ? `<button class="btn-secondary" style="font-size:12px;padding:4px 12px;flex-shrink:0"
-                        onclick="${a.tab ? `abrirTab('${a.tab}')` : `location.href='${a.ir}'`}">Ver</button>` : ""}
+            ${a.fluxo || a.tab || a.ir ? `<button class="btn-secondary" style="font-size:12px;padding:4px 12px;flex-shrink:0"
+                        onclick="${a.fluxo ? `abrirFluxoFiltrado(${escHtml(JSON.stringify(a.fluxo))})`
+                                 : a.tab ? `abrirTab('${a.tab}')` : `location.href='${a.ir}'`}">Ver</button>` : ""}
         </div>`).join("");
 }
 
@@ -3277,7 +3278,8 @@ async function vgDespesasSemObra() {
     if (!count) return null;
     return { icone: "🧾", cor: "rgba(0,0,0,.06)",
              titulo: count === 1 ? "1 despesa sem obra" : `${count} despesas sem obra`,
-             sub: "Não entram no custo de nenhuma obra", tab: "financeiro" };
+             sub: "Não entram no custo de nenhuma obra",
+             fluxo: { filtroObra: SEM_OBRA, filtroTipo: "saida" } };
 }
 
 async function vgFaturasPorPagar() {
@@ -3288,7 +3290,8 @@ async function vgFaturasPorPagar() {
     const soma = (data || []).reduce((s, m) => s + Number(m.valor_total || 0), 0);
     return { icone: "💶", cor: "rgba(165,72,61,.10)",
              titulo: count === 1 ? "1 fatura por pagar" : `${count} faturas por pagar`,
-             sub: vgEuros(soma), tab: "financeiro" };
+             sub: vgEuros(soma),
+             fluxo: { filtroEstadoPag: "por_pagar", filtroTipo: "saida" } };
 }
 
 async function vgStockAbaixoMinimo() {
@@ -4324,6 +4327,8 @@ async function carregarPainelDocumentos() {
     const erroTabela = docsRes.error
         ? `<div style="color:#e09486;font-size:12px;margin-bottom:8px">Não foi possível ler os documentos: ${escDoc(docsRes.error.message)}</div>` : "";
 
+    const fotosHeic = docs.filter(d => ehHeic({ name: d.nome_ficheiro, type: d.mime }));
+
     const opcoesTipo = Object.entries(TIPOS_DOC_OBRA)
         .map(([k, t]) => `<option value="${k}">${t.icone} ${t.nome}</option>`).join("");
 
@@ -4364,19 +4369,25 @@ async function carregarPainelDocumentos() {
             <button class="btn-secondary" onclick="abrirFichaClienteObra()">${cliente ? "✏️ Cliente e link" : "+ Definir cliente"}</button>
         </div>
 
-        <div class="card" style="padding:14px;margin:0 0 12px">
-            <div style="font-weight:600;font-size:13px;margin-bottom:10px">⬆ Carregar documento</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-                <select id="docObraTipo" onchange="document.getElementById('docObraVisivel').checked = TIPOS_DOC_OBRA[this.value].visivel" style="max-width:200px">${opcoesTipo}</select>
-                <input type="file" id="docObraFicheiro" multiple accept="application/pdf,image/*" style="flex:1;min-width:180px">
-                <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;color:inherit;text-transform:none;letter-spacing:0;white-space:nowrap;width:auto;margin:0">
-                    <input type="checkbox" id="docObraVisivel" checked style="width:auto;margin:0"> Visível ao cliente
+        <div class="card doc-carregar">
+            <div class="doc-carregar-titulo">⬆ Carregar documento</div>
+            <div class="barra-filtros" style="margin:0">
+                <select id="docObraTipo" onchange="document.getElementById('docObraVisivel').checked = TIPOS_DOC_OBRA[this.value].visivel">${opcoesTipo}</select>
+                <input type="file" id="docObraFicheiro" multiple accept="application/pdf,image/*,.heic,.heif" hidden onchange="mostrarFicheirosDocObra(this)">
+                <label for="docObraFicheiro" class="btn-pequeno doc-escolher" id="docObraEscolhidos">📎 Escolher ficheiro</label>
+                <label class="doc-visivel">
+                    <input type="checkbox" id="docObraVisivel" checked> Visível ao cliente
                 </label>
-                <button class="btn-primary" id="btnCarregarDocObra" onclick="carregarDocumentoObra()">Carregar</button>
+                <button class="btn-icone" id="btnCarregarDocObra" onclick="carregarDocumentoObra()" title="Carregar">⬆</button>
             </div>
-            <div style="font-size:11px;opacity:.5;margin-top:8px">Orçamentos, faturas e recibos: o assistente lê o PDF e mostra o que vai registar antes de gravar. Máx. 20 MB por ficheiro.</div>
-            <div id="docObraMsg" style="display:none;font-size:12px;margin-top:8px"></div>
+            <div style="font-size:11px;opacity:.5;margin-top:6px">O assistente lê orçamentos, faturas e recibos antes de gravar. Fotos passam a JPG. Máx. 20 MB.</div>
+            <div id="docObraMsg" style="display:none;font-size:12px;margin-top:6px"></div>
         </div>
+        ${fotosHeic.length ? `
+        <div class="card doc-carregar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="flex:1;min-width:180px;font-size:12.5px">📷 ${fotosHeic.length === 1 ? "1 foto está" : fotosHeic.length + " fotos estão"} em HEIC e não aparece${fotosHeic.length === 1 ? "" : "m"} no Android nem na Área do cliente.</span>
+            <button class="btn-pequeno" id="btnConverterHeic" onclick="converterFotosHeicObra()">Converter para JPG</button>
+        </div>` : ""}
 
         ${erroTabela}
         <div class="card" style="padding:0;margin:0 0 20px;overflow:hidden">
@@ -4394,19 +4405,48 @@ function nomeSeguroFicheiro(nome) {
         .replace(/[^\w.\-]+/g, "_").replace(/_+/g, "_").slice(-80);
 }
 
+function mostrarFicheirosDocObra(inp) {
+    const n = inp.files?.length || 0;
+    const el = document.getElementById("docObraEscolhidos");
+    if (!el) return;
+    el.textContent = n === 0 ? "📎 Escolher ficheiro" : n === 1 ? "📎 " + inp.files[0].name : `📎 ${n} ficheiros`;
+    el.title = [...(inp.files || [])].map(f => f.name).join("\n");
+}
+
 async function carregarDocumentoObra() {
     const obra = _painelObraActual;
     const inp  = document.getElementById("docObraFicheiro");
     const tipo = document.getElementById("docObraTipo").value;
     const visivel = document.getElementById("docObraVisivel").checked;
-    const ficheiros = [...(inp.files || [])];
+    let ficheiros = [...(inp.files || [])];
     if (!ficheiros.length) { msgDocObra("Escolhe primeiro o ficheiro.", "warn"); return; }
 
-    const grandes = ficheiros.filter(f => f.size > MAX_DOC_OBRA);
-    if (grandes.length) { msgDocObra(`"${grandes[0].name}" tem mais de 20 MB.`, "err"); return; }
-
     const btn = document.getElementById("btnCarregarDocObra");
-    btn.disabled = true; btn.textContent = "⏳ A carregar…";
+    btn.disabled = true; btn.textContent = "⏳";
+
+    // Fotos (e qualquer HEIC) passam a JPEG reduzido antes de gravar
+    try {
+        const novos = [];
+        for (const f of ficheiros) {
+            if (tipo === "foto" || ehHeic(f)) {
+                msgDocObra(`A preparar "${f.name}"…`, "warn");
+                novos.push(await prepararFoto(f));
+            } else novos.push(f);
+        }
+        ficheiros = novos;
+    } catch (e) {
+        console.error("prepararFoto:", e);
+        btn.disabled = false; btn.textContent = "⬆";
+        msgDocObra("Não foi possível converter a foto: " + e.message, "err");
+        return;
+    }
+
+    const grandes = ficheiros.filter(f => f.size > MAX_DOC_OBRA);
+    if (grandes.length) {
+        btn.disabled = false; btn.textContent = "⬆";
+        msgDocObra(`"${grandes[0].name}" tem mais de 20 MB.`, "err"); return;
+    }
+
     const { data: { session } } = await SB.auth.getSession();
     const ler = TIPOS_DOC_OBRA[tipo].ler;
     const criados = [];
@@ -4436,7 +4476,7 @@ async function carregarDocumentoObra() {
         msgDocObra("Não foi possível carregar: " + e.message, "err");
         return;
     } finally {
-        btn.disabled = false; btn.textContent = "Carregar";
+        btn.disabled = false; btn.textContent = "⬆";
     }
 
     await carregarPainelDocumentos();
@@ -4447,6 +4487,48 @@ async function carregarDocumentoObra() {
             ? `${criados.length} documentos carregados. Usa "Ler e registar" em cada um.`
             : `${criados.length === 1 ? "Documento carregado" : criados.length + " documentos carregados"}.`);
     }
+}
+
+// Fotos antigas em HEIC: troca cada ficheiro por um JPEG no mesmo sítio
+// do armazenamento e atualiza a linha. O ficheiro HEIC só se apaga depois
+// de o JPEG e a linha estarem gravados.
+async function converterFotosHeicObra() {
+    const obra = _painelObraActual;
+    const btn = document.getElementById("btnConverterHeic");
+    const { data: docs, error } = await SB.from("obra_documentos").select("*").eq("obra_id", obra.id);
+    if (error) { msgDocObra("Não foi possível ler os documentos: " + error.message, "err"); return; }
+    const heic = (docs || []).filter(d => ehHeic({ name: d.nome_ficheiro, type: d.mime }));
+    if (!heic.length) return carregarPainelDocumentos();
+    if (btn) btn.disabled = true;
+
+    let feitas = 0;
+    try {
+        for (const d of heic) {
+            if (btn) btn.textContent = `⏳ ${feitas + 1}/${heic.length}`;
+            const dl = await SB.storage.from(BUCKET_DOCS_OBRA).download(d.caminho);
+            if (dl.error) throw new Error(dl.error.message);
+            const jpg = await prepararFoto(new File([dl.data], d.nome_ficheiro, { type: d.mime || "image/heic" }));
+            const caminho = d.caminho.replace(/\.[^./]+$/, "") + ".jpg";
+            const up = await SB.storage.from(BUCKET_DOCS_OBRA).upload(caminho, jpg, { contentType: "image/jpeg", upsert: true });
+            if (up.error) throw new Error(up.error.message);
+            const { error: e2 } = await SB.from("obra_documentos").update({
+                caminho, nome_ficheiro: jpg.name, mime: "image/jpeg", tamanho: jpg.size,
+            }).eq("id", d.id);
+            if (e2) {
+                await SB.storage.from(BUCKET_DOCS_OBRA).remove([caminho]);
+                throw new Error(e2.message);
+            }
+            await SB.storage.from(BUCKET_DOCS_OBRA).remove([d.caminho]);
+            feitas++;
+        }
+    } catch (e) {
+        console.error("converterFotosHeicObra:", e);
+        await carregarPainelDocumentos();
+        msgDocObra(`Converti ${feitas} de ${heic.length}. Falhou: ${e.message}`, "err");
+        return;
+    }
+    await carregarPainelDocumentos();
+    msgDocObra(feitas === 1 ? "1 foto convertida para JPG." : `${feitas} fotos convertidas para JPG.`);
 }
 
 async function abrirDocumentoObra(id) {
@@ -5161,7 +5243,23 @@ async function initFluxo() {
         if (ano) ano.value = "";
         _fluxoObraPedida = null;
     }
+    // Vindo de um aviso da Visão geral (faturas por pagar, despesas sem obra):
+    // limpa os outros filtros, mostra todos os anos e aplica só o pedido.
+    if (_fluxoFiltroPedido) {
+        ["filtroObra","filtroCategoria","filtroTipo","filtroEstadoPag","filtroDataInicio","filtroDataFim","filtroAnoFluxo"]
+            .forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+        Object.entries(_fluxoFiltroPedido).forEach(([id, v]) => {
+            const el = document.getElementById(id); if (el) el.value = v;
+        });
+        _fluxoFiltroPedido = null;
+    }
     await carregarMovimentos();
+}
+
+let _fluxoFiltroPedido = null;
+function abrirFluxoFiltrado(filtro) {
+    _fluxoFiltroPedido = filtro;
+    abrirTab("financeiro", "fluxo");
 }
 
 // O filtro de ano é lido pelo carregarMovimentos, mas ninguém o preenchia.
@@ -5188,6 +5286,9 @@ async function carregarCategoriasFinanceiras() {
     });
 }
 
+// Valor do filtro de obra para as despesas que ainda não têm obra.
+const SEM_OBRA = "sem_obra";
+
 async function carregarObrasFluxo() {
     const { data } = await SB.from("obras").select("id, nome").order("nome");
     ["movObra", "filtroObra"].forEach(id => {
@@ -5197,6 +5298,7 @@ async function carregarObrasFluxo() {
         // despesas da empresa há a obra GERAL / EMPRESA.
         const placeholder = id.startsWith("filtro") ? "— Todas —" : "— Escolher obra —";
         sel.innerHTML = `<option value="">${placeholder}</option>`;
+        if (id === "filtroObra") sel.innerHTML += `<option value="${SEM_OBRA}">— Sem obra —</option>`;
         data?.forEach(o => { sel.innerHTML += `<option value="${escHtml(o.id)}">${escHtml(o.nome)}</option>`; });
     });
 }
@@ -5234,6 +5336,7 @@ async function carregarMovimentos() {
     const obra       = document.getElementById("filtroObra")?.value || "";
     const categoria  = document.getElementById("filtroCategoria")?.value || "";
     const tipo       = document.getElementById("filtroTipo")?.value || "";
+    const estadoPag  = document.getElementById("filtroEstadoPag")?.value || "";
     const dataInicio = document.getElementById("filtroDataInicio")?.value || "";
     const dataFim    = document.getElementById("filtroDataFim")?.value || "";
     const anoFiltro  = document.getElementById("filtroAnoFluxo")?.value || "";
@@ -5252,9 +5355,11 @@ async function carregarMovimentos() {
                  fornecedores(id, nome, nif), categorias_financeiras(id, nome), obras(id, nome)`)
         .order("data_documento", { ascending: false });
 
-    if (obra)      query = query.eq("obra_id", obra);
+    if (obra === SEM_OBRA) query = query.is("obra_id", null);
+    else if (obra) query = query.eq("obra_id", obra);
     if (categoria) query = query.eq("categoria_id", categoria);
     if (tipo)      query = query.eq("tipo", tipo);
+    if (estadoPag) query = query.eq("estado_pagamento", estadoPag);
     if (dInicio)   query = query.gte("data_documento", dInicio);
     if (dFim)      query = query.lte("data_documento", dFim);
 
@@ -5272,12 +5377,12 @@ let _filtrosFluxoLigados = false;
 function ligarFiltrosFluxo() {
     if (_filtrosFluxoLigados) return;
     _filtrosFluxoLigados = true;
-    ["filtroObra","filtroCategoria","filtroTipo","filtroDataInicio","filtroDataFim","filtroAnoFluxo"].forEach(id => {
+    ["filtroObra","filtroCategoria","filtroTipo","filtroEstadoPag","filtroDataInicio","filtroDataFim","filtroAnoFluxo"].forEach(id => {
         document.getElementById(id)?.addEventListener("change", carregarMovimentos);
         document.getElementById(id)?.addEventListener("input",  carregarMovimentos);
     });
     document.getElementById("btnLimparFiltros")?.addEventListener("click", () => {
-        ["filtroObra","filtroCategoria","filtroTipo","filtroDataInicio","filtroDataFim"]
+        ["filtroObra","filtroCategoria","filtroTipo","filtroEstadoPag","filtroDataInicio","filtroDataFim"]
             .forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
         const anoEl = document.getElementById("filtroAnoFluxo");
         if (anoEl) anoEl.value = new Date().getFullYear().toString();
@@ -5806,7 +5911,7 @@ function ligarEventosGlobais() {
     // Obras — filtro e eventos
     document.getElementById("pesquisaObras")?.addEventListener("input", filtrarObras);
     document.getElementById("filtroEstadoObras")?.addEventListener("change", filtrarObras);
-    document.getElementById("btnNovaObra")?.addEventListener("click", () => abrirTab("gerarqr"));
+    document.getElementById("btnNovaObra")?.addEventListener("click", () => editarObra(null));
     document.getElementById("modalQR")?.addEventListener("click", e => {
         if (e.target.id === "modalQR") fecharModalQR();
     });
