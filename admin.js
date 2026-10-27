@@ -7352,11 +7352,16 @@ let _bibServicos = [];
 let _bibMateriais = {};
 
 async function initBiblioteca() {
-    if (_bibServicos.length) { renderBiblioteca(); return; }
-    await carregarBiblioteca();
+    if (!_bibServicos.length) await lerBiblioteca();
+    mostrarBiblioteca();
 }
 
-async function carregarBiblioteca() {
+// Lê todos os serviços, activos e inactivos. O ecrã da biblioteca precisa
+// dos inactivos (para os reactivar); o autocomplete do orçamento filtra
+// pelos activos. Antes havia duas leituras para a mesma variável, e a do
+// orçamento só trazia os activos: se corresse primeiro, a biblioteca
+// abria sem os inactivos.
+async function lerBiblioteca() {
     const [sRes, mRes] = await Promise.all([
         SB.from("biblioteca_servicos").select("*").order("categoria").order("ordem").order("nome"),
         SB.from("biblioteca_materiais").select("*").order("ordem")
@@ -7367,12 +7372,21 @@ async function carregarBiblioteca() {
         if (!_bibMateriais[m.servico_id]) _bibMateriais[m.servico_id] = [];
         _bibMateriais[m.servico_id].push(m);
     });
+}
+
+async function carregarBiblioteca() {
+    await lerBiblioteca();
+    mostrarBiblioteca();
+}
+
+// Preenche o filtro de categorias e desenha a lista.
+function mostrarBiblioteca() {
     const cats = [...new Set(_bibServicos.map(s => s.categoria))].sort();
     const sel  = document.getElementById("bibFiltroCategoria");
     if (sel) {
         const atual = sel.value;
         sel.innerHTML = '<option value="">— Todas —</option>' +
-            cats.map(c => `<option value="${c}" ${c===atual?'selected':''}>${c}</option>`).join("");
+            cats.map(c => `<option value="${esc(c)}" ${c===atual?'selected':''}>${esc(c)}</option>`).join("");
     }
     renderBiblioteca();
 }
@@ -7497,17 +7511,7 @@ async function toggleBibAtivo(id, ativo) {
 // INTEGRAÇÃO NO ORÇAMENTO — autocomplete biblioteca
 // =======================================================
 async function garantirBibliotecaCarregada() {
-    if (_bibServicos.length) return;
-    const [sRes, mRes] = await Promise.all([
-        SB.from("biblioteca_servicos").select("*").eq("ativo", true).order("categoria").order("ordem"),
-        SB.from("biblioteca_materiais").select("*").order("ordem")
-    ]);
-    _bibServicos = sRes.data || [];
-    _bibMateriais = {};
-    (mRes.data||[]).forEach(m => {
-        if (!_bibMateriais[m.servico_id]) _bibMateriais[m.servico_id] = [];
-        _bibMateriais[m.servico_id].push(m);
-    });
+    if (!_bibServicos.length) await lerBiblioteca();
 }
 
 function ligarAutocompleteBiblioteca(inputEl, cid) {
