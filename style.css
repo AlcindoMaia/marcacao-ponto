@@ -998,6 +998,7 @@ table.cot-ed-tabela th { text-align: left; font-family: var(--font-title); font-
 table.cot-ed-tabela td { padding: 3px 4px; vertical-align: top; border-bottom: 1px solid rgba(0,0,0,.05); }
 table.cot-ed-tabela input:not([type=checkbox]) { width: 100%; min-width: 80px; padding: 5px 6px; font-size: 12px; border: 1px solid rgba(0,0,0,.12); border-radius: 6px; background: #fff; }
 table.cot-ed-tabela input.num { text-align: right; }
+body.dark table.cot-ed-tabela input:not([type=checkbox]), body.dark .cot-ed-sec textarea { background: #18232e; color: #ece5de; border-color: rgba(255,255,255,.14); }
 .cot-ed-add { margin-top: 6px; font-size: 12px; padding: 6px 12px; }
 .cot-ed-cel { min-width: 130px; }
 .cot-ed-cel label { display: block; font-size: 10px; color: var(--text-muted); margin-top: 3px; }
