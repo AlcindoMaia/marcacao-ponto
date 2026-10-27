@@ -7,7 +7,7 @@
 
 <title>Painel Administrativo — Maia Solutions</title>
 
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 <link rel="stylesheet" href="telemovel.css?v=6">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
@@ -1540,12 +1540,12 @@
 
             <div class="serv-thead" style="flex-shrink:0;margin:0 12px;border-radius:6px 6px 0 0">
                 <span>Serviço</span>
-                <span>H. Orç.</span>
-                <span>H. Real</span>
+                <span title="Valor do serviço, sem IVA">€ Valor</span>
+                <span title="Mão de obra + material ligados ao serviço">€ Custo</span>
+                <span>Margem</span>
+                <span>Margem %</span>
                 <span>€ MO</span>
                 <span>€ Material</span>
-                <span>€ Orç.</span>
-                <span>Desvio</span>
                 <span style="text-align:center">Estado</span>
             </div>
 
@@ -1804,7 +1804,7 @@
 <script src="fotos.js"></script>
 <script src="planeamento.js?v=3"></script>
 <script src="cotacoes.js"></script>
-<script src="admin.js?v=11"></script>
+<script src="admin.js?v=12"></script>
 <script src="telemovel.js?v=5"></script>
 
 
@@ -1920,12 +1920,12 @@
                 <!-- Novo serviço -->
                 <div style="border-top:1px solid rgba(255,255,255,.08);padding-top:12px">
                     <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin-bottom:8px">Novo serviço</div>
-                    <div style="display:grid;grid-template-columns:1fr 80px 90px auto;gap:8px;align-items:center">
+                    <div style="display:grid;grid-template-columns:1fr 120px auto;gap:8px;align-items:center">
                         <input id="novoServNome" placeholder="Nome do serviço"
                                style="padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
-                        <input id="novoServHoras" type="number" step="0.5" min="0" placeholder="Horas"
-                               style="padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
-                        <input id="novoServValor" type="number" step="0.01" min="0" placeholder="€ orç."
+                        <input id="novoServHoras" type="hidden"
+                               style="display:none;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
+                        <input id="novoServValor" type="number" step="0.01" min="0" placeholder="€ valor s/ IVA"
                                style="padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
                         <button onclick="adicionarServico()" class="btn-primary" style="white-space:nowrap">+ Serviço</button>
                     </div>

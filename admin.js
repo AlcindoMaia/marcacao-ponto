@@ -2052,9 +2052,9 @@ async function carregarServicosModal() {
         return;
     }
     lista.innerHTML = data.map(s => {
-        const hR  = horasP[s.id]||0;
         const mR  = matP[s.id]||0;
-        const pct = s.horas_orcamento > 0 ? Math.min(Math.round(hR/s.horas_orcamento*100),100) : null;
+        const vS  = Number(s.valor_orcamento||0);
+        const pct = vS > 0 && mR > 0 ? Math.min(Math.round(mR/vS*100),100) : null;
         const barCol = s.concluido ? "#8fbfa0" : pct>=75 ? "#fb923c" : "var(--primary,#b58863)";
         return `<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;border:1px solid ${s.concluido?"rgba(143,191,160,.2)":"rgba(255,255,255,.06)"}">
             <div style="flex:1;min-width:0">
@@ -2064,8 +2064,8 @@ async function carregarServicosModal() {
                     ${s.concluido?`<span style="font-size:10px;background:rgba(143,191,160,.15);color:#8fbfa0;padding:1px 6px;border-radius:10px">✓ Concluído</span>`:""}
                 </div>
                 <div style="display:flex;gap:14px;font-size:11px;opacity:.6">
-                    <span>🕐 ${hR.toFixed(1)}h${s.horas_orcamento?` / ${s.horas_orcamento}h`:""}</span>
-                    <span>💶 ${mR.toFixed(0)}€ mat${s.valor_orcamento?` / ${s.valor_orcamento}€`:""}</span>
+                    <span>💶 ${vS ? vS.toFixed(0)+"€ valor" : "sem valor"}</span>
+                    <span>🧱 ${mR.toFixed(0)}€ material ligado</span>
                 </div>
                 ${pct!==null?`<div style="margin-top:6px;background:rgba(255,255,255,.1);border-radius:3px;height:3px"><div style="width:${pct}%;height:100%;background:${barCol};border-radius:3px"></div></div>`:""}
             </div>
@@ -2172,46 +2172,58 @@ async function abrirPainelObra(obra) {
         .select("obra_servico_id, valor")
         .in("obra_servico_id", ids);
 
-    const horasP = {}, moP = {}, matP = {};
+    // Custos da obra inteira (sem IVA), para mostrar o que não está ligado a
+    // nenhum serviço: sem isto a soma das margens dos serviços engana.
+    const [{ data: faturasObra }, { data: regsObra }] = await Promise.all([
+        SB.from("movimentos_financeiros").select("valor_base, valor_total")
+            .eq("obra_id", obra.id).eq("tipo", "saida").eq("ativo", true),
+        SB.from("registos_admin").select("horas, funcionarios(valor_dia)")
+            .eq("obra_id", obra.id).eq("tipo", "presenca"),
+    ]);
+
+    const moP = {}, matP = {};
     (regServs||[]).forEach(r => {
         const sid = r.obra_servico_id;
-        const h   = Number(r.horas||0);
-        horasP[sid] = (horasP[sid]||0) + h;
         const vd = valorDiaPorRegisto[r.registo_id] || 0;
-        if (vd) moP[sid] = (moP[sid]||0) + h * (vd/8);
+        if (vd) moP[sid] = (moP[sid]||0) + Number(r.horas||0) * (vd/8);
     });
     (movServs||[]).forEach(r => { matP[r.obra_servico_id] = (matP[r.obra_servico_id]||0)+Number(r.valor||0); });
 
-    const totHOrç  = (servicos||[]).reduce((s,v)=>s+(v.horas_orcamento||0),0);
-    const totHReal = Object.values(horasP).reduce((s,v)=>s+v,0);
-    const totVOrç  = (servicos||[]).reduce((s,v)=>s+(v.valor_orcamento||0),0);
+    const totValor = (servicos||[]).reduce((s,v)=>s+Number(v.valor_orcamento||0),0);
     const totMO    = Object.values(moP).reduce((s,v)=>s+v,0);
     const totMat   = Object.values(matP).reduce((s,v)=>s+v,0);
-    const totReal  = totMO + totMat;
-    const totDesvio = totVOrç > 0 ? totReal - totVOrç : null;
+    const matObra  = (faturasObra||[]).reduce((s,m)=>s+semIva(m),0);
+    const moObra   = (regsObra||[]).reduce((s,r)=>s+Number(r.horas||0)*Number(r.funcionarios?.valor_dia||0)/8,0);
+    const matSemServ = Math.max(matObra - totMat, 0);
+    const moSemServ  = Math.max(moObra - totMO, 0);
+    const custoObra  = Math.max(matObra, totMat) + Math.max(moObra, totMO);
+    const margemObra = totValor - custoObra;
+    const margemPctObra = totValor > 0 ? margemObra / totValor * 100 : null;
     const concluidosCount = (servicos||[]).filter(s=>s.concluido).length;
+    const eur = v => Math.round(v).toLocaleString("pt-PT") + " €";
+    const corMg = v => v === null ? "rgba(255,255,255,.3)" : v < 0 ? "#e09486" : "#8fbfa0";
 
-    // KPIs redesenhados
+    // KPIs: valor dos serviços contra o custo real, tudo sem IVA
     const kpis = [
         {
-            label: "Horas Orçadas",
-            val: totHOrç > 0 ? totHOrç.toFixed(0)+"h" : "—",
-            sub: totHReal > 0 ? `${totHReal.toFixed(1)}h realizadas` : "Sem registos",
-            cor: totHReal > totHOrç && totHOrç > 0 ? "#fb923c" : totHReal > 0 ? "#8fbfa0" : "rgba(255,255,255,.6)",
+            label: "Valor dos serviços",
+            val: totValor > 0 ? eur(totValor) : "—",
+            sub: "sem IVA",
+            cor: "rgba(255,255,255,.85)",
             accent: "#b58863"
         },
         {
-            label: "Custo Mão de Obra",
-            val: totMO > 0 ? totMO.toFixed(0)+"€" : "—",
-            sub: totMat > 0 ? `+${totMat.toFixed(0)}€ material` : "Sem material",
+            label: "Custo real",
+            val: custoObra > 0 ? eur(custoObra) : "—",
+            sub: `${eur(Math.max(moObra, totMO))} mão de obra · ${eur(Math.max(matObra, totMat))} material`,
             cor: "#e09486",
             accent: "#e09486"
         },
         {
-            label: "Orçamento Total",
-            val: totVOrç > 0 ? totVOrç.toFixed(0)+"€" : "—",
-            sub: totDesvio !== null ? (totDesvio > 0 ? `▲ +${totDesvio.toFixed(0)}€ desvio` : `▼ ${totDesvio.toFixed(0)}€ dentro`) : "Sem orçamento",
-            cor: totDesvio > 0 ? "#e09486" : "#8fbfa0",
+            label: "Margem",
+            val: totValor > 0 ? eur(margemObra) : "—",
+            sub: margemPctObra !== null ? `${margemPctObra.toFixed(1)}% do valor` : "Sem valor nos serviços",
+            cor: totValor > 0 ? corMg(margemObra) : "rgba(255,255,255,.6)",
             accent: "#a78bfa"
         },
         {
@@ -2230,58 +2242,56 @@ async function abrirPainelObra(obra) {
             <div class="kpi-sub">${k.sub}</div>
         </div>`).join("");
 
-    // Progresso geral
+    // Quanto do valor já foi gasto
     const progEl = document.getElementById("painelObraProgresso");
     if (progEl) {
-        const pctGeral = totHOrç > 0 ? Math.min(Math.round(totHReal/totHOrç*100),100) : null;
-        progEl.innerHTML = pctGeral !== null
-            ? `<span style="color:rgba(255,255,255,.5)">Progresso geral:</span> <span style="color:var(--primary,#b58863);font-weight:600">${pctGeral}%</span>`
+        progEl.innerHTML = totValor > 0
+            ? `<span style="color:rgba(255,255,255,.5)">Custo:</span> <span style="color:var(--primary,#b58863);font-weight:600">${Math.round(custoObra/totValor*100)}% do valor</span>`
             : "";
     }
 
-    // Linhas de serviços
+    // Linhas de serviços: valor contra custo real e a margem que fica
+    const linhaServ = (nome, badges, valor, mo, mat, estado, pctBar) => {
+        const custo  = mo + mat;
+        const margem = valor ? valor - custo : null;
+        const mPct   = valor ? margem / valor * 100 : null;
+        return `<div class="serv-row">
+            <div>
+                <div style="font-weight:500;font-size:13px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">${nome}${badges}</div>
+                ${pctBar !== null ? `
+                <div style="display:flex;align-items:center;gap:6px;margin-top:5px" title="Custo em % do valor">
+                    <div style="flex:1;max-width:100px;background:rgba(255,255,255,.08);border-radius:3px;height:3px">
+                        <div style="width:${Math.min(pctBar,100)}%;height:100%;background:${pctBar>100?"#e09486":pctBar>=80?"#fb923c":"var(--primary,#b58863)"};border-radius:3px"></div>
+                    </div>
+                    <span style="font-size:10px;color:rgba(255,255,255,.35)">${pctBar}%</span>
+                </div>` : ""}
+            </div>
+            <div style="color:rgba(255,255,255,.85);font-size:13px">${valor ? eur(valor) : "—"}</div>
+            <div style="color:#e09486;font-size:13px">${custo > 0 ? eur(custo) : "—"}</div>
+            <div style="font-weight:600;font-size:13px;color:${corMg(margem)}">${margem === null ? "—" : eur(margem)}</div>
+            <div style="font-size:12px;color:${corMg(mPct)}">${mPct === null ? "—" : mPct.toFixed(0) + "%"}</div>
+            <div style="color:rgba(255,255,255,.45);font-size:12px">${mo > 0 ? eur(mo) : "—"}</div>
+            <div style="color:rgba(255,255,255,.45);font-size:12px">${mat > 0 ? eur(mat) : "—"}</div>
+            <div style="text-align:center">${estado}</div>
+        </div>`;
+    };
+
     const tbody = document.getElementById("painelServicosTbody");
     tbody.innerHTML = (servicos||[]).map(s => {
-        const hR    = horasP[s.id]||0;
-        const moR   = moP[s.id]||0;
-        const matR  = matP[s.id]||0;
-        const totR  = moR + matR;
-        const desvio= s.valor_orcamento ? totR - s.valor_orcamento : null;
-        const pct   = s.horas_orcamento > 0 ? Math.round(hR/s.horas_orcamento*100) : null;
-        const barCol= s.concluido ? "#8fbfa0" : pct>=100 ? "#e09486" : pct>=75 ? "#fb923c" : "var(--primary,#b58863)";
-
+        const valor = Number(s.valor_orcamento || 0);
+        const mo = moP[s.id]||0, mat = matP[s.id]||0;
         const estadoBadge = s.concluido
             ? `<span style="background:rgba(143,191,160,.15);color:#8fbfa0;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap">✓ Feito</span>`
             : `<span style="background:rgba(255,255,255,.07);color:rgba(255,255,255,.4);padding:2px 9px;border-radius:10px;font-size:10px;white-space:nowrap">Em curso</span>`;
-
         const extraBadge = s.extra
             ? `<span style="background:rgba(251,146,60,.15);color:#fb923c;padding:1px 6px;border-radius:6px;font-size:9px;font-weight:600;margin-left:4px">Extra</span>`
             : "";
-
-        return `<div class="serv-row">
-            <div>
-                <div style="font-weight:500;font-size:13px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">
-                    ${s.nome}${extraBadge}
-                </div>
-                ${pct !== null ? `
-                <div style="display:flex;align-items:center;gap:6px;margin-top:5px">
-                    <div style="flex:1;max-width:100px;background:rgba(255,255,255,.08);border-radius:3px;height:3px">
-                        <div style="width:${Math.min(pct,100)}%;height:100%;background:${barCol};border-radius:3px"></div>
-                    </div>
-                    <span style="font-size:10px;color:rgba(255,255,255,.35)">${pct}%</span>
-                </div>` : ""}
-            </div>
-            <div style="color:rgba(255,255,255,.45);font-size:12px">${s.horas_orcamento ? s.horas_orcamento+"h" : "—"}</div>
-            <div style="color:${hR>(s.horas_orcamento||9999)?"#fb923c":"rgba(255,255,255,.85)"};font-size:13px">${hR>0?hR.toFixed(1)+"h":"—"}</div>
-            <div style="color:#e09486;font-size:13px">${moR>0?moR.toFixed(0)+"€":"—"}</div>
-            <div style="color:#e09486;font-size:13px">${matR>0?matR.toFixed(0)+"€":"—"}</div>
-            <div style="color:rgba(255,255,255,.45);font-size:12px">${s.valor_orcamento?s.valor_orcamento.toFixed(0)+"€":"—"}</div>
-            <div style="font-weight:600;font-size:13px;color:${desvio===null?"rgba(255,255,255,.3)":desvio>0?"#e09486":"#8fbfa0"}">
-                ${desvio===null?"—":(desvio>0?"+":"")+desvio.toFixed(0)+"€"}
-            </div>
-            <div style="text-align:center">${estadoBadge}</div>
-        </div>`;
-    }).join("");
+        return linhaServ(esc(s.nome), extraBadge, valor, mo, mat, estadoBadge,
+            valor > 0 && (mo + mat) > 0 ? Math.round((mo + mat) / valor * 100) : null);
+    }).join("") + (matSemServ + moSemServ >= 1 ? linhaServ(
+        `<span style="opacity:.6;font-style:italic">Custos sem serviço</span>`,
+        `<span title="Faturas e horas desta obra que não foram ligadas a nenhum serviço" style="opacity:.4;font-size:11px;margin-left:4px">ⓘ</span>`,
+        0, moSemServ, matSemServ, "", null) : "");
 
     // Abrir o primeiro separador: é o que dispara o carregamento do resumo
     abrirPainelTab("resumo");
