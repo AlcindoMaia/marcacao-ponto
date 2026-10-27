@@ -5554,8 +5554,9 @@ async function carregarServicosImputacao(obraId, movId = null) {
     const linhasDiv = document.getElementById("imputacaoLinhas");
     if (linhasDiv) linhasDiv.innerHTML = `
         <div style="font-size:11px;letter-spacing:.5px;opacity:.5;text-transform:uppercase;margin-bottom:8px">
-            Imputar material a serviço(s) desta obra
+            Ligar a serviço(s) desta obra
         </div>
+        <div style="font-size:11px;opacity:.5;margin:-4px 0 8px">Com um só serviço e o valor vazio, liga o total sem IVA.</div>
         <div id="imputLinhasInner"></div>
         <button type="button" id="btnAddImput"
             style="background:rgba(181,136,99,.1);border:1px solid rgba(181,136,99,.2);color:var(--primary,#b58863);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;margin-top:6px">
@@ -5569,7 +5570,8 @@ async function carregarServicosImputacao(obraId, movId = null) {
         // Repor o que já estava imputado a este movimento
         guardadas.forEach(g => adicionarLinhaImput(servs, g.obra_servico_id, g.valor));
     } else {
-        adicionarLinhaImput(servs);   // uma linha vazia por defeito
+        // uma linha por defeito; com um só serviço já vem escolhido
+        adicionarLinhaImput(servs, servs.length === 1 ? servs[0].id : null);
     }
 }
 
@@ -5584,7 +5586,7 @@ function adicionarLinhaImput(servs, servicoId = null, valor = null) {
         <select class="imput-serv-sel" style="flex:1;padding:6px 8px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:13px">
             <option value="">— Serviço —</option>${opts}
         </select>
-        <input class="imput-serv-val" type="number" step="0.01" min="0" placeholder="€"
+        <input class="imput-serv-val" type="number" step="0.01" min="0" placeholder="€ s/ IVA"
             style="width:80px;padding:6px 8px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:13px">
         <button type="button" onclick="this.parentElement.remove()" style="background:rgba(224,148,134,.1);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>`;
     inner.appendChild(div);
@@ -5952,9 +5954,13 @@ async function guardarMovimento() {
         // Remover imputações anteriores se for edição
         if (movEditId) await SB.from("movimento_servicos").delete().eq("movimento_id", movEditId);
         const imputacoes = [];
+        const comServico = [...linhasImput].filter(l => l.querySelector(".imput-serv-sel")?.value);
         linhasImput.forEach(linha => {
             const sid = linha.querySelector(".imput-serv-sel")?.value;
-            const val = parseFloat(linha.querySelector(".imput-serv-val")?.value);
+            let val = parseFloat(linha.querySelector(".imput-serv-val")?.value);
+            // Um só serviço e sem valor: leva o movimento todo, sem IVA (é assim
+            // que o painel da obra conta os custos)
+            if (sid && !(val > 0) && comServico.length === 1) val = payload.valor_base;
             if (sid && val > 0) imputacoes.push({ movimento_id: movId, obra_servico_id: sid, valor: val });
         });
         if (imputacoes.length) await SB.from("movimento_servicos").insert(imputacoes);
