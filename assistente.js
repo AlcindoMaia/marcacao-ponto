@@ -771,10 +771,3 @@ function euros(n) {
     return new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(Number(n) || 0);
 }
 
-function esc(s) {
-    // Escapa também a plica: sem ela, um atributo delimitado por plicas
-    // fica aberto a quem souber disso.
-    return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
-        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-    }[c]));
-}
