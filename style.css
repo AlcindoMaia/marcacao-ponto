@@ -1437,3 +1437,11 @@ body.dark #filtroMesFinanceiro { background: #18232e; color: #ece5de; border-col
 body:has(#modalPainelObra[style*="display: flex"], #modalPainelObra[style*="display:flex"]) .modal:not(.hidden) {
     z-index: 1200;
 }
+
+/* Declaração de valores: opção no movimento e formulário */
+.mov-declaracao { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; font-size: 13px; cursor: pointer; }
+.mov-declaracao input { width: auto; margin: 0; }
+.decl-empresa { margin: 4px 0 10px; font-size: 13px; }
+.decl-empresa summary { cursor: pointer; opacity: .7; margin-bottom: 8px; }
+.decl-previa { margin: 10px 0 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px;
+               font-size: 13px; line-height: 1.6; opacity: .85; }
