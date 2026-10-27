@@ -5587,11 +5587,11 @@ function adicionarLinhaImput(servs, servicoId = null, valor = null) {
     div.className = "linha-imput-serv";
     div.style.cssText = "display:flex;gap:8px;align-items:center;margin-bottom:6px";
     div.innerHTML = `
-        <select class="imput-serv-sel" style="flex:1;padding:6px 8px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:13px">
+        <select class="imput-serv-sel" style="flex:1;min-width:0;padding:6px 8px;font-size:13px">
             <option value="">— Serviço —</option>${opts}
         </select>
         <input class="imput-serv-val" type="number" step="0.01" min="0" placeholder="€ s/ IVA"
-            style="width:80px;padding:6px 8px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:13px">
+            style="width:100px;padding:6px 8px;font-size:13px">
         <button type="button" onclick="this.parentElement.remove()" style="background:rgba(224,148,134,.1);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>`;
     inner.appendChild(div);
 
@@ -7155,19 +7155,17 @@ async function carregarDRE() {
     const totalRec  = receitas.reduce((s,m) => s + semIva(m), 0);
     const totalCus  = custos.reduce((s,m) => s + semIva(m), 0);
 
-    // Custo mão de obra dos registos_admin no mesmo período
-    const { data: regAdmin } = await SB.from("registos_admin")
-        .select("funcionario_id, data, tipo, obra_id")
-        .gte("data", inicio).lte("data", fim);
-    const { data: funcsD } = await SB.from("funcionarios").select("id, valor_dia").eq("ativo", true);
-    const dpf = {};
-    (regAdmin||[]).forEach(r => {
-        if (r.tipo === "falta" || !r.obra_id) return;
-        if (!dpf[r.funcionario_id]) dpf[r.funcionario_id] = new Set();
-        dpf[r.funcionario_id].add(r.data);
-    });
-    let custoMO = 0;
-    (funcsD||[]).forEach(f => { if (f.valor_dia) custoMO += (dpf[f.id]?.size||0) * f.valor_dia; });
+    // Custo mão de obra dos registos_admin no mesmo período: horas × valor_dia ÷ 8,
+    // como no painel da obra. Conta toda a gente, também quem já saiu (antes só
+    // contava os ativos e os custos de quem saiu desapareciam). Sem obra
+    // escolhida conta todas as presenças, porque todas são pagas.
+    let qReg = SB.from("registos_admin")
+        .select("horas, funcionarios(valor_dia)")
+        .eq("tipo", "presenca").gte("data", inicio).lte("data", fim);
+    if (obraId) qReg = qReg.eq("obra_id", obraId);
+    const { data: regAdmin } = await qReg;
+    const custoMO = (regAdmin||[]).reduce((s,r) =>
+        s + Number(r.horas||0) * Number(r.funcionarios?.valor_dia||0) / 8, 0);
 
     const custoTotal = totalCus + custoMO;
     const resultado  = totalRec - custoTotal;
