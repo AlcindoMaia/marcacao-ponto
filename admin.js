@@ -7612,7 +7612,7 @@ function atualizarPreviaDeclaracao() {
 
 async function abrirDeclaracaoValores(movId) {
     const { data: mov, error } = await SB.from("movimentos_financeiros")
-        .select("id, data_documento, valor_total, cliente_nome, clientes(nome), obras(nome, morada, local, clientes(nome, morada))")
+        .select("id, obra_id, data_documento, valor_total, cliente_nome, clientes(nome), obras(nome, morada, local, clientes(nome, morada))")
         .eq("id", movId).maybeSingle();
     if (error || !mov) { console.error(error); alert("Não foi possível abrir este movimento."); return; }
     _declaracaoMov = mov;
@@ -7641,7 +7641,7 @@ function fecharDeclaracaoValores() {
     _declaracaoMov = null;
 }
 
-function gerarDeclaracaoValores() {
+async function gerarDeclaracaoValores() {
     const c   = lerCamposDeclaracao();
     const msg = document.getElementById("declMsg");
     if (!c.data || !Number(c.valor) || !c.morada || !c.proprietarios) {
@@ -7705,5 +7705,101 @@ function gerarDeclaracaoValores() {
     if (!win) { msg.textContent = "O navegador bloqueou a janela. Permita pop-ups para esta página."; return; }
     win.document.write(html);
     win.document.close();
+
+    const mov = _declaracaoMov;
+    const guardar = document.getElementById("declGuardarObra")?.checked;
     fecharDeclaracaoValores();
+    if (!guardar || !mov?.obra_id) return;
+
+    // Aviso na própria janela da declaração, que é onde o Alcindo está a olhar
+    const aviso = (texto, erro) => {
+        const barra = win.document?.querySelector(".barra");
+        if (!barra) { if (erro) alert(texto); return; }
+        const s = win.document.createElement("span");
+        s.textContent = texto;
+        s.style.cssText = `margin-right:10px;font:13px system-ui,sans-serif;padding:6px 10px;border-radius:6px;background:${erro ? "#f6d6d0" : "#dcefe2"}`;
+        barra.prepend(s);
+    };
+    try {
+        await guardarDeclaracaoNaObra(mov, c, titulo);
+        aviso("✓ Guardada nos documentos da obra, visível ao cliente");
+    } catch (e) {
+        console.error("guardarDeclaracaoNaObra:", e);
+        aviso("Não foi possível guardar na obra: " + e.message, true);
+    }
+}
+
+// O PDF que o cliente vê na Área do cliente. Desenhado com o jsPDF nas
+// mesmas posições do modelo (em pontos); a letra é Helvetica, porque o PDF
+// não pode levar a Aptos. Gerar outra vez a declaração do mesmo movimento
+// substitui a anterior.
+const JSPDF_URL = "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js";
+const JSPDF_SRI = "sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk";
+function carregarJsPDF() {
+    if (window.jspdf) return Promise.resolve(window.jspdf);
+    return new Promise((ok, falha) => {
+        const sc = document.createElement("script");
+        sc.src = JSPDF_URL; sc.integrity = JSPDF_SRI; sc.crossOrigin = "anonymous";
+        sc.onload = () => ok(window.jspdf);
+        sc.onerror = () => falha(new Error("não foi possível carregar o gerador de PDF"));
+        document.head.appendChild(sc);
+    });
+}
+
+async function imagemParaDataUrl(url) {
+    const blob = await (await fetch(url)).blob();
+    const dataUrl = await new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(blob); });
+    const img = new Image();
+    await new Promise((ok, falha) => { img.onload = ok; img.onerror = falha; img.src = dataUrl; });
+    return { dataUrl, w: img.naturalWidth, h: img.naturalHeight };
+}
+
+async function pdfDeclaracao(c) {
+    const { jsPDF } = await carregarJsPDF();
+    const pdf = new jsPDF({ unit: "pt", format: "a4" });
+    const logo = await imagemParaDataUrl("declaracao-logo.png?v=1");
+    pdf.addImage(logo.dataUrl, "PNG", 16, 21, 189, 189 * logo.h / logo.w);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(11);
+    pdf.text("Eu abaixo-assinado,", 85.1, 170.8, { baseline: "top" });
+    pdf.text(`${c.representante}, representante da empresa, ${c.empresa}`, 85.1, 207.4, { baseline: "top" });
+    pdf.setLineWidth(1.5);
+    pdf.line(84, 244.5, 511, 244.5);
+    pdf.splitTextToSize(textoDeclaracao(c), 426).forEach((l, i) =>
+        pdf.text(l, 85.1, 288.1 + 11 + i * 36.6, { baseline: "top" }));
+    const yAssin = 288.1 + 146.4 + 121.1;
+    pdf.text("Assinatura", 85.1 + 213, yAssin, { baseline: "top", align: "center" });
+    pdf.setLineWidth(0.75);
+    pdf.line(153.3, yAssin + 14.65 + 70.8, 479.1, yAssin + 14.65 + 70.8);
+    return pdf.output("blob");
+}
+
+async function guardarDeclaracaoNaObra(mov, c, titulo) {
+    const blob = await pdfDeclaracao(c);
+    const nome = `${titulo}.pdf`;
+    const caminho = `${mov.obra_id}/${Date.now()}-${nomeSeguroFicheiro(nome)}`;
+    const { data: { session } } = await SB.auth.getSession();
+
+    const { data: antigas } = await SB.from("obra_documentos").select("id, caminho")
+        .eq("movimento_id", mov.id).like("nome_ficheiro", "Declaração de valores%");
+
+    const up = await SB.storage.from(BUCKET_DOCS_OBRA).upload(caminho, blob, { contentType: "application/pdf" });
+    if (up.error) throw new Error(up.error.message);
+    const { error } = await SB.from("obra_documentos").insert({
+        obra_id: mov.obra_id, tipo: "recibo", nome_ficheiro: nome, caminho,
+        mime: "application/pdf", tamanho: blob.size, visivel_cliente: true,
+        estado: "registado", data_documento: c.data || null, movimento_id: mov.id,
+        criado_por: session?.user?.email || null,
+    });
+    if (error) {
+        await SB.storage.from(BUCKET_DOCS_OBRA).remove([caminho]);
+        throw new Error(error.message);
+    }
+    // Só depois de a nova estar gravada sai a anterior
+    if (antigas?.length) {
+        await SB.storage.from(BUCKET_DOCS_OBRA).remove(antigas.map(a => a.caminho));
+        await SB.from("obra_documentos").delete().in("id", antigas.map(a => a.id));
+    }
+    if (_painelObraActual?.id === mov.obra_id && typeof carregarPainelDocumentos === "function"
+        && document.getElementById("painelTab-documentos")?.offsetParent) carregarPainelDocumentos();
 }
