@@ -2594,8 +2594,12 @@ function parsearQRFatura(texto) {
         }
 
         // ── Tipo de documento → tipo do movimento ──
+        // Fatura nossa (A = NIF do emitente): é ao contrário, entra dinheiro
         const tipoDoc = c["D"] || "";
-        const tipoMov = ["NC","ND"].includes(tipoDoc) ? "entrada" : "saida";
+        const nossa = (c["A"] || "").trim() === NIF_MAIA_SOLUTIONS;
+        modoFaturaNossa(nossa);
+        const credito = ["NC","ND"].includes(tipoDoc);
+        const tipoMov = nossa ? (credito ? "saida" : "entrada") : (credito ? "entrada" : "saida");
         const tipoEl = document.getElementById("movTipo");
         if (tipoEl) tipoEl.value = tipoMov;
 
@@ -2622,8 +2626,17 @@ function parsearQRFatura(texto) {
         }
 
         // ── NIF do emitente + busca automática do fornecedor ──
-        const nifEmit = (c["A"] || "").trim();
-        if (nifEmit) {
+        // (na fatura nossa, o NIF que interessa é o do cliente, B)
+        const nifEmit = (c[nossa ? "B" : "A"] || "").trim();
+        if (nossa) {
+            if (nifEmit && nifEmit !== "999999990") {
+                document.getElementById("movNif").value = nifEmit;
+                SB.from("clientes").select("nome").eq("nif", nifEmit).limit(1)
+                    .then(({ data }) => {
+                        if (data?.[0]?.nome) document.getElementById("movFornecedor").value = data[0].nome;
+                    });
+            }
+        } else if (nifEmit) {
             document.getElementById("movNif").value = nifEmit;
             verificarNif(nifEmit, document.getElementById("movNifInfo"), { nome: "movFornecedor" });
             // Buscar nome do fornecedor na BD
@@ -2664,6 +2677,41 @@ function parsearQRFatura(texto) {
 // A leitura é feita por uma Edge Function; a chave da IA fica no servidor.
 // =======================================================
 let _linhasFaturaLidas = [];   // guardadas até o movimento ser gravado
+
+// -------------------------------------------------------
+// FATURA NOSSA (emitida pela Maia Solutions a um cliente)
+// É dinheiro que entra: grava-se como entrada, com o cliente em
+// cliente_nome, e não toca em fornecedores, preços nem inventário.
+// -------------------------------------------------------
+const NIF_MAIA_SOLUTIONS = "518392074";
+let _movEmitidaPorNos = false;
+
+function modoFaturaNossa(ligar) {
+    _movEmitidaPorNos = !!ligar;
+    const rotulo = (id) => document.getElementById(id)?.closest(".form-group")?.querySelector("label");
+    const lNif = rotulo("movNif"), lNome = rotulo("movFornecedor");
+    if (lNif)  lNif.textContent  = ligar ? "NIF Cliente"  : "NIF Fornecedor";
+    if (lNome) lNome.textContent = ligar ? "Nome Cliente" : "Nome Fornecedor";
+
+    let aviso = document.getElementById("movAvisoNossa");
+    if (!aviso) {
+        const info = document.getElementById("movNifInfo");
+        if (!info) return;
+        aviso = document.createElement("div");
+        aviso.id = "movAvisoNossa";
+        aviso.style.cssText = "display:none;align-items:center;gap:10px;background:rgba(143,191,160,.12);" +
+            "border:1px solid rgba(143,191,160,.4);border-radius:8px;padding:8px 12px;font-size:13px;margin:-4px 0 10px";
+        info.parentNode.insertBefore(aviso, info);
+    }
+    aviso.innerHTML = `<span style="flex:1">💶 Fatura da Maia Solutions a um cliente: fica como <b>entrada</b> na obra do cliente.</span>` +
+        `<button type="button" class="btn-secondary" style="font-size:12px;padding:3px 10px">Não é nossa</button>`;
+    aviso.querySelector("button").onclick = () => {
+        modoFaturaNossa(false);
+        const tipoEl = document.getElementById("movTipo");
+        if (tipoEl) tipoEl.value = "saida";
+    };
+    aviso.style.display = ligar ? "flex" : "none";
+}
 
 // -------------------------------------------------------
 // ARTIGOS, SINÓNIMOS E PREÇOS
@@ -2720,7 +2768,7 @@ function unidadeIdPorTexto(texto) {
 // quase sempre entregue lá: dar entrada encheria o inventário de coisas
 // que não estão cá. Fica por isso só sugerido — a decisão é de quem lança.
 function sugerirEntradaStock(artigoId, l) {
-    if (!artigoId) return false;
+    if (!artigoId || _movEmitidaPorNos) return false;
     if (!(Number(l.quantidade) > 0)) return false;
     if (document.getElementById("movTipo")?.value === "entrada") return false;   // nota de crédito
     return !document.getElementById("movObra")?.value;
@@ -2880,8 +2928,11 @@ async function proximaFaturaDaFila() {
     await mostrarLinhasFatura(doc);
     actualizarBarraFila();
 
+    const quem = doc.emitida_por_nos
+        ? `nossa, a ${doc.cliente_conhecido?.nome || doc.cliente_nome || "cliente por identificar"}`
+        : (doc.fornecedor_nome || "fornecedor por identificar");
     mostrarFeedbackQR(
-        `${doc.numero_documento || "Fatura"} · ${doc.fornecedor_nome || "fornecedor por identificar"} · ` +
+        `${doc.numero_documento || "Fatura"} · ${quem} · ` +
         `${Number(doc.total_com_iva || 0).toFixed(2)}€ · ${(doc.linhas || []).length} linhas`,
         doc.avisos?.length ? "warn" : "ok"
     );
@@ -2986,10 +3037,24 @@ function preencherMovimentoComFatura(d) {
 
     set("movReferencia", (d.numero_documento || "").substring(0, 80));
     set("movData", d.data);
-    set("movTipo", d.tipo_documento === "NC" ? "entrada" : "saida");
-    set("movNif", d.fornecedor_nif);
-    set("movFornecedor", d.fornecedor_conhecido?.nome || d.fornecedor_nome);
-    if (d.fornecedor_nif) verificarNif(d.fornecedor_nif, document.getElementById("movNifInfo"));
+    modoFaturaNossa(d.emitida_por_nos);
+    if (d.emitida_por_nos) {
+        // A nossa nota de crédito devolve dinheiro ao cliente: é saída
+        set("movTipo", d.tipo_documento === "NC" ? "saida" : "entrada");
+        set("movNif", d.cliente_nif);
+        set("movFornecedor", d.cliente_conhecido?.nome || d.cliente_nome);
+        set("movObra", d.obra_sugerida?.id);
+        // Fatura-recibo já vem paga; fatura normal fica por receber
+        set("movEstado", d.tipo_documento === "FR" ? "pago" : "por_pagar");
+        const cat = [...(document.getElementById("movCategoria")?.options || [])]
+            .find(o => /servi[cç]os prestados/i.test(o.textContent));
+        if (cat && d.tipo_documento !== "NC") set("movCategoria", cat.value);
+    } else {
+        set("movTipo", d.tipo_documento === "NC" ? "entrada" : "saida");
+        set("movNif", d.fornecedor_nif);
+        set("movFornecedor", d.fornecedor_conhecido?.nome || d.fornecedor_nome);
+        if (d.fornecedor_nif) verificarNif(d.fornecedor_nif, document.getElementById("movNifInfo"));
+    }
 
     const total = Number(d.total_com_iva);
     const base  = Number(d.total_sem_iva);
@@ -3015,7 +3080,8 @@ async function mostrarLinhasFatura(d) {
 
     // Cada linha já chega com artigo, ou tenta-se reconhecer pela descrição
     _linhasFaturaLidas = (d.linhas || []).map((l, i) => {
-        const artigoId = l.artigo_id || artigoParaTexto(l.descricao);
+        // Na fatura nossa as linhas são o que vendemos: não são artigos comprados
+        const artigoId = _movEmitidaPorNos ? null : (l.artigo_id || artigoParaTexto(l.descricao));
         return { ...l, ordem: i, artigo_id: artigoId, stock: l.stock ?? sugerirEntradaStock(artigoId, l) };
     });
     await carregarUltimosPrecos(_linhasFaturaLidas.map(l => l.artigo_id));
@@ -5431,7 +5497,7 @@ async function carregarMovimentos() {
     let query = SB.from("movimentos_financeiros")
         .select(`id, referencia, data_documento, tipo,
                  valor_base, iva, valor_total, estado_pagamento, observacoes,
-                 obra_id, categoria_id, fornecedor_id,
+                 obra_id, categoria_id, fornecedor_id, cliente_nome,
                  fornecedores(id, nome, nif), categorias_financeiras(id, nome), obras(id, nome)`)
         .order("data_documento", { ascending: false });
 
@@ -5490,11 +5556,11 @@ function renderMovimentos() {
             <td>${esc(m.data_documento || "")}</td>
             <td>${esc(m.referencia || "—")}</td>
             <td><span class="badge-tipo ${ent ? "entrada" : "saida"}">${ent ? "Entrada" : "Saída"}</span></td>
-            <td>${esc(m.fornecedores?.nome || "—")}</td>
+            <td>${esc(m.fornecedores?.nome || m.cliente_nome || "—")}</td>
             <td>${esc(m.categorias_financeiras?.nome || "—")}</td>
             <td>${esc(m.obras?.nome || "—")}</td>
             <td style="text-align:right;font-weight:500;color:${ent ? "#8fbfa0" : "#e09486"}">${ent ? "+" : "–"}${Number(m.valor_total).toFixed(2)} €</td>
-            <td><span class="badge-estado ${m.estado_pagamento}">${m.estado_pagamento === "pago" ? "Pago" : "Por pagar"}</span></td>
+            <td><span class="badge-estado ${m.estado_pagamento}">${m.estado_pagamento === "pago" ? (ent ? "Recebido" : "Pago") : (ent ? "Por receber" : "Por pagar")}</span></td>
             <td class="acoes-td">
                 <button class="btn-acao" title="Editar">✏️</button>
                 <button class="btn-acao" title="Apagar">🗑️</button>
@@ -5628,6 +5694,7 @@ async function abrirModalMovimento(mov = null) {
     }
 
     movEditId = mov?.id || null;
+    modoFaturaNossa(!!(mov && mov.tipo === "entrada" && !mov.fornecedor_id && mov.cliente_nome));
 
     // Título
     const titulo = modal.querySelector("h2, .modal-title, [id*='titulo'], [id*='Titulo']");
@@ -5668,6 +5735,7 @@ async function abrirModalMovimento(mov = null) {
         set("movCategoria",  mov.categoria_id);
         set("movObra",       mov.obra_id);
         set("movObs",        mov.observacoes);
+        if (_movEmitidaPorNos) set("movFornecedor", mov.cliente_nome);
 
         // Preencher fornecedor
         if (mov.fornecedor_id) {
@@ -5833,7 +5901,8 @@ async function guardarMovimento() {
     const nome = document.getElementById("movFornecedor")?.value?.trim();
     let fornecedor_id = null;
 
-    if (nif) {
+    // Na fatura nossa o NIF e o nome são do cliente: não é fornecedor
+    if (nif && !_movEmitidaPorNos) {
         const { data: ex } = await SB.from("fornecedores").select("id").eq("nif", nif).maybeSingle();
         if (ex) {
             fornecedor_id = ex.id;
@@ -5877,6 +5946,14 @@ async function guardarMovimento() {
         estado_pagamento: document.getElementById("movEstado")?.value,
         observacoes:      document.getElementById("movObs")?.value?.trim() || null
     };
+    if (_movEmitidaPorNos) {
+        payload.cliente_nome = nome || null;
+        // Não há coluna para o NIF do cliente: fica nas observações
+        if (nif && !(payload.observacoes || "").includes(nif)) {
+            payload.observacoes = [`NIF cliente: ${nif}`, payload.observacoes].filter(Boolean).join(" · ");
+        }
+        if (!movEditId) payload.fonte = "fatura_emitida";
+    }
 
     const { data: movSalvo, error } = movEditId
         ? await SB.from("movimentos_financeiros").update(payload).eq("id", movEditId).select("id").single()
@@ -5918,7 +5995,8 @@ async function guardarMovimento() {
         if (errLinhas) {
             console.error(errLinhas);
             alert("O movimento foi guardado, mas as linhas da fatura não: " + errLinhas.message);
-        } else {
+        } else if (!_movEmitidaPorNos) {
+            // O que vendemos não é preço de compra nem entra no inventário
             await gravarSinonimosEPrecos(gravadas, fornecedor_id, dataDoc);
             await gravarEntradasStock(movIdLinhas, gravadas, linhasFatura, dataDoc, payload.referencia);
         }

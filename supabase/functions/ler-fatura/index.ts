@@ -13,6 +13,11 @@
 //   3. IVA 0% com autoliquidação (M31) é normal na construção, não é erro.
 //   4. Números em formato português: "1 674,40" = 1674.40.
 //
+// Faturas EMITIDAS pela Maia Solutions (a nossa fatura a um cliente) também
+// chegam aqui. Essas são entradas, não despesas: o documento volta marcado
+// com emitida_por_nos, com o cliente e a obra provável, e sem os controlos
+// de fornecedor (o IBAN impresso é o nosso).
+//
 // Segredos (Supabase → Edge Functions → Secrets):
 //   ANTHROPIC_API_KEY    a chave da API
 //   ASSISTENTE_TETO_DIA  opcional, leituras por dia (defeito 50)
@@ -90,6 +95,9 @@ Devolves SEMPRE este JSON, sem texto à volta:
       "fornecedor_nome": string|null,
       "fornecedor_nif": string|null,
       "fornecedor_iban": string|null,
+      "emitida_por_nos": boolean,
+      "cliente_nome": string|null,
+      "cliente_nif": string|null,
       "total_sem_iva": number|null,
       "total_iva": number|null,
       "total_com_iva": number|null,
@@ -112,9 +120,17 @@ Devolves SEMPRE este JSON, sem texto à volta:
 
 Regras:
 - O FORNECEDOR é quem EMITE a fatura, normalmente no topo e no rodapé
-  ("Contribuinte: ..."). O NIF ${nifEmpresa} é o NOSSO, do cliente: nunca o
-  uses como fornecedor. Rótulos como "V/ NIF" ou "Nº Contribuinte" junto da
-  morada de entrega referem-se ao cliente.
+  ("Contribuinte: ..."). Nós somos a Maia Solutions, NIF ${nifEmpresa}.
+  Rótulos como "V/ NIF", "Exmo(s) Sr(s)" ou "Nº Contribuinte" junto da
+  morada de entrega referem-se a quem RECEBE a fatura (o adquirente).
+- Na maior parte das faturas somos nós o adquirente: emitida_por_nos false,
+  e o NIF ${nifEmpresa} nunca vai para fornecedor_nif.
+- Se quem EMITE é a Maia Solutions (NIF ${nifEmpresa} no cabeçalho ou rodapé
+  do emitente, logótipo e dados da Maia Solutions no topo), a fatura é NOSSA,
+  passada a um cliente: emitida_por_nos true, fornecedor_nome e fornecedor_nif
+  com os nossos dados, fornecedor_iban null, e o adquirente em cliente_nome e
+  cliente_nif.
+- Em qualquer caso, cliente_nome e cliente_nif são o adquirente, se legíveis.
 - Números em formato português: vírgula decimal e espaço ou ponto nos
   milhares. "1 674,40" devolve-se como 1674.40.
 - Copia a descrição tal como está. Não traduzas nem resumas.
@@ -273,9 +289,71 @@ Deno.serve(async (req) => {
             avisos.push("Base mais IVA não dá o total do documento.");
         }
         if (!linhas.length) avisos.push("Não foi reconhecida nenhuma linha.");
-        if (d.fornecedor_nif && d.fornecedor_nif.replace(/\D/g, "") === nifEmpresa) {
-            avisos.push("O NIF lido é o da nossa empresa: confirma quem emitiu a fatura.");
+
+        // ---- Fatura nossa, a um cliente? ----
+        // Decide o código: o NIF do emitente é o nosso, ou a IA marcou-a como
+        // nossa e o nome do emitente é o nosso. O que vier dela sozinha não chega.
+        const soDigitos = (v: unknown) => String(v ?? "").replace(/\D/g, "");
+        const nifEmitente = soDigitos(d.fornecedor_nif);
+        const emitidaPorNos = nifEmitente === nifEmpresa ||
+            (d.emitida_por_nos === true && /maia\s*solutions/i.test(d.fornecedor_nome || ""));
+
+        if (emitidaPorNos) {
+            const nifCliente = soDigitos(d.cliente_nif);
+            avisos.unshift("Fatura emitida pela Maia Solutions: vai como ENTRADA (recebimento do cliente), não como despesa.");
+
+            let cliente = null;
+            // 999999990 é o "consumidor final" genérico: não identifica ninguém
+            if (nifCliente && nifCliente !== nifEmpresa && nifCliente !== "999999990") {
+                const { data: c } = await admin.from("clientes")
+                    .select("id, nome, nif").eq("nif", nifCliente).limit(1);
+                cliente = c?.[0] || null;
+            }
+            if (!cliente && d.cliente_nome) {
+                const { data: todos } = await admin.from("clientes").select("id, nome, nif");
+                cliente = (todos || [])
+                    .map((c: any) => ({ c, s: semelhancaDeNomes(d.cliente_nome, c.nome) }))
+                    .filter((x: any) => x.s >= 0.6)
+                    .sort((a: any, b: any) => b.s - a.s)[0]?.c || null;
+            }
+
+            // A obra do cliente: pelas obras ligadas a ele e, como quase todas
+            // as obras têm o nome do cliente sem estarem ligadas, pelo nome.
+            // Das candidatas, a única ou a mais recente ainda ativa.
+            const { data: obras } = await admin.from("obras")
+                .select("id, nome, estado, cliente_id, created_at")
+                .order("created_at", { ascending: false });
+            const nomeCliente = cliente?.nome || d.cliente_nome || "";
+            const lista = (obras || []).filter((o: any) =>
+                (cliente && o.cliente_id === cliente.id) ||
+                (nomeCliente && semelhancaDeNomes(nomeCliente, o.nome) >= 0.6));
+            const obra = lista.length === 1 ? lista[0]
+                       : lista.find((o: any) => o.estado === "ativa") || null;
+            if (lista.length > 1) {
+                avisos.push(`Há ${lista.length} obras que podem ser deste cliente: confirma a obra escolhida.`);
+            } else if (!lista.length) {
+                avisos.push("Não encontrei a obra deste cliente: escolhe-a à mão.");
+            }
+
+            if (d.numero_documento) {
+                const { data: reps } = await admin.from("movimentos_financeiros")
+                    .select("id, data_documento").eq("tipo", "entrada").eq("ativo", true)
+                    .eq("referencia", d.numero_documento).limit(1);
+                if (reps?.[0]) avisos.push(`Já existe uma entrada com a referência ${d.numero_documento} (${reps[0].data_documento}).`);
+            }
+
+            saida.push({
+                ...d,
+                emitida_por_nos: true,
+                cliente_nif: nifCliente || null,
+                cliente_conhecido: cliente,
+                obra_sugerida: obra ? { id: obra.id, nome: obra.nome } : null,
+                fornecedor_conhecido: null,
+                avisos,
+            });
+            continue;
         }
+        d.emitida_por_nos = false;
 
         // Fatura repetida? limit(1) e não maybeSingle(): com duas cópias já
         // gravadas, o maybeSingle dava erro e o aviso não aparecia — que era
