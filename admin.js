@@ -228,7 +228,7 @@ function abrirTab(nome, sub) {
     tabDiv.classList.add("active");
     guardarSitio({ tab: nome, sub: sub || null });
     if (nome === "visaogeral")   initVisaoGeral();
-    if (nome === "financeiro")   { switchFinTab(subFin || "ordenados"); }
+    if (nome === "financeiro")   { switchFinTab(subFin || "fluxo"); }
     if (nome === "dashboard")    initDashboard();
     if (nome === "funcionarios") {
         mostrarSecSub("func", sub || "equipa");
@@ -259,9 +259,32 @@ function abrirTab(nome, sub) {
 // =======================================================
 
 // =======================================================
-// FINANCEIRO — sub-tabs switch + DRE + Fluxo + Orçado Real
+// VALORES SEM IVA
+// Margens, resultados e o painel da obra contam tudo sem IVA, nas entradas
+// e nas compras: o IVA das compras deduz-se, não é custo. O Fluxo de caixa
+// continua com IVA porque é o dinheiro que passa pelo banco.
+// O IVA tira-se de valor_total − valor_base e não da coluna iva, porque os
+// movimentos gravados à mão até 2026-10 tinham lá a taxa e não o valor.
+// =======================================================
+function semIva(m)   { return Number(m.valor_base ?? m.valor_total ?? 0); }
+function ivaMov(m)   { return Number(m.valor_total || 0) - semIva(m); }
+function taxaIvaMov(m) {
+    const base = Number(m.valor_base || 0);
+    return base > 0 ? Math.round(ivaMov(m) / base * 100) : 0;
+}
+// Orçamento sem IVA; nos importados de PDF pode faltar o total sem IVA
+function orcSemIva(o) {
+    const sem = Number(o.total_sem_iva || 0);
+    if (sem > 0) return sem;
+    return Number(o.total_com_iva || 0) / (1 + Number(o.taxa_iva ?? 23) / 100);
+}
+
+// =======================================================
+// FINANCEIRO — sub-tabs: Fluxo de caixa · DRE · Ordenados
 // =======================================================
 function switchFinTab(tab) {
+    // Uma sub-tab lembrada que já não existe (ex.: Orçado vs Real) abre o Fluxo
+    if (!document.getElementById("finTab-" + tab)) tab = "fluxo";
     document.querySelectorAll(".fin-subtab").forEach(btn => {
         const active = btn.dataset.fintab === tab;
         btn.style.background   = active ? "rgba(181,136,99,.15)" : "none";
@@ -275,124 +298,6 @@ function switchFinTab(tab) {
     if (tab === "ordenados")  carregarFinanceiro();
     if (tab === "dre")        carregarDRE();
     if (tab === "fluxo")      initFluxo();
-    if (tab === "orcado")     carregarOrcadoReal();
-}
-
-async function carregarDRE() {
-    const periodo = document.getElementById("drePeriodo")?.value || "ano";
-    const obraId  = document.getElementById("dreObra")?.value || "";
-
-    // Calcular datas
-    const hoje = new Date();
-    let dInicio, dFim;
-    if (periodo === "mes") {
-        dInicio = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,"0")}-01`;
-        dFim    = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,"0")}-${new Date(hoje.getFullYear(), hoje.getMonth()+1, 0).getDate()}`;
-    } else if (periodo === "trimestre") {
-        const q = Math.floor(hoje.getMonth() / 3);
-        dInicio = `${hoje.getFullYear()}-${String(q*3+1).padStart(2,"0")}-01`;
-        dFim    = `${hoje.getFullYear()}-${String(q*3+3).padStart(2,"0")}-${new Date(hoje.getFullYear(), q*3+3, 0).getDate()}`;
-    } else if (periodo === "ano") {
-        dInicio = `${hoje.getFullYear()}-01-01`;
-        dFim    = `${hoje.getFullYear()}-12-31`;
-    } else {
-        dInicio = "2000-01-01"; dFim = "2099-12-31";
-    }
-
-    let q = SB.from("movimentos_financeiros")
-        .select("tipo, valor_total, categorias_financeiras(nome)")
-        .gte("data_documento", dInicio).lte("data_documento", dFim);
-    if (obraId) q = q.eq("obra_id", obraId);
-    const { data } = await q;
-    if (!data) return;
-
-    const receitas = data.filter(m => m.tipo === "entrada");
-    const custos   = data.filter(m => m.tipo === "saida");
-    const totRec   = receitas.reduce((s,m) => s+Number(m.valor_total||0), 0);
-    const totCust  = custos.reduce((s,m)   => s+Number(m.valor_total||0), 0);
-    const resultado = totRec - totCust;
-    const margem    = totRec > 0 ? (resultado / totRec * 100) : 0;
-
-    const fmt = v => v.toLocaleString("pt-PT", {minimumFractionDigits:2, maximumFractionDigits:2}) + " €";
-    document.getElementById("dreReceitas").textContent  = fmt(totRec);
-    document.getElementById("dreCustos").textContent    = fmt(totCust);
-    document.getElementById("dreResultado").textContent = fmt(resultado);
-    document.getElementById("dreResultado").style.color = resultado >= 0 ? "#8fbfa0" : "#e09486";
-    document.getElementById("dreMargem").textContent    = margem.toFixed(1) + "%";
-
-    // Detalhes por categoria
-    const porCat = {};
-    data.forEach(m => {
-        const cat = m.categorias_financeiras?.nome || "Sem categoria";
-        if (!porCat[cat]) porCat[cat] = { entrada:0, saida:0 };
-        porCat[cat][m.tipo] += Number(m.valor_total||0);
-    });
-
-    document.getElementById("dreDetalheReceitas").innerHTML = Object.entries(porCat)
-        .filter(([,v]) => v.entrada > 0).sort(([,a],[,b]) => b.entrada-a.entrada)
-        .map(([cat,v]) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
-            <span style="opacity:.8">${cat}</span><span style="color:#8fbfa0">${fmt(v.entrada)}</span>
-        </div>`).join("") || '<div style="opacity:.4;font-size:13px">Sem receitas</div>';
-
-    document.getElementById("dreDetalheCustos").innerHTML = Object.entries(porCat)
-        .filter(([,v]) => v.saida > 0).sort(([,a],[,b]) => b.saida-a.saida)
-        .map(([cat,v]) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
-            <span style="opacity:.8">${cat}</span><span style="color:#e09486">${fmt(v.saida)}</span>
-        </div>`).join("") || '<div style="opacity:.4;font-size:13px">Sem custos</div>';
-
-    // Preencher select de obras se vazio
-    const dreObraEl = document.getElementById("dreObra");
-    if (dreObraEl && dreObraEl.options.length <= 1) {
-        const { data: obras } = await SB.from("obras").select("id,nome").order("nome");
-        (obras||[]).forEach(o => {
-            const opt = document.createElement("option");
-            opt.value = o.id; opt.textContent = o.nome;
-            dreObraEl.appendChild(opt);
-        });
-    }
-}
-
-async function carregarOrcadoReal() {
-    const obraId = document.getElementById("orcadoObra")?.value || "";
-    const fmt = v => v.toLocaleString("pt-PT", {minimumFractionDigits:2}) + " €";
-
-    // Orçamento aprovado
-    let qOrc = SB.from("orcamentos").select("valor_total").in("estado", ["aceite","enviado"]);
-    if (obraId) qOrc = qOrc.eq("obra_id", obraId);
-    const { data: orcs } = await qOrc;
-    const totalOrcado = (orcs||[]).reduce((s,o)=>s+Number(o.valor_total||0),0);
-
-    // Custos reais
-    let qCusto = SB.from("movimentos_financeiros").select("valor_total").eq("tipo","saida");
-    if (obraId) qCusto = qCusto.eq("obra_id", obraId);
-    const { data: custos } = await qCusto;
-    const totalReal = (custos||[]).reduce((s,m)=>s+Number(m.valor_total||0),0);
-
-    const desvio = totalOrcado - totalReal;
-    const pct    = totalOrcado > 0 ? (totalReal/totalOrcado*100) : 0;
-
-    document.getElementById("orcadoTotal").textContent   = fmt(totalOrcado);
-    document.getElementById("orcadoReal").textContent    = fmt(totalReal);
-    document.getElementById("orcadoDesvio").textContent  = fmt(desvio);
-    document.getElementById("orcadoDesvio").style.color  = desvio >= 0 ? "#8fbfa0" : "#e09486";
-    document.getElementById("orcadoPercent").textContent = pct.toFixed(1) + "%";
-
-    const bar = document.getElementById("orcadoBar");
-    const barLabel = document.getElementById("orcadoBarLabel");
-    if (bar) bar.style.width = Math.min(pct, 100) + "%";
-    if (bar) bar.style.background = pct > 100 ? "#e09486" : pct > 80 ? "#f97316" : "#8fbfa0";
-    if (barLabel) barLabel.textContent = pct.toFixed(0) + "% do orçamento consumido";
-
-    // Preencher select obras
-    const orcObraEl = document.getElementById("orcadoObra");
-    if (orcObraEl && orcObraEl.options.length <= 1) {
-        const { data: obras } = await SB.from("obras").select("id,nome").order("nome");
-        (obras||[]).forEach(o => {
-            const opt = document.createElement("option");
-            opt.value = o.id; opt.textContent = o.nome;
-            orcObraEl.appendChild(opt);
-        });
-    }
 }
 
 async function carregarFinanceiro() {
@@ -2147,9 +2052,9 @@ async function carregarServicosModal() {
         return;
     }
     lista.innerHTML = data.map(s => {
-        const hR  = horasP[s.id]||0;
         const mR  = matP[s.id]||0;
-        const pct = s.horas_orcamento > 0 ? Math.min(Math.round(hR/s.horas_orcamento*100),100) : null;
+        const vS  = Number(s.valor_orcamento||0);
+        const pct = vS > 0 && mR > 0 ? Math.min(Math.round(mR/vS*100),100) : null;
         const barCol = s.concluido ? "#8fbfa0" : pct>=75 ? "#fb923c" : "var(--primary,#b58863)";
         return `<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;border:1px solid ${s.concluido?"rgba(143,191,160,.2)":"rgba(255,255,255,.06)"}">
             <div style="flex:1;min-width:0">
@@ -2159,8 +2064,8 @@ async function carregarServicosModal() {
                     ${s.concluido?`<span style="font-size:10px;background:rgba(143,191,160,.15);color:#8fbfa0;padding:1px 6px;border-radius:10px">✓ Concluído</span>`:""}
                 </div>
                 <div style="display:flex;gap:14px;font-size:11px;opacity:.6">
-                    <span>🕐 ${hR.toFixed(1)}h${s.horas_orcamento?` / ${s.horas_orcamento}h`:""}</span>
-                    <span>💶 ${mR.toFixed(0)}€ mat${s.valor_orcamento?` / ${s.valor_orcamento}€`:""}</span>
+                    <span>💶 ${vS ? vS.toFixed(0)+"€ valor" : "sem valor"}</span>
+                    <span>🧱 ${mR.toFixed(0)}€ material ligado</span>
                 </div>
                 ${pct!==null?`<div style="margin-top:6px;background:rgba(255,255,255,.1);border-radius:3px;height:3px"><div style="width:${pct}%;height:100%;background:${barCol};border-radius:3px"></div></div>`:""}
             </div>
@@ -2267,46 +2172,58 @@ async function abrirPainelObra(obra) {
         .select("obra_servico_id, valor")
         .in("obra_servico_id", ids);
 
-    const horasP = {}, moP = {}, matP = {};
+    // Custos da obra inteira (sem IVA), para mostrar o que não está ligado a
+    // nenhum serviço: sem isto a soma das margens dos serviços engana.
+    const [{ data: faturasObra }, { data: regsObra }] = await Promise.all([
+        SB.from("movimentos_financeiros").select("valor_base, valor_total")
+            .eq("obra_id", obra.id).eq("tipo", "saida").eq("ativo", true),
+        SB.from("registos_admin").select("horas, funcionarios(valor_dia)")
+            .eq("obra_id", obra.id).eq("tipo", "presenca"),
+    ]);
+
+    const moP = {}, matP = {};
     (regServs||[]).forEach(r => {
         const sid = r.obra_servico_id;
-        const h   = Number(r.horas||0);
-        horasP[sid] = (horasP[sid]||0) + h;
         const vd = valorDiaPorRegisto[r.registo_id] || 0;
-        if (vd) moP[sid] = (moP[sid]||0) + h * (vd/8);
+        if (vd) moP[sid] = (moP[sid]||0) + Number(r.horas||0) * (vd/8);
     });
     (movServs||[]).forEach(r => { matP[r.obra_servico_id] = (matP[r.obra_servico_id]||0)+Number(r.valor||0); });
 
-    const totHOrç  = (servicos||[]).reduce((s,v)=>s+(v.horas_orcamento||0),0);
-    const totHReal = Object.values(horasP).reduce((s,v)=>s+v,0);
-    const totVOrç  = (servicos||[]).reduce((s,v)=>s+(v.valor_orcamento||0),0);
+    const totValor = (servicos||[]).reduce((s,v)=>s+Number(v.valor_orcamento||0),0);
     const totMO    = Object.values(moP).reduce((s,v)=>s+v,0);
     const totMat   = Object.values(matP).reduce((s,v)=>s+v,0);
-    const totReal  = totMO + totMat;
-    const totDesvio = totVOrç > 0 ? totReal - totVOrç : null;
+    const matObra  = (faturasObra||[]).reduce((s,m)=>s+semIva(m),0);
+    const moObra   = (regsObra||[]).reduce((s,r)=>s+Number(r.horas||0)*Number(r.funcionarios?.valor_dia||0)/8,0);
+    const matSemServ = Math.max(matObra - totMat, 0);
+    const moSemServ  = Math.max(moObra - totMO, 0);
+    const custoObra  = Math.max(matObra, totMat) + Math.max(moObra, totMO);
+    const margemObra = totValor - custoObra;
+    const margemPctObra = totValor > 0 ? margemObra / totValor * 100 : null;
     const concluidosCount = (servicos||[]).filter(s=>s.concluido).length;
+    const eur = v => Math.round(v).toLocaleString("pt-PT") + " €";
+    const corMg = v => v === null ? "rgba(255,255,255,.3)" : v < 0 ? "#e09486" : "#8fbfa0";
 
-    // KPIs redesenhados
+    // KPIs: valor dos serviços contra o custo real, tudo sem IVA
     const kpis = [
         {
-            label: "Horas Orçadas",
-            val: totHOrç > 0 ? totHOrç.toFixed(0)+"h" : "—",
-            sub: totHReal > 0 ? `${totHReal.toFixed(1)}h realizadas` : "Sem registos",
-            cor: totHReal > totHOrç && totHOrç > 0 ? "#fb923c" : totHReal > 0 ? "#8fbfa0" : "rgba(255,255,255,.6)",
+            label: "Valor dos serviços",
+            val: totValor > 0 ? eur(totValor) : "—",
+            sub: "sem IVA",
+            cor: "rgba(255,255,255,.85)",
             accent: "#b58863"
         },
         {
-            label: "Custo Mão de Obra",
-            val: totMO > 0 ? totMO.toFixed(0)+"€" : "—",
-            sub: totMat > 0 ? `+${totMat.toFixed(0)}€ material` : "Sem material",
+            label: "Custo real",
+            val: custoObra > 0 ? eur(custoObra) : "—",
+            sub: `${eur(Math.max(moObra, totMO))} mão de obra · ${eur(Math.max(matObra, totMat))} material`,
             cor: "#e09486",
             accent: "#e09486"
         },
         {
-            label: "Orçamento Total",
-            val: totVOrç > 0 ? totVOrç.toFixed(0)+"€" : "—",
-            sub: totDesvio !== null ? (totDesvio > 0 ? `▲ +${totDesvio.toFixed(0)}€ desvio` : `▼ ${totDesvio.toFixed(0)}€ dentro`) : "Sem orçamento",
-            cor: totDesvio > 0 ? "#e09486" : "#8fbfa0",
+            label: "Margem",
+            val: totValor > 0 ? eur(margemObra) : "—",
+            sub: margemPctObra !== null ? `${margemPctObra.toFixed(1)}% do valor` : "Sem valor nos serviços",
+            cor: totValor > 0 ? corMg(margemObra) : "rgba(255,255,255,.6)",
             accent: "#a78bfa"
         },
         {
@@ -2325,58 +2242,56 @@ async function abrirPainelObra(obra) {
             <div class="kpi-sub">${k.sub}</div>
         </div>`).join("");
 
-    // Progresso geral
+    // Quanto do valor já foi gasto
     const progEl = document.getElementById("painelObraProgresso");
     if (progEl) {
-        const pctGeral = totHOrç > 0 ? Math.min(Math.round(totHReal/totHOrç*100),100) : null;
-        progEl.innerHTML = pctGeral !== null
-            ? `<span style="color:rgba(255,255,255,.5)">Progresso geral:</span> <span style="color:var(--primary,#b58863);font-weight:600">${pctGeral}%</span>`
+        progEl.innerHTML = totValor > 0
+            ? `<span style="color:rgba(255,255,255,.5)">Custo:</span> <span style="color:var(--primary,#b58863);font-weight:600">${Math.round(custoObra/totValor*100)}% do valor</span>`
             : "";
     }
 
-    // Linhas de serviços
+    // Linhas de serviços: valor contra custo real e a margem que fica
+    const linhaServ = (nome, badges, valor, mo, mat, estado, pctBar) => {
+        const custo  = mo + mat;
+        const margem = valor ? valor - custo : null;
+        const mPct   = valor ? margem / valor * 100 : null;
+        return `<div class="serv-row">
+            <div>
+                <div style="font-weight:500;font-size:13px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">${nome}${badges}</div>
+                ${pctBar !== null ? `
+                <div style="display:flex;align-items:center;gap:6px;margin-top:5px" title="Custo em % do valor">
+                    <div style="flex:1;max-width:100px;background:rgba(255,255,255,.08);border-radius:3px;height:3px">
+                        <div style="width:${Math.min(pctBar,100)}%;height:100%;background:${pctBar>100?"#e09486":pctBar>=80?"#fb923c":"var(--primary,#b58863)"};border-radius:3px"></div>
+                    </div>
+                    <span style="font-size:10px;color:rgba(255,255,255,.35)">${pctBar}%</span>
+                </div>` : ""}
+            </div>
+            <div style="color:rgba(255,255,255,.85);font-size:13px">${valor ? eur(valor) : "—"}</div>
+            <div style="color:#e09486;font-size:13px">${custo > 0 ? eur(custo) : "—"}</div>
+            <div style="font-weight:600;font-size:13px;color:${corMg(margem)}">${margem === null ? "—" : eur(margem)}</div>
+            <div style="font-size:12px;color:${corMg(mPct)}">${mPct === null ? "—" : mPct.toFixed(0) + "%"}</div>
+            <div style="color:rgba(255,255,255,.45);font-size:12px">${mo > 0 ? eur(mo) : "—"}</div>
+            <div style="color:rgba(255,255,255,.45);font-size:12px">${mat > 0 ? eur(mat) : "—"}</div>
+            <div style="text-align:center">${estado}</div>
+        </div>`;
+    };
+
     const tbody = document.getElementById("painelServicosTbody");
     tbody.innerHTML = (servicos||[]).map(s => {
-        const hR    = horasP[s.id]||0;
-        const moR   = moP[s.id]||0;
-        const matR  = matP[s.id]||0;
-        const totR  = moR + matR;
-        const desvio= s.valor_orcamento ? totR - s.valor_orcamento : null;
-        const pct   = s.horas_orcamento > 0 ? Math.round(hR/s.horas_orcamento*100) : null;
-        const barCol= s.concluido ? "#8fbfa0" : pct>=100 ? "#e09486" : pct>=75 ? "#fb923c" : "var(--primary,#b58863)";
-
+        const valor = Number(s.valor_orcamento || 0);
+        const mo = moP[s.id]||0, mat = matP[s.id]||0;
         const estadoBadge = s.concluido
             ? `<span style="background:rgba(143,191,160,.15);color:#8fbfa0;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap">✓ Feito</span>`
             : `<span style="background:rgba(255,255,255,.07);color:rgba(255,255,255,.4);padding:2px 9px;border-radius:10px;font-size:10px;white-space:nowrap">Em curso</span>`;
-
         const extraBadge = s.extra
             ? `<span style="background:rgba(251,146,60,.15);color:#fb923c;padding:1px 6px;border-radius:6px;font-size:9px;font-weight:600;margin-left:4px">Extra</span>`
             : "";
-
-        return `<div class="serv-row">
-            <div>
-                <div style="font-weight:500;font-size:13px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">
-                    ${s.nome}${extraBadge}
-                </div>
-                ${pct !== null ? `
-                <div style="display:flex;align-items:center;gap:6px;margin-top:5px">
-                    <div style="flex:1;max-width:100px;background:rgba(255,255,255,.08);border-radius:3px;height:3px">
-                        <div style="width:${Math.min(pct,100)}%;height:100%;background:${barCol};border-radius:3px"></div>
-                    </div>
-                    <span style="font-size:10px;color:rgba(255,255,255,.35)">${pct}%</span>
-                </div>` : ""}
-            </div>
-            <div style="color:rgba(255,255,255,.45);font-size:12px">${s.horas_orcamento ? s.horas_orcamento+"h" : "—"}</div>
-            <div style="color:${hR>(s.horas_orcamento||9999)?"#fb923c":"rgba(255,255,255,.85)"};font-size:13px">${hR>0?hR.toFixed(1)+"h":"—"}</div>
-            <div style="color:#e09486;font-size:13px">${moR>0?moR.toFixed(0)+"€":"—"}</div>
-            <div style="color:#e09486;font-size:13px">${matR>0?matR.toFixed(0)+"€":"—"}</div>
-            <div style="color:rgba(255,255,255,.45);font-size:12px">${s.valor_orcamento?s.valor_orcamento.toFixed(0)+"€":"—"}</div>
-            <div style="font-weight:600;font-size:13px;color:${desvio===null?"rgba(255,255,255,.3)":desvio>0?"#e09486":"#8fbfa0"}">
-                ${desvio===null?"—":(desvio>0?"+":"")+desvio.toFixed(0)+"€"}
-            </div>
-            <div style="text-align:center">${estadoBadge}</div>
-        </div>`;
-    }).join("");
+        return linhaServ(esc(s.nome), extraBadge, valor, mo, mat, estadoBadge,
+            valor > 0 && (mo + mat) > 0 ? Math.round((mo + mat) / valor * 100) : null);
+    }).join("") + (matSemServ + moSemServ >= 1 ? linhaServ(
+        `<span style="opacity:.6;font-style:italic">Custos sem serviço</span>`,
+        `<span title="Faturas e horas desta obra que não foram ligadas a nenhum serviço" style="opacity:.4;font-size:11px;margin-left:4px">ⓘ</span>`,
+        0, moSemServ, matSemServ, "", null) : "");
 
     // Abrir o primeiro separador: é o que dispara o carregamento do resumo
     abrirPainelTab("resumo");
@@ -4954,6 +4869,10 @@ async function gravarPropostaDocumento() {
             }).select("id").single();
             if (error) throw new Error(error.code === "23505" ? `já existe um orçamento com o número ${numero}.` : error.message);
             ligacao.orcamento_id = o.id;
+            if (val("propEstadoOrc") === "aceite") {
+                const r = await criarServicosDoOrcamento(o.id);
+                if (r.aviso) alert(r.aviso);
+            }
         }
 
         if (tipo === "fatura") {
@@ -4995,7 +4914,7 @@ async function gravarPropostaDocumento() {
         fecharPropostaDocumento();
         await carregarPainelDocumentos();
         msgDocObra({
-            orcamento: `Orçamento ${numero} registado na obra.`,
+            orcamento: `Orçamento ${numero} registado na obra` + (val("propEstadoOrc") === "aceite" ? " e serviços criados." : "."),
             fatura:    `Fatura ${numero} lançada no Financeiro.`,
             recibo:    "Recibo registado" + (ligacao.movimento_id ? " e fatura marcada como paga." : "."),
         }[tipo]);
@@ -5193,8 +5112,8 @@ async function carregarPainelResumo() {
     el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">A carregar...</div>`;
 
     const [movsRes, orcRes, pontoRes, regRes] = await Promise.all([
-        SB.from("movimentos_financeiros").select("tipo, valor_total, categorias_financeiras(nome)").eq("obra_id", obraId).eq("ativo", true),
-        SB.from("orcamentos").select("numero, estado, total_com_iva, total_sem_iva, subtotal_mao_obra, subtotal_materiais").eq("obra_id", obraId),
+        SB.from("movimentos_financeiros").select("tipo, valor_base, valor_total, categorias_financeiras(nome)").eq("obra_id", obraId).eq("ativo", true),
+        SB.from("orcamentos").select("numero, estado, taxa_iva, total_com_iva, total_sem_iva, subtotal_mao_obra, subtotal_materiais").eq("obra_id", obraId),
         SB.from("vw_registos_ponto").select("funcionario, horas, dia").eq("obra", _painelObraActual.nome),
         // registos_admin é a fonte de verdade das horas pagas (é daí que
         // saem os salários), por isso é daí que sai o custo de mão de obra.
@@ -5206,15 +5125,16 @@ async function carregarPainelResumo() {
     const ponto = pontoRes.data || [];
     const regs  = regRes.data   || [];
 
-    const totalEntradas = movs.filter(m => m.tipo === "entrada").reduce((s,m) => s + Number(m.valor_total), 0);
-    const totalFaturas  = movs.filter(m => m.tipo === "saida").reduce((s,m) => s + Number(m.valor_total), 0);
+    // Tudo sem IVA (ver semIva): recebido, faturas de compra e orçamento
+    const totalEntradas = movs.filter(m => m.tipo === "entrada").reduce((s,m) => s + semIva(m), 0);
+    const totalFaturas  = movs.filter(m => m.tipo === "saida").reduce((s,m) => s + semIva(m), 0);
     const horasRegistos = regs.reduce((s,r) => s + Number(r.horas || 0), 0);
     const custoMaoObra  = regs.reduce((s,r) => s + Number(r.horas || 0) * Number(r.funcionarios?.valor_dia || 0) / 8, 0);
     const totalSaidas   = totalFaturas + custoMaoObra;
     const margem        = totalEntradas - totalSaidas;
     const margemPct     = totalEntradas > 0 ? ((margem / totalEntradas) * 100).toFixed(1) : null;
     const orcAceite     = orcs.filter(o => o.estado === "aceite");
-    const totalOrc      = orcAceite.reduce((s,o) => s + Number(o.total_com_iva||0), 0);
+    const totalOrc      = orcAceite.reduce((s,o) => s + orcSemIva(o), 0);
     const desvio        = totalOrc > 0 ? totalOrc - totalSaidas : null;
     let horasPonto = 0;
     ponto.forEach(r => {
@@ -5228,11 +5148,11 @@ async function carregarPainelResumo() {
     el.innerHTML = `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
             <div class="card" style="padding:16px;text-align:center">
-                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">RECEBIDO</div>
+                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">RECEBIDO S/ IVA</div>
                 <div style="font-size:20px;font-weight:800;color:#8fbfa0">${fmt(totalEntradas)}</div>
             </div>
             <div class="card" style="padding:16px;text-align:center">
-                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">GASTO</div>
+                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">GASTO S/ IVA</div>
                 <div style="font-size:20px;font-weight:800;color:#e09486">${fmt(totalSaidas)}</div>
                 <div style="font-size:11px;opacity:.55;margin-top:4px">${fmt(totalFaturas)} faturas · ${fmt(custoMaoObra)} mão de obra</div>
             </div>
@@ -5250,8 +5170,8 @@ async function carregarPainelResumo() {
         ${totalOrc > 0 ? `
         <div class="card" style="padding:16px;margin-bottom:12px">
             <div style="font-size:11px;opacity:.5;margin-bottom:12px;font-family:var(--font-title);letter-spacing:.5px">ORÇAMENTO VS REAL</div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Orçamento aceite</span><span style="font-weight:700">${fmt(totalOrc)}</span></div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Faturas</span><span style="font-weight:700">${fmt(totalFaturas)}</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Orçamento aceite (s/ IVA)</span><span style="font-weight:700">${fmt(totalOrc)}</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Faturas (s/ IVA)</span><span style="font-weight:700">${fmt(totalFaturas)}</span></div>
             <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Mão de obra (${horasRegistos.toFixed(0)}h)</span><span style="font-weight:700">${fmt(custoMaoObra)}</span></div>
             <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Gasto real</span><span style="font-weight:700;color:#e09486">${fmt(totalSaidas)}</span></div>
             <div style="border-top:1px solid var(--border);margin:8px 0;padding-top:8px;display:flex;justify-content:space-between;font-size:14px">
@@ -5263,7 +5183,7 @@ async function carregarPainelResumo() {
             </div>
             <div style="font-size:11px;opacity:.5;margin-top:4px;text-align:right">${((totalSaidas/totalOrc)*100).toFixed(0)}% do orçamento utilizado</div>
         </div>` : `<div class="card" style="padding:14px;opacity:.5;font-size:13px;text-align:center;margin-bottom:12px">Sem orçamento aceite associado.</div>`}
-        ${orcs.length > 0 ? `<div class="card" style="padding:14px"><div style="font-size:11px;opacity:.5;margin-bottom:10px;font-family:var(--font-title);letter-spacing:.5px">ORÇAMENTOS</div>${orcs.map(o => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;font-family:monospace">${o.numero}</span><span class="badge-estado ${o.estado === "aceite" ? "pago" : "por_pagar"}" style="font-size:10px">${o.estado}</span><span style="font-size:13px;font-weight:700">${fmt(o.total_com_iva)}</span></div>`).join("")}</div>` : ""}`;
+        ${orcs.length > 0 ? `<div class="card" style="padding:14px"><div style="font-size:11px;opacity:.5;margin-bottom:10px;font-family:var(--font-title);letter-spacing:.5px">ORÇAMENTOS</div>${orcs.map(o => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;font-family:monospace">${o.numero}</span><span class="badge-estado ${o.estado === "aceite" ? "pago" : "por_pagar"}" style="font-size:10px">${o.estado}</span><span style="font-size:13px;font-weight:700" title="${fmt(o.total_com_iva)} com IVA">${fmt(orcSemIva(o))} <span style="font-size:10px;font-weight:400;opacity:.6">s/ IVA</span></span></div>`).join("")}</div>` : ""}`;
 }
 
 async function carregarPainelFinanceiro() {
@@ -5475,6 +5395,19 @@ function actualizarKpisFluxo(lista) {
     const entradas = lista.filter(m => m.tipo === "entrada").reduce((s,m) => s + Number(m.valor_total), 0);
     const saidas   = lista.filter(m => m.tipo === "saida").reduce((s,m)   => s + Number(m.valor_total), 0);
     const saldo    = entradas - saidas;
+    // IVA a pôr de parte: o das faturas da Maia Solutions menos o das compras.
+    // As notas de crédito entram com o sinal certo por serem do tipo contrário.
+    const ivaVendas  = lista.filter(m => m.tipo === "entrada").reduce((s,m) => s + ivaMov(m), 0);
+    const ivaCompras = lista.filter(m => m.tipo === "saida").reduce((s,m)   => s + ivaMov(m), 0);
+    const ivaParte   = ivaVendas - ivaCompras;
+    const ivaEl = document.getElementById("ivaPorDeParte");
+    if (ivaEl) {
+        ivaEl.textContent = Math.max(ivaParte, 0).toFixed(2) + " €";
+        const sub = document.getElementById("ivaPorDeParteSub");
+        if (sub) sub.textContent = ivaParte < 0
+            ? `IVA a recuperar: ${(-ivaParte).toFixed(2)} €`
+            : `${ivaVendas.toFixed(2)} € nas vendas − ${ivaCompras.toFixed(2)} € nas compras`;
+    }
     document.getElementById("totalEntradas").textContent = entradas.toFixed(2) + " €";
     document.getElementById("totalSaidas").textContent   = saidas.toFixed(2) + " €";
     const sEl = document.getElementById("saldoFluxo");
@@ -5502,6 +5435,7 @@ async function carregarMovimentos() {
                  valor_base, iva, valor_total, estado_pagamento, observacoes,
                  obra_id, categoria_id, fornecedor_id, cliente_nome,
                  fornecedores(id, nome, nif), categorias_financeiras(id, nome), obras(id, nome)`)
+        .eq("ativo", true)   // os inativos são duplicados retirados; o DRE e o painel já os ignoravam
         .order("data_documento", { ascending: false });
 
     if (obra === SEM_OBRA) query = query.is("obra_id", null);
@@ -5624,8 +5558,9 @@ async function carregarServicosImputacao(obraId, movId = null) {
     const linhasDiv = document.getElementById("imputacaoLinhas");
     if (linhasDiv) linhasDiv.innerHTML = `
         <div style="font-size:11px;letter-spacing:.5px;opacity:.5;text-transform:uppercase;margin-bottom:8px">
-            Imputar material a serviço(s) desta obra
+            Ligar a serviço(s) desta obra
         </div>
+        <div style="font-size:11px;opacity:.5;margin:-4px 0 8px">Com um só serviço e o valor vazio, liga o total sem IVA.</div>
         <div id="imputLinhasInner"></div>
         <button type="button" id="btnAddImput"
             style="background:rgba(181,136,99,.1);border:1px solid rgba(181,136,99,.2);color:var(--primary,#b58863);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;margin-top:6px">
@@ -5639,7 +5574,8 @@ async function carregarServicosImputacao(obraId, movId = null) {
         // Repor o que já estava imputado a este movimento
         guardadas.forEach(g => adicionarLinhaImput(servs, g.obra_servico_id, g.valor));
     } else {
-        adicionarLinhaImput(servs);   // uma linha vazia por defeito
+        // uma linha por defeito; com um só serviço já vem escolhido
+        adicionarLinhaImput(servs, servs.length === 1 ? servs[0].id : null);
     }
 }
 
@@ -5654,7 +5590,7 @@ function adicionarLinhaImput(servs, servicoId = null, valor = null) {
         <select class="imput-serv-sel" style="flex:1;padding:6px 8px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:13px">
             <option value="">— Serviço —</option>${opts}
         </select>
-        <input class="imput-serv-val" type="number" step="0.01" min="0" placeholder="€"
+        <input class="imput-serv-val" type="number" step="0.01" min="0" placeholder="€ s/ IVA"
             style="width:80px;padding:6px 8px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:13px">
         <button type="button" onclick="this.parentElement.remove()" style="background:rgba(224,148,134,.1);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>`;
     inner.appendChild(div);
@@ -5735,7 +5671,8 @@ async function abrirModalMovimento(mov = null) {
         set("movData",       mov.data_documento);
         set("movTipo",       mov.tipo);
         set("movTotal",      mov.valor_total);
-        set("movIva",        mov.iva);
+        // O campo mostra a taxa; a coluna iva guarda o valor em euros
+        set("movIva",        taxaIvaMov(mov));
         set("movBase",       mov.valor_base);
         set("movEstado",     mov.estado_pagamento);
         set("movCategoria",  mov.categoria_id);
@@ -5951,11 +5888,13 @@ async function guardarMovimento() {
         categoria_id:     document.getElementById("movCategoria")?.value || null,
         obra_id:          document.getElementById("movObra")?.value || null,
         valor_base:       Number(document.getElementById("movBase")?.value) || 0,
-        iva:              Number(document.getElementById("movIva")?.value) || 0,
         valor_total,
         estado_pagamento: document.getElementById("movEstado")?.value,
         observacoes:      document.getElementById("movObs")?.value?.trim() || null
     };
+    // O campo IVA do ecrã é a taxa (%). Gravava-se a taxa na coluna iva, que
+    // nos outros registos é o valor em euros: grava-se agora o valor.
+    payload.iva = Math.round(((Number(valor_total) || 0) - payload.valor_base) * 100) / 100;
     if (_movEmitidaPorNos) {
         payload.cliente_nome = nome || null;
         // Não há coluna para o NIF do cliente: fica nas observações
@@ -6019,9 +5958,13 @@ async function guardarMovimento() {
         // Remover imputações anteriores se for edição
         if (movEditId) await SB.from("movimento_servicos").delete().eq("movimento_id", movEditId);
         const imputacoes = [];
+        const comServico = [...linhasImput].filter(l => l.querySelector(".imput-serv-sel")?.value);
         linhasImput.forEach(linha => {
             const sid = linha.querySelector(".imput-serv-sel")?.value;
-            const val = parseFloat(linha.querySelector(".imput-serv-val")?.value);
+            let val = parseFloat(linha.querySelector(".imput-serv-val")?.value);
+            // Um só serviço e sem valor: leva o movimento todo, sem IVA (é assim
+            // que o painel da obra conta os custos)
+            if (sid && !(val > 0) && comServico.length === 1) val = payload.valor_base;
             if (sid && val > 0) imputacoes.push({ movimento_id: movId, obra_servico_id: sid, valor: val });
         });
         if (imputacoes.length) await SB.from("movimento_servicos").insert(imputacoes);
@@ -6188,7 +6131,6 @@ function ligarEventosGlobais() {
             document.querySelectorAll(".fin-subtab-content").forEach(c => c.style.display = "none");
             document.getElementById(`finTab-${tab}`).style.display = "block";
             if (tab === "dre")    carregarDRE();
-            if (tab === "orcado") iniciarOrcadoReal();
         });
     });
     // Definir mês actual por defeito
@@ -6240,7 +6182,78 @@ async function mudarEstadoOrcamento(o, novo) {
     const estado = o.estado === novo ? 'enviado' : novo;
     const { error } = await SB.from('orcamentos').update({ estado }).eq('id', o.id);
     if (error) { alert('Não foi possível mudar o estado: ' + error.message); return; }
+    if (estado === 'aceite') {
+        const r = await criarServicosDoOrcamento(o.id);
+        if (r.aviso) alert(r.aviso);
+    } else if (o.estado === 'aceite') {
+        await retirarServicosDoOrcamento(o.id);
+    }
     await carregarOrcamentos();
+}
+
+// =======================================================
+// SERVIÇOS A PARTIR DO ORÇAMENTO ACEITE
+// Quando o Alcindo marca um orçamento como aceite (na lista ou ao carregar o
+// PDF do TOCONLINE), a obra ganha os serviços desse orçamento, com o valor
+// sem IVA. A aceitação feita pelo cliente na Área do cliente não passa aqui.
+// - orçamento feito na app: um serviço por categoria;
+// - orçamento de PDF: um serviço com o total (o PDF só dá totais).
+// obra_servicos.orcamento_id guarda a origem: não se cria duas vezes e,
+// ao tirar o aceite, sabe-se o que retirar.
+// =======================================================
+async function criarServicosDoOrcamento(orcId) {
+    const { data: o, error } = await SB.from('orcamentos')
+        .select('id, numero, obra_id, obra_descricao, notas, taxa_iva, total_sem_iva, total_com_iva')
+        .eq('id', orcId).single();
+    if (error || !o) return { aviso: 'Não foi possível ler o orçamento para criar os serviços.' };
+    if (!o.obra_id) return { aviso: `O orçamento ${o.numero} não tem obra: escolhe a obra no orçamento para os serviços aparecerem no painel.` };
+
+    const { data: daObra } = await SB.from('obra_servicos')
+        .select('id, orcamento_id, ordem').eq('obra_id', o.obra_id);
+    if ((daObra || []).some(s => s.orcamento_id === o.id)) return { criados: 0 };   // já criados antes
+
+    // Extra só quando o PDF veio marcado como revisão ou extra: uma obra pode
+    // ter vários orçamentos normais (ex.: telhado e capoto em separado)
+    const extra = /revisão ou extra/.test(o.notas || '');
+    let ordem = Math.max(0, ...(daObra || []).map(s => s.ordem || 0)) + 1;
+
+    const { data: cats } = await SB.from('orcamento_categorias')
+        .select('nome, ordem, orcamento_linhas(tipo, quantidade, preco_unitario, n_pessoas)')
+        .eq('orcamento_id', o.id).order('ordem');
+
+    const novos = (cats || []).map(c => ({
+        nome: c.nome,
+        valor: (c.orcamento_linhas || []).reduce((s, l) => s + Number(l.quantidade || 0) * Number(l.preco_unitario || 0)
+            * (l.tipo === 'mao_obra' ? (Number(l.n_pessoas) || 1) : 1), 0),
+    })).filter(c => c.valor > 0);
+
+    if (!novos.length) {
+        const desc = (o.obra_descricao || '').trim();
+        novos.push({ nome: desc ? `${desc} (${o.numero})` : `Orçamento ${o.numero}`, valor: orcSemIva(o) });
+    }
+
+    const { error: errIns } = await SB.from('obra_servicos').insert(novos.map(n => ({
+        obra_id: o.obra_id, orcamento_id: o.id, nome: n.nome,
+        valor_orcamento: Math.round(n.valor * 100) / 100, extra, ordem: ordem++,
+    })));
+    if (errIns) { console.error(errIns); return { aviso: 'O orçamento ficou aceite, mas não foi possível criar os serviços: ' + errIns.message }; }
+    return { criados: novos.length };
+}
+
+// Ao tirar o aceite: os serviços que vieram do orçamento saem, a não ser que
+// já tenham faturas ou horas ligadas (aí ficam, para não perder a ligação).
+async function retirarServicosDoOrcamento(orcId) {
+    const { data: servs } = await SB.from('obra_servicos').select('id, nome').eq('orcamento_id', orcId);
+    if (!servs?.length) return;
+    const ids = servs.map(s => s.id);
+    const [{ data: mv }, { data: rg }] = await Promise.all([
+        SB.from('movimento_servicos').select('obra_servico_id').in('obra_servico_id', ids),
+        SB.from('registo_servicos').select('obra_servico_id').in('obra_servico_id', ids),
+    ]);
+    const usados = new Set([...(mv || []), ...(rg || [])].map(r => r.obra_servico_id));
+    const livres = ids.filter(id => !usados.has(id));
+    if (livres.length) await SB.from('obra_servicos').delete().in('id', livres);
+    if (usados.size) alert(`${usados.size} serviço(s) deste orçamento já têm faturas ou horas ligadas e ficaram na obra. Apaga-os à mão se já não fizerem sentido.`);
 }
 
 // Sub-separadores: orçamentos a clientes · comparar fornecedores (cotacoes.js)
@@ -7131,7 +7144,7 @@ async function carregarDRE() {
     } else { inicio = "2000-01-01"; fim = "2099-12-31"; }
 
     let query = SB.from("movimentos_financeiros")
-        .select("tipo, valor_total, categoria_id, categorias_financeiras(nome), estado_pagamento")
+        .select("tipo, valor_base, valor_total, categoria_id, categorias_financeiras(nome), estado_pagamento")
         .eq("ativo", true).gte("data_documento", inicio).lte("data_documento", fim);
     if (obraId) query = query.eq("obra_id", obraId);
     const { data } = await query;
@@ -7139,8 +7152,8 @@ async function carregarDRE() {
 
     const receitas  = data.filter(m => m.tipo === "entrada");
     const custos    = data.filter(m => m.tipo === "saida");
-    const totalRec  = receitas.reduce((s,m) => s + Number(m.valor_total), 0);
-    const totalCus  = custos.reduce((s,m) => s + Number(m.valor_total), 0);
+    const totalRec  = receitas.reduce((s,m) => s + semIva(m), 0);
+    const totalCus  = custos.reduce((s,m) => s + semIva(m), 0);
 
     // Custo mão de obra dos registos_admin no mesmo período
     const { data: regAdmin } = await SB.from("registos_admin")
@@ -7169,14 +7182,14 @@ async function carregarDRE() {
     document.getElementById("dreMargem").textContent = margem.toFixed(1) + "%";
 
     const recByCat = {};
-    receitas.forEach(m => { const c = m.categorias_financeiras?.nome || "Sem categoria"; recByCat[c] = (recByCat[c]||0) + Number(m.valor_total); });
+    receitas.forEach(m => { const c = m.categorias_financeiras?.nome || "Sem categoria"; recByCat[c] = (recByCat[c]||0) + semIva(m); });
     document.getElementById("dreDetalheReceitas").innerHTML = Object.entries(recByCat).sort((a,b)=>b[1]-a[1]).map(([cat,val]) =>
         `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
             <span style="opacity:.8">${cat}</span><span style="color:#8fbfa0;font-weight:600">${val.toFixed(2)} €</span></div>`
     ).join("") || "<p style='opacity:.4;font-size:13px'>Sem receitas no período</p>";
 
     const cusByCat = {};
-    custos.forEach(m => { const c = m.categorias_financeiras?.nome || "Sem categoria"; cusByCat[c] = (cusByCat[c]||0) + Number(m.valor_total); });
+    custos.forEach(m => { const c = m.categorias_financeiras?.nome || "Sem categoria"; cusByCat[c] = (cusByCat[c]||0) + semIva(m); });
     document.getElementById("dreDetalheCustos").innerHTML = Object.entries(cusByCat).sort((a,b)=>b[1]-a[1]).map(([cat,val]) =>
         `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
             <span style="opacity:.8">${cat}</span><span style="color:#e09486;font-weight:600">${val.toFixed(2)} €</span></div>`
@@ -7188,55 +7201,6 @@ async function carregarDRE() {
         const { data: obras } = await SB.from("obras").select("id, nome").eq("ativo", true).order("nome");
         (obras||[]).forEach(o => { const opt = document.createElement("option"); opt.value=o.id; opt.textContent=o.nome; dreObraEl.appendChild(opt); });
     }
-}
-
-// =======================================================
-// ORÇADO VS. REAL
-// =======================================================
-async function iniciarOrcadoReal() {
-    const sel = document.getElementById("orcadoObra");
-    if (sel && sel.options.length <= 1) {
-        const { data: obras } = await SB.from("obras").select("id, nome").eq("ativo", true).order("nome");
-        (obras||[]).forEach(o => { const opt = document.createElement("option"); opt.value=o.id; opt.textContent=o.nome; sel.appendChild(opt); });
-    }
-}
-
-async function carregarOrcadoReal() {
-    const obraId = document.getElementById("orcadoObra")?.value;
-    if (!obraId) { alert("Seleciona uma obra"); return; }
-
-    const [orcRes, gastosRes] = await Promise.all([
-        SB.from("orcamentos").select("valor_total").eq("obra_id",obraId).eq("ativo",true).order("criado_em",{ascending:false}).limit(1).maybeSingle(),
-        SB.from("movimentos_financeiros").select("valor_total,categoria_id,categorias_financeiras(nome)").eq("obra_id",obraId).eq("tipo","saida").eq("ativo",true)
-    ]);
-
-    const totalOrcado = orcRes.data?.valor_total || 0;
-    const gastos      = gastosRes.data || [];
-    const totalReal   = gastos.reduce((s,m) => s+Number(m.valor_total), 0);
-    const desvio      = totalReal - totalOrcado;
-    const percent     = totalOrcado > 0 ? (totalReal / totalOrcado * 100) : 0;
-
-    document.getElementById("orcadoTotal").textContent   = totalOrcado > 0 ? totalOrcado.toFixed(2)+" €" : "Sem orçamento";
-    document.getElementById("orcadoReal").textContent    = totalReal.toFixed(2) + " €";
-    const devEl = document.getElementById("orcadoDesvio");
-    devEl.textContent = (desvio>=0?"+":"")+desvio.toFixed(2)+" €";
-    devEl.style.color = desvio<=0 ? "#8fbfa0" : "#e09486";
-    document.getElementById("orcadoPercent").textContent = percent.toFixed(1)+"%";
-
-    const pct = Math.min(percent,100);
-    const bar = document.getElementById("orcadoBar");
-    bar.style.width      = pct+"%";
-    bar.style.background = pct<80?"var(--primary)":pct<100?"#f97316":"#e09486";
-    document.getElementById("orcadoBarLabel").textContent = percent.toFixed(1)+"% executado";
-
-    const catMap = {};
-    gastos.forEach(m => { const c=m.categorias_financeiras?.nome||"Sem categoria"; catMap[c]=(catMap[c]||0)+Number(m.valor_total); });
-    document.getElementById("orcadoTabela").innerHTML = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).map(([cat,val]) =>
-        `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
-            <td style="padding:8px;font-size:13px">${cat}</td>
-            <td style="padding:8px;font-size:13px;text-align:right;color:#e09486;font-weight:600">${val.toFixed(2)} €</td>
-            <td style="padding:8px;font-size:13px;text-align:right;opacity:.6">${totalReal>0?(val/totalReal*100).toFixed(1):0}%</td>
-        </tr>`).join("") || `<tr><td colspan="3" style="padding:20px;text-align:center;opacity:.4">Sem gastos registados</td></tr>`;
 }
 
 // =======================================================
@@ -7723,7 +7687,7 @@ function atualizarPreviaDeclaracao() {
 
 async function abrirDeclaracaoValores(movId) {
     const { data: mov, error } = await SB.from("movimentos_financeiros")
-        .select("id, data_documento, valor_total, cliente_nome, clientes(nome), obras(nome, morada, local, clientes(nome, morada))")
+        .select("id, obra_id, data_documento, valor_total, cliente_nome, clientes(nome), obras(nome, morada, local, clientes(nome, morada))")
         .eq("id", movId).maybeSingle();
     if (error || !mov) { console.error(error); alert("Não foi possível abrir este movimento."); return; }
     _declaracaoMov = mov;
@@ -7752,7 +7716,7 @@ function fecharDeclaracaoValores() {
     _declaracaoMov = null;
 }
 
-function gerarDeclaracaoValores() {
+async function gerarDeclaracaoValores() {
     const c   = lerCamposDeclaracao();
     const msg = document.getElementById("declMsg");
     if (!c.data || !Number(c.valor) || !c.morada || !c.proprietarios) {
@@ -7816,5 +7780,101 @@ function gerarDeclaracaoValores() {
     if (!win) { msg.textContent = "O navegador bloqueou a janela. Permita pop-ups para esta página."; return; }
     win.document.write(html);
     win.document.close();
+
+    const mov = _declaracaoMov;
+    const guardar = document.getElementById("declGuardarObra")?.checked;
     fecharDeclaracaoValores();
+    if (!guardar || !mov?.obra_id) return;
+
+    // Aviso na própria janela da declaração, que é onde o Alcindo está a olhar
+    const aviso = (texto, erro) => {
+        const barra = win.document?.querySelector(".barra");
+        if (!barra) { if (erro) alert(texto); return; }
+        const s = win.document.createElement("span");
+        s.textContent = texto;
+        s.style.cssText = `margin-right:10px;font:13px system-ui,sans-serif;padding:6px 10px;border-radius:6px;background:${erro ? "#f6d6d0" : "#dcefe2"}`;
+        barra.prepend(s);
+    };
+    try {
+        await guardarDeclaracaoNaObra(mov, c, titulo);
+        aviso("✓ Guardada nos documentos da obra, visível ao cliente");
+    } catch (e) {
+        console.error("guardarDeclaracaoNaObra:", e);
+        aviso("Não foi possível guardar na obra: " + e.message, true);
+    }
+}
+
+// O PDF que o cliente vê na Área do cliente. Desenhado com o jsPDF nas
+// mesmas posições do modelo (em pontos); a letra é Helvetica, porque o PDF
+// não pode levar a Aptos. Gerar outra vez a declaração do mesmo movimento
+// substitui a anterior.
+const JSPDF_URL = "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js";
+const JSPDF_SRI = "sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk";
+function carregarJsPDF() {
+    if (window.jspdf) return Promise.resolve(window.jspdf);
+    return new Promise((ok, falha) => {
+        const sc = document.createElement("script");
+        sc.src = JSPDF_URL; sc.integrity = JSPDF_SRI; sc.crossOrigin = "anonymous";
+        sc.onload = () => ok(window.jspdf);
+        sc.onerror = () => falha(new Error("não foi possível carregar o gerador de PDF"));
+        document.head.appendChild(sc);
+    });
+}
+
+async function imagemParaDataUrl(url) {
+    const blob = await (await fetch(url)).blob();
+    const dataUrl = await new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(blob); });
+    const img = new Image();
+    await new Promise((ok, falha) => { img.onload = ok; img.onerror = falha; img.src = dataUrl; });
+    return { dataUrl, w: img.naturalWidth, h: img.naturalHeight };
+}
+
+async function pdfDeclaracao(c) {
+    const { jsPDF } = await carregarJsPDF();
+    const pdf = new jsPDF({ unit: "pt", format: "a4" });
+    const logo = await imagemParaDataUrl("declaracao-logo.png?v=1");
+    pdf.addImage(logo.dataUrl, "PNG", 16, 21, 189, 189 * logo.h / logo.w);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(11);
+    pdf.text("Eu abaixo-assinado,", 85.1, 170.8, { baseline: "top" });
+    pdf.text(`${c.representante}, representante da empresa, ${c.empresa}`, 85.1, 207.4, { baseline: "top" });
+    pdf.setLineWidth(1.5);
+    pdf.line(84, 244.5, 511, 244.5);
+    pdf.splitTextToSize(textoDeclaracao(c), 426).forEach((l, i) =>
+        pdf.text(l, 85.1, 288.1 + 11 + i * 36.6, { baseline: "top" }));
+    const yAssin = 288.1 + 146.4 + 121.1;
+    pdf.text("Assinatura", 85.1 + 213, yAssin, { baseline: "top", align: "center" });
+    pdf.setLineWidth(0.75);
+    pdf.line(153.3, yAssin + 14.65 + 70.8, 479.1, yAssin + 14.65 + 70.8);
+    return pdf.output("blob");
+}
+
+async function guardarDeclaracaoNaObra(mov, c, titulo) {
+    const blob = await pdfDeclaracao(c);
+    const nome = `${titulo}.pdf`;
+    const caminho = `${mov.obra_id}/${Date.now()}-${nomeSeguroFicheiro(nome)}`;
+    const { data: { session } } = await SB.auth.getSession();
+
+    const { data: antigas } = await SB.from("obra_documentos").select("id, caminho")
+        .eq("movimento_id", mov.id).like("nome_ficheiro", "Declaração de valores%");
+
+    const up = await SB.storage.from(BUCKET_DOCS_OBRA).upload(caminho, blob, { contentType: "application/pdf" });
+    if (up.error) throw new Error(up.error.message);
+    const { error } = await SB.from("obra_documentos").insert({
+        obra_id: mov.obra_id, tipo: "recibo", nome_ficheiro: nome, caminho,
+        mime: "application/pdf", tamanho: blob.size, visivel_cliente: true,
+        estado: "registado", data_documento: c.data || null, movimento_id: mov.id,
+        criado_por: session?.user?.email || null,
+    });
+    if (error) {
+        await SB.storage.from(BUCKET_DOCS_OBRA).remove([caminho]);
+        throw new Error(error.message);
+    }
+    // Só depois de a nova estar gravada sai a anterior
+    if (antigas?.length) {
+        await SB.storage.from(BUCKET_DOCS_OBRA).remove(antigas.map(a => a.caminho));
+        await SB.from("obra_documentos").delete().in("id", antigas.map(a => a.id));
+    }
+    if (_painelObraActual?.id === mov.obra_id && typeof carregarPainelDocumentos === "function"
+        && document.getElementById("painelTab-documentos")?.offsetParent) carregarPainelDocumentos();
 }

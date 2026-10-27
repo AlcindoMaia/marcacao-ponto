@@ -894,7 +894,7 @@ body.dark .plan-add:hover { background: rgba(255,255,255,.08); color: #f0f0f0; }
 #modalPainelObra .serv-row,
 #modalPainelObra .serv-thead {
     display: grid;
-    grid-template-columns: 1fr 80px 80px 90px 90px 80px 80px 90px;
+    grid-template-columns: 1fr 90px 90px 90px 70px 80px 80px 90px;
     align-items: center;
 }
 #modalPainelObra .serv-row {

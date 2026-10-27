@@ -324,6 +324,9 @@ create table if not exists orcamentos (
     updated_at         timestamptz default now()
 );
 
+-- orçamento aceite que criou o serviço da obra (null = criado à mão)
+alter table obra_servicos add column if not exists orcamento_id uuid references orcamentos(id) on delete set null;
+
 create table if not exists orcamento_categorias (
     id           uuid primary key default gen_random_uuid(),
     orcamento_id uuid not null references orcamentos(id) on delete cascade,
@@ -414,6 +417,7 @@ create index if not exists idx_fatura_linhas_movimento on fatura_linhas(moviment
 create index if not exists idx_precos_artigo_data      on precos(artigo_id, data desc);
 
 create index if not exists idx_obra_servicos_obra       on obra_servicos(obra_id);
+create index if not exists idx_obra_servicos_orcamento  on obra_servicos(orcamento_id);
 create index if not exists idx_registo_servicos_reg     on registo_servicos(registo_id);
 create index if not exists idx_registo_servicos_serv    on registo_servicos(obra_servico_id);
 create index if not exists idx_movimento_servicos_mov   on movimento_servicos(movimento_id);
