@@ -3,6 +3,7 @@
 // =======================================================
 
 let _obras     = [];
+let _servicosPorObra = {};   // obra_id → serviços da obra (para ligar as horas)
 let _funcs     = [];
 let _dataActual = hoje();
 
@@ -83,13 +84,16 @@ async function iniciarApp() {
     mostrarEcrã("ecrãLoading");
 
     // Carregar dados base
-    const [obrasRes, funcsRes] = await Promise.all([
+    const [obrasRes, funcsRes, servRes] = await Promise.all([
         SB.from("obras").select("id, nome").order("nome"),
-        SB.from("funcionarios").select("id, nome, valor_dia, tipo_contrato").eq("ativo", true).order("nome")
+        SB.from("funcionarios").select("id, nome, valor_dia, tipo_contrato").eq("ativo", true).order("nome"),
+        SB.from("obra_servicos").select("id, obra_id, nome, extra, concluido").order("ordem").order("created_at")
     ]);
 
     _obras = obrasRes.data || [];
     _funcs = funcsRes.data || [];
+    _servicosPorObra = {};
+    (servRes.data || []).forEach(sv => (_servicosPorObra[sv.obra_id] ||= []).push(sv));
 
     // Definir data de hoje
     const dataEl = document.getElementById("dataRegisto");
@@ -132,7 +136,7 @@ async function carregarParaData() {
 
     // Buscar registos já existentes para esta data
     const { data: existentes } = await SB.from("registos_admin")
-        .select("id, funcionario_id, obra_id, horas, observacoes, tipo")
+        .select("id, funcionario_id, obra_id, horas, observacoes, tipo, registo_servicos(obra_servico_id)")
         .eq("data", data);
 
     renderFuncionarios(existentes || []);
@@ -464,8 +468,26 @@ function adicionarLinha(container, funcId, registo = null, btnAdd = null) {
 
     // Select de obras
     const selectObra = document.createElement("select");
+    selectObra.className = "sel-obra";
     selectObra.innerHTML = `<option value="">— Obra —</option>` +
         _obras.map(o => `<option value="${esc(o.id)}" ${registo?.obra_id === o.id ? "selected" : ""}>${esc(o.nome)}</option>`).join("");
+
+    // Serviço da obra: as horas da linha ficam ligadas a ele, para o painel
+    // da obra saber o custo de mão de obra de cada serviço. Só aparece quando
+    // a obra tem serviços; para dividir o dia por dois serviços, usa-se outra linha.
+    const selectServ = document.createElement("select");
+    selectServ.className = "sel-servico";
+    const servGuardado = registo?.registo_servicos?.[0]?.obra_servico_id || "";
+    const preencherServicos = () => {
+        const servs = _servicosPorObra[selectObra.value] || [];
+        const atual = selectServ.value || servGuardado;
+        selectServ.innerHTML = `<option value="">— Serviço (opcional) —</option>` +
+            servs.map(sv => `<option value="${esc(sv.id)}">${esc(sv.nome)}${sv.extra ? " [Extra]" : ""}${sv.concluido ? " ✓" : ""}</option>`).join("");
+        if (servs.some(sv => sv.id === atual)) selectServ.value = atual;
+        else if (servs.length === 1) selectServ.value = servs[0].id;
+        selectServ.style.display = servs.length ? "" : "none";
+    };
+    selectObra.addEventListener("change", () => { selectServ.value = ""; preencherServicos(); });
 
     // Input de horas
     const inputHoras = document.createElement("input");
@@ -490,6 +512,8 @@ function adicionarLinha(container, funcId, registo = null, btnAdd = null) {
     linha.appendChild(selectObra);
     linha.appendChild(inputHoras);
     linha.appendChild(btnRm);
+    linha.appendChild(selectServ);   // por baixo, a toda a largura
+    preencherServicos();
 
     // Inserir antes do botão de adicionar
     if (btnAdd) container.insertBefore(linha, btnAdd);
@@ -503,13 +527,15 @@ async function guardarTudo() {
     const data = _dataActual;
     const linhas = document.querySelectorAll(".linha-registo");
     const registos = [];
+    const servicosDasLinhas = [];   // serviço de cada registo, na mesma ordem
 
     for (const linha of linhas) {
         const funcId = linha.dataset.funcId;
         // Ignorar linhas de funcionários com falta marcada (já guardada pelo toggleFalta)
         const cardFalta = document.querySelector(`.func-card[data-func-id="${funcId}"]`);
         if (cardFalta?.dataset?.falta === '1') continue;
-        const obraId = linha.querySelector('select').value || null;
+        const obraId = linha.querySelector('.sel-obra').value || null;
+        const servicoId = obraId ? (linha.querySelector('.sel-servico')?.value || null) : null;
         const horas  = parseFloat(linha.querySelector('input[type="number"], input:not([class])').value);
         if (!horas || horas <= 0) continue;
 
@@ -525,6 +551,7 @@ async function guardarTudo() {
             horas:          horas,
             observacoes:    isTemp ? `[TEMP] ${nomeTemp}` : undefined
         });
+        servicosDasLinhas.push(servicoId);
     }
 
     if (registos.length === 0) {
@@ -550,8 +577,16 @@ async function guardarTudo() {
         }
     }
 
-    const { error } = await SB.from("registos_admin").insert(registos);
+    // As ligações antigas a serviços saíram com os registos apagados (cascade)
+    const { data: inseridos, error } = await SB.from("registos_admin").insert(registos).select("id");
     if (error) { feedback("Erro ao guardar: " + error.message, "erro"); return; }
+
+    const ligacoes = (inseridos || []).map((r, i) => servicosDasLinhas[i]
+        ? { registo_id: r.id, obra_servico_id: servicosDasLinhas[i], horas: registos[i].horas } : null).filter(Boolean);
+    if (ligacoes.length) {
+        const { error: errServ } = await SB.from("registo_servicos").insert(ligacoes);
+        if (errServ) { feedback("Horas guardadas, mas não foi possível ligá-las aos serviços: " + errServ.message, "erro"); return; }
+    }
 
     feedback(`✓ ${registos.length} linha(s) guardada(s) com sucesso!`, "ok");
 
