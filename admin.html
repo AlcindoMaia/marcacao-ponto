@@ -7,7 +7,7 @@
 
 <title>Painel Administrativo — Maia Solutions</title>
 
-<link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="style.css?v=12">
 <link rel="stylesheet" href="telemovel.css?v=6">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
@@ -942,6 +942,11 @@
             </div>
         </div>
 
+        <!-- Só nas entradas: o recibo que o cliente pede ao pagar -->
+        <label id="movDeclaracaoWrap" class="mov-declaracao" style="display:none">
+            <input type="checkbox" id="movDeclaracao"> 📄 Gerar declaração de valores ao guardar
+        </label>
+
         <div class="modal-actions">
             <button class="btn-secondary" id="fecharModalMovBtnAlt" onclick="fecharModalMovimento()">Cancelar</button>
             <button class="btn-primary" id="btnGuardarMov">Guardar</button>
@@ -1784,6 +1789,35 @@
   </div>
 </div>
 
+<!-- Declaração de valores recebidos (modelo "Declaração de valores - steel frame") -->
+<div id="modalDeclaracao" class="modal hidden">
+    <div class="modal-content" style="max-width:560px">
+        <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center">
+            <h2>📄 Declaração de valores</h2>
+            <button class="modal-close" onclick="fecharDeclaracaoValores()" style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.5">×</button>
+        </div>
+        <div class="form-row">
+            <div class="form-group input-sm"><label>Data</label><input id="declData" type="date"></div>
+            <div class="form-group input-sm"><label>Valor (€)</label><input id="declValor" type="number" step="0.01" min="0"></div>
+        </div>
+        <div class="form-group"><label>Proprietário(s) da obra</label><input id="declProprietarios" placeholder="Ex.: Ana Pereira e Nelson Neves"></div>
+        <div class="form-group"><label>Morada da obra</label><input id="declMorada" placeholder="Ex.: Rua dos Ferreiros nº 174 A"></div>
+        <details class="decl-empresa">
+            <summary>Dados da empresa</summary>
+            <div class="form-group"><label>Representante</label><input id="declRepresentante"></div>
+            <div class="form-group"><label>Empresa</label><input id="declEmpresa"></div>
+            <div class="form-group"><label>Contribuinte n.º</label><input id="declNif" inputmode="numeric"></div>
+        </details>
+        <p id="declPrevia" class="decl-previa"></p>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="fecharDeclaracaoValores()">Cancelar</button>
+            <button class="btn-primary" onclick="gerarDeclaracaoValores()">🖨️ Gerar PDF</button>
+        </div>
+        <div id="declMsg" style="margin-top:8px;font-size:13px;color:#e09486"></div>
+    </div>
+</div>
+
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js" integrity="sha384-Dr98ddmUw2QkdCarNQ+OL7xLty7cSxgR0T7v1tq4UErS/qLV0132sBYTolRAFuOV" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -1794,7 +1828,7 @@
 <script src="fotos.js"></script>
 <script src="planeamento.js?v=3"></script>
 <script src="cotacoes.js"></script>
-<script src="admin.js?v=8"></script>
+<script src="admin.js?v=10"></script>
 <script src="telemovel.js?v=5"></script>
 
 

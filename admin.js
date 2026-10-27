@@ -5204,7 +5204,7 @@ async function carregarPainelFinanceiro() {
     const el = document.getElementById("painelTab-financeiro");
     el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">A carregar...</div>`;
     const { data } = await SB.from("movimentos_financeiros")
-        .select("data_documento, tipo, referencia, valor_total, observacoes, fornecedores(nome), categorias_financeiras(nome)")
+        .select("id, data_documento, tipo, referencia, valor_total, observacoes, fornecedores(nome), categorias_financeiras(nome)")
         .eq("obra_id", _painelObraActual.id).eq("ativo", true)
         .order("data_documento", { ascending: false });
     // Registar um pagamento sem ir ao Fluxo de caixa: o movimento abre já com esta obra
@@ -5229,7 +5229,10 @@ async function carregarPainelFinanceiro() {
             </div>
             ${d.items.map(m => `<div style="padding:8px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12px">
                 <div><div style="opacity:.6">${esc(m.data_documento)}</div><div style="font-weight:500">${esc(m.fornecedores?.nome || m.observacoes || m.referencia || "—")}</div></div>
-                <div style="font-weight:700;color:${m.tipo === "entrada" ? "#8fbfa0" : "#e09486"}">${m.tipo === "entrada" ? "+" : "−"}${Number(m.valor_total).toFixed(2)} €</div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <div style="font-weight:700;color:${m.tipo === "entrada" ? "#8fbfa0" : "#e09486"}">${m.tipo === "entrada" ? "+" : "−"}${Number(m.valor_total).toFixed(2)} €</div>
+                    ${m.tipo === "entrada" ? `<button class="btn-icone" title="Gerar declaração de valores" onclick="abrirDeclaracaoValores('${m.id}')">📄</button>` : ""}
+                </div>
             </div>`).join("")}
         </div>`).join("");
 }
@@ -5498,9 +5501,12 @@ function renderMovimentos() {
             <td class="acoes-td">
                 <button class="btn-acao" title="Editar">✏️</button>
                 <button class="btn-acao" title="Apagar">🗑️</button>
+                ${ent ? `<button class="btn-acao btn-declaracao" title="Gerar declaração de valores">📄</button>` : ""}
             </td>`;
         tr.querySelectorAll(".btn-acao")[0].onclick = () => abrirModalMovimento(m);
         tr.querySelectorAll(".btn-acao")[1].onclick = () => apagarMovimento(m.id, m.referencia);
+        const btnDecl = tr.querySelector(".btn-declaracao");
+        if (btnDecl) btnDecl.onclick = () => abrirDeclaracaoValores(m.id);
         tbody.appendChild(tr);
     });
     // Botão "Ver mais" se houver mais registos
@@ -5709,6 +5715,10 @@ async function abrirModalMovimento(mov = null) {
             });
         }
     }
+
+    const declEl = document.getElementById("movDeclaracao");
+    if (declEl) declEl.checked = false;
+    atualizarOpcaoDeclaracao();
 
     // Mostrar modal — igual ao padrão dos outros modais
     // Limpar display inline (pode ter ficado de um fechar anterior)
@@ -5942,6 +5952,7 @@ async function guardarMovimento() {
     // Lote em curso: guardar esta não fecha, abre a seguinte já preenchida
     const restantes = _filaFaturas.slice();
     const totalLote = _filaTotal;
+    const gerarDeclaracao = payload.tipo === "entrada" && document.getElementById("movDeclaracao")?.checked;
 
     fecharModalMovimento();
     await carregarMovimentos();
@@ -5952,6 +5963,8 @@ async function guardarMovimento() {
         _filaTotal   = totalLote;
         await abrirModalMovimento();
         await proximaFaturaDaFila();
+    } else if (gerarDeclaracao && movId) {
+        abrirDeclaracaoValores(movId);
     }
 }
 
@@ -6025,6 +6038,7 @@ function ligarEventosGlobais() {
     document.getElementById("movObra")?.addEventListener("change", function () {
         carregarServicosImputacao(this.value || null, movEditId);
     });
+    document.getElementById("movTipo")?.addEventListener("change", atualizarOpcaoDeclaracao);
 
     // Movimentos stock — filtros
     ["filtroMovArtigo","filtroMovFunc","filtroMovObra","filtroMovInicio","filtroMovFim"].forEach(id => {
@@ -7567,3 +7581,162 @@ async function aplicarServicoBiblioteca(servicoId, inputDescricao, cid) {
     setTimeout(() => info.remove(), 5000);
 }
 
+
+// ── Declaração de valores ──────────────────────────────────────────────
+// O papel que o cliente recebe quando paga uma parte da obra. Reproduz o
+// modelo "Declaração de valores - steel frame" (Word, A4, Aptos 11):
+// as posições abaixo vêm das medidas desse PDF, em pontos.
+
+const DECLARACAO_EMPRESA = {
+    representante: "Alcindo Maia",
+    empresa:       "Alcindo Maia – Steelframe Uni. Lda",
+    nif:           "518392074",
+};
+let _declaracaoMov = null;
+
+// Os dados da empresa podem ser corrigidos no formulário; ficam lembrados
+// neste navegador para a próxima declaração.
+function dadosEmpresaDeclaracao() {
+    try {
+        return { ...DECLARACAO_EMPRESA, ...JSON.parse(localStorage.getItem("declaracaoEmpresa") || "{}") };
+    } catch { return { ...DECLARACAO_EMPRESA }; }
+}
+
+function atualizarOpcaoDeclaracao() {
+    const wrap = document.getElementById("movDeclaracaoWrap");
+    if (wrap) wrap.style.display = document.getElementById("movTipo")?.value === "entrada" ? "" : "none";
+}
+
+// "2026-05-19" → "19 de maio de 2026"
+function dataPorExtenso(iso) {
+    const meses = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+    const [a, m, d] = String(iso || "").split("-").map(Number);
+    if (!a || !m || !d) return "";
+    return `${d} de ${meses[m - 1]} de ${a}`;
+}
+
+// 10000 → "10 000€" (como no modelo); os cêntimos só aparecem se houver
+function valorDeclaracao(v) {
+    const n = Math.round(Number(v || 0) * 100) / 100;
+    const [int, dec] = n.toFixed(2).split(".");
+    const milhares = int.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    return (dec === "00" ? milhares : `${milhares},${dec}`) + "€";
+}
+
+function lerCamposDeclaracao() {
+    const v = id => document.getElementById(id)?.value?.trim() || "";
+    return {
+        data: v("declData"), valor: v("declValor"),
+        proprietarios: v("declProprietarios"), morada: v("declMorada"),
+        representante: v("declRepresentante"), empresa: v("declEmpresa"), nif: v("declNif"),
+    };
+}
+
+function textoDeclaracao(c) {
+    return `Declaro para os devidos efeitos que no dia ${dataPorExtenso(c.data) || "___"}, contribuinte n.º ` +
+        `${c.nif || "___"} que recebi o valor de ${c.valor ? valorDeclaracao(c.valor) : "___"} por conta de ` +
+        `trabalhos a efetuar na obra da ${c.morada || "___"}, pertencente a ${c.proprietarios || "___"}.`;
+}
+
+function atualizarPreviaDeclaracao() {
+    const el = document.getElementById("declPrevia");
+    if (el) el.textContent = textoDeclaracao(lerCamposDeclaracao());
+}
+
+async function abrirDeclaracaoValores(movId) {
+    const { data: mov, error } = await SB.from("movimentos_financeiros")
+        .select("id, data_documento, valor_total, cliente_nome, clientes(nome), obras(nome, morada, local, clientes(nome, morada))")
+        .eq("id", movId).maybeSingle();
+    if (error || !mov) { console.error(error); alert("Não foi possível abrir este movimento."); return; }
+    _declaracaoMov = mov;
+
+    const emp  = dadosEmpresaDeclaracao();
+    const obra = mov.obras || {};
+    const set  = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ""; };
+    set("declData",          mov.data_documento);
+    set("declValor",         mov.valor_total);
+    set("declProprietarios", obra.clientes?.nome || mov.clientes?.nome || mov.cliente_nome || "");
+    set("declMorada",        obra.morada || obra.local || "");
+    set("declRepresentante", emp.representante);
+    set("declEmpresa",       emp.empresa);
+    set("declNif",           emp.nif);
+    document.getElementById("declMsg").textContent = "";
+    atualizarPreviaDeclaracao();
+
+    const modal = document.getElementById("modalDeclaracao");
+    modal.querySelectorAll("input").forEach(i => i.oninput = atualizarPreviaDeclaracao);
+    modal.style.display = "";
+    modal.classList.remove("hidden");
+}
+
+function fecharDeclaracaoValores() {
+    document.getElementById("modalDeclaracao")?.classList.add("hidden");
+    _declaracaoMov = null;
+}
+
+function gerarDeclaracaoValores() {
+    const c   = lerCamposDeclaracao();
+    const msg = document.getElementById("declMsg");
+    if (!c.data || !Number(c.valor) || !c.morada || !c.proprietarios) {
+        msg.textContent = "Preencha a data, o valor, a morada e o(s) proprietário(s).";
+        return;
+    }
+    try {
+        localStorage.setItem("declaracaoEmpresa",
+            JSON.stringify({ representante: c.representante, empresa: c.empresa, nif: c.nif }));
+    } catch { /* sem armazenamento: usa os dados de origem da próxima vez */ }
+
+    // O título é o nome que o navegador propõe ao guardar em PDF
+    const nomeObra = _declaracaoMov?.obras?.nome || c.proprietarios;
+    const titulo   = `Declaração de valores - ${nomeObra} - ${c.data}`;
+    const logo     = new URL("declaracao-logo.png?v=1", location.href).href;
+
+    const html = `<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8">
+<title>${esc(titulo)}</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #e5e5e5; }
+  body { font-family: Aptos, Calibri, Carlito, "Segoe UI", Arial, sans-serif; font-size: 11pt; color: #000;
+         -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .folha { position: relative; width: 595.3pt; height: 841.9pt; margin: 20px auto; background: #fff;
+           box-shadow: 0 2px 12px rgba(0,0,0,.25); overflow: hidden; }
+  .logo  { position: absolute; left: 16pt; top: 21pt; width: 189pt; }
+  .linha1, .linha2 { position: absolute; left: 85.1pt; line-height: 14.65pt; white-space: nowrap; }
+  .linha1 { top: 170.8pt; }
+  .linha2 { top: 207.4pt; }
+  .regua { position: absolute; left: 84pt; top: 244.5pt; width: 427pt; border-top: 1.5pt solid #000; }
+  .corpo { position: absolute; left: 85.1pt; top: 288.1pt; width: 426pt; }
+  .corpo p { margin: 0; line-height: 36.6pt; min-height: 146.4pt; }   /* 4 linhas, como no modelo */
+  .assinatura { margin-top: 121.1pt; text-align: center; line-height: 14.65pt; }
+  .traco { margin: 70.8pt 0 0 68.2pt; width: 325.8pt; border-top: .75pt solid #000; }
+  .barra { position: fixed; top: 12px; right: 12px; }
+  .barra button { font: 600 14px system-ui, sans-serif; padding: 8px 14px; border-radius: 8px; border: 0;
+                  background: #1C2B3A; color: #fff; cursor: pointer; }
+  @media print {
+    html, body { background: #fff; }
+    .folha { margin: 0; box-shadow: none; }
+    .barra { display: none; }
+  }
+</style></head><body>
+<div class="barra"><button onclick="window.print()">🖨️ Imprimir / Guardar PDF</button></div>
+<div class="folha">
+  <img class="logo" src="${esc(logo)}" alt="Maia Solutions">
+  <div class="linha1">Eu abaixo-assinado,</div>
+  <div class="linha2">${esc(c.representante)}, representante da empresa, ${esc(c.empresa)}</div>
+  <div class="regua"></div>
+  <div class="corpo">
+    <p>${esc(textoDeclaracao(c))}</p>
+    <div class="assinatura">Assinatura</div>
+    <div class="traco"></div>
+  </div>
+</div>
+<script>window.onload = () => setTimeout(() => window.print(), 300);<\/script>
+</body></html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) { msg.textContent = "O navegador bloqueou a janela. Permita pop-ups para esta página."; return; }
+    win.document.write(html);
+    win.document.close();
+    fecharDeclaracaoValores();
+}
