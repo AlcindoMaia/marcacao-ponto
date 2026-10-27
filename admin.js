@@ -4869,6 +4869,10 @@ async function gravarPropostaDocumento() {
             }).select("id").single();
             if (error) throw new Error(error.code === "23505" ? `já existe um orçamento com o número ${numero}.` : error.message);
             ligacao.orcamento_id = o.id;
+            if (val("propEstadoOrc") === "aceite") {
+                const r = await criarServicosDoOrcamento(o.id);
+                if (r.aviso) alert(r.aviso);
+            }
         }
 
         if (tipo === "fatura") {
@@ -4910,7 +4914,7 @@ async function gravarPropostaDocumento() {
         fecharPropostaDocumento();
         await carregarPainelDocumentos();
         msgDocObra({
-            orcamento: `Orçamento ${numero} registado na obra.`,
+            orcamento: `Orçamento ${numero} registado na obra` + (val("propEstadoOrc") === "aceite" ? " e serviços criados." : "."),
             fatura:    `Fatura ${numero} lançada no Financeiro.`,
             recibo:    "Recibo registado" + (ligacao.movimento_id ? " e fatura marcada como paga." : "."),
         }[tipo]);
@@ -6178,7 +6182,77 @@ async function mudarEstadoOrcamento(o, novo) {
     const estado = o.estado === novo ? 'enviado' : novo;
     const { error } = await SB.from('orcamentos').update({ estado }).eq('id', o.id);
     if (error) { alert('Não foi possível mudar o estado: ' + error.message); return; }
+    if (estado === 'aceite') {
+        const r = await criarServicosDoOrcamento(o.id);
+        if (r.aviso) alert(r.aviso);
+    } else if (o.estado === 'aceite') {
+        await retirarServicosDoOrcamento(o.id);
+    }
     await carregarOrcamentos();
+}
+
+// =======================================================
+// SERVIÇOS A PARTIR DO ORÇAMENTO ACEITE
+// Quando o Alcindo marca um orçamento como aceite (na lista ou ao carregar o
+// PDF do TOCONLINE), a obra ganha os serviços desse orçamento, com o valor
+// sem IVA. A aceitação feita pelo cliente na Área do cliente não passa aqui.
+// - orçamento feito na app: um serviço por categoria;
+// - orçamento de PDF: um serviço com o total (o PDF só dá totais).
+// obra_servicos.orcamento_id guarda a origem: não se cria duas vezes e,
+// ao tirar o aceite, sabe-se o que retirar.
+// =======================================================
+async function criarServicosDoOrcamento(orcId) {
+    const { data: o, error } = await SB.from('orcamentos')
+        .select('id, numero, obra_id, obra_descricao, notas, taxa_iva, total_sem_iva, total_com_iva')
+        .eq('id', orcId).single();
+    if (error || !o) return { aviso: 'Não foi possível ler o orçamento para criar os serviços.' };
+    if (!o.obra_id) return { aviso: `O orçamento ${o.numero} não tem obra: escolhe a obra no orçamento para os serviços aparecerem no painel.` };
+
+    const { data: daObra } = await SB.from('obra_servicos')
+        .select('id, orcamento_id, ordem').eq('obra_id', o.obra_id);
+    if ((daObra || []).some(s => s.orcamento_id === o.id)) return { criados: 0 };   // já criados antes
+
+    // Extra: a obra já tinha serviços de outro orçamento, ou o PDF veio marcado como revisão/extra
+    const extra = (daObra || []).some(s => s.orcamento_id) || /revisão ou extra/.test(o.notas || '');
+    let ordem = Math.max(0, ...(daObra || []).map(s => s.ordem || 0)) + 1;
+
+    const { data: cats } = await SB.from('orcamento_categorias')
+        .select('nome, ordem, orcamento_linhas(tipo, quantidade, preco_unitario, n_pessoas)')
+        .eq('orcamento_id', o.id).order('ordem');
+
+    const novos = (cats || []).map(c => ({
+        nome: c.nome,
+        valor: (c.orcamento_linhas || []).reduce((s, l) => s + Number(l.quantidade || 0) * Number(l.preco_unitario || 0)
+            * (l.tipo === 'mao_obra' ? (Number(l.n_pessoas) || 1) : 1), 0),
+    })).filter(c => c.valor > 0);
+
+    if (!novos.length) {
+        const desc = (o.obra_descricao || '').trim();
+        novos.push({ nome: desc ? `${desc} (${o.numero})` : `Orçamento ${o.numero}`, valor: orcSemIva(o) });
+    }
+
+    const { error: errIns } = await SB.from('obra_servicos').insert(novos.map(n => ({
+        obra_id: o.obra_id, orcamento_id: o.id, nome: n.nome,
+        valor_orcamento: Math.round(n.valor * 100) / 100, extra, ordem: ordem++,
+    })));
+    if (errIns) { console.error(errIns); return { aviso: 'O orçamento ficou aceite, mas não foi possível criar os serviços: ' + errIns.message }; }
+    return { criados: novos.length };
+}
+
+// Ao tirar o aceite: os serviços que vieram do orçamento saem, a não ser que
+// já tenham faturas ou horas ligadas (aí ficam, para não perder a ligação).
+async function retirarServicosDoOrcamento(orcId) {
+    const { data: servs } = await SB.from('obra_servicos').select('id, nome').eq('orcamento_id', orcId);
+    if (!servs?.length) return;
+    const ids = servs.map(s => s.id);
+    const [{ data: mv }, { data: rg }] = await Promise.all([
+        SB.from('movimento_servicos').select('obra_servico_id').in('obra_servico_id', ids),
+        SB.from('registo_servicos').select('obra_servico_id').in('obra_servico_id', ids),
+    ]);
+    const usados = new Set([...(mv || []), ...(rg || [])].map(r => r.obra_servico_id));
+    const livres = ids.filter(id => !usados.has(id));
+    if (livres.length) await SB.from('obra_servicos').delete().in('id', livres);
+    if (usados.size) alert(`${usados.size} serviço(s) deste orçamento já têm faturas ou horas ligadas e ficaram na obra. Apaga-os à mão se já não fizerem sentido.`);
 }
 
 // Sub-separadores: orçamentos a clientes · comparar fornecedores (cotacoes.js)
