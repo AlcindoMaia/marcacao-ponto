@@ -1429,3 +1429,11 @@ body.dark ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); }
 
 body.dark #filtroMesFinanceiro { background: #18232e; color: #ece5de; border-color: rgba(255,255,255,.14); }
 .barra-filtros #filtroMesFinanceiro { padding: 0 8px; font-size: 12.5px; }
+
+/* Painel da obra › Financeiro: botão "Registar pagamento". A janela do
+   movimento abre por cima do painel (que tem z-index 1100). */
+.painel-fin-barra { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+.painel-fin-novo { width: auto; padding: 0 12px; font-size: 12.5px; font-weight: 600; color: var(--primary); }
+body:has(#modalPainelObra[style*="display: flex"], #modalPainelObra[style*="display:flex"]) .modal:not(.hidden) {
+    z-index: 1200;
+}

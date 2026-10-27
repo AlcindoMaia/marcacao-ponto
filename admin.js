@@ -110,9 +110,58 @@ function mostrarPainel() {
 // =======================================================
 function inicializarPainel() {
     ativarTabs();
-    abrirTab(tabPedidaNoEndereco() || "visaogeral");
+    // Um link com #tab=… ou #ler-fatura manda; sem ele volta-se ao sítio
+    // onde se estava, se a app foi usada há menos de LEMBRAR_MINUTOS.
+    const sitio = location.hash ? null : lerSitio();
+    if (sitio && document.querySelector(`.tab[data-tab="${sitio.tab}"]`)) {
+        abrirTab(sitio.tab, sitio.sub || undefined);
+        if (sitio.obra) reabrirObraLembrada(sitio.obra, sitio.painelTab);
+    } else {
+        abrirTab(tabPedidaNoEndereco() || "visaogeral");
+    }
+    vigiarUsoDaApp();
     carregarNotificacoes(); // Carregar alertas iniciais
     tratarAccaoNoEndereco();
+}
+
+// =======================================================
+// LEMBRAR ONDE SE ESTAVA
+// Ao atualizar a página volta-se ao separador, sub-separador e obra
+// aberta. Só se volta à Visão geral depois de LEMBRAR_MINUTOS sem a app
+// aberta. Fica guardado só neste browser (localStorage).
+// =======================================================
+const LEMBRAR_MINUTOS = 30;
+const CHAVE_SITIO = "ultimoSitio";
+
+function lerSitio() {
+    try {
+        const s = JSON.parse(localStorage.getItem(CHAVE_SITIO) || "null");
+        if (s && s.tab && Date.now() - s.t < LEMBRAR_MINUTOS * 60000) return s;
+    } catch (e) {}
+    return null;
+}
+
+function guardarSitio(mudancas) {
+    try {
+        const s = Object.assign(lerSitio() || {}, mudancas, { t: Date.now() });
+        localStorage.setItem(CHAVE_SITIO, JSON.stringify(s));
+    } catch (e) {}
+}
+
+// Enquanto a app está aberta o relógio não conta: renova-se a hora
+// de minuto a minuto e ao sair ou mudar de janela.
+function vigiarUsoDaApp() {
+    const renovar = () => { if (lerSitio()) guardarSitio({}); };
+    setInterval(() => { if (document.visibilityState === "visible") renovar(); }, 60000);
+    document.addEventListener("visibilitychange", renovar);
+    window.addEventListener("pagehide", renovar);
+}
+
+async function reabrirObraLembrada(id, painelTab) {
+    const { data: obra } = await SB.from("obras").select("*").eq("id", id).maybeSingle();
+    if (!obra) return guardarSitio({ obra: null });
+    await abrirPainelObra(obra);
+    if (painelTab && painelTab !== "resumo" && _painelObraActual?.id === obra.id) abrirPainelTab(painelTab);
 }
 
 // O assistente manda para aqui com #tab=financeiro ou #ler-fatura.
@@ -177,6 +226,7 @@ function abrirTab(nome, sub) {
     if (!tabBtn || !tabDiv) return;
     tabBtn.classList.add("active");
     tabDiv.classList.add("active");
+    guardarSitio({ tab: nome, sub: sub || null });
     if (nome === "visaogeral")   initVisaoGeral();
     if (nome === "financeiro")   { switchFinTab(subFin || "ordenados"); }
     if (nome === "dashboard")    initDashboard();
@@ -185,13 +235,21 @@ function abrirTab(nome, sub) {
         if (sub === "registos") switchRegTab("ponto");
         else initFuncionarios();
     }
-    if (nome === "inventario")   initInventario();
+    if (nome === "inventario") {
+        initInventario();
+        if (sub === "movimentos") abrirSubTabMovimentos();
+        else guardarSitio({ sub: document.querySelector(".inv-subtab.active")?.dataset.invtab || null });
+    }
     if (nome === "obras") {
         mostrarSecSub("obras", sub || "lista");
         if (sub === "qr") initGerarQr();
         else initObras();
     }
-    if (nome === "orcamentos")    initOrcamentos();
+    if (nome === "orcamentos") {
+        initOrcamentos();
+        if (sub) switchOrcSub(sub);
+        else guardarSitio({ sub: document.querySelector(".orc-subtab.active")?.dataset.orcsub || null });
+    }
     if (nome === "config")        initConfig();
     if (nome === "planeamento")   initPlaneamento();
 }
@@ -213,6 +271,7 @@ function switchFinTab(tab) {
     document.querySelectorAll(".fin-subtab-content").forEach(c => c.style.display = "none");
     const el = document.getElementById("finTab-" + tab);
     if (el) el.style.display = "block";
+    guardarSitio({ sub: tab });
     if (tab === "ordenados")  carregarFinanceiro();
     if (tab === "dre")        carregarDRE();
     if (tab === "fluxo")      initFluxo();
@@ -2133,6 +2192,7 @@ async function abrirPainelObra(obra) {
     const modal = document.getElementById("modalPainelObra");
     _painelObraActual = obra;   // os separadores (resumo, financeiro, ponto,
                                 // stock) leem a obra daqui
+    guardarSitio({ obra: obra.id, painelTab: "resumo" });
     document.getElementById("painelObraNome").textContent = obra.nome;
 
     // Meta: data prevista + estado
@@ -3606,6 +3666,7 @@ async function initInventario() {
             btn.style.color = "var(--primary)";
             const target = document.getElementById("invTab-" + btn.dataset.invtab);
             if (target) target.style.display = "block";
+            guardarSitio({ sub: btn.dataset.invtab });
             if (btn.dataset.invtab === "movimentos") {
                 await carregarFiltrosMovStock();
                 await carregarMovimentosStock();
@@ -3630,6 +3691,7 @@ async function abrirSubTabMovimentos() {
     }
     const tabMov = document.getElementById("invTab-movimentos");
     if (tabMov) tabMov.style.display = "block";
+    guardarSitio({ sub: "movimentos" });
     await carregarFiltrosMovStock();
     await carregarMovimentosStock();
 }
@@ -4206,6 +4268,7 @@ function fecharPainelObra() {
     // sempre à classe, por isso só acrescentar "hidden" não o fechava.
     if (m) { m.style.display = "none"; m.classList.add("hidden"); }
     _painelObraActual = null;
+    guardarSitio({ obra: null });
 }
 
 function abrirPainelTab(tab) {
@@ -4219,6 +4282,7 @@ function abrirPainelTab(tab) {
     if (btn) { btn.classList.add("active"); btn.style.borderBottomColor = "var(--primary)"; btn.style.color = "var(--primary)"; }
     const el = document.getElementById(`painelTab-${tab}`);
     if (el) el.style.display = "block";
+    if (_painelObraActual) guardarSitio({ painelTab: tab });
     if (tab === "resumo")     carregarPainelResumo();
     if (tab === "financeiro") carregarPainelFinanceiro();
     if (tab === "ponto")      carregarPainelPonto();
@@ -5142,7 +5206,10 @@ async function carregarPainelFinanceiro() {
         .select("data_documento, tipo, referencia, valor_total, observacoes, fornecedores(nome), categorias_financeiras(nome)")
         .eq("obra_id", _painelObraActual.id).eq("ativo", true)
         .order("data_documento", { ascending: false });
-    if (!data?.length) { el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">Sem movimentos financeiros.</div>`; return; }
+    // Registar um pagamento sem ir ao Fluxo de caixa: o movimento abre já com esta obra
+    const barra = `<div class="painel-fin-barra"><button class="btn-icone painel-fin-novo" onclick="novoMovimentoDaObra()"
+        title="Registar um pagamento ou recebimento desta obra">＋ Registar pagamento</button></div>`;
+    if (!data?.length) { el.innerHTML = barra + `<div style="padding:24px;text-align:center;opacity:.5">Sem movimentos financeiros.</div>`; return; }
     const porCat = {};
     data.forEach(m => {
         const cat = m.categorias_financeiras?.nome || "Sem categoria";
@@ -5151,7 +5218,7 @@ async function carregarPainelFinanceiro() {
         else porCat[cat].saidas += Number(m.valor_total);
         porCat[cat].items.push(m);
     });
-    el.innerHTML = Object.entries(porCat).map(([cat, d]) => `
+    el.innerHTML = barra + Object.entries(porCat).map(([cat, d]) => `
         <div class="card" style="margin-bottom:10px;padding:0;overflow:hidden">
             <div style="padding:10px 14px;background:rgba(181,136,99,.08);display:flex;justify-content:space-between;align-items:center">
                 <span style="font-family:var(--font-title);font-size:11px;letter-spacing:.5px;text-transform:uppercase">${cat}</span>
@@ -5164,6 +5231,18 @@ async function carregarPainelFinanceiro() {
                 <div style="font-weight:700;color:${m.tipo === "entrada" ? "#8fbfa0" : "#e09486"}">${m.tipo === "entrada" ? "+" : "−"}${Number(m.valor_total).toFixed(2)} €</div>
             </div>`).join("")}
         </div>`).join("");
+}
+
+async function novoMovimentoDaObra() {
+    const obra = _painelObraActual;
+    if (!obra) return;
+    await abrirModalMovimento();
+    const sel = document.getElementById("movObra");
+    if (!sel) return;
+    const id = String(obra.id);
+    if (![...sel.options].some(o => o.value === id)) sel.add(new Option(obra.nome, id));
+    sel.value = id;
+    sel.dispatchEvent(new Event("change"));   // mostra os serviços da obra para imputar
 }
 
 async function carregarPainelPonto() {
@@ -5865,6 +5944,7 @@ async function guardarMovimento() {
 
     fecharModalMovimento();
     await carregarMovimentos();
+    if (_painelObraActual) carregarPainelFinanceiro();   // veio do painel da obra
 
     if (restantes.length) {
         _filaFaturas = restantes;
@@ -6074,6 +6154,7 @@ async function mudarEstadoOrcamento(o, novo) {
 function switchOrcSub(sub) {
     document.querySelectorAll(".orc-subtab").forEach(b => b.classList.toggle("active", b.dataset.orcsub === sub));
     document.querySelectorAll(".orc-sub").forEach(d => d.style.display = d.id === "orcSub-" + sub ? "" : "none");
+    guardarSitio({ sub });
     if (sub === "fornecedores") initCotacoes();
 }
 
