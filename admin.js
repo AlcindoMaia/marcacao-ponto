@@ -1407,11 +1407,31 @@ async function carregarFuncionarios() {
                 <button class="btn-acao btn-toggle-func" title="${ativo ? "Desativar" : "Ativar"}">${ativo ? "🔴" : "🟢"}</button>
             </td>`;
 
+        tr.dataset.ativo = ativo ? "1" : "";
+        tr.dataset.temp  = f.tipo_contrato === "temporario" ? "1" : "";
+        tr.dataset.semqr = temDevice ? "" : "1";
         tr.querySelector(".btn-hist-func").onclick  = () => abrirHistoricoFuncionario(f);
         tr.querySelector(".btn-stock-func").onclick = () => toggleAcessoStock(f.id, f.nome, !!f.acesso_stock);
         tr.querySelector(".btn-edit-func").onclick  = () => abrirModalFuncionario(f);
         tr.querySelector(".btn-toggle-func").onclick= () => toggleAtivoFuncionario(f.id, f.nome, ativo);
         tbody.appendChild(tr);
+    });
+    filtrarFuncionarios();
+}
+
+// Pesquisa + botões de estado (Só ativos, Inativos, Temporários, Sem QR, Todos)
+function filtrarFuncionarios() {
+    const txt    = (document.getElementById("pesquisaFuncionarios")?.value || "").toLowerCase();
+    const estado = document.querySelector("#chipsEstadoFunc .chip-estado.ativo")?.dataset.estado || "";
+    document.querySelectorAll("#tabelaFuncionarios tbody tr").forEach(tr => {
+        if (!("ativo" in tr.dataset)) return;   // linha "Sem funcionários"
+        const d = tr.dataset;
+        const passaEstado = estado === "ativos"      ? !!d.ativo
+                          : estado === "inativos"    ? !d.ativo
+                          : estado === "temporarios" ? !!d.temp && !!d.ativo
+                          : estado === "semqr"       ? !!d.semqr && !!d.ativo
+                          : true;
+        tr.style.display = passaEstado && tr.innerText.toLowerCase().includes(txt) ? "" : "none";
     });
 }
 
@@ -5982,10 +6002,10 @@ function ligarEventosGlobais() {
     });
 
     // Pesquisa funcionários
-    document.getElementById("pesquisaFuncionarios")?.addEventListener("input", function () {
-        const f = this.value.toLowerCase();
-        document.querySelectorAll("#tabelaFuncionarios tbody tr")
-            .forEach(tr => { tr.style.display = tr.innerText.toLowerCase().includes(f) ? "" : "none"; });
+    document.getElementById("pesquisaFuncionarios")?.addEventListener("input", filtrarFuncionarios);
+    document.querySelectorAll("#chipsEstadoFunc .chip-estado").forEach(b => b.onclick = () => {
+        document.querySelectorAll("#chipsEstadoFunc .chip-estado").forEach(c => c.classList.toggle("ativo", c === b));
+        filtrarFuncionarios();
     });
 
     // Obras — filtro e eventos

@@ -7,7 +7,7 @@
 
 <title>Painel Administrativo — Maia Solutions</title>
 
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=11">
 <link rel="stylesheet" href="telemovel.css?v=6">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
@@ -966,6 +966,15 @@
         <button id="btnNovoFuncionario" class="btn-primary">+ Funcionário</button>
     </div>
 
+    <!-- Filtro por estado -->
+    <div class="chips-estado" id="chipsEstadoFunc">
+        <button type="button" class="chip-estado ativo" data-estado="ativos">Só ativos</button>
+        <button type="button" class="chip-estado" data-estado="inativos">Inativos</button>
+        <button type="button" class="chip-estado" data-estado="temporarios">Temporários</button>
+        <button type="button" class="chip-estado" data-estado="semqr">⚠ Sem QR</button>
+        <button type="button" class="chip-estado" data-estado="">Todos</button>
+    </div>
+
     <!-- KPIs em cards -->
     <div class="grid-cards">
         <div class="card metric">
@@ -989,6 +998,7 @@
                 <tr>
                     <th>Nome</th>
                     <th>Código</th>
+                    <th>Categoria</th>
                     <th>Valor/dia</th>
                     <th>Estado</th>
                     <th>Dispositivo</th>
@@ -1784,7 +1794,7 @@
 <script src="fotos.js"></script>
 <script src="planeamento.js?v=2"></script>
 <script src="cotacoes.js"></script>
-<script src="admin.js?v=6"></script>
+<script src="admin.js?v=7"></script>
 <script src="telemovel.js?v=5"></script>
 
 
