@@ -3021,22 +3021,22 @@ async function mostrarLinhasFatura(d) {
     tbody.innerHTML = _linhasFaturaLidas.map((l, i) => `
         <tr data-i="${i}">
             <td style="padding:3px 6px"><input value="${esc(l.descricao || "")}" data-campo="descricao"
-                style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;background:#fff;color:var(--text-dark)"></td>
+                style="width:100%;padding:4px 6px;border-radius:5px;font-size:12px"></td>
             <td style="padding:3px 6px">
                 <select data-campo="artigo" onchange="aoEscolherArtigoLinha(this)"
-                    style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;background:#fff;color:var(--text-dark)">
+                    style="width:100%;padding:4px 6px;border-radius:5px;font-size:12px">
                     ${opcoesArtigos(l.artigo_id)}
                 </select>
                 <div class="linha-preco-ant" style="font-size:10px;margin-top:2px;line-height:1.3"></div>
             </td>
             <td style="padding:3px 6px"><input type="number" step="0.001" value="${l.quantidade ?? ""}" data-campo="quantidade"
-                style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;text-align:right;background:#fff;color:var(--text-dark)"></td>
+                style="width:100%;padding:4px 6px;border-radius:5px;font-size:12px;text-align:right"></td>
             <td style="padding:3px 6px"><input value="${esc(l.unidade || "")}" data-campo="unidade"
-                style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;background:#fff;color:var(--text-dark)"></td>
+                style="width:100%;padding:4px 6px;border-radius:5px;font-size:12px"></td>
             <td style="padding:3px 6px"><input type="number" step="0.01" value="${l.preco_unitario ?? ""}" data-campo="preco_unitario"
-                style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;text-align:right;background:#fff;color:var(--text-dark)"></td>
+                style="width:100%;padding:4px 6px;border-radius:5px;font-size:12px;text-align:right"></td>
             <td style="padding:3px 6px"><input type="number" step="0.01" value="${l.valor_total ?? ""}" data-campo="valor_total"
-                style="width:100%;padding:4px 6px;border:1px solid rgba(0,0,0,.12);border-radius:5px;font-size:12px;text-align:right;background:#fff;color:var(--text-dark)"></td>
+                style="width:100%;padding:4px 6px;border-radius:5px;font-size:12px;text-align:right"></td>
             <td style="padding:3px 6px;text-align:center">
                 <input type="checkbox" data-campo="stock" ${l.stock ? "checked" : ""}
                     title="Dar entrada desta quantidade no inventário"
@@ -7513,11 +7513,11 @@ function adicionarLinhaBibMat(mat = null) {
     if (mat?.id) div.dataset.id = mat.id;
     div.innerHTML = `
         <input value="${esc(mat?.descricao||'')}" placeholder="Nome do material" data-field="descricao"
-            style="padding:6px 8px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:12px;outline:none">
+            style="padding:6px 8px;border-radius:6px;font-size:12px;outline:none">
         <input value="${mat?.quantidade||''}" type="number" step="0.001" min="0" placeholder="Qtd" data-field="quantidade"
-            style="padding:6px 8px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:12px;text-align:right;outline:none">
+            style="padding:6px 8px;border-radius:6px;font-size:12px;text-align:right;outline:none">
         <select data-field="unidade"
-            style="padding:6px 4px;background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:6px;color:var(--text-dark);font-size:12px">
+            style="padding:6px 4px;border-radius:6px;font-size:12px">
             ${["kg","L","m²","ml","m³","un","saco","rolo","cx"].map(u=>`<option ${u===(mat?.unidade||'un')?'selected':''}>${u}</option>`).join("")}
         </select>
         <button onclick="this.closest('.bib-mat-linha').remove()" style="background:rgba(165,72,61,.1);border:none;border-radius:6px;padding:5px;cursor:pointer;font-size:14px;opacity:.7">×</button>`;
