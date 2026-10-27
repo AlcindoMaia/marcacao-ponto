@@ -180,7 +180,7 @@ function planTempoHtml(dia, local) {
     if (!dia) return "";
     const [icone, texto] = tempoIcone(dia.tipo);
     const dica = `${texto} em ${local} · chuva ${dia.prob}% · ${Math.round(dia.tMin)}–${Math.round(dia.tMax)} °C (IPMA)`;
-    return `<span class="plan-tempo" title="${escapeHtmlPlan(dica)}">${icone} ${Math.round(dia.tMax)}° · 💧${dia.prob}%</span>`;
+    return `<span class="plan-tempo" title="${esc(dica)}">${icone} ${Math.round(dia.tMax)}° · 💧${dia.prob}%</span>`;
 }
 
 // Reuniões do Google Calendar (função calendario-google). Se falhar, o quadro
@@ -218,7 +218,7 @@ function desenharGrelha() {
         const base = _planTempo.base;
         html += `<th class="${ds === hoje ? "plan-hoje" : ""}">
                     ${PLAN_DIAS[i]}<span>${d.getDate()}/${d.getMonth() + 1}</span>
-                    ${feriado ? `<span class="plan-feriado">🎉 ${escapeHtmlPlan(feriado)}</span>` : ""}
+                    ${feriado ? `<span class="plan-feriado">🎉 ${esc(feriado)}</span>` : ""}
                     ${base ? planTempoHtml(base.dias[ds], base.local) : ""}
                  </th>`;
     });
@@ -270,19 +270,19 @@ function colunaHtml(dataStr, tarefas, reunioes = []) {
         const tempo = _planTempo["t:" + t.id] || _planTempo.base;
         const prev  = tempo?.dias[dataStr];
         const chuva = prev && prev.prob >= 60 && t.estado !== "concluida" && t.estado !== "cancelada"
-            ? `<span class="plan-chuva" title="${escapeHtmlPlan(`Chuva ${prev.prob}% em ${tempo.local} (IPMA)`)}">🌧️ ${prev.prob}%</span> ` : "";
+            ? `<span class="plan-chuva" title="${esc(`Chuva ${prev.prob}% em ${tempo.local} (IPMA)`)}">🌧️ ${prev.prob}%</span> ` : "";
         // Responsável primeiro, depois os restantes por nome
         const atrib = [...(t.tarefa_funcionarios || [])].sort((a, b) =>
             (b.responsavel - a.responsavel) || planNomeFunc(a.funcionario_id).localeCompare(planNomeFunc(b.funcionario_id)));
         const iniciais = atrib.map(tf => {
             const nome = planNomeFunc(tf.funcionario_id);
             return `<span class="plan-avatar ${tf.responsavel ? "plan-avatar-resp" : ""}"
-                          title="${escapeHtmlPlan(nome)}${tf.responsavel ? " (responsável)" : ""}">${escapeHtmlPlan(planIniciais(nome))}</span>`;
+                          title="${esc(nome)}${tf.responsavel ? " (responsável)" : ""}">${esc(planIniciais(nome))}</span>`;
         }).join("");
         return `<div class="plan-cartao plan-estado-${t.estado}"
                      draggable="${PLAN_SO_TOQUE.matches ? "false" : "true"}" data-id="${t.id}">
-                    <strong>${escapeHtmlPlan(t.descricao)}</strong>
-                    <span>${escapeHtmlPlan(obra)}</span>
+                    <strong>${esc(t.descricao)}</strong>
+                    <span>${esc(obra)}</span>
                     <div class="plan-cartao-rodape">
                         <span>${chuva}${hora}${Number(t.duracao_horas)}h${real}</span>
                         <div class="plan-avatares">${iniciais}</div>
@@ -295,16 +295,16 @@ function colunaHtml(dataStr, tarefas, reunioes = []) {
         const hora = r.dia_inteiro ? "Dia inteiro"
             : r.hora_inicio + (r.hora_fim ? "–" + r.hora_fim : "");
         const dica = [r.titulo, hora, r.local, r.notas].filter(Boolean).join("\n");
-        return `<div class="plan-reuniao" title="${escapeHtmlPlan(dica)}">
-                    <strong>📅 ${escapeHtmlPlan(r.titulo)}</strong>
-                    ${r.local ? `<span>${escapeHtmlPlan(r.local)}</span>` : ""}
-                    <span>${escapeHtmlPlan(hora)}</span>
+        return `<div class="plan-reuniao" title="${esc(dica)}">
+                    <strong>📅 ${esc(r.titulo)}</strong>
+                    ${r.local ? `<span>${esc(r.local)}</span>` : ""}
+                    <span>${esc(hora)}</span>
                 </div>`;
     }).join("");
 
     const classes = [excesso.length ? "plan-excesso" : "", feriadoEm(dataStr) ? "plan-dia-feriado" : ""].join(" ");
     return `<td class="plan-celula ${classes}" data-data="${dataStr}">
-                ${excesso.length ? `<div class="plan-aviso" title="Mais de 8h no dia">⚠ ${escapeHtmlPlan(excesso.join(", "))}</div>` : ""}
+                ${excesso.length ? `<div class="plan-aviso" title="Mais de 8h no dia">⚠ ${esc(excesso.join(", "))}</div>` : ""}
                 ${cartoesReuniao}
                 ${cartoes}
                 <button class="plan-add" title="Nova tarefa">+ Tarefa</button>
@@ -558,7 +558,7 @@ function abrirModalTarefa(id, dataPre = null) {
     const selObra = document.getElementById("planObra");
     // Obras concluídas ficam de fora, exceto a que a tarefa já tem
     selObra.innerHTML = `<option value="">— Sem obra —</option>` +
-        _planObras.filter(o => o.estado !== "concluida" || (t && t.obra_id === o.id)).map(o => `<option value="${o.id}">${escapeHtmlPlan(o.codigo ? o.codigo + " · " + o.nome : o.nome)}</option>`).join("");
+        _planObras.filter(o => o.estado !== "concluida" || (t && t.obra_id === o.id)).map(o => `<option value="${o.id}">${esc(o.codigo ? o.codigo + " · " + o.nome : o.nome)}</option>`).join("");
     selObra.value = t && t.obra_id ? t.obra_id : "";
 
     // Localização
@@ -579,7 +579,7 @@ function abrirModalTarefa(id, dataPre = null) {
         <div class="plan-func-linha">
             <label class="plan-check">
                 <input type="checkbox" value="${f.id}" ${atribuidos.includes(f.id) ? "checked" : ""}>
-                ${escapeHtmlPlan(f.nome)}${f.ativo === false ? " (inativo)" : ""}
+                ${esc(f.nome)}${f.ativo === false ? " (inativo)" : ""}
             </label>
             <label class="plan-check plan-resp-opcao" title="Responsável pela tarefa">
                 <input type="radio" name="planResp" value="${f.id}" ${respAtual === f.id ? "checked" : ""}
@@ -758,10 +758,3 @@ async function eliminarTarefa() {
     await carregarPlaneamento();
 }
 
-function escapeHtmlPlan(s) {
-    // Escapa também a plica: sem ela, um atributo delimitado por plicas
-    // fica aberto a quem souber disso.
-    return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
-        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-    }[c]));
-}

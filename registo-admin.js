@@ -1,11 +1,3 @@
-// Escape de HTML. Um nome com uma aspa ou um sinal de menor fechava o
-// atributo onde era interpolado.
-function escRA(s) {
-    return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
-        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-    }[c]));
-}
-
 // =======================================================
 // REGISTO DIÁRIO DO ENCARREGADO
 // =======================================================
@@ -175,10 +167,10 @@ function renderFuncionarios(existentes) {
         const isTemp = f.tipo_contrato === 'temporario';
         card.innerHTML = `
             <div class="func-card-header">
-                <div class="func-avatar ${isFalta ? 'avatar-falta' : isTemp ? 'avatar-temp' : ''}">${escRA(f.nome.charAt(0).toUpperCase())}</div>
+                <div class="func-avatar ${isFalta ? 'avatar-falta' : isTemp ? 'avatar-temp' : ''}">${esc(f.nome.charAt(0).toUpperCase())}</div>
                 <div class="func-info">
                     <div class="func-nome">
-                        ${escRA(f.nome)}
+                        ${esc(f.nome)}
                         ${isTemp ? '<span class="etq-temp">TEMP</span>' : ''}
                     </div>
                     <div class="func-resumo ${isFalta ? 'resumo-falta' : ''}">${isFalta ? '✕ Falta' : resumo}</div>
@@ -252,10 +244,10 @@ function reconstruirCartaoTemp(nome, regs, syntheticId) {
     const totalH = regs.reduce((s, r) => s + Number(r.horas || 0), 0);
     card.innerHTML = `
         <div class="func-card-header">
-            <div class="func-avatar avatar-temp">${escRA(nome.charAt(0).toUpperCase())}</div>
+            <div class="func-avatar avatar-temp">${esc(nome.charAt(0).toUpperCase())}</div>
             <div class="func-info">
                 <div class="func-nome">
-                    ${escRA(nome)}
+                    ${esc(nome)}
                     <span class="etq-temp">TEMP</span>
                 </div>
                 <div class="func-resumo">${totalH.toFixed(1)}h · ${regs.length} obra(s)</div>
@@ -314,9 +306,9 @@ function preencherListaTemps() {
         lista.innerHTML = '<div style="padding:8px 0;opacity:.5;font-size:13px">Sem temporários registados</div>';
     } else {
         lista.innerHTML = temps.map(f => `
-            <div class="temp-opcao" data-temp-id="${escRA(f.id)}" data-temp-nome="${escRA(f.nome)}" data-temp-valor="${Number(f.valor_dia)||0}">
-                <div class="func-avatar avatar-temp" style="width:32px;height:32px;font-size:13px">${escRA(f.nome.charAt(0).toUpperCase())}</div>
-                <span style="font-size:13px;font-weight:500">${escRA(f.nome)}</span>
+            <div class="temp-opcao" data-temp-id="${esc(f.id)}" data-temp-nome="${esc(f.nome)}" data-temp-valor="${Number(f.valor_dia)||0}">
+                <div class="func-avatar avatar-temp" style="width:32px;height:32px;font-size:13px">${esc(f.nome.charAt(0).toUpperCase())}</div>
+                <span style="font-size:13px;font-weight:500">${esc(f.nome)}</span>
                 <span style="margin-left:auto;font-size:11px;opacity:.5">${f.valor_dia ? f.valor_dia+'€/dia' : ''}</span>
             </div>`).join('');
         // Os dados vêm do dataset, não interpolados dentro do onclick.
@@ -347,16 +339,16 @@ function adicionarTempExistente(funcId, nome, valorDia) {
     card.dataset.tempNome = nome;
     card.innerHTML = `
         <div class="func-card-header">
-            <div class="func-avatar avatar-temp">${escRA(nome.charAt(0).toUpperCase())}</div>
+            <div class="func-avatar avatar-temp">${esc(nome.charAt(0).toUpperCase())}</div>
             <div class="func-info">
                 <div class="func-nome">
-                    ${escRA(nome)}
+                    ${esc(nome)}
                     <span class="etq-temp">TEMP</span>
                 </div>
                 <div class="func-resumo">Sem registo</div>
             </div>
             <div class="func-lado">
-                <button class="btn-falta" onclick="toggleFalta(event,'${escRA(funcId)}')" title="Marcar falta">✕ Falta</button>
+                <button class="btn-falta" onclick="toggleFalta(event,'${esc(funcId)}')" title="Marcar falta">✕ Falta</button>
                 <button class="btn-x" onclick="this.closest('.func-card').remove()" title="Tirar da lista">×</button>
                 <div class="func-toggle">▼</div>
             </div>
@@ -473,7 +465,7 @@ function adicionarLinha(container, funcId, registo = null, btnAdd = null) {
     // Select de obras
     const selectObra = document.createElement("select");
     selectObra.innerHTML = `<option value="">— Obra —</option>` +
-        _obras.map(o => `<option value="${escRA(o.id)}" ${registo?.obra_id === o.id ? "selected" : ""}>${escRA(o.nome)}</option>`).join("");
+        _obras.map(o => `<option value="${esc(o.id)}" ${registo?.obra_id === o.id ? "selected" : ""}>${esc(o.nome)}</option>`).join("");
 
     // Input de horas
     const inputHoras = document.createElement("input");
@@ -674,8 +666,8 @@ async function mostrarComparacao() {
 
         html += `
             <div class="comp-item ${divergencia}">
-                <div class="comp-nome">${escRA(nomeFunc)}</div>
-                <div class="comp-detalhe">${escRA(detalhes)}</div>
+                <div class="comp-nome">${esc(nomeFunc)}</div>
+                <div class="comp-detalhe">${esc(detalhes)}</div>
                 <span class="comp-badge ${badgeClass}">${badgeLabel}</span>
             </div>`;
     });
