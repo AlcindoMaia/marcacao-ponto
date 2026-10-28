@@ -308,6 +308,11 @@
                 <div class="card"><h3 style="color:#8fbfa0;margin-bottom:12px">📥 RECEITAS</h3><div id="dreDetalheReceitas"></div></div>
                 <div class="card"><h3 style="color:#e09486;margin-bottom:12px">📤 CUSTOS</h3><div id="dreDetalheCustos"></div></div>
             </div>
+            <div class="card" style="margin-top:16px">
+                <h3 style="margin-bottom:4px">🎯 ONDE VAI O DINHEIRO (CURVA ABC)</h3>
+                <div style="font-size:12px;opacity:.6;margin-bottom:10px">Fornecedores e mão de obra ordenados pelo custo sem IVA. Os da classe A levam 80% do dinheiro: é com esses que vale a pena negociar.</div>
+                <div id="dreAbc"><p style="opacity:.4;font-size:13px">Carrega em Calcular.</p></div>
+            </div>
         </div>
 
         <!-- SUB-TAB: FLUXO DE CAIXA (movimentos, antes era uma tab própria) -->
@@ -1506,6 +1511,10 @@
                     style="background:none;border:none;border-bottom:2px solid var(--primary);color:var(--primary);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title,sans-serif);letter-spacing:.5px;white-space:nowrap">
                     <span class="pt-ic">📊</span><span class="pt-txt">Resumo</span>
                 </button>
+                <button class="painel-tab" data-tab="andamento" onclick="abrirPainelTab('andamento')"
+                    style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title,sans-serif);letter-spacing:.5px;white-space:nowrap">
+                    <span class="pt-ic">🗓️</span><span class="pt-txt">Andamento</span>
+                </button>
                 <button class="painel-tab" data-tab="financeiro" onclick="abrirPainelTab('financeiro')"
                     style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title,sans-serif);letter-spacing:.5px;white-space:nowrap">
                     <span class="pt-ic">💰</span><span class="pt-txt">Financeiro</span>
@@ -1556,6 +1565,7 @@
             <!-- Conteúdo dos separadores -->
             <div style="padding:0 12px 16px">
                 <div id="painelTab-resumo"     class="painel-tab-content" style="display:block"></div>
+                <div id="painelTab-andamento"  class="painel-tab-content" style="display:none"></div>
                 <div id="painelTab-financeiro" class="painel-tab-content" style="display:none"></div>
                 <div id="painelTab-ponto"      class="painel-tab-content" style="display:none"></div>
                 <div id="painelTab-stock"      class="painel-tab-content" style="display:none"></div>
@@ -1808,7 +1818,8 @@
 <script src="fotos.js"></script>
 <script src="planeamento.js?v=3"></script>
 <script src="cotacoes.js"></script>
-<script src="admin.js?v=14"></script>
+<script src="andamento.js?v=1"></script>
+<script src="admin.js?v=15"></script>
 <script src="telemovel.js?v=5"></script>
 
 

@@ -10,10 +10,11 @@
 <link rel="icon" href="Logo.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500&family=Inter:wght@400;500;600&display=swap">
 <!--
-  Área do cliente (só consulta). O cliente abre cliente.html?t=<código>, o
-  link fixo que recebeu por WhatsApp. Esta página não lê a base de dados: pede
-  tudo à função area-cliente, que só devolve as obras do cliente e os
-  documentos marcados "Visível ao cliente".
+  Área do cliente. O cliente abre cliente.html?t=<código>, o link fixo que
+  recebeu por WhatsApp. Esta página não lê a base de dados: pede tudo à
+  função area-cliente, que só devolve as obras do cliente e os documentos
+  marcados "Visível ao cliente". A única coisa que o cliente pode enviar é a
+  resposta a um orçamento (aceito / pedir alterações), que o Alcindo confirma.
 -->
 <style>
     :root {
@@ -63,6 +64,41 @@
     .fotos a.falhou .sem-pre { display: flex; }
     .vazio { color: var(--suave); font-size: 14px; padding: 6px 0; }
     .centro { text-align: center; padding: 60px 16px; color: var(--suave); }
+    .fases { list-style: none; margin: 0; padding: 0; }
+    .fases li { display: flex; gap: 12px; padding: 8px 0; border-top: 1px solid var(--linha); align-items: flex-start; }
+    .fases li:first-child { border-top: none; }
+    .fases .ponto { width: 22px; height: 22px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; font-size: 12px; margin-top: 1px; border: 2px solid var(--linha); color: var(--suave); }
+    .fases .concluida .ponto { background: rgba(143,191,160,.18); border-color: var(--ok); color: var(--ok); }
+    .fases .a_decorrer .ponto { border-color: var(--caramelo); }
+    .fases .a_decorrer .ponto::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--caramelo); }
+    .fases .nm { font-weight: 600; }
+    .fases .por_fazer .nm { color: var(--suave); font-weight: 500; }
+    .fases .dt { font-size: 12px; color: var(--suave); }
+    details.auto { border-top: 1px solid var(--linha); padding: 10px 0; }
+    details.auto:first-of-type { border-top: none; }
+    details.auto summary { cursor: pointer; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; list-style: none; }
+    details.auto summary::-webkit-details-marker { display: none; }
+    details.auto summary .nm { font-weight: 600; }
+    details.auto summary .nm::before { content: "▸ "; color: var(--primary); }
+    details.auto[open] summary .nm::before { content: "▾ "; }
+    details.auto table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+    details.auto td { padding: 5px 0; border-top: 1px solid var(--linha); vertical-align: top; }
+    details.auto td.n { text-align: right; white-space: nowrap; padding-left: 10px; }
+    details.auto tr.tot td { font-weight: 600; }
+    details.auto .notas { font-size: 13px; color: var(--suave); margin-top: 8px; white-space: pre-wrap; }
+    .diario .dia { padding: 8px 0; border-top: 1px solid var(--linha); font-size: 14px; }
+    .diario .dia:first-child { border-top: none; }
+    .diario .dt { font-size: 12px; color: var(--suave); text-transform: capitalize; }
+    .diario .tx { white-space: pre-wrap; }
+    .resp { padding: 0 0 12px 40px; }
+    .resp .botoes { display: flex; gap: 8px; flex-wrap: wrap; }
+    .resp button { font: inherit; font-size: 14px; font-weight: 600; border-radius: 10px; padding: 9px 14px; cursor: pointer; border: 1px solid var(--caramelo); background: transparent; color: var(--primary); }
+    .resp button.principal { background: var(--caramelo); color: #131c25; }
+    .resp button:disabled { opacity: .5; cursor: default; }
+    .resp .caixa { background: rgba(255,255,255,.04); border: 1px solid var(--linha); border-radius: 12px; padding: 12px; }
+    .resp .caixa p { margin: 0 0 10px; font-size: 14px; }
+    .resp textarea { width: 100%; min-height: 90px; font: inherit; font-size: 14px; color: var(--texto); background: var(--bg); border: 1px solid var(--linha); border-radius: 10px; padding: 10px; margin-bottom: 10px; resize: vertical; }
+    .resp .erro { color: #e59a8f; font-size: 13px; margin-top: 8px; }
     .rodape { text-align: center; color: var(--suave); font-size: 12px; margin-top: 30px; }
 </style>
 </head>
@@ -75,6 +111,7 @@
 
 <script>
 const FUNCAO = "https://npyosbigynxmxdakcymg.supabase.co/functions/v1/area-cliente";
+const TOKEN  = new URLSearchParams(location.search).get("t") || "";
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g,
     c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -94,17 +131,123 @@ function linhaDoc(d, icone, extra = "") {
     </a>`;
 }
 
+function estadoOrcamento(d) {
+    const est = d.estado_orcamento === "aceite" ? `<span class="estado ok">Aceite</span>`
+        : d.resposta_pendente ? `<span class="estado pend">${d.resposta_pendente.resposta === "aceite"
+            ? "Aceitou · a aguardar confirmação" : "Pediu alterações · a aguardar"}</span>`
+        : d.estado_orcamento === "enviado" ? `<span class="estado pend">A aguardar a sua resposta</span>` : "";
+    return [d.total != null ? euros(d.total) + " com IVA" : "", est].filter(Boolean).join(" · ");
+}
+
+// Botões por baixo de um orçamento à espera de resposta
+function respostaOrcamento(d) {
+    if (d.estado_orcamento !== "enviado" || d.resposta_pendente) return "";
+    return `<div class="resp" data-doc="${esc(d.id)}" data-numero="${esc(d.numero || d.nome)}" data-total="${esc(d.total != null ? euros(d.total) : "")}">${BOTOES_RESPOSTA}</div>`;
+}
+const BOTOES_RESPOSTA = `<div class="botoes">
+    <button type="button" class="principal" data-passo="aceitar">Aceito este orçamento</button>
+    <button type="button" data-passo="alterar">Pedir alterações</button>
+</div>`;
+
+function caixaResposta(el, passo) {
+    const num = esc(el.dataset.numero), total = esc(el.dataset.total);
+    if (passo === "aceitar") {
+        el.innerHTML = `<div class="caixa">
+            <p>Confirma que aceita o orçamento <b>${num}</b>${total ? `, no valor de <b>${total}</b> com IVA` : ""}?
+            A Maia Solutions entra em contacto consigo para confirmar e combinar os passos seguintes.</p>
+            <div class="botoes">
+                <button type="button" class="principal" data-passo="enviar-aceite">Sim, aceito</button>
+                <button type="button" data-passo="voltar">Cancelar</button>
+            </div></div>`;
+    } else if (passo === "alterar") {
+        el.innerHTML = `<div class="caixa">
+            <p>O que gostaria de alterar no orçamento <b>${num}</b>?</p>
+            <textarea maxlength="2000" placeholder="Ex.: retirar a pintura exterior, mudar o pavimento da cozinha…"></textarea>
+            <div class="botoes">
+                <button type="button" class="principal" data-passo="enviar-alteracoes">Enviar pedido</button>
+                <button type="button" data-passo="voltar">Cancelar</button>
+            </div></div>`;
+        el.querySelector("textarea").focus();
+    }
+}
+
+async function enviarResposta(el, tipo) {
+    const comentario = tipo === "alteracoes" ? el.querySelector("textarea").value.trim() : "";
+    const avisar = msg => {
+        el.querySelector(".erro")?.remove();
+        el.querySelector(".caixa").insertAdjacentHTML("beforeend", `<div class="erro">${esc(msg)}</div>`);
+    };
+    if (tipo === "alteracoes" && !comentario) return avisar("Escreva o que gostaria de alterar.");
+    el.querySelectorAll("button").forEach(b => b.disabled = true);
+    try {
+        const r = await fetch(FUNCAO, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: TOKEN, acao: "responder_orcamento", documento_id: el.dataset.doc, resposta: tipo, comentario }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.erro || "Erro " + r.status);
+        await iniciar();
+    } catch (e) {
+        el.querySelectorAll("button").forEach(b => b.disabled = false);
+        avisar(e.message);
+    }
+}
+
+document.addEventListener("click", e => {
+    const b = e.target.closest(".resp button");
+    if (!b) return;
+    const el = b.closest(".resp"), passo = b.dataset.passo;
+    if (passo === "enviar-aceite") enviarResposta(el, "aceite");
+    else if (passo === "enviar-alteracoes") enviarResposta(el, "alteracoes");
+    else if (passo === "voltar") el.innerHTML = BOTOES_RESPOSTA;
+    else caixaResposta(el, passo);
+});
+
+function htmlFases(fases) {
+    if (!fases.length) return "";
+    const icone = { concluida: "✓", a_decorrer: "", por_fazer: "" };
+    const quando = f => f.estado === "concluida"
+        ? (f.data_fim ? "Concluída · " + dataPT(f.data_fim) : "Concluída")
+        : [f.data_inicio ? (f.estado === "a_decorrer" ? "Começou a " : "Início previsto: ") + dataPT(f.data_inicio) : "",
+           f.data_fim ? "Fim previsto: " + dataPT(f.data_fim) : ""].filter(Boolean).join(" · ");
+    return `<h2>Andamento</h2><ul class="fases">${fases.map(f => `<li class="${esc(f.estado)}">
+        <span class="ponto">${icone[f.estado] || ""}</span>
+        <span><span class="nm">${esc(f.nome)}</span>${quando(f) ? `<br><span class="dt">${esc(quando(f))}</span>` : ""}</span>
+    </li>`).join("")}</ul>`;
+}
+
+function htmlAutos(autos) {
+    if (!autos.length) return "";
+    return `<h2>Autos de medição</h2>${autos.slice().reverse().map(a => `<details class="auto">
+        <summary><span class="nm">Auto nº ${esc(a.numero)} · ${esc(dataPT(a.data))}</span><span>${euros(a.total)} com IVA</span></summary>
+        <table>
+            ${a.linhas.map(l => `<tr><td>${esc(l.servico)}</td><td class="n">${esc(l.percentagem)}% feito</td><td class="n">${euros(l.valor)}</td></tr>`).join("")}
+            <tr><td colspan="2" class="n">Total sem IVA</td><td class="n">${euros(a.total_sem_iva)}</td></tr>
+            <tr><td colspan="2" class="n">IVA ${esc(a.taxa_iva)}%</td><td class="n">${euros(a.iva)}</td></tr>
+            <tr class="tot"><td colspan="2" class="n">Total</td><td class="n">${euros(a.total)}</td></tr>
+        </table>
+        ${a.notas ? `<div class="notas">${esc(a.notas)}</div>` : ""}
+    </details>`).join("")}`;
+}
+
+function htmlDiario(notas) {
+    if (!notas.length) return "";
+    const dia = d => new Date(d + "T12:00:00").toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
+    return `<h2>Diário da obra</h2><div class="diario">${notas.map(n => `<div class="dia">
+        <div class="dt">${esc(dia(n.data))}</div><div class="tx">${esc(n.notas)}</div></div>`).join("")}</div>`;
+}
+
 function seccao(titulo, itens, vazio) {
     return `<h2>${titulo}</h2>${itens.length ? itens.join("") : `<div class="vazio">${vazio}</div>`}`;
 }
 
-function htmlObra(o, docs) {
+function htmlObra(o, docs, fases, autos, diario) {
     const pct = Math.max(0, Math.min(100, Number(o.percentagem_conclusao) || 0));
     const feita = o.estado === "concluida";
     const de = t => docs.filter(d => d.tipo === t);
 
-    const orcs = de("orcamento").map(d => linhaDoc(d, "🧾",
-        d.estado_orcamento === "aceite" ? `<span class="estado ok">Aceite</span>` : ""));
+    const orcs = de("orcamento").map(d => linhaDoc(d, "🧾", estadoOrcamento(d)) + respostaOrcamento(d));
     const fats = [...de("fatura"), ...de("recibo")]
         .sort((a, b) => String(b.data).localeCompare(String(a.data)))
         .map(d => d.tipo === "recibo"
@@ -130,7 +273,10 @@ function htmlObra(o, docs) {
             <span>${pct}% concluída</span>
             ${o.data_conclusao_prevista && !feita ? `<span>Conclusão prevista: ${esc(dataPT(o.data_conclusao_prevista))}</span>` : ""}
         </div>
+        ${htmlFases(fases)}
+        ${htmlDiario(diario)}
         ${seccao("Orçamentos", orcs, "Ainda não há orçamentos.")}
+        ${htmlAutos(autos)}
         ${seccao("Faturas e recibos", fats, "Ainda não há faturas.")}
         ${fotos.length ? `<h2>Fotografias</h2><div class="fotos">${fotos.join("")}</div>` : ""}
         ${outros.length ? seccao("Outros documentos", outros, "") : ""}
@@ -139,8 +285,7 @@ function htmlObra(o, docs) {
 
 async function iniciar() {
     const el = document.getElementById("conteudo");
-    const token = new URLSearchParams(location.search).get("t") || "";
-    if (!token) {
+    if (!TOKEN) {
         el.innerHTML = `<div class="centro">Este link não está completo.<br>Abra o link que recebeu da Maia Solutions.</div>`;
         return;
     }
@@ -148,7 +293,7 @@ async function iniciar() {
         const r = await fetch(FUNCAO, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token }),
+            body: JSON.stringify({ token: TOKEN }),
         });
         const j = await r.json();
         if (!r.ok) throw new Error(j.erro || "Erro " + r.status);
@@ -159,7 +304,9 @@ async function iniciar() {
             <h1>Olá${primeiro ? ", " + esc(primeiro) : ""}</h1>
             <p class="sub">Aqui pode acompanhar ${obras.length === 1 ? "a sua obra" : "as suas obras"} e consultar os documentos.</p>
             ${obras.length
-                ? obras.map(o => htmlObra(o, docs.filter(d => d.obra_id === o.id))).join("")
+                ? obras.map(o => htmlObra(o, docs.filter(d => d.obra_id === o.id),
+                    (j.fases || []).filter(f => f.obra_id === o.id), (j.autos || []).filter(a => a.obra_id === o.id),
+                    (j.diario || []).filter(n => n.obra_id === o.id))).join("")
                 : `<div class="centro">Ainda não há obras associadas.</div>`}
             <div class="rodape">Os links dos documentos valem 1 hora. Se algum não abrir, atualize a página.<br>Maia Solutions</div>`;
     } catch (e) {
