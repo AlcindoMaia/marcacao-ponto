@@ -2051,12 +2051,13 @@ async function carregarServicosModal() {
         lista.innerHTML = `<div style="opacity:.4;font-size:13px;text-align:center;padding:16px">Sem serviços. Adicione o primeiro acima.</div>`;
         return;
     }
+    _servicosModal = Object.fromEntries(data.map(s => [s.id, s]));
     lista.innerHTML = data.map(s => {
         const mR  = matP[s.id]||0;
         const vS  = Number(s.valor_orcamento||0);
         const pct = vS > 0 && mR > 0 ? Math.min(Math.round(mR/vS*100),100) : null;
         const barCol = s.concluido ? "#8fbfa0" : pct>=75 ? "#fb923c" : "var(--primary,#b58863)";
-        return `<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;border:1px solid ${s.concluido?"rgba(143,191,160,.2)":"rgba(255,255,255,.06)"}">
+        return `<div id="servRow-${s.id}" style="background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;border:1px solid ${s.concluido?"rgba(143,191,160,.2)":"rgba(255,255,255,.06)"}">
             <div style="flex:1;min-width:0">
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
                     <span style="font-size:13px;font-weight:600">${esc(s.nome)}</span>
@@ -2070,6 +2071,7 @@ async function carregarServicosModal() {
                 ${pct!==null?`<div style="margin-top:6px;background:rgba(255,255,255,.1);border-radius:3px;height:3px"><div style="width:${pct}%;height:100%;background:${barCol};border-radius:3px"></div></div>`:""}
             </div>
             <div style="display:flex;gap:4px;flex-shrink:0">
+                <button onclick="editarServico('${s.id}')" style="background:rgba(255,255,255,.07);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px" title="Editar nome e valor">✏️</button>
                 <button onclick="toggleServicoConcluido('${s.id}',${s.concluido})" style="background:${s.concluido?"rgba(143,191,160,.15)":"rgba(255,255,255,.07)"};border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px" title="${s.concluido?"Reabrir":"Concluir"}">${s.concluido?"↩":"✓"}</button>
                 <button data-servico-id="${esc(s.id)}" data-servico-nome="${esc(s.nome)}" class="btn-elim-servico" style="background:rgba(224,148,134,.1);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;opacity:.6">🗑</button>
             </div>
@@ -2096,6 +2098,35 @@ async function adicionarServico() {
     document.getElementById("novoServHoras").value = "";
     document.getElementById("novoServValor").value = "";
     document.getElementById("novoServExtra").checked = false;
+    await carregarServicosModal();
+}
+
+// Editar nome, valor e "extra" de um serviço, ali mesmo na lista
+let _servicosModal = {};
+function editarServico(id) {
+    const s = _servicosModal[id], row = document.getElementById("servRow-" + id);
+    if (!s || !row) return;
+    row.innerHTML = `<div style="flex:1;display:grid;grid-template-columns:1fr 120px;gap:8px;align-items:end">
+            <label style="font-size:11px;opacity:.7">Serviço<input id="servEdNome-${id}" value="${esc(s.nome)}"></label>
+            <label style="font-size:11px;opacity:.7">Valor sem IVA (€)<input id="servEdValor-${id}" type="number" step="0.01" min="0" value="${s.valor_orcamento ?? ""}"></label>
+            <label style="font-size:12px;display:flex;gap:6px;align-items:center"><input id="servEdExtra-${id}" type="checkbox" style="width:auto"${s.extra ? " checked" : ""}> Extra</label>
+            <div style="display:flex;gap:6px;justify-content:flex-end">
+                <button class="btn-primary" style="padding:5px 12px;font-size:12px" onclick="gravarServico('${id}')">Gravar</button>
+                <button class="btn-secondary" style="padding:5px 12px;font-size:12px" onclick="carregarServicosModal()">Cancelar</button>
+            </div>
+        </div>`;
+    document.getElementById("servEdValor-" + id).focus();
+}
+
+async function gravarServico(id) {
+    const nome = document.getElementById("servEdNome-" + id).value.trim();
+    if (!nome) { alert("Nome do serviço obrigatório."); return; }
+    const v = document.getElementById("servEdValor-" + id).value;
+    const valor = v === "" ? null : Math.round(parseFloat(v) * 100) / 100;
+    if (valor !== null && !(valor >= 0)) { alert("Valor inválido."); return; }
+    const extra = document.getElementById("servEdExtra-" + id).checked;
+    const { error } = await SB.from("obra_servicos").update({ nome, valor_orcamento: valor, extra }).eq("id", id);
+    if (error) { console.error(error); alert("Não foi possível gravar o serviço: " + error.message); return; }
     await carregarServicosModal();
 }
 
