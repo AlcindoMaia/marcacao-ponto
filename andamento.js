@@ -112,8 +112,19 @@ function desenharAndamento() {
 function htmlFases() {
     const titulo = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
         <div style="font-family:var(--font-title,sans-serif);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;opacity:.6">Fases da obra</div>
-        ${_andamento.fases.length ? `<button class="btn-secondary" style="padding:4px 12px;font-size:12px" onclick="novaFase()">+ Fase</button>` : ""}
-    </div>`;
+        ${_andamento.fases.length ? `<div style="display:flex;gap:6px">
+            <button class="btn-secondary" style="padding:4px 12px;font-size:12px" onclick="mostrarTrocaFases()" title="Substituir pelas fases de outro tipo de obra">Trocar fases</button>
+            <button class="btn-secondary" style="padding:4px 12px;font-size:12px" onclick="novaFase()">+ Fase</button>
+        </div>` : ""}
+    </div>
+    ${_andamento.fases.length ? `<div id="trocaFases" style="display:none;margin-bottom:10px;padding:10px;border-radius:8px;background:rgba(255,255,255,.04)">
+        <div style="font-size:12px;opacity:.75;margin-bottom:8px">Substituir as fases desta obra pelas de:</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${Object.entries(FASES_TIPO).map(([k, t]) =>
+                `<button class="btn-secondary" style="font-size:12px" onclick="trocarFasesTipo('${k}')">${esc(t.nome)}</button>`).join("")}
+            <button class="btn-secondary" style="font-size:12px;opacity:.7" onclick="desenharAndamento()">Cancelar</button>
+        </div>
+    </div>` : ""}`;
 
     if (!_andamento.fases.length) {
         return titulo + `<div style="font-size:13px;opacity:.7;margin-bottom:10px">Esta obra ainda não tem fases. Começa com as fases habituais e depois ajusta:</div>
@@ -155,6 +166,25 @@ async function criarFasesTipo(tipo) {
     if (error) return msgAndamento("Não foi possível criar as fases: " + error.message, "err");
     await carregarPainelAndamento();
     msgAndamento(`${t.fases.length} fases criadas. Apaga as que não se aplicam e põe as datas.`);
+}
+
+function mostrarTrocaFases() {
+    const el = document.getElementById("trocaFases");
+    if (el) el.style.display = el.style.display === "none" ? "block" : "none";
+}
+
+// Escolheu o tipo de obra errado: apaga as fases e cria as do tipo certo
+async function trocarFasesTipo(tipo) {
+    const t = FASES_TIPO[tipo];
+    if (!t) return;
+    const n = _andamento.fases.length;
+    const mexidas = _andamento.fases.filter(f => f.estado !== "por_fazer" || f.data_inicio || f.data_fim).length;
+    if (!confirm(`Trocar as ${n} fases atuais pelas ${t.fases.length} de "${t.nome}"?` +
+        (mexidas ? `\n\n${mexidas} fase(s) já têm estado ou datas: perdem-se e tens de as marcar outra vez.` : ""))) return;
+    const { error: errDel } = await SB.from("obra_fases").delete().eq("obra_id", _painelObraActual.id);
+    if (errDel) return msgAndamento("Não foi possível apagar as fases atuais: " + errDel.message, "err");
+    _andamento.fases = [];
+    await criarFasesTipo(tipo);
 }
 
 function formFase(f) {
