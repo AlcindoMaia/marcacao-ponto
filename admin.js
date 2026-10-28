@@ -820,10 +820,18 @@ async function carregarRegistos() {
             <td>${incompleto
                 ? `<span class="estado-incompleto">Incompleto</span>`
                 : `<span class="estado-ok">OK</span>`
-            }</td>`;
+            }${r.a_rever ? ` <span class="estado-incompleto" title="Marcado na área do funcionário, sem o QR">A rever · ${r.distancia_m != null ? esc(r.distancia_m) + " m da obra" : "obra sem GPS"}</span>
+                <button class="btn-icone btn-confirmar-rever" title="Confirmar que estava na obra">✓</button>` : ""}</td>`;
 
         tr.querySelectorAll(".editavel").forEach(td => {
             td.addEventListener("blur", () => guardarEdicaoRegisto(tr, td));
+        });
+
+        // Marcações da área do funcionário fora do raio ou em obra sem GPS
+        tr.querySelector(".btn-confirmar-rever")?.addEventListener("click", async () => {
+            const { error } = await SB.from("ponto").update({ a_rever: false }).in("id", r.ids_a_rever || []);
+            if (error) { console.error(error); alert("Não foi possível confirmar."); return; }
+            carregarRegistos();
         });
 
         tbody.appendChild(tr);
