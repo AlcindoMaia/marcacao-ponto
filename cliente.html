@@ -104,7 +104,7 @@
        vídeo: o telhado abre a partir do topo, o MAIA sobe e o SOLUTIONS
        escreve-se. Só se vê se a espera passar de 0,3 s, para não piscar. */
     .carregar { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; opacity: 0; animation: surgir .3s ease .3s forwards; }
-    .carregar .logo { position: relative; width: min(300px, 76vw); aspect-ratio: 728 / 336; }
+    .carregar .logo { position: relative; width: min(300px, 76vw); aspect-ratio: 760 / 345; }
     .carregar .logo img { position: absolute; inset: 0; width: 100%; height: 100%; }
     .carregar .telhado { clip-path: inset(0 50% 0 50%); animation: abrir .8s cubic-bezier(.2,.7,.2,1) .35s forwards, brilho 1.8s ease-in-out 1.4s infinite; }
     .carregar .maia { opacity: 0; animation: subir .5s ease-out .8s forwards; }
@@ -114,7 +114,7 @@
     @keyframes escrever { to { clip-path: inset(0 0 0 0); } }
     @keyframes surgir { to { opacity: 1; } }
     @keyframes subir { from { opacity: 0; transform: translateY(10%); } to { opacity: 1; transform: none; } }
-    @keyframes brilho { 50% { filter: drop-shadow(0 0 6px rgba(224,174,119,.75)); } }
+    @keyframes brilho { 50% { filter: drop-shadow(0 0 8px rgba(245,180,40,.6)); } }
     @media (prefers-reduced-motion: reduce) {
         .carregar, .carregar * { animation: none !important; opacity: 1 !important; clip-path: none !important; }
     }
@@ -128,9 +128,9 @@
 <main id="conteudo">
     <div class="carregar" role="status">
         <div class="logo" aria-hidden="true">
-            <img class="telhado" src="img/logo-telhado.png" alt="">
-            <img class="maia" src="img/logo-maia.png" alt="">
-            <img class="solutions" src="img/logo-solutions.png" alt="">
+            <img class="telhado" src="img/logo-telhado.webp" alt="">
+            <img class="maia" src="img/logo-maia.webp" alt="">
+            <img class="solutions" src="img/logo-solutions.webp" alt="">
         </div>
         <p>A carregar a sua obra…</p>
     </div>
