@@ -10,10 +10,11 @@
 <link rel="icon" href="Logo.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500&family=Inter:wght@400;500;600&display=swap">
 <!--
-  Área do cliente (só consulta). O cliente abre cliente.html?t=<código>, o
-  link fixo que recebeu por WhatsApp. Esta página não lê a base de dados: pede
-  tudo à função area-cliente, que só devolve as obras do cliente e os
-  documentos marcados "Visível ao cliente".
+  Área do cliente. O cliente abre cliente.html?t=<código>, o link fixo que
+  recebeu por WhatsApp. Esta página não lê a base de dados: pede tudo à
+  função area-cliente, que só devolve as obras do cliente e os documentos
+  marcados "Visível ao cliente". A única coisa que o cliente pode enviar é a
+  resposta a um orçamento (aceito / pedir alterações), que o Alcindo confirma.
 -->
 <style>
     :root {
@@ -63,6 +64,15 @@
     .fotos a.falhou .sem-pre { display: flex; }
     .vazio { color: var(--suave); font-size: 14px; padding: 6px 0; }
     .centro { text-align: center; padding: 60px 16px; color: var(--suave); }
+    .resp { padding: 0 0 12px 40px; }
+    .resp .botoes { display: flex; gap: 8px; flex-wrap: wrap; }
+    .resp button { font: inherit; font-size: 14px; font-weight: 600; border-radius: 10px; padding: 9px 14px; cursor: pointer; border: 1px solid var(--caramelo); background: transparent; color: var(--primary); }
+    .resp button.principal { background: var(--caramelo); color: #131c25; }
+    .resp button:disabled { opacity: .5; cursor: default; }
+    .resp .caixa { background: rgba(255,255,255,.04); border: 1px solid var(--linha); border-radius: 12px; padding: 12px; }
+    .resp .caixa p { margin: 0 0 10px; font-size: 14px; }
+    .resp textarea { width: 100%; min-height: 90px; font: inherit; font-size: 14px; color: var(--texto); background: var(--bg); border: 1px solid var(--linha); border-radius: 10px; padding: 10px; margin-bottom: 10px; resize: vertical; }
+    .resp .erro { color: #e59a8f; font-size: 13px; margin-top: 8px; }
     .rodape { text-align: center; color: var(--suave); font-size: 12px; margin-top: 30px; }
 </style>
 </head>
@@ -75,6 +85,7 @@
 
 <script>
 const FUNCAO = "https://npyosbigynxmxdakcymg.supabase.co/functions/v1/area-cliente";
+const TOKEN  = new URLSearchParams(location.search).get("t") || "";
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g,
     c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -94,6 +105,79 @@ function linhaDoc(d, icone, extra = "") {
     </a>`;
 }
 
+function estadoOrcamento(d) {
+    const est = d.estado_orcamento === "aceite" ? `<span class="estado ok">Aceite</span>`
+        : d.resposta_pendente ? `<span class="estado pend">${d.resposta_pendente.resposta === "aceite"
+            ? "Aceitou · a aguardar confirmação" : "Pediu alterações · a aguardar"}</span>`
+        : d.estado_orcamento === "enviado" ? `<span class="estado pend">A aguardar a sua resposta</span>` : "";
+    return [d.total != null ? euros(d.total) + " com IVA" : "", est].filter(Boolean).join(" · ");
+}
+
+// Botões por baixo de um orçamento à espera de resposta
+function respostaOrcamento(d) {
+    if (d.estado_orcamento !== "enviado" || d.resposta_pendente) return "";
+    return `<div class="resp" data-doc="${esc(d.id)}" data-numero="${esc(d.numero || d.nome)}" data-total="${esc(d.total != null ? euros(d.total) : "")}">${BOTOES_RESPOSTA}</div>`;
+}
+const BOTOES_RESPOSTA = `<div class="botoes">
+    <button type="button" class="principal" data-passo="aceitar">Aceito este orçamento</button>
+    <button type="button" data-passo="alterar">Pedir alterações</button>
+</div>`;
+
+function caixaResposta(el, passo) {
+    const num = esc(el.dataset.numero), total = esc(el.dataset.total);
+    if (passo === "aceitar") {
+        el.innerHTML = `<div class="caixa">
+            <p>Confirma que aceita o orçamento <b>${num}</b>${total ? `, no valor de <b>${total}</b> com IVA` : ""}?
+            A Maia Solutions entra em contacto consigo para confirmar e combinar os passos seguintes.</p>
+            <div class="botoes">
+                <button type="button" class="principal" data-passo="enviar-aceite">Sim, aceito</button>
+                <button type="button" data-passo="voltar">Cancelar</button>
+            </div></div>`;
+    } else if (passo === "alterar") {
+        el.innerHTML = `<div class="caixa">
+            <p>O que gostaria de alterar no orçamento <b>${num}</b>?</p>
+            <textarea maxlength="2000" placeholder="Ex.: retirar a pintura exterior, mudar o pavimento da cozinha…"></textarea>
+            <div class="botoes">
+                <button type="button" class="principal" data-passo="enviar-alteracoes">Enviar pedido</button>
+                <button type="button" data-passo="voltar">Cancelar</button>
+            </div></div>`;
+        el.querySelector("textarea").focus();
+    }
+}
+
+async function enviarResposta(el, tipo) {
+    const comentario = tipo === "alteracoes" ? el.querySelector("textarea").value.trim() : "";
+    const avisar = msg => {
+        el.querySelector(".erro")?.remove();
+        el.querySelector(".caixa").insertAdjacentHTML("beforeend", `<div class="erro">${esc(msg)}</div>`);
+    };
+    if (tipo === "alteracoes" && !comentario) return avisar("Escreva o que gostaria de alterar.");
+    el.querySelectorAll("button").forEach(b => b.disabled = true);
+    try {
+        const r = await fetch(FUNCAO, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: TOKEN, acao: "responder_orcamento", documento_id: el.dataset.doc, resposta: tipo, comentario }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.erro || "Erro " + r.status);
+        await iniciar();
+    } catch (e) {
+        el.querySelectorAll("button").forEach(b => b.disabled = false);
+        avisar(e.message);
+    }
+}
+
+document.addEventListener("click", e => {
+    const b = e.target.closest(".resp button");
+    if (!b) return;
+    const el = b.closest(".resp"), passo = b.dataset.passo;
+    if (passo === "enviar-aceite") enviarResposta(el, "aceite");
+    else if (passo === "enviar-alteracoes") enviarResposta(el, "alteracoes");
+    else if (passo === "voltar") el.innerHTML = BOTOES_RESPOSTA;
+    else caixaResposta(el, passo);
+});
+
 function seccao(titulo, itens, vazio) {
     return `<h2>${titulo}</h2>${itens.length ? itens.join("") : `<div class="vazio">${vazio}</div>`}`;
 }
@@ -103,8 +187,7 @@ function htmlObra(o, docs) {
     const feita = o.estado === "concluida";
     const de = t => docs.filter(d => d.tipo === t);
 
-    const orcs = de("orcamento").map(d => linhaDoc(d, "🧾",
-        d.estado_orcamento === "aceite" ? `<span class="estado ok">Aceite</span>` : ""));
+    const orcs = de("orcamento").map(d => linhaDoc(d, "🧾", estadoOrcamento(d)) + respostaOrcamento(d));
     const fats = [...de("fatura"), ...de("recibo")]
         .sort((a, b) => String(b.data).localeCompare(String(a.data)))
         .map(d => d.tipo === "recibo"
@@ -139,8 +222,7 @@ function htmlObra(o, docs) {
 
 async function iniciar() {
     const el = document.getElementById("conteudo");
-    const token = new URLSearchParams(location.search).get("t") || "";
-    if (!token) {
+    if (!TOKEN) {
         el.innerHTML = `<div class="centro">Este link não está completo.<br>Abra o link que recebeu da Maia Solutions.</div>`;
         return;
     }
@@ -148,7 +230,7 @@ async function iniciar() {
         const r = await fetch(FUNCAO, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token }),
+            body: JSON.stringify({ token: TOKEN }),
         });
         const j = await r.json();
         if (!r.ok) throw new Error(j.erro || "Erro " + r.status);

@@ -6145,6 +6145,7 @@ function ligarEventosGlobais() {
 // =======================================================
 
 let _orcamentos      = [];
+let _respostasOrc    = {};   // orcamento_id -> resposta do cliente por tratar
 let _orcObras        = [];
 let _orcEditId       = null;
 let _catCounter      = 0;
@@ -6182,6 +6183,10 @@ async function mudarEstadoOrcamento(o, novo) {
     const estado = o.estado === novo ? 'enviado' : novo;
     const { error } = await SB.from('orcamentos').update({ estado }).eq('id', o.id);
     if (error) { alert('Não foi possível mudar o estado: ' + error.message); return; }
+    // Uma resposta do cliente por tratar fica tratada com a decisão tomada aqui
+    const r = _respostasOrc[o.id];
+    if (r && estado !== 'enviado') await tratarRespostaCliente(r,
+        r.resposta === 'aceite' && estado === 'aceite' ? 'confirmada' : 'vista');
     if (estado === 'aceite') {
         const r = await criarServicosDoOrcamento(o.id);
         if (r.aviso) alert(r.aviso);
@@ -6193,9 +6198,9 @@ async function mudarEstadoOrcamento(o, novo) {
 
 // =======================================================
 // SERVIÇOS A PARTIR DO ORÇAMENTO ACEITE
-// Quando o Alcindo marca um orçamento como aceite (na lista ou ao carregar o
-// PDF do TOCONLINE), a obra ganha os serviços desse orçamento, com o valor
-// sem IVA. A aceitação feita pelo cliente na Área do cliente não passa aqui.
+// Quando o Alcindo marca um orçamento como aceite (na lista, ao carregar o
+// PDF do TOCONLINE ou ao confirmar a aceitação feita pelo cliente na Área do
+// cliente), a obra ganha os serviços desse orçamento, com o valor sem IVA.
 // - orçamento feito na app: um serviço por categoria;
 // - orçamento de PDF: um serviço com o total (o PDF só dá totais).
 // obra_servicos.orcamento_id guarda a origem: não se cria duas vezes e,
@@ -6256,6 +6261,53 @@ async function retirarServicosDoOrcamento(orcId) {
     if (usados.size) alert(`${usados.size} serviço(s) deste orçamento já têm faturas ou horas ligadas e ficaram na obra. Apaga-os à mão se já não fizerem sentido.`);
 }
 
+// =======================================================
+// RESPOSTAS DO CLIENTE (Área do cliente)
+// O cliente carrega em "Aceito" ou "Pedir alterações" num orçamento enviado.
+// Nada muda no orçamento até o Alcindo confirmar aqui; "Confirmar" faz o
+// mesmo que o ✓ (fica aceite e cria os serviços da obra).
+// =======================================================
+async function tratarRespostaCliente(r, decisao) {
+    const { error } = await SB.from('orcamento_respostas')
+        .update({ tratada_em: new Date().toISOString(), decisao }).eq('id', r.id);
+    if (error) alert('Não foi possível marcar a resposta do cliente como tratada: ' + error.message);
+    delete _respostasOrc[r.orcamento_id];
+}
+
+async function confirmarRespostaCliente(o) {
+    const r = _respostasOrc[o.id];
+    if (!r) return;
+    if (r.resposta === 'aceite') {
+        if (o.estado !== 'aceite') return mudarEstadoOrcamento(o, 'aceite');   // também trata a resposta
+        await tratarRespostaCliente(r, 'confirmada');
+    } else {
+        await tratarRespostaCliente(r, 'vista');
+    }
+    await carregarOrcamentos();
+    carregarNotificacoes();
+}
+
+async function ignorarRespostaCliente(o) {
+    const r = _respostasOrc[o.id];
+    if (!r || !confirm(`Ignorar a resposta do cliente ao orçamento ${o.numero || ''}? O orçamento fica como está e o cliente volta a poder responder.`)) return;
+    await tratarRespostaCliente(r, 'ignorada');
+    await carregarOrcamentos();
+    carregarNotificacoes();
+}
+
+function htmlRespostaCliente(r) {
+    const quando = new Date(r.created_at).toLocaleString('pt-PT', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+    const aceite = r.resposta === 'aceite';
+    return `<div class="resp-cliente" style="margin-top:6px;padding:6px 8px;border-radius:8px;background:rgba(181,136,99,.12);font-size:11px;line-height:1.4">
+        <div style="font-weight:600">${aceite ? '👤 Cliente aceitou' : '✏️ Cliente pede alterações'} · ${esc(quando)}</div>
+        ${r.comentario ? `<div style="opacity:.8;white-space:pre-wrap;margin-top:2px">${esc(r.comentario)}</div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:5px">
+            <button class="btn-resp-ok btn-primary" style="padding:3px 10px;font-size:11px">${aceite ? 'Confirmar aceite' : 'Visto'}</button>
+            ${aceite ? '<button class="btn-resp-nao btn-secondary" style="padding:3px 10px;font-size:11px">Ignorar</button>' : ''}
+        </div>
+    </div>`;
+}
+
 // Sub-separadores: orçamentos a clientes · comparar fornecedores (cotacoes.js)
 function switchOrcSub(sub) {
     document.querySelectorAll(".orc-subtab").forEach(b => b.classList.toggle("active", b.dataset.orcsub === sub));
@@ -6266,9 +6318,12 @@ function switchOrcSub(sub) {
 
 // ── Carregar lista ──────────────────────────────────────────
 async function carregarOrcamentos() {
-    const { data, error } = await SB.from('orcamentos')
-        .select('*, obras(nome)')
-        .order('created_at', { ascending: false });
+    const [{ data, error }, { data: resps }] = await Promise.all([
+        SB.from('orcamentos').select('*, obras(nome)').order('created_at', { ascending: false }),
+        SB.from('orcamento_respostas').select('id, orcamento_id, resposta, comentario, created_at').is('tratada_em', null),
+    ]);
+    _respostasOrc = {};
+    (resps || []).forEach(r => { _respostasOrc[r.orcamento_id] = r; });
 
     const tbody = document.querySelector('#tabelaOrcamentos tbody');
     if (!tbody) return;
@@ -6339,6 +6394,7 @@ function renderTabelaOrc(lista) {
                     <button class="btn-estado-rapido nao${o.estado === 'recusado' ? ' ativo' : ''}" title="${o.estado === 'recusado' ? 'Tirar não aceite' : 'Marcar como não aceite'}">✕</button>
                 </div>
                 ${vencido ? '<div style="font-size:10px;color:#a5483d;margin-top:3px">⚠ Vencido</div>' : ''}
+                ${_respostasOrc[o.id] ? htmlRespostaCliente(_respostasOrc[o.id]) : ''}
             </td>` +
             `<td style="font-size:12px;white-space:nowrap;width:90px;padding:10px 12px;${vencido ? 'color:#a5483d' : 'opacity:.5'}">${dataFmt(o.validade)}</td>` +
             `<td class="acoes-td" style="white-space:nowrap;width:120px;padding:8px 12px">
@@ -6355,6 +6411,9 @@ function renderTabelaOrc(lista) {
         tr.querySelector('.btn-x').onclick = e => { e.stopPropagation(); apagarOrcamento(o.id, o.numero); };
         tr.querySelector('.btn-estado-rapido.sim').onclick = e => { e.stopPropagation(); mudarEstadoOrcamento(o, 'aceite'); };
         tr.querySelector('.btn-estado-rapido.nao').onclick = e => { e.stopPropagation(); mudarEstadoOrcamento(o, 'recusado'); };
+        const bOk = tr.querySelector('.btn-resp-ok'), bNao = tr.querySelector('.btn-resp-nao');
+        if (bOk)  bOk.onclick  = e => { e.stopPropagation(); confirmarRespostaCliente(o); };
+        if (bNao) bNao.onclick = e => { e.stopPropagation(); ignorarRespostaCliente(o); };
         tr.ondblclick = () => abrirModalOrcamento(o.id);
         tbody.appendChild(tr);
     });
@@ -7207,7 +7266,7 @@ async function carregarDRE() {
 async function carregarNotificacoes() {
     const hoje = new Date().toISOString().split("T")[0];
 
-    const [atrasadosRes, stockRes] = await Promise.all([
+    const [atrasadosRes, stockRes, respostasRes] = await Promise.all([
         SB.from("movimentos_financeiros")
             .select("id, tipo, valor_total, data_documento, fornecedores(nome), obras(nome), observacoes")
             .eq("estado_pagamento", "por_pagar")
@@ -7217,11 +7276,16 @@ async function carregarNotificacoes() {
         SB.from("artigos")
             .select("id, descricao, stock_minimo, stock_inicial")
             .not("stock_minimo", "is", null)
-            .gt("stock_minimo", 0)
+            .gt("stock_minimo", 0),
+        SB.from("orcamento_respostas")
+            .select("id, resposta, created_at, orcamentos(numero, cliente_nome)")
+            .is("tratada_em", null)
+            .order("created_at"),
     ]);
 
     const atrasados = atrasadosRes.data || [];
     const artigos   = stockRes.data    || [];
+    const respostas = respostasRes.data || [];
 
     // Calcular stock actual para artigos com mínimo
     let stockAlertas = [];
@@ -7242,7 +7306,7 @@ async function carregarNotificacoes() {
         });
     }
 
-    const total = atrasados.length + stockAlertas.length;
+    const total = atrasados.length + stockAlertas.length + respostas.length;
     const badge = document.getElementById("notifBadge");
     const painel = document.getElementById("notifPainel");
     if (!badge || !painel) return;
@@ -7257,6 +7321,17 @@ async function carregarNotificacoes() {
     badge.textContent   = total > 9 ? "9+" : total;
 
     let html = "";
+
+    if (respostas.length > 0) {
+        html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:700;letter-spacing:.05em;opacity:.5;text-transform:uppercase">
+            🧾 ${respostas.length} Resposta(s) de clientes a orçamentos</div>`;
+        respostas.forEach(r => {
+            html += `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer" onclick="abrirTab('orcamentos')">
+                <div style="font-size:13px;font-weight:500;color:var(--text-dark)">${esc(r.orcamentos?.cliente_nome || "Cliente")} · ${esc(r.orcamentos?.numero || "")}</div>
+                <div style="font-size:11px;color:var(--primary);margin-top:2px">${r.resposta === "aceite" ? "Aceitou o orçamento: falta confirmares" : "Pediu alterações"}</div>
+            </div>`;
+        });
+    }
 
     if (atrasados.length > 0) {
         const totalAtr = atrasados.reduce((s,m) => s + Number(m.valor_total), 0);
