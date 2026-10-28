@@ -233,6 +233,7 @@ function abrirTab(nome, sub) {
     if (nome === "funcionarios") {
         mostrarSecSub("func", sub || "equipa");
         if (sub === "registos") switchRegTab("ponto");
+        else if (sub === "empresa") carregarDocsEmpresa();
         else initFuncionarios();
     }
     if (nome === "inventario") {
@@ -316,21 +317,25 @@ async function carregarFinanceiro() {
     // Buscar registos_admin do mês (fonte de verdade para salários)
     const [registosRes, funcsRes] = await Promise.all([
         SB.from("registos_admin")
-            .select("funcionario_id, horas, data, tipo, obra_id, obras(nome)")
+            .select("funcionario_id, horas, data, tipo, motivo, obra_id, obras(nome)")
             .gte("data", inicio).lte("data", fim),
         SB.from("funcionarios")
-            .select("id, nome, valor_dia, ativo").eq("ativo", true)
+            .select("id, nome, valor_dia, salario_mensal, ativo").eq("ativo", true)
     ]);
 
     const registos = registosRes.data || [];
     const funcs    = funcsRes.data    || [];
 
-    // Agrupar por funcionário — excluir só faltas
+    // Agrupar por funcionário: dias trabalhados e faltas por motivo
     const porFunc = {};
     registos.forEach(r => {
-        if (r.tipo === "falta") return;     // faltas não contam
         const fid = r.funcionario_id;
-        if (!porFunc[fid]) porFunc[fid] = { horas: 0, dias: new Set() };
+        if (!porFunc[fid]) porFunc[fid] = { horas: 0, dias: new Set(), faltas: {} };
+        if (r.tipo === "falta") {
+            const m = r.motivo || "sem_motivo";
+            porFunc[fid].faltas[m] = (porFunc[fid].faltas[m] || 0) + 1;
+            return;
+        }
         porFunc[fid].horas += Number(r.horas) || 0;
         porFunc[fid].dias.add(r.data);
     });
@@ -340,18 +345,20 @@ async function carregarFinanceiro() {
 
     funcs.forEach(f => {
         const dados = porFunc[f.id];
-        if (!dados) return;
-        const horas = dados.horas;
-        const dias  = dados.dias.size;
-        const valor = f.valor_dia ? dias * f.valor_dia : 0;
+        // Quem recebe ao mês aparece sempre, mesmo sem registos
+        if (!dados && !f.salario_mensal) return;
+        const d = dados || { horas: 0, dias: new Set(), faltas: {} };
+        const horas = d.horas;
+        const dias  = d.dias.size;
+        const calc  = rhValorOrdenado(f, dias, d.faltas);
         totalHoras += horas;
         totalDias  += dias;
-        totalPagar += valor;
+        totalPagar += calc.valor;
         tbody.innerHTML += `<tr>
-            <td>${f.nome}</td>
+            <td>${esc(f.nome)}${calc.nota ? `<div style="font-size:11px;opacity:.6">${esc(calc.nota)}</div>` : ""}</td>
             <td>${horas.toFixed(2)}h</td>
             <td>${dias}</td>
-            <td>${valor.toFixed(2)} €</td>
+            <td>${calc.valor.toFixed(2)} €</td>
         </tr>`;
     });
 
@@ -1282,6 +1289,9 @@ async function carregarFuncionarios() {
         return;
     }
 
+    // Semáforo dos documentos de cada um (rh.js)
+    const semaforos = await rhSemaforos(data).catch(() => ({}));
+
     data.forEach(f => {
         const ativo    = f.ativo !== false;
         const data_reg = f.created_at ? new Date(f.created_at).toLocaleDateString("pt-PT", { timeZone: "Europe/Lisbon" }) : "—";
@@ -1293,7 +1303,7 @@ async function carregarFuncionarios() {
 
         tr.innerHTML = `
             <td style="font-weight:500">
-                ${f.nome || "—"}
+                ${semaforos[f.id] ? `<span title="${esc(semaforos[f.id].dica)}" style="margin-right:4px">${semaforos[f.id].icone}</span>` : ""}${esc(f.nome || "—")}
                 ${!temDevice ? '<span style="font-size:10px;color:#b58863;margin-left:4px">⚠ sem QR</span>' : ""}
                 ${f.tipo_contrato === 'temporario' ? '<span style="font-size:9px;font-weight:700;background:rgba(181,136,99,.15);color:#c8901e;padding:1px 6px;border-radius:8px;margin-left:4px">TEMP</span>' : ""}
             </td>
@@ -1355,6 +1365,17 @@ function abrirModalFuncionario(func = null) {
     setField("funcTelemovel",  func?.telemovel);
     setField("funcNif",        func?.nif);
     setField("funcIban",       func?.iban);
+    setField("funcNiss",            func?.niss);
+    setField("funcDataNascimento",  func?.data_nascimento);
+    setField("funcNacionalidade",   func?.nacionalidade);
+    setField("funcMorada",          func?.morada);
+    setField("funcDataAdmissao",    func?.data_admissao);
+    setField("funcDataFimContrato", func?.data_fim_contrato);
+    setField("funcDataSaida",       func?.data_saida);
+    setField("funcSalarioMensal",   func?.salario_mensal);
+    setField("funcEmergenciaNome",  func?.emergencia_nome);
+    setField("funcEmergenciaTel",   func?.emergencia_telefone);
+    rhPrepararFicha(func);   // separadores Documentos, Férias e Obras (rh.js)
 
     // Info dispositivo — só em edição
     const deviceInfo = document.getElementById("funcDeviceInfo");
@@ -1403,6 +1424,7 @@ async function guardarFuncionario() {
         telemovel: document.getElementById("funcTelemovel")?.value.trim() || null,
         nif:       document.getElementById("funcNif")?.value.trim() || null,
         iban:      document.getElementById("funcIban")?.value.trim() || null,
+        ...rhCamposFicha(),
     };
 
     if (funcEditId) {
@@ -4447,6 +4469,15 @@ async function carregarPainelDocumentos() {
             <button class="btn-secondary" onclick="abrirFichaClienteObra()">${cliente ? "✏️ Cliente e link" : "+ Definir cliente"}</button>
         </div>
 
+        <div class="card" style="padding:14px;margin:0 0 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="font-size:20px">👷</span>
+            <span style="flex:1;min-width:160px">
+                <span style="display:block;font-weight:600;font-size:13px">Registo de trabalhadores da obra</span>
+                <span style="font-size:11px;opacity:.6">O que a lei pede no estaleiro (DL 273/2003, art. 21.º): quem trabalhou, quando, dados e seguro. Feito a partir do registo diário.</span>
+            </span>
+            <button class="btn-secondary" onclick="pdfRegistoTrabalhadoresObra()">📄 Gerar PDF</button>
+        </div>
+
         <div class="card doc-carregar">
             <div class="doc-carregar-titulo">⬆ Carregar documento</div>
             <div class="barra-filtros" style="margin:0">
@@ -7381,7 +7412,10 @@ async function carregarNotificacoes() {
         });
     }
 
-    const total = atrasados.length + stockAlertas.length + respostas.length;
+    // Recursos humanos: validades, dias sem registo, ausências (rh.js)
+    const rh = await rhAlertas().catch(e => { console.error("rhAlertas:", e); return { total: 0, html: "" }; });
+
+    const total = atrasados.length + stockAlertas.length + respostas.length + rh.total;
     const badge = document.getElementById("notifBadge");
     const painel = document.getElementById("notifPainel");
     if (!badge || !painel) return;
@@ -7395,7 +7429,7 @@ async function carregarNotificacoes() {
     badge.style.display = "flex";
     badge.textContent   = total > 9 ? "9+" : total;
 
-    let html = "";
+    let html = rh.html;
 
     if (respostas.length > 0) {
         html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:700;letter-spacing:.05em;opacity:.5;text-transform:uppercase">
