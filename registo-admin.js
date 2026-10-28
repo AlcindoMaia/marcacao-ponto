@@ -136,7 +136,7 @@ async function carregarParaData() {
 
     // Buscar registos já existentes para esta data
     const { data: existentes } = await SB.from("registos_admin")
-        .select("id, funcionario_id, obra_id, horas, observacoes, tipo, registo_servicos(obra_servico_id)")
+        .select("id, funcionario_id, obra_id, horas, observacoes, tipo, motivo, registo_servicos(obra_servico_id)")
         .eq("data", data);
 
     renderFuncionarios(existentes || []);
@@ -169,6 +169,7 @@ function renderFuncionarios(existentes) {
         card.dataset.falta = isFalta ? '1' : '0';
 
         const isTemp = f.tipo_contrato === 'temporario';
+        const falta  = isFalta ? registosFunc[0] : null;
         card.innerHTML = `
             <div class="func-card-header">
                 <div class="func-avatar ${isFalta ? 'avatar-falta' : isTemp ? 'avatar-temp' : ''}">${esc(f.nome.charAt(0).toUpperCase())}</div>
@@ -180,6 +181,7 @@ function renderFuncionarios(existentes) {
                     <div class="func-resumo ${isFalta ? 'resumo-falta' : ''}">${isFalta ? '✕ Falta' : resumo}</div>
                 </div>
                 <div class="func-lado">
+                    ${falta ? selectMotivoFalta(falta) : ''}
                     <button class="btn-falta ${isFalta ? 'btn-falta-activo' : ''}"
                         onclick="toggleFalta(event,'${f.id}')"
                         title="${isFalta ? 'Remover falta' : 'Marcar falta'}">
@@ -399,6 +401,30 @@ function adicionarNovoTemp() {
     adicionarLinha(document.getElementById(`linhas-${tempId}`), tempId);
     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setTimeout(() => card.querySelector('.input-temp-nome')?.focus(), 50);
+}
+
+// Motivo da falta: decide se desconta no ordenado e o saldo de férias
+const MOTIVOS_FALTA = {
+    ferias:        "🏖 Férias",
+    baixa:         "🩺 Baixa médica",
+    justificada:   "📄 Justificada",
+    injustificada: "⛔ Injustificada",
+};
+
+function selectMotivoFalta(r) {
+    const opcoes = Object.entries(MOTIVOS_FALTA)
+        .map(([k, n]) => `<option value="${k}" ${r.motivo === k ? 'selected' : ''}>${n}</option>`).join('');
+    return `<select class="sel-motivo${r.motivo ? '' : ' sem-motivo'}" title="Motivo da falta"
+        onclick="event.stopPropagation()" onchange="mudarMotivoFalta('${r.id}', this)">
+        <option value="" ${r.motivo ? '' : 'selected'}>Motivo?</option>${opcoes}</select>`;
+}
+
+async function mudarMotivoFalta(id, sel) {
+    const motivo = sel.value || null;
+    const { error } = await SB.from('registos_admin').update({ motivo }).eq('id', id);
+    if (error) { console.error(error); feedback('Não foi possível gravar o motivo', 'erro'); return; }
+    sel.classList.toggle('sem-motivo', !motivo);
+    feedback(motivo ? 'Motivo gravado' : 'Motivo apagado', 'ok');
 }
 
 async function toggleFalta(event, funcId) {

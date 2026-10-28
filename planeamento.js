@@ -670,6 +670,13 @@ async function _guardarTarefa() {
         alert("Longitude inválida."); return;
     }
 
+    // Ausências e documentos caducados de quem vai na tarefa (rh.js): avisa, não impede
+    if (typeof rhAvisosTarefa === "function") {
+        const ids = [...document.querySelectorAll('#planFuncionarios input[type="checkbox"]:checked')].map(i => i.value);
+        const avisos = await rhAvisosTarefa(ids, dataPrevista).catch(() => []);
+        if (avisos.length && !confirm("Atenção:\n\n• " + avisos.join("\n• ") + "\n\nGuardar na mesma?")) return;
+    }
+
     const anterior = _planEditId ? _planTarefas.find(x => x.id === _planEditId) : null;
 
     const payload = {
