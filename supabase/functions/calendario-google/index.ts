@@ -58,9 +58,33 @@ Deno.serve(async (req) => {
         return resposta({ erro: `No máximo ${MAX_DIAS} dias de cada vez` }, 400);
     }
 
-    const links = (Deno.env.get("GOOGLE_CALENDAR_ICS") || "")
-        .split(/[\s,]+/).filter(l => l.startsWith("https://"));
-    if (!links.length) return resposta({ configurado: false, reunioes: [] });
+    // Aceita o link como o Google o mostra ou como se cola sem querer:
+    // entre aspas, com webcal:// ou http:// em vez de https://
+    // e até sem o https:// à frente
+    // Se o nome do segredo ficou ligeiramente diferente (espaço, minúsculas,
+    // outra grafia), usa o que parecer ser o do calendário
+    const nomes = Object.keys(Deno.env.toObject())
+        .filter(k => !k.startsWith("SUPABASE_") && /CAL|ICS|GOOGLE|ICAL/i.test(k));
+    const nome = Deno.env.get("GOOGLE_CALENDAR_ICS") ? "GOOGLE_CALENDAR_ICS"
+        : nomes.find(k => /calendar\.google\.com|\.ics/i.test(Deno.env.get(k) || "")) || "GOOGLE_CALENDAR_ICS";
+    const bruto = Deno.env.get(nome) || "";
+    if (nome !== "GOOGLE_CALENDAR_ICS") console.log(`a usar o segredo "${nome}"`);
+    const links = bruto
+        .split(/[\s,;]+/)
+        .map(l => l.replace(/^["'<]+|["'>]+$/g, "")
+                   .replace(/^(webcal|http):\/\//i, "https://")
+                   .replace(/^(?!https:\/\/)(?=calendar\.google\.com\/)/i, "https://"))
+        .filter(l => /^https:\/\//i.test(l));
+    if (!links.length) {
+        // Só a forma do valor, nunca o valor: chega para saber o que foi colado
+        console.log(`GOOGLE_CALENDAR_ICS sem link utilizável: ${bruto.length} caracteres, ` +
+            `segredos parecidos: [${nomes.join(", ")}], ` +
+            `começa por "${bruto.slice(0, 6).replace(/[^a-z:/"' ]/gi, "?")}", ` +
+            `google=${bruto.includes("calendar.google.com")}, ical=${bruto.includes("/ical/")}`);
+        // Vai como falha para o quadro mostrar o aviso "⚠ calendário"
+        return resposta({ configurado: false, reunioes: [],
+            falhas: ["O link do Google Calendar não está guardado no servidor (segredo GOOGLE_CALENDAR_ICS)."] });
+    }
 
     const reunioes = [];
     const falhas: string[] = [];
@@ -68,7 +92,12 @@ Deno.serve(async (req) => {
         try {
             const r = await fetch(link, { signal: AbortSignal.timeout(10_000) });
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            reunioes.push(...lerReunioes(ICAL, await r.text(), de, ate));
+            const ics = await r.text();
+            const lidas = lerReunioes(ICAL, ics, de, ate);
+            // Só contagens: o link e o conteúdo da agenda não vão para os registos
+            console.log(`calendário ${i + 1}: ${ics.length} bytes, ` +
+                `${(ics.match(/BEGIN:VEVENT/g) || []).length} eventos, ${lidas.length} entre ${de} e ${ate}`);
+            reunioes.push(...lidas);
         } catch (e) {
             // Nunca devolver o link: é secreto
             console.error(`calendário ${i + 1}:`, (e as Error).message);
