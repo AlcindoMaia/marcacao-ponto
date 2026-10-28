@@ -7204,7 +7204,7 @@ async function carregarDRE() {
     } else { inicio = "2000-01-01"; fim = "2099-12-31"; }
 
     let query = SB.from("movimentos_financeiros")
-        .select("tipo, valor_base, valor_total, categoria_id, categorias_financeiras(nome), estado_pagamento")
+        .select("tipo, valor_base, valor_total, categoria_id, categorias_financeiras(nome), estado_pagamento, fornecedores(nome)")
         .eq("ativo", true).gte("data_documento", inicio).lte("data_documento", fim);
     if (obraId) query = query.eq("obra_id", obraId);
     const { data } = await query;
@@ -7253,12 +7253,55 @@ async function carregarDRE() {
             <span style="opacity:.8">${cat}</span><span style="color:#e09486;font-weight:600">${val.toFixed(2)} €</span></div>`
     ).join("") || "<p style='opacity:.4;font-size:13px'>Sem custos no período</p>";
 
+    desenharCurvaABC(custos, custoMO);
+
     // Popular select de obras no DRE
     const dreObraEl = document.getElementById("dreObra");
     if (dreObraEl && dreObraEl.options.length <= 1) {
         const { data: obras } = await SB.from("obras").select("id, nome").eq("ativo", true).order("nome");
         (obras||[]).forEach(o => { const opt = document.createElement("option"); opt.value=o.id; opt.textContent=o.nome; dreObraEl.appendChild(opt); });
     }
+}
+
+// Curva ABC dos custos do período: os poucos fornecedores (e a mão de obra
+// da equipa) que levam a maior parte do dinheiro. A = até 80% do custo
+// acumulado, B = até 95%, C = o resto. Serve para saber onde negociar.
+function desenharCurvaABC(custos, custoMO) {
+    const el = document.getElementById("dreAbc");
+    if (!el) return;
+    const por = {};
+    custos.forEach(m => {
+        const nome = m.fornecedores?.nome || "Sem fornecedor";
+        por[nome] = (por[nome] || 0) + semIva(m);
+    });
+    if (custoMO > 0) por["Mão de obra da equipa"] = custoMO;
+    const itens = Object.entries(por).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    const total = itens.reduce((s, [, v]) => s + v, 0);
+    if (!total) { el.innerHTML = "<p style='opacity:.4;font-size:13px'>Sem custos no período</p>"; return; }
+
+    let acum = 0;
+    const linhas = itens.map(([nome, v]) => {
+        const antes = acum / total;
+        acum += v;
+        // A classe decide-se pelo ponto onde o item começa: o primeiro é sempre A
+        const classe = antes < 0.8 ? "A" : antes < 0.95 ? "B" : "C";
+        return { nome, v, pct: v / total * 100, acum: acum / total * 100, classe };
+    });
+    const cor = { A: "#e09486", B: "#e0b07a", C: "rgba(255,255,255,.45)" };
+    const resumo = ["A", "B", "C"].map(c => {
+        const l = linhas.filter(x => x.classe === c);
+        return l.length ? `<span style="color:${cor[c]}"><b>${c}</b>: ${l.length} · ${Math.round(l.reduce((s, x) => s + x.pct, 0))}% do custo</span>` : "";
+    }).filter(Boolean).join(" &nbsp; ");
+    const linhaHtml = x => `<div style="display:grid;grid-template-columns:22px 1fr auto 46px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
+        <span style="font-weight:700;color:${cor[x.classe]}">${x.classe}</span>
+        <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(x.nome)}">${esc(x.nome)}</span>
+        <span style="font-weight:600;white-space:nowrap">${x.v.toFixed(2)} €</span>
+        <span style="opacity:.55;text-align:right">${x.pct.toFixed(0)}%</span>
+    </div>`;
+    const ab = linhas.filter(x => x.classe !== "C"), c = linhas.filter(x => x.classe === "C");
+    el.innerHTML = `<div style="font-size:12px;margin-bottom:8px">${resumo}</div>
+        ${ab.map(linhaHtml).join("")}
+        ${c.length ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px;opacity:.6">Classe C: mais ${c.length} com ${c.reduce((s, x) => s + x.v, 0).toFixed(2)} €</summary>${c.map(linhaHtml).join("")}</details>` : ""}`;
 }
 
 // =======================================================
