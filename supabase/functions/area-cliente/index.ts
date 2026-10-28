@@ -8,6 +8,7 @@
 //   - as obras ligadas a ele (nome, local, estado, percentagem, data prevista);
 //   - as fases visíveis de cada obra (nome, datas, estado) e os autos de
 //     medição já enviados (serviço, % acumulada, valor, totais);
+//   - as notas do diário de obra marcadas como visíveis (as últimas 20);
 //   - os documentos dessas obras marcados "Visível ao cliente", com um link
 //     temporário (1 hora) para abrir o ficheiro;
 //   - nas faturas, o total e se está paga; nos orçamentos, o estado, o total
@@ -67,17 +68,20 @@ Deno.serve(async (req) => {
 
     const idsObras = (obras || []).map(o => o.id);
     let documentos: any[] = [];
-    let fases: any[] = [], autos: any[] = [];
+    let fases: any[] = [], autos: any[] = [], diario: any[] = [];
 
     if (idsObras.length) {
-        const [f, a] = await Promise.all([
+        const [f, a, n] = await Promise.all([
             db.from("obra_fases").select("obra_id, nome, ordem, data_inicio, data_fim, estado")
                 .in("obra_id", idsObras).eq("visivel_cliente", true).order("ordem"),
             db.from("autos_medicao")
                 .select("id, obra_id, numero, data, estado, taxa_iva, notas, auto_linhas(percentagem, valor, obra_servicos(nome, ordem))")
                 .in("obra_id", idsObras).in("estado", ["enviado", "faturado"]).order("numero"),
+            db.from("obra_diario").select("obra_id, data, notas")
+                .in("obra_id", idsObras).eq("visivel_cliente", true).order("data", { ascending: false }).limit(20),
         ]);
         fases = f.data || [];
+        diario = n.data || [];
         autos = (a.data || []).map((x: any) => {
             const linhas = (x.auto_linhas || [])
                 .sort((p: any, q: any) => (p.obra_servicos?.ordem || 0) - (q.obra_servicos?.ordem || 0))
@@ -141,7 +145,7 @@ Deno.serve(async (req) => {
 
     await db.from("clientes").update({ ultimo_acesso: new Date().toISOString() }).eq("id", cliente.id);
 
-    return resposta({ cliente: { nome: cliente.nome }, obras: obras || [], documentos, fases, autos });
+    return resposta({ cliente: { nome: cliente.nome }, obras: obras || [], documentos, fases, autos, diario });
 });
 
 // Resposta do cliente a um orçamento. Só vale para um documento de orçamento

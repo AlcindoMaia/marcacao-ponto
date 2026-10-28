@@ -86,6 +86,10 @@
     details.auto td.n { text-align: right; white-space: nowrap; padding-left: 10px; }
     details.auto tr.tot td { font-weight: 600; }
     details.auto .notas { font-size: 13px; color: var(--suave); margin-top: 8px; white-space: pre-wrap; }
+    .diario .dia { padding: 8px 0; border-top: 1px solid var(--linha); font-size: 14px; }
+    .diario .dia:first-child { border-top: none; }
+    .diario .dt { font-size: 12px; color: var(--suave); text-transform: capitalize; }
+    .diario .tx { white-space: pre-wrap; }
     .resp { padding: 0 0 12px 40px; }
     .resp .botoes { display: flex; gap: 8px; flex-wrap: wrap; }
     .resp button { font: inherit; font-size: 14px; font-weight: 600; border-radius: 10px; padding: 9px 14px; cursor: pointer; border: 1px solid var(--caramelo); background: transparent; color: var(--primary); }
@@ -227,11 +231,18 @@ function htmlAutos(autos) {
     </details>`).join("")}`;
 }
 
+function htmlDiario(notas) {
+    if (!notas.length) return "";
+    const dia = d => new Date(d + "T12:00:00").toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
+    return `<h2>Diário da obra</h2><div class="diario">${notas.map(n => `<div class="dia">
+        <div class="dt">${esc(dia(n.data))}</div><div class="tx">${esc(n.notas)}</div></div>`).join("")}</div>`;
+}
+
 function seccao(titulo, itens, vazio) {
     return `<h2>${titulo}</h2>${itens.length ? itens.join("") : `<div class="vazio">${vazio}</div>`}`;
 }
 
-function htmlObra(o, docs, fases, autos) {
+function htmlObra(o, docs, fases, autos, diario) {
     const pct = Math.max(0, Math.min(100, Number(o.percentagem_conclusao) || 0));
     const feita = o.estado === "concluida";
     const de = t => docs.filter(d => d.tipo === t);
@@ -263,6 +274,7 @@ function htmlObra(o, docs, fases, autos) {
             ${o.data_conclusao_prevista && !feita ? `<span>Conclusão prevista: ${esc(dataPT(o.data_conclusao_prevista))}</span>` : ""}
         </div>
         ${htmlFases(fases)}
+        ${htmlDiario(diario)}
         ${seccao("Orçamentos", orcs, "Ainda não há orçamentos.")}
         ${htmlAutos(autos)}
         ${seccao("Faturas e recibos", fats, "Ainda não há faturas.")}
@@ -293,7 +305,8 @@ async function iniciar() {
             <p class="sub">Aqui pode acompanhar ${obras.length === 1 ? "a sua obra" : "as suas obras"} e consultar os documentos.</p>
             ${obras.length
                 ? obras.map(o => htmlObra(o, docs.filter(d => d.obra_id === o.id),
-                    (j.fases || []).filter(f => f.obra_id === o.id), (j.autos || []).filter(a => a.obra_id === o.id))).join("")
+                    (j.fases || []).filter(f => f.obra_id === o.id), (j.autos || []).filter(a => a.obra_id === o.id),
+                    (j.diario || []).filter(n => n.obra_id === o.id))).join("")
                 : `<div class="centro">Ainda não há obras associadas.</div>`}
             <div class="rodape">Os links dos documentos valem 1 hora. Se algum não abrir, atualize a página.<br>Maia Solutions</div>`;
     } catch (e) {

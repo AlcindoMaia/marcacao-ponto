@@ -1,11 +1,14 @@
 // =======================================================
 // ANDAMENTO DA OBRA (separador do painel da obra)
-// Duas partes, ambas visíveis ao cliente na Área do cliente:
+// Três partes, todas visíveis ao cliente na Área do cliente:
 //   - Fases: linha do tempo simples com datas e estado (sem percentagens).
 //     Uma obra sem fases pode começar com as fases-tipo de cada tipo de obra.
 //   - Autos de medição: a % feita (acumulada) de cada serviço da obra; o
 //     valor do auto é o que essa % acrescenta ao auto anterior, sem IVA.
 //     A fatura continua a sair do TOCONLINE: o auto é o pedido de pagamento.
+//   - Diário: monta-se sozinho com as presenças, as tarefas do planeamento e
+//     as fotos de cada dia; só a nota do dia se escreve (o cliente vê as
+//     notas marcadas como visíveis).
 // Tabelas em andamento.sql. Usa _painelObraActual, SB e esc do admin.js /
 // config.js.
 // =======================================================
@@ -39,8 +42,16 @@ const ESTADOS_AUTO = {
     faturado: { nome: "Faturado", dica: "Já tem fatura no TOCONLINE; o cliente continua a ver" },
 };
 
-let _andamento = { fases: [], autos: [], servicos: [], linhas: [] };
+let _andamento = { fases: [], autos: [], servicos: [], diario: [], registos: [], tarefas: [], fotos: [] };
+const DIAS_DIARIO = 30;
 let _autoEmEdicao = null;   // null, ou { id|null, numero, data, taxa_iva, notas, estado, pct: {servico_id: %} }
+
+// "50/30/20" -> [50, 80, 100] (% acumulada no fim de cada prestação)
+function planoAcumulado(txt) {
+    const partes = String(txt || "").split(/[\/;+ ]+/).map(Number).filter(n => n > 0);
+    let acum = 0;
+    return partes.map(p => (acum = Math.min(100, acum + p)));
+}
 
 const eurAnd = v => Number(v || 0).toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 const dataAnd = d => d ? d.split("-").reverse().join("/") : "";
@@ -62,17 +73,27 @@ async function carregarPainelAndamento() {
     if (_andamento.obraId !== obraId) _autoEmEdicao = null;   // outra obra: fecha o auto aberto
     el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">A carregar...</div>`;
 
-    const [fasesRes, autosRes, servRes] = await Promise.all([
+    const desde = new Date(Date.now() - DIAS_DIARIO * 86400000).toISOString().slice(0, 10);
+    const hoje  = new Date().toISOString().slice(0, 10);
+    const [fasesRes, autosRes, servRes, diarioRes, regRes, tarRes, fotRes] = await Promise.all([
         SB.from("obra_fases").select("*").eq("obra_id", obraId).order("ordem").order("created_at"),
         SB.from("autos_medicao").select("*, auto_linhas(obra_servico_id, percentagem, valor)").eq("obra_id", obraId).order("numero"),
         SB.from("obra_servicos").select("id, nome, valor_orcamento, ordem").eq("obra_id", obraId).order("ordem").order("created_at"),
+        SB.from("obra_diario").select("*").eq("obra_id", obraId).gte("data", desde),
+        SB.from("registos_admin").select("data, horas, observacoes, funcionarios(nome)")
+            .eq("obra_id", obraId).eq("tipo", "presenca").gte("data", desde).lte("data", hoje),
+        SB.from("tarefas").select("data_prevista, descricao, estado")
+            .eq("obra_id", obraId).gte("data_prevista", desde).lte("data_prevista", hoje).neq("estado", "cancelada"),
+        SB.from("obra_documentos").select("id, nome_ficheiro, created_at")
+            .eq("obra_id", obraId).eq("tipo", "foto").gte("created_at", desde),
     ]);
-    const erro = fasesRes.error || autosRes.error || servRes.error;
+    const erro = fasesRes.error || autosRes.error || servRes.error || diarioRes.error;
     if (erro) {
         el.innerHTML = `<div style="padding:24px;text-align:center;color:#e09486">Não foi possível carregar o andamento: ${esc(erro.message)}</div>`;
         return;
     }
-    _andamento = { obraId, fases: fasesRes.data || [], autos: autosRes.data || [], servicos: servRes.data || [] };
+    _andamento = { obraId, fases: fasesRes.data || [], autos: autosRes.data || [], servicos: servRes.data || [],
+        diario: diarioRes.data || [], registos: regRes.data || [], tarefas: tarRes.data || [], fotos: fotRes.data || [] };
     desenharAndamento();
 }
 
@@ -82,7 +103,8 @@ function desenharAndamento() {
     el.innerHTML = `
         <div id="andamentoMsg" style="font-size:12px;min-height:16px;margin:4px 0"></div>
         <div class="card" style="margin:0 0 14px">${htmlFases()}</div>
-        <div class="card" style="margin:0">${_autoEmEdicao ? htmlEditorAuto() : htmlAutos()}</div>`;
+        <div class="card" style="margin:0 0 14px">${_autoEmEdicao ? htmlEditorAuto() : htmlAutos()}</div>
+        <div class="card" style="margin:0">${htmlDiario()}</div>`;
     if (_autoEmEdicao) recalcularAuto();
 }
 
@@ -246,7 +268,14 @@ function htmlAutos() {
         return titulo + `<div style="font-size:13px;opacity:.7">Os autos medem os serviços da obra. Esta obra ainda não tem serviços: aceita o orçamento ou cria os serviços em ✏️ Editar obra › Serviços.</div>`;
     }
 
-    const resumo = `<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;margin-bottom:10px;opacity:.85">
+    const plano = _painelObraActual.plano_pagamentos ?? "50/30/20";
+    const linhaPlano = `<div style="font-size:12px;margin-bottom:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <span style="opacity:.7">Plano de pagamentos:</span>
+        <input id="planoPag" value="${esc(plano)}" placeholder="ex.: 50/30/20" style="width:120px;padding:3px 8px;font-size:12px"
+            onchange="gravarPlanoPagamentos(this.value)" title="% de cada prestação, separadas por /. Vazio = sem plano.">
+        <span style="opacity:.5">% de cada prestação</span>
+    </div>`;
+    const resumo = linhaPlano + `<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;margin-bottom:10px;opacity:.85">
         <span>Valor dos serviços: <b>${eurAnd(totalServ)}</b></span>
         <span>Já pedido: <b>${eurAnd(pedido)}</b>${totalServ > 0 ? ` (${Math.round(pedido / totalServ * 100)}%)` : ""}</span>
         <span>Falta: <b>${eurAnd(totalServ - pedido)}</b></span>
@@ -274,14 +303,26 @@ function htmlAutos() {
     }).join("");
 }
 
+async function gravarPlanoPagamentos(txt) {
+    const plano = txt.trim();
+    const soma = plano.split(/[\/;+ ]+/).map(Number).reduce((s, n) => s + (n > 0 ? n : 0), 0);
+    if (plano && Math.abs(soma - 100) > 0.01) msgAndamento(`Atenção: as prestações somam ${soma}% em vez de 100%.`, "err");
+    const { error } = await SB.from("obras").update({ plano_pagamentos: plano || null }).eq("id", _painelObraActual.id);
+    if (error) return msgAndamento("Não foi possível gravar o plano: " + error.message, "err");
+    _painelObraActual.plano_pagamentos = plano || null;
+}
+
 function novoAuto() {
     const ultimo = _andamento.autos[_andamento.autos.length - 1];
     const numero = (ultimo?.numero || 0) + 1;
     const ant = pctAnteriores(numero);
+    // Com plano, o auto começa na % acumulada da prestação correspondente
+    const prest = planoAcumulado(_painelObraActual.plano_pagamentos ?? "50/30/20")[numero - 1];
     _autoEmEdicao = {
         id: null, numero, data: new Date().toISOString().slice(0, 10), estado: "rascunho",
         taxa_iva: ultimo ? Number(ultimo.taxa_iva) : 23, notas: "",
-        pct: Object.fromEntries(_andamento.servicos.map(s => [s.id, ant[s.id] || 0])),
+        pct: Object.fromEntries(_andamento.servicos.map(s => [s.id, Math.max(ant[s.id] || 0, prest || 0)])),
+        prestacao: prest ? `Prestação ${numero} do plano: ${prest}% acumulado. Ajusta se o combinado for outro.` : "",
     };
     desenharAndamento();
 }
@@ -330,6 +371,7 @@ function htmlEditorAuto() {
                 <div style="display:flex;gap:4px"><input type="number" id="autoPctTodos" min="0" max="100" step="1" placeholder="ex.: 30">
                 <button class="btn-secondary" style="padding:4px 10px;font-size:12px" onclick="aplicarPctTodos()">Aplicar</button></div></label>`}
         </div>
+        ${a.prestacao ? `<div style="font-size:12px;opacity:.7;margin-bottom:8px">${esc(a.prestacao)}</div>` : ""}
         <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse">
             <thead><tr style="font-size:11px;opacity:.55;text-align:right">
@@ -429,6 +471,84 @@ async function apagarAuto(id) {
     if (!confirm(`Apagar o auto nº ${a.numero}?${a.estado !== "rascunho" ? " O cliente deixa de o ver." : ""}`)) return;
     const { error } = await SB.from("autos_medicao").delete().eq("id", id);
     if (error) return msgAndamento("Não foi possível apagar: " + error.message, "err");
+    await carregarPainelAndamento();
+}
+
+// ── Diário de obra ───────────────────────────────────────────
+function diasDoDiario() {
+    const dias = {};
+    const dia = d => (dias[d] ??= { data: d, equipa: {}, obs: [], tarefas: [], fotos: [], nota: null });
+    _andamento.registos.forEach(r => {
+        const d = dia(r.data), nome = r.funcionarios?.nome || "?";
+        d.equipa[nome] = (d.equipa[nome] || 0) + Number(r.horas || 0);
+        if (r.observacoes) d.obs.push(r.observacoes);
+    });
+    _andamento.tarefas.forEach(t => dia(t.data_prevista).tarefas.push(t));
+    _andamento.fotos.forEach(f => dia(f.created_at.slice(0, 10)).fotos.push(f));
+    _andamento.diario.forEach(n => { dia(n.data).nota = n; });
+    return Object.values(dias).sort((a, b) => b.data.localeCompare(a.data));
+}
+
+function htmlDiario() {
+    const dias = diasDoDiario();
+    const hoje = new Date().toISOString().slice(0, 10);
+    const titulo = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <div style="font-family:var(--font-title,sans-serif);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;opacity:.6">Diário de obra · últimos ${DIAS_DIARIO} dias</div>
+        ${dias.some(d => d.data === hoje) ? "" : `<button class="btn-secondary" style="padding:4px 12px;font-size:12px" onclick="editarNotaDia('${hoje}')">+ Nota de hoje</button>`}
+    </div>
+    <div id="diarioEd-${hoje}-novo"></div>`;
+    if (!dias.length) {
+        return titulo + `<div style="font-size:13px;opacity:.7">Nada registado nesta obra nos últimos ${DIAS_DIARIO} dias. O diário enche-se sozinho com as presenças do registo diário, as tarefas do planeamento e as fotos carregadas na obra.</div>`;
+    }
+    const sem = d => new Date(d + "T12:00:00").toLocaleDateString("pt-PT", { weekday: "short", day: "2-digit", month: "2-digit" });
+    return titulo + dias.map((d, i) => {
+        const equipa = Object.entries(d.equipa).map(([n, h]) => `${esc(n)} ${Number(h.toFixed(1))}h`).join(", ");
+        const tar = d.tarefas.map(t => `${t.estado === "concluida" ? "✓" : "•"} ${esc(t.descricao)}`).join("<br>");
+        const fotos = d.fotos.map(f => `<a href="#" onclick="abrirDocumentoObra('${f.id}');return false" title="${esc(f.nome_ficheiro)}">📷</a>`).join(" ");
+        const nota = d.nota;
+        return `<div style="padding:9px 0;border-top:${i ? "1px solid rgba(255,255,255,.06)" : "none"};font-size:12px">
+            <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+                <b style="font-size:13px;text-transform:capitalize">${sem(d.data)}</b>
+                <button class="btn-acao" title="${nota ? "Editar a nota" : "Escrever nota"}" onclick="editarNotaDia('${d.data}')">✏️</button>
+            </div>
+            ${equipa ? `<div style="opacity:.75">👷 ${equipa}</div>` : ""}
+            ${tar ? `<div style="opacity:.75;margin-top:2px">${tar}</div>` : ""}
+            ${d.obs.length ? `<div style="opacity:.6;margin-top:2px">${d.obs.map(esc).join(" · ")}</div>` : ""}
+            ${fotos ? `<div style="margin-top:2px">${fotos}</div>` : ""}
+            ${nota ? `<div style="margin-top:4px;padding:6px 8px;border-radius:6px;background:rgba(181,136,99,.1);white-space:pre-wrap">${esc(nota.notas)}${nota.visivel_cliente ? "" : ` <span title="O cliente não vê esta nota" style="opacity:.5">🔒</span>`}</div>` : ""}
+            <div id="diarioEd-${d.data}"></div>
+        </div>`;
+    }).join("");
+}
+
+function editarNotaDia(data) {
+    desenharAndamento();
+    const box = document.getElementById("diarioEd-" + data) || document.getElementById(`diarioEd-${data}-novo`);
+    if (!box) return;
+    const n = _andamento.diario.find(x => x.data === data);
+    box.innerHTML = `<div style="padding:8px;margin-top:6px;border-radius:8px;background:rgba(255,255,255,.04)">
+        <textarea id="diarioTxt" rows="3" maxlength="4000" placeholder="Ocorrências, atrasos, visitas, o que ficou feito…">${esc(n?.notas || "")}</textarea>
+        <label style="font-size:12px;display:flex;gap:6px;align-items:center;margin:6px 0"><input type="checkbox" id="diarioVis" style="width:auto"${n?.visivel_cliente ? " checked" : ""}> O cliente vê esta nota</label>
+        <div style="display:flex;gap:6px">
+            <button class="btn-primary" style="padding:5px 14px;font-size:12px" onclick="gravarNotaDia('${data}')">Gravar</button>
+            <button class="btn-secondary" style="padding:5px 14px;font-size:12px" onclick="desenharAndamento()">Cancelar</button>
+        </div></div>`;
+    document.getElementById("diarioTxt").focus();
+}
+
+async function gravarNotaDia(data) {
+    const notas = document.getElementById("diarioTxt").value.trim();
+    const visivel_cliente = document.getElementById("diarioVis").checked;
+    const n = _andamento.diario.find(x => x.data === data);
+    let error;
+    if (!notas) {
+        if (n) ({ error } = await SB.from("obra_diario").delete().eq("id", n.id));
+    } else if (n) {
+        ({ error } = await SB.from("obra_diario").update({ notas, visivel_cliente }).eq("id", n.id));
+    } else {
+        ({ error } = await SB.from("obra_diario").insert({ obra_id: _painelObraActual.id, data, notas, visivel_cliente }));
+    }
+    if (error) return msgAndamento("Não foi possível gravar a nota: " + error.message, "err");
     await carregarPainelAndamento();
 }
 

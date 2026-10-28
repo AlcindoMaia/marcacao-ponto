@@ -1,5 +1,5 @@
 -- =======================================================
--- ANDAMENTO DA OBRA: FASES E AUTOS DE MEDIÇÃO
+-- ANDAMENTO DA OBRA: FASES, AUTOS DE MEDIÇÃO E DIÁRIO
 -- Separador "Andamento" no painel da obra.
 --
 -- Fases: uma linha do tempo simples (fundações, estrutura, acabamentos…),
@@ -29,6 +29,11 @@ create table if not exists obra_fases (
 );
 
 create index if not exists idx_obra_fases_obra on obra_fases (obra_id, ordem);
+
+-- Plano de pagamentos proposto ao cliente, em % de cada prestação (ex.:
+-- "50/30/20"). Cada auto novo começa na % acumulada da prestação seguinte;
+-- muda-se à vontade por obra e em cada auto.
+alter table obras add column if not exists plano_pagamentos text default '50/30/20';
 
 create table if not exists autos_medicao (
     id               uuid primary key default gen_random_uuid(),
@@ -72,3 +77,30 @@ create policy "auto_linhas: admin gere tudo" on auto_linhas
 
 revoke all on obra_fases, autos_medicao, auto_linhas from anon;
 grant select, insert, update, delete on obra_fases, autos_medicao, auto_linhas to authenticated;
+
+-- =======================================================
+-- DIÁRIO DE OBRA
+-- O diário monta-se sozinho com o que já existe (presenças em
+-- registos_admin, tarefas do planeamento e fotos da obra); aqui fica só a
+-- nota escrita de cada dia (ocorrências, atrasos, visitas). O cliente vê as
+-- notas marcadas como visíveis.
+-- =======================================================
+
+create table if not exists obra_diario (
+    id               uuid primary key default gen_random_uuid(),
+    obra_id          uuid not null references obras(id) on delete cascade,
+    data             date not null,
+    notas            text not null check (char_length(notas) <= 4000),
+    visivel_cliente  boolean not null default false,
+    created_at       timestamptz default now(),
+    unique (obra_id, data)
+);
+
+alter table obra_diario enable row level security;
+
+drop policy if exists "obra_diario: admin gere tudo" on obra_diario;
+create policy "obra_diario: admin gere tudo" on obra_diario
+    for all to authenticated using (is_admin()) with check (is_admin());
+
+revoke all on obra_diario from anon;
+grant select, insert, update, delete on obra_diario to authenticated;
