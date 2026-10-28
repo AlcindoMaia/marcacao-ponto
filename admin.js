@@ -4272,6 +4272,7 @@ function abrirPainelTab(tab) {
     if (tab === "ponto")      carregarPainelPonto();
     if (tab === "stock")      carregarPainelStock();
     if (tab === "documentos") carregarPainelDocumentos();
+    if (tab === "andamento")  carregarPainelAndamento();
 }
 
 // ── Documentos da obra (Google Drive) ────────────────────────

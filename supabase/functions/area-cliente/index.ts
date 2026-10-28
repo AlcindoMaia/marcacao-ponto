@@ -6,6 +6,8 @@
 // função é a ÚNICA porta e só devolve o que o cliente pode ver:
 //   - o nome do cliente;
 //   - as obras ligadas a ele (nome, local, estado, percentagem, data prevista);
+//   - as fases visíveis de cada obra (nome, datas, estado) e os autos de
+//     medição já enviados (serviço, % acumulada, valor, totais);
 //   - os documentos dessas obras marcados "Visível ao cliente", com um link
 //     temporário (1 hora) para abrir o ficheiro;
 //   - nas faturas, o total e se está paga; nos orçamentos, o estado, o total
@@ -65,6 +67,27 @@ Deno.serve(async (req) => {
 
     const idsObras = (obras || []).map(o => o.id);
     let documentos: any[] = [];
+    let fases: any[] = [], autos: any[] = [];
+
+    if (idsObras.length) {
+        const [f, a] = await Promise.all([
+            db.from("obra_fases").select("obra_id, nome, ordem, data_inicio, data_fim, estado")
+                .in("obra_id", idsObras).eq("visivel_cliente", true).order("ordem"),
+            db.from("autos_medicao")
+                .select("id, obra_id, numero, data, estado, taxa_iva, notas, auto_linhas(percentagem, valor, obra_servicos(nome, ordem))")
+                .in("obra_id", idsObras).in("estado", ["enviado", "faturado"]).order("numero"),
+        ]);
+        fases = f.data || [];
+        autos = (a.data || []).map((x: any) => {
+            const linhas = (x.auto_linhas || [])
+                .sort((p: any, q: any) => (p.obra_servicos?.ordem || 0) - (q.obra_servicos?.ordem || 0))
+                .map((l: any) => ({ servico: l.obra_servicos?.nome || "", percentagem: Number(l.percentagem), valor: Number(l.valor) }));
+            const base = Math.round(linhas.reduce((s: number, l: any) => s + l.valor, 0) * 100) / 100;
+            const iva  = Math.round(base * Number(x.taxa_iva) / 100 * 100) / 100;
+            return { obra_id: x.obra_id, numero: x.numero, data: x.data, estado: x.estado, notas: x.notas,
+                     taxa_iva: Number(x.taxa_iva), linhas, total_sem_iva: base, iva, total: Math.round((base + iva) * 100) / 100 };
+        });
+    }
 
     if (idsObras.length) {
         const { data: docs } = await db.from("obra_documentos")
@@ -118,7 +141,7 @@ Deno.serve(async (req) => {
 
     await db.from("clientes").update({ ultimo_acesso: new Date().toISOString() }).eq("id", cliente.id);
 
-    return resposta({ cliente: { nome: cliente.nome }, obras: obras || [], documentos });
+    return resposta({ cliente: { nome: cliente.nome }, obras: obras || [], documentos, fases, autos });
 });
 
 // Resposta do cliente a um orçamento. Só vale para um documento de orçamento
