@@ -134,6 +134,7 @@ async function carregarHistorico(funcId) {
   actualizarEstado(hojeRegs);
   ultimoTipoAtual = data?.[0]?.tipo ?? null;
   actualizarBotao(ultimoTipoAtual);
+  mostrarServicos();
 
   const lista = document.getElementById("histLista");
   if (!data || data.length === 0) {
@@ -196,20 +197,13 @@ async function confirmarMarcacao() {
         // impede a marcação: fica "a rever" para o Alcindo.
         const obraEscolhida = MODO_AREA ? document.getElementById("obraEscolha").value : obraID;
         if (!obraEscolhida) { mostrarFeedback("Escolhe a obra onde estás.", "erro"); return; }
-        const { data, error } = MODO_AREA
-          ? await SB.rpc("ponto_marcar_area", {
-              p_device:   getDeviceId(),
-              p_obra_id:  obraEscolhida,
-              p_lat:      lat,
-              p_lon:      lon,
-              p_precisao: pos.coords.accuracy
-            })
-          : await SB.rpc("ponto_marcar", {
-              p_device:  getDeviceId(),
-              p_obra_id: obraID,
-              p_lat:     lat,
-              p_lon:     lon
-            });
+        const args = MODO_AREA
+          ? { p_device: getDeviceId(), p_obra_id: obraEscolhida, p_lat: lat, p_lon: lon, p_precisao: pos.coords.accuracy }
+          : { p_device: getDeviceId(), p_obra_id: obraID, p_lat: lat, p_lon: lon };
+        // Serviço da obra, só na entrada: as horas do dia ficam ligadas a ele
+        const servico = servicoEscolhido();
+        if (servico) args.p_servico = servico;
+        const { data, error } = await SB.rpc(MODO_AREA ? "ponto_marcar_area" : "ponto_marcar", args);
         if (error) {
           console.error(error);
           const m = error.message || "";
@@ -256,6 +250,33 @@ let funcionario = null;
 let obra = null;
 let ultimoTipoAtual = null;
 
+// Serviços da obra para a entrada. Com um só, já vem escolhido; sem
+// serviços (ou se o servidor ainda não tiver a função) a lista não aparece.
+let servicosObra = [];
+async function carregarServicos(obraId) {
+  servicosObra = [];
+  if (obraId) {
+    const { data, error } = await SB.rpc("servicos_para_marcar", { p_device: getDeviceId(), p_obra_id: obraId });
+    if (error) console.error(error); else servicosObra = data || [];
+  }
+  const sel = document.getElementById("servicoEscolha");
+  sel.innerHTML = servicosObra.length === 1
+    ? `<option value="${esc(servicosObra[0].id)}">${esc(servicosObra[0].nome)}</option>`
+    : `<option value="">Que serviço vais fazer?</option>` +
+      servicosObra.map(sv => `<option value="${esc(sv.id)}">${esc(sv.nome)}</option>`).join("") +
+      `<option value="">Não sei</option>`;
+  mostrarServicos();
+}
+// A lista só aparece quando a próxima marcação é uma entrada
+function mostrarServicos() {
+  const sel = document.getElementById("servicoEscolha");
+  if (sel) sel.style.display = servicosObra.length && ultimoTipoAtual !== "entrada" ? "" : "none";
+}
+function servicoEscolhido() {
+  const sel = document.getElementById("servicoEscolha");
+  return sel && sel.style.display !== "none" ? (sel.value || null) : null;
+}
+
 // Lista das obras ativas (só nomes), com a última obra já escolhida
 async function carregarObrasArea() {
   const { data, error } = await SB.rpc("obras_para_marcar", { p_device: getDeviceId() });
@@ -282,7 +303,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     document.getElementById("obraNome").style.display = "none";
-    document.getElementById("obraEscolha").style.display = "";
+    const selObra = document.getElementById("obraEscolha");
+    selObra.style.display = "";
+    selObra.addEventListener("change", () => carregarServicos(selObra.value));
+    await carregarServicos(selObra.value);
   } else {
     obra = await getObra(obraID);
     if (!obra) {
@@ -290,6 +314,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     document.getElementById("obraNome").textContent = obra.nome;
+    await carregarServicos(obraID);
   }
 
   mostrarEcrã("ecrãPrincipal");
