@@ -221,3 +221,11 @@
     table.cartao-compacto > tbody > tr > td::before { flex-basis: auto; margin-right: auto; }
     table.cartao-compacto > tbody > tr > td { padding: 2px 0 !important; }
 }
+
+/* Linhas escondidas por um filtro (tr.style.display = "none") ficam escondidas
+   também em cartões: o "display: block !important" acima ganhava ao estilo da
+   linha e o filtro "Só as ativas" das obras mostrava todas. O #nunca só serve
+   para este seletor ganhar a qualquer outro (ex.: cartao-compacto em grelha). */
+table.tabela-cartoes > :is(tbody, tfoot) > tr:is([style*="display: none"], [style*="display:none"], [hidden], #nunca) {
+    display: none !important;
+}
