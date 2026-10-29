@@ -7,7 +7,7 @@
 
 <title>Painel Administrativo — Maia Solutions</title>
 
-<link rel="stylesheet" href="style.css?v=14">
+<link rel="stylesheet" href="style.css?v=15">
 <link rel="stylesheet" href="telemovel.css?v=7">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
@@ -124,15 +124,10 @@
     <button class="btn-secondary" onclick="fazerLogout()" style="font-size:13px;padding:6px 14px;margin-left:8px">Sair</button>
 </header>
 
-<!-- LOGIN OVERLAY — fixo, cobre toda a página quando activo -->
-<div id="loginBox" style="
-    position:fixed;inset:0;z-index:9999;
-    background:rgba(245,242,237,0.97);
-    display:flex;align-items:center;justify-content:center;
-    backdrop-filter:blur(4px);
-">
-    <div class="card" style="max-width:400px;width:90%;padding:32px">
-        <h2 style="font-family:var(--font-title);font-size:18px;font-weight:400;letter-spacing:2px;text-transform:uppercase;text-align:center;margin-bottom:24px">Área Restrita</h2>
+<!-- LOGIN OVERLAY — fixo, cobre toda a página quando activo (estilo em style.css) -->
+<div id="loginBox">
+    <div class="card login-cartao">
+        <h2>Área Restrita</h2>
         <div style="display:flex;flex-direction:column;gap:10px">
             <input id="emailInput" type="email" placeholder="Email" autocomplete="email">
             <input id="passwordInput" type="password" placeholder="Password" autocomplete="current-password">
@@ -141,10 +136,15 @@
         <div id="pinMsg" style="font-size:13px;color:var(--color-err);text-align:center;margin-top:10px;min-height:18px"></div>
     </div>
 </div>
-
-
-
-
+<script>
+// Se o admin.js ainda não correu (bibliotecas externas lentas ou bloqueadas),
+// o Entrar diz isso em vez de não fazer nada.
+document.getElementById("btnLogin").addEventListener("click", function () {
+    if (typeof fazerLogin !== "function") {
+        document.getElementById("pinMsg").textContent = "A app ainda está a carregar. Se não passar daqui, recarregue a página.";
+    }
+});
+</script>
 
 <!-- ÁREA ADMIN -->
 <div id="adminArea" class="container hidden">
@@ -1895,6 +1895,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js" integrity="sha384-Dr98ddmUw2QkdCarNQ+OL7xLty7cSxgR0T7v1tq4UErS/qLV0132sBYTolRAFuOV" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- Se o jsDelivr falhar, o mesmo ficheiro (mesma integrity) vem do unpkg -->
+<script>window.supabase || document.write('<script src="https://unpkg.com/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous" referrerpolicy="no-referrer"><\/script>')</script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js" integrity="sha384-hStSInNIZ8ljtOVrmrgf7zdHMapaLBWoSnPTtF0nzsybp4+LuhDz6sHuEVpWIX8o" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="config.js?v=2"></script>
 <script src="leitor-qr.js"></script>
@@ -1904,7 +1906,7 @@
 <script src="cotacoes.js"></script>
 <script src="andamento.js?v=2"></script>
 <script src="rh.js?v=1"></script>
-<script src="admin.js?v=19"></script>
+<script src="admin.js?v=20"></script>
 <script src="telemovel.js?v=5"></script>
 
 
