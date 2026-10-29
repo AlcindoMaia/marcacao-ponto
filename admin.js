@@ -2351,11 +2351,159 @@ async function abrirPainelObra(obra) {
             valor > 0 && (mo + mat) > 0 ? Math.round((mo + mat) / valor * 100) : null);
     }).join("") + (matSemServ + moSemServ >= 1 ? linhaServ(
         `<span style="opacity:.6;font-style:italic">Custos sem serviço</span>`,
-        `<span title="Faturas e horas desta obra que não foram ligadas a nenhum serviço" style="opacity:.4;font-size:11px;margin-left:4px">ⓘ</span>`,
-        0, moSemServ, matSemServ, "", null) : "");
+        `<span style="color:var(--primary,#b58863);font-size:11px;margin-left:6px;white-space:nowrap">▸ ligar a serviço</span>`,
+        0, moSemServ, matSemServ, "", null)
+        // Tocar na linha abre por baixo a gaveta com as horas e faturas por ligar
+        .replace(`<div class="serv-row">`, `<div class="serv-row" id="linhaSemServ" onclick="abrirGavetaSemServico()" style="cursor:pointer" title="Ver as horas e faturas desta obra que não estão ligadas a nenhum serviço">`)
+        + `<div id="gavetaSemServ" style="display:none"></div>` : "");
+    _servicosPainel = servicos || [];
 
     // Abrir o primeiro separador: é o que dispara o carregamento do resumo
     abrirPainelTab("resumo");
+}
+
+// =======================================================
+// GAVETA "CUSTOS SEM SERVIÇO" (painel da obra)
+// As horas (registos_admin) e as faturas (movimentos de saída) desta obra
+// que ainda não estão ligadas a nenhum serviço, ou só em parte. Escolhe-se o
+// serviço, marcam-se as linhas e liga-se o que falta de cada uma de uma vez,
+// sem ir ao Registo diário nem abrir fatura a fatura.
+// =======================================================
+let _gavetaSemServ = { horas: [], faturas: [] };
+
+async function abrirGavetaSemServico(forcarAberta = false) {
+    const gav = document.getElementById("gavetaSemServ");
+    const obra = _painelObraActual;
+    if (!gav || !obra) return;
+    if (gav.style.display !== "none" && !forcarAberta) { gav.style.display = "none"; return; }
+    gav.style.display = "block";
+    gav.innerHTML = `<div style="padding:16px;text-align:center;font-size:12px;opacity:.5">A carregar…</div>`;
+
+    const [{ data: regs, error: e1 }, { data: movs, error: e2 }] = await Promise.all([
+        SB.from("registos_admin")
+            .select("id, data, horas, funcionarios(nome, valor_dia), registo_servicos(horas)")
+            .eq("obra_id", obra.id).eq("tipo", "presenca").order("data", { ascending: false }),
+        SB.from("movimentos_financeiros")
+            .select("id, data_documento, referencia, valor_base, valor_total, fornecedores(nome), movimento_servicos(valor)")
+            .eq("obra_id", obra.id).eq("tipo", "saida").eq("ativo", true).order("data_documento", { ascending: false }),
+    ]);
+    if (e1 || e2) {
+        console.error(e1 || e2);
+        gav.innerHTML = `<div style="padding:16px;font-size:12px;color:#e09486">Não foi possível carregar os custos por ligar.</div>`;
+        return;
+    }
+
+    // O que falta ligar em cada linha (uma linha pode estar ligada só em parte)
+    const horas = (regs || []).map(r => {
+        const falta = Number(r.horas || 0) - (r.registo_servicos || []).reduce((s, x) => s + Number(x.horas || 0), 0);
+        const vd = Number(r.funcionarios?.valor_dia || 0);
+        return { id: r.id, data: r.data, nome: r.funcionarios?.nome || "—", horas: Math.round(falta * 100) / 100, custo: falta * vd / 8 };
+    }).filter(r => r.horas > 0.009);
+    const faturas = (movs || []).map(m => {
+        const falta = semIva(m) - (m.movimento_servicos || []).reduce((s, x) => s + Number(x.valor || 0), 0);
+        return { id: m.id, data: m.data_documento, nome: m.fornecedores?.nome || "Sem fornecedor",
+                 ref: m.referencia || "", valor: Math.round(falta * 100) / 100 };
+    }).filter(m => m.valor > 0.009);
+    _gavetaSemServ = { horas, faturas };
+    desenharGavetaSemServico();
+}
+
+function desenharGavetaSemServico() {
+    const gav = document.getElementById("gavetaSemServ");
+    if (!gav) return;
+    const { horas, faturas } = _gavetaSemServ;
+    const eur = v => v.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+    const dataPt = d => d ? d.split("-").reverse().join("/") : "—";
+    const servs = _servicosPainel || [];
+
+    if (!horas.length && !faturas.length) {
+        gav.innerHTML = `<div style="padding:14px 16px;font-size:12px;opacity:.6;background:rgba(181,136,99,.05)">Já não há horas nem faturas por ligar nesta obra.</div>`;
+        return;
+    }
+
+    const linha = (tipo, id, col1, col2, col3) => `
+        <label style="font-family:var(--font-body);letter-spacing:0;text-transform:none;color:inherit;margin:0;display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;font-size:12px">
+            <input type="checkbox" class="gs-item" data-tipo="${tipo}" data-id="${id}" checked style="width:16px;height:16px;flex-shrink:0">
+            <span style="width:74px;flex-shrink:0;opacity:.6">${col1}</span>
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${col2}</span>
+            <span style="flex-shrink:0;text-align:right;opacity:.85">${col3}</span>
+        </label>`;
+    const bloco = (tipo, titulo, resumo, linhas) => `
+        <div style="margin-top:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
+                <div style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;opacity:.55">${titulo} · ${resumo}</div>
+                <label style="font-family:var(--font-body);letter-spacing:0;text-transform:none;color:inherit;margin:0;display:inline-flex;align-items:center;gap:4px;font-size:11px;opacity:.7;cursor:pointer;white-space:nowrap;flex-shrink:0">
+                    <input type="checkbox" checked onchange="marcarTodosGaveta('${tipo}', this.checked)" style="width:14px;height:14px;margin:0"> todas
+                </label>
+            </div>
+            <div style="max-height:260px;overflow-y:auto">${linhas}</div>
+        </div>`;
+
+    const totH = horas.reduce((s, r) => s + r.horas, 0), totHC = horas.reduce((s, r) => s + r.custo, 0);
+    const totF = faturas.reduce((s, m) => s + m.valor, 0);
+
+    gav.innerHTML = `
+    <div style="padding:12px 16px 14px;background:rgba(181,136,99,.05);border-top:1px solid rgba(181,136,99,.15)">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+            <span style="font-size:12px;opacity:.7;flex-basis:100%">Ligar as marcadas a</span>
+            <select id="gsServico" style="flex:1;min-width:0;width:auto;padding:6px 8px;font-size:13px">
+                ${servs.length === 1 ? "" : `<option value="">— Serviço —</option>`}
+                ${servs.map(s => `<option value="${s.id}">${esc(s.nome)}${s.extra ? " [Extra]" : ""}</option>`).join("")}
+            </select>
+            <button type="button" id="gsLigar" onclick="ligarGavetaSemServico()" class="btn-primary"
+                style="padding:6px 14px;font-size:13px;white-space:nowrap">Ligar</button>
+        </div>
+        ${horas.length ? bloco("h", "Mão de obra", `${horas.length} registo(s) · ${totH.toLocaleString("pt-PT")} h · ${eur(totHC)}`,
+            horas.map(r => linha("h", r.id, dataPt(r.data), esc(r.nome), `${r.horas.toLocaleString("pt-PT")} h · ${eur(r.custo)}`)).join("")) : ""}
+        ${faturas.length ? bloco("f", "Faturas", `${faturas.length} · ${eur(totF)} sem IVA`,
+            faturas.map(m => linha("f", m.id, dataPt(m.data), esc(m.nome) + (m.ref ? ` <span style="opacity:.5">${esc(m.ref)}</span>` : ""), eur(m.valor))).join("")) : ""}
+        <div id="gsMsg" style="font-size:12px;margin-top:8px"></div>
+    </div>`;
+}
+
+function marcarTodosGaveta(tipo, marcado) {
+    document.querySelectorAll(`#gavetaSemServ .gs-item[data-tipo="${tipo}"]`).forEach(c => c.checked = marcado);
+}
+
+async function ligarGavetaSemServico() {
+    const servId = document.getElementById("gsServico")?.value;
+    const msg = document.getElementById("gsMsg");
+    if (!servId) { msg.style.color = "#e09486"; msg.textContent = "Escolha o serviço."; return; }
+    const marcados = [...document.querySelectorAll("#gavetaSemServ .gs-item:checked")];
+    if (!marcados.length) { msg.style.color = "#e09486"; msg.textContent = "Marque pelo menos uma linha."; return; }
+
+    // Liga só o que falta de cada linha, para não contar duas vezes o que já
+    // estava ligado a outro serviço
+    const ids = t => new Set(marcados.filter(c => c.dataset.tipo === t).map(c => c.dataset.id));
+    const idsH = ids("h"), idsF = ids("f");
+    const ligH = _gavetaSemServ.horas.filter(r => idsH.has(r.id))
+        .map(r => ({ registo_id: r.id, obra_servico_id: servId, horas: r.horas }));
+    const ligF = _gavetaSemServ.faturas.filter(m => idsF.has(m.id))
+        .map(m => ({ movimento_id: m.id, obra_servico_id: servId, valor: m.valor }));
+
+    const btn = document.getElementById("gsLigar");
+    if (btn) btn.disabled = true;
+    msg.style.color = ""; msg.textContent = "A ligar…";
+    const [rH, rF] = await Promise.all([
+        ligH.length ? SB.from("registo_servicos").insert(ligH) : { error: null },
+        ligF.length ? SB.from("movimento_servicos").insert(ligF) : { error: null },
+    ]);
+    if (rH.error || rF.error) {
+        console.error(rH.error || rF.error);
+        if (btn) btn.disabled = false;
+        msg.style.color = "#e09486";
+        msg.textContent = "Não foi possível ligar tudo. Volte a abrir a gaveta para ver o que ficou por ligar.";
+        return;
+    }
+
+    // Redesenhar o painel com os novos números, no mesmo separador
+    const tab = document.querySelector(".painel-tab.active")?.dataset.tab || "resumo";
+    await abrirPainelObra(_painelObraActual);
+    if (tab !== "resumo") abrirPainelTab(tab);
+    if (!document.getElementById("gavetaSemServ")) return;   // já não há custos por ligar
+    await abrirGavetaSemServico(true);
+    const m2 = document.getElementById("gsMsg");
+    if (m2) { m2.style.color = "#8fbfa0"; m2.textContent = `✓ ${ligH.length + ligF.length} linha(s) ligada(s) ao serviço.`; }
 }
 
 async function toggleEstadoObra(id, nome, estadoAtual) {
@@ -4305,6 +4453,7 @@ async function apagarArtigo(id, nome) {
 // PAINEL DE OBRA — modal completo com sub-tabs
 // =======================================================
 let _painelObraActual = null;
+let _servicosPainel = [];   // serviços da obra aberta no painel (gaveta "Custos sem serviço")
 
 
 function fecharPainelObra() {
