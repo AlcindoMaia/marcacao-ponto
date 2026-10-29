@@ -603,14 +603,20 @@ label {
 
 /* ── Login box ─────────────────────────────────────── */
 #loginBox {
-    background: var(--panel-solid);
-    backdrop-filter: blur(12px);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-lg);
-    padding: 40px;
-    max-width: 380px;
-    margin: 60px auto;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: var(--bg);
     text-align: center;
+}
+#loginBox .login-cartao {
+    max-width: 380px;
+    width: 100%;
+    padding: 32px;
 }
 
 #loginBox h2 {
@@ -778,7 +784,6 @@ body.dark .modal { background: rgba(0,0,0,.6); }
 body.dark .modal-content { background: #25363f; }
 body.dark .filtros-linha select,
 body.dark .filtros-linha input[type="date"] { background: rgba(255,255,255,.07); color: #f0f0f0; }
-body.dark #loginBox { background: rgba(30,30,30,.95); }
 body.dark label { color: rgba(255,255,255,.45); }
 
 /* =======================================================
@@ -1289,7 +1294,7 @@ body.dark table tbody td { border-bottom-color: rgba(255,255,255,.06); }
 body.dark table tbody tr:hover { background: rgba(181,136,99,.08) !important; }
 body.dark .modal { background: rgba(5,10,15,.7); }
 body.dark .modal-content { background: #1d2a37; color: #ece5de; border: 1px solid rgba(255,255,255,.08); }
-body.dark #loginBox { background: #1d2a37; color: #ece5de; }
+body.dark #loginBox { background: #131c25; color: #ece5de; }
 body.dark .dark-toggle:hover { background: rgba(255,255,255,.1); }
 body.dark .plan-cartao { background: #25363f; color: #ece5de; }
 body.dark .plan-cartao .plan-avatar-resp { color: #131c25; }

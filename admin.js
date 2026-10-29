@@ -41,57 +41,80 @@ const _PAGINA_FLUXO_TAM = 50;
 // =======================================================
 // AUTH — Login com Supabase Auth (email + password)
 // =======================================================
-window.addEventListener("load", async () => {
+// O botão Entrar liga-se já, sem esperar pelo "load" (que espera por todas as
+// imagens e CDN): no telemóvel o "load" pode tardar e o botão ficava morto.
+document.getElementById("btnLogin")?.addEventListener("click", fazerLogin);
+document.addEventListener("keydown", e => {
+    if (e.key === "Enter" && loginVisivel()) fazerLogin();
+});
+
+function loginVisivel() {
+    const lb = document.getElementById("loginBox");
+    return !!lb && lb.style.display !== "none";
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+    // Sem a biblioteca do Supabase o config.js falhou e o SB nem pode ser lido
+    // (nem com typeof); fazerLogin explica o que falhou.
+    if (!window.supabase) return;
     ligarEventosGlobais();
 
     // Verificar se já há sessão activa
-    const { data: { session } } = await SB.auth.getSession();
+    let session = null;
+    try { ({ data: { session } } = await SB.auth.getSession()); } catch (e) {}
     if (session) {
         mostrarPainel();
         return;
     }
-
-    // Mostrar form de login
-    const lb = document.getElementById("loginBox");
-    if (lb) lb.style.display = "flex";
     document.getElementById("emailInput")?.focus();
-
-    document.getElementById("btnLogin")?.addEventListener("click", fazerLogin);
-    document.addEventListener("keydown", e => {
-        if (e.key === "Enter" && !document.getElementById("loginBox").classList.contains("hidden")) {
-            fazerLogin();
-        }
-    });
 });
 
+let _aEntrar = false;
 async function fazerLogin() {
+    if (_aEntrar) return;
     const email    = document.getElementById("emailInput")?.value?.trim();
     const password = document.getElementById("passwordInput")?.value;
     const msg      = document.getElementById("pinMsg");
+    const erro = t => { msg.textContent = t; msg.style.color = "#e09486"; };
 
     if (!email || !password) {
-        msg.textContent = "Preencha email e password.";
+        erro("Preencha email e password.");
+        return;
+    }
+    // Sem a biblioteca do Supabase (CDN bloqueado ou sem rede) não há login
+    if (!window.supabase) {
+        erro("Não foi possível carregar a ligação ao servidor. Verifique a internet e recarregue a página.");
         return;
     }
 
     msg.textContent = "A autenticar...";
     msg.style.color = "";
 
-    const { error } = await SB.auth.signInWithPassword({ email, password });
+    _aEntrar = true;
+    let error;
+    try {
+        ({ error } = await SB.auth.signInWithPassword({ email, password }));
+    } catch (e) {
+        error = e;
+    } finally {
+        _aEntrar = false;
+    }
 
     if (error) {
-        msg.textContent = "Credenciais inválidas.";
-        msg.style.color = "#e09486";
+        const semRede = !error.status || /fetch|network|rede/i.test(error.message || "");
+        erro(semRede ? "Sem ligação ao servidor. Verifique a internet e tente de novo."
+                     : "Credenciais inválidas.");
         return;
     }
 
+    msg.textContent = "";
     mostrarPainel();
 }
 
 async function fazerLogout() {
     await SB.auth.signOut();
     document.getElementById("adminArea").classList.add("hidden");
-    document.getElementById("loginBox").classList.remove("hidden");
+    document.getElementById("loginBox").style.display = "flex";
     document.getElementById("emailInput").value    = "";
     document.getElementById("passwordInput").value = "";
     document.getElementById("pinMsg").textContent  = "";
@@ -512,12 +535,28 @@ async function carregarRegistosAdmin() {
     else renderRaDetalhe();
 }
 
-function renderRaMapaFuncionario(ano, mes) {
+// Dias do mês como "AAAA-MM-DD", para os mapas mensais dos Registos
+function diasDoMes(ano, mes) {
     const ultimoDia = new Date(ano, mes, 0).getDate();
-    const dias = Array.from({length: ultimoDia}, (_,i) => {
+    return Array.from({length: ultimoDia}, (_,i) => {
         const d = String(i+1).padStart(2,"0");
         return `${ano}-${String(mes).padStart(2,"0")}-${d}`;
     });
+}
+
+// Cabeçalho com um <th> por dia (fins de semana e feriados esbatidos)
+function cabecalhoDiasMes(dias) {
+    return dias.map(d => {
+        const dObj = new Date(d+"T12:00:00");
+        const dow  = dObj.getDay();
+        const fer  = feriadoEm(d);
+        const isWE = dow===0||dow===6||!!fer;
+        return `<th style="padding:4px 2px;text-align:center;min-width:28px;font-size:10px;font-weight:500;${isWE?"opacity:.3":""}${fer?";color:#a5483d":""}"${fer?` title="Feriado: ${esc(fer)}"`:""}>${String(dObj.getDate()).padStart(2,"0")}</th>`;
+    }).join("");
+}
+
+function renderRaMapaFuncionario(ano, mes) {
+    const dias = diasDoMes(ano, mes);
 
     // Agrupar por funcionário
     const porFunc = {};
@@ -538,13 +577,7 @@ function renderRaMapaFuncionario(ano, mes) {
     <thead>
         <tr style="background:var(--primary-lt)">
             <th style="padding:8px 12px;text-align:left;position:sticky;left:0;background:var(--panel-solid);z-index:2;min-width:140px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Funcionário</th>
-            ${dias.map(d => {
-                const dObj = new Date(d+"T12:00:00");
-                const dow  = dObj.getDay();
-                const fer  = feriadoEm(d);
-                const isWE = dow===0||dow===6||!!fer;
-                return `<th style="padding:4px 2px;text-align:center;min-width:28px;font-size:10px;font-weight:500;${isWE?"opacity:.3":""}${fer?";color:#a5483d":""}"${fer?` title="Feriado: ${esc(fer)}"`:""}>${String(dObj.getDate()).padStart(2,"0")}</th>`;
-            }).join("")}
+            ${cabecalhoDiasMes(dias)}
             <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Dias</th>
             <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Horas</th>
             <th style="padding:8px 10px;text-align:right;min-width:70px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Valor €</th>
@@ -587,11 +620,7 @@ function renderRaMapaFuncionario(ano, mes) {
 }
 
 function renderRaMapaObra(ano, mes) {
-    const ultimoDia = new Date(ano, mes, 0).getDate();
-    const dias = Array.from({length: ultimoDia}, (_,i) => {
-        const d = String(i+1).padStart(2,"0");
-        return `${ano}-${String(mes).padStart(2,"0")}-${d}`;
-    });
+    const dias = diasDoMes(ano, mes);
 
     // Agrupar por obra
     const porObra = {};
@@ -612,13 +641,7 @@ function renderRaMapaObra(ano, mes) {
     <thead>
         <tr style="background:var(--primary-lt)">
             <th style="padding:8px 12px;text-align:left;position:sticky;left:0;background:var(--panel-solid);z-index:2;min-width:160px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Obra</th>
-            ${dias.map(d => {
-                const dObj = new Date(d+"T12:00:00");
-                const dow  = dObj.getDay();
-                const fer  = feriadoEm(d);
-                const isWE = dow===0||dow===6||!!fer;
-                return `<th style="padding:4px 2px;text-align:center;min-width:28px;font-size:10px;font-weight:500;${isWE?"opacity:.3":""}${fer?";color:#a5483d":""}"${fer?` title="Feriado: ${esc(fer)}"`:""}>${String(dObj.getDate()).padStart(2,"0")}</th>`;
-            }).join("")}
+            ${cabecalhoDiasMes(dias)}
             <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Horas</th>
             <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Colabs.</th>
         </tr>
