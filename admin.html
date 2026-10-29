@@ -42,6 +42,12 @@
 }
 .sec-subtab.active { background:rgba(181,136,99,.15); color:var(--primary); border-bottom-color:var(--primary); }
 #filtroEstadoObras { width:auto; flex:0 0 auto; }
+/* Separadores da ficha do trabalhador (mesmo aspeto dos sub-separadores) */
+.ficha-tab { background:none; color:var(--text-muted); border:none; border-bottom:2px solid transparent;
+    padding:7px 12px; font-size:13px; font-weight:600; cursor:pointer; border-radius:4px 4px 0 0; }
+.ficha-tab.active { background:rgba(181,136,99,.15); color:var(--primary); border-bottom-color:var(--primary); }
+.ficha-tab:disabled { opacity:.35; cursor:default; }
+.rh-secao { font-size:11px; text-transform:uppercase; letter-spacing:.05em; opacity:.55; margin:16px 0 6px; font-weight:700; }
 
 /* Botão falta uniforme */
 .btn-falta-tab {
@@ -941,6 +947,7 @@
     <div class="sec-subtabs">
         <button type="button" class="sec-subtab active" data-grupo="func" data-sub="equipa">👷 Equipa</button>
         <button type="button" class="sec-subtab" data-grupo="func" data-sub="registos">📋 Registos</button>
+        <button type="button" class="sec-subtab" data-grupo="func" data-sub="empresa">📁 Documentos da empresa</button>
     </div>
 
     <div class="sec-sub-conteudo" id="funcSub-equipa">
@@ -1116,6 +1123,11 @@
     </div><!-- fim regTabContent-admin -->
 
     </div><!-- fim funcSub-registos -->
+
+    <!-- SUB-SEPARADOR: DOCUMENTOS DA EMPRESA (seguro, alvará, não dívida). rh.js -->
+    <div class="sec-sub-conteudo" id="funcSub-empresa" style="display:none">
+        <div id="rhEmpresa"><div style="padding:24px;text-align:center;opacity:.5">A carregar...</div></div>
+    </div>
 
 </div>
 
@@ -1596,13 +1608,26 @@
 
 <!-- ================= MODAL FUNCIONÁRIO ================= -->
 <div id="modalFuncionario" class="modal hidden">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width:720px">
 
         <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
             <h2 id="modalFuncTitulo">Novo Funcionário</h2>
             <button onclick="fecharModalFuncionario()" class="modal-close"
                     style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.6">×</button>
         </div>
+
+        <!-- Separadores da ficha (os outros três só existem depois de gravado). rh.js -->
+        <div class="sec-subtabs" id="fichaTabs">
+            <button type="button" class="ficha-tab active" data-ficha="dados">👤 Dados</button>
+            <button type="button" class="ficha-tab" data-ficha="documentos">📁 Documentos</button>
+            <button type="button" class="ficha-tab" data-ficha="ausencias">🏖 Férias e ausências</button>
+            <button type="button" class="ficha-tab" data-ficha="obras">🏗 Obras</button>
+        </div>
+        <div id="fichaTab-documentos" class="ficha-conteudo" style="display:none"></div>
+        <div id="fichaTab-ausencias"  class="ficha-conteudo" style="display:none"></div>
+        <div id="fichaTab-obras"      class="ficha-conteudo" style="display:none"></div>
+
+        <div id="fichaTab-dados" class="ficha-conteudo">
 
         <div class="form-row">
             <div class="form-group">
@@ -1658,6 +1683,64 @@
             </div>
         </div>
 
+        <!-- Dados que a lei pede no registo de trabalhadores da obra (DL 273/2003, art. 21.º) -->
+        <div class="rh-secao">Dados legais</div>
+        <div class="form-row">
+            <div class="form-group input-sm">
+                <label>N.º Segurança Social</label>
+                <input id="funcNiss" inputmode="numeric" placeholder="11 dígitos">
+            </div>
+            <div class="form-group input-sm">
+                <label>Data de nascimento</label>
+                <input id="funcDataNascimento" type="date">
+            </div>
+            <div class="form-group input-sm">
+                <label>Nacionalidade</label>
+                <input id="funcNacionalidade" placeholder="Portuguesa">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Morada</label>
+                <input id="funcMorada" placeholder="Rua, n.º, código postal, localidade">
+            </div>
+        </div>
+
+        <div class="rh-secao">Contrato</div>
+        <div class="form-row">
+            <div class="form-group input-sm">
+                <label>Data de admissão</label>
+                <input id="funcDataAdmissao" type="date">
+            </div>
+            <div class="form-group input-sm">
+                <label>Fim do contrato <span style="opacity:.5">(a termo)</span></label>
+                <input id="funcDataFimContrato" type="date">
+            </div>
+            <div class="form-group input-sm">
+                <label>Data de saída</label>
+                <input id="funcDataSaida" type="date">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group input-sm">
+                <label>Salário base mensal (€)</label>
+                <input id="funcSalarioMensal" type="number" step="0.01" placeholder="Vazio = pago ao dia">
+            </div>
+        </div>
+        <div style="font-size:11px;opacity:.55;margin:-4px 0 4px">Com salário mensal, os Ordenados usam-no e só descontam faltas injustificadas e dias de baixa (pagos pela Segurança Social). O valor por dia continua a servir para pôr o custo da mão de obra em cada obra.</div>
+
+        <div class="rh-secao">Contacto de emergência</div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Nome</label>
+                <input id="funcEmergenciaNome" placeholder="Ex.: Maria Silva (mulher)">
+            </div>
+            <div class="form-group input-sm">
+                <label>Telefone</label>
+                <input id="funcEmergenciaTel" placeholder="+351 ...">
+            </div>
+        </div>
+
         <!-- Info dispositivo — só visível em modo edição -->
         <div id="funcDeviceInfo" style="display:none;margin-top:12px;padding:12px;border-radius:8px;background:rgba(255,255,255,.05);font-size:13px">
             <div style="opacity:.6;font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Dispositivo registado</div>
@@ -1694,6 +1777,7 @@
             <button class="btn-primary" id="guardarFuncionarioBtn">Guardar</button>
         </div>
         <div id="modalFuncMsg" style="margin-top:8px;font-size:13px;color:#e09486"></div>
+        </div><!-- fim fichaTab-dados -->
 
     </div>
 </div>
@@ -1816,9 +1900,10 @@
 <script src="leitor-qr.js"></script>
 <script src="dados-publicos.js"></script>
 <script src="fotos.js"></script>
-<script src="planeamento.js?v=3"></script>
+<script src="planeamento.js?v=4"></script>
 <script src="cotacoes.js"></script>
 <script src="andamento.js?v=2"></script>
+<script src="rh.js?v=1"></script>
 <script src="admin.js?v=18"></script>
 <script src="telemovel.js?v=5"></script>
 
