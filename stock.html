@@ -256,13 +256,20 @@
     margin-bottom: 10px;
   }
 </style>
+<link rel="stylesheet" href="carregar.css?v=1">
 </head>
 <body>
 
 <!-- LOADING -->
 <div id="ecrãLoading" class="ecrã" style="display:flex">
-  <div class="spinner"></div>
-  <p style="color:var(--text-muted);font-size:14px">A verificar acesso…</p>
+  <div class="carregar" role="status">
+    <div class="logo" aria-hidden="true">
+      <img class="telhado" src="img/logo-telhado.webp" alt="">
+      <img class="maia" src="img/logo-maia.webp" alt="">
+      <img class="solutions" src="img/logo-solutions.webp" alt="">
+    </div>
+    <p>A verificar acesso…</p>
+  </div>
 </div>
 
 <!-- BLOQUEIO -->
