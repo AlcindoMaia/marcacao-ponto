@@ -92,10 +92,13 @@ function actualizarBotao(ultimoTipo) {
   const icon = document.getElementById("btnIcon");
   const label = document.getElementById("btnLabel");
   const sublabel = document.getElementById("btnSublabel");
+  const btn = document.getElementById("btnMarcacao");
   if (ultimoTipo === "entrada") {
     icon.textContent="⏹"; label.textContent="SAÍDA"; sublabel.textContent="Toca para registar saída";
+    btn.style.background = "conic-gradient(from 200deg at 40% 60%, #e09486, #a5483d, #e09486)";
   } else {
     icon.textContent="▶"; label.textContent="ENTRADA"; sublabel.textContent="Toca para registar entrada";
+    btn.style.background = "conic-gradient(from 200deg at 40% 60%, #c49a76, #9a7150, #c49a76)";
   }
 }
 
@@ -129,11 +132,12 @@ async function carregarHistorico(funcId) {
   const hoje = diaLocal(new Date().toISOString());
   const hojeRegs = (data||[]).filter(r => diaLocal(r.datahora) === hoje);
   actualizarEstado(hojeRegs);
-  actualizarBotao(data?.[0]?.tipo ?? null);
+  ultimoTipoAtual = data?.[0]?.tipo ?? null;
+  actualizarBotao(ultimoTipoAtual);
 
   const lista = document.getElementById("histLista");
   if (!data || data.length === 0) {
-    lista.innerHTML = `<div style="padding:16px 0;font-size:13px;color:var(--text-muted);text-align:center">Sem registos esta semana</div>`;
+    lista.innerHTML = `<div class="hist-vazio">Sem registos esta semana</div>`;
     return;
   }
 
@@ -155,10 +159,12 @@ async function carregarHistorico(funcId) {
     const saida   = registosDia.find(r => r.tipo === "saida");
     const horas   = (entrada && saida) ? calcHoras(entrada.datahora, saida.datahora) : null;
     return `<div class="hist-item">
-      <div class="hist-tipo ${entrada ? "entrada" : "saida"}"></div>
-      <div class="hist-texto">${diaLabel}</div>
-      <div class="hist-data">${entrada ? fmtHora(entrada.datahora) : "—"} → ${saida ? fmtHora(saida.datahora) : "—"}</div>
-      <div class="hist-hora">${horas || ""}</div>
+      <div class="hist-dot ${entrada ? "entrada" : "saida"}"></div>
+      <div class="hist-mid">
+        <div class="hist-dia">${diaLabel}</div>
+        <div class="hist-horas-line">${entrada ? fmtHora(entrada.datahora) : "—"} → ${saida ? fmtHora(saida.datahora) : "—"}</div>
+      </div>
+      <div class="hist-total">${horas || ""}</div>
     </div>`;
   }).join("");
 }
@@ -185,13 +191,25 @@ async function confirmarMarcacao() {
         // dentro de ponto_marcar, e a mensagem de recusa dele é mostrada
         // abaixo tal como vem.
 
-        // O funcionário e o tipo (entrada/saída) são determinados no servidor
-        const { data, error } = await SB.rpc("ponto_marcar", {
-          p_device:  getDeviceId(),
-          p_obra_id: obraID,
-          p_lat:     lat,
-          p_lon:     lon
-        });
+        // O funcionário e o tipo (entrada/saída) são determinados no servidor.
+        // Na área do funcionário a obra vem da lista e a distância não
+        // impede a marcação: fica "a rever" para o Alcindo.
+        const obraEscolhida = MODO_AREA ? document.getElementById("obraEscolha").value : obraID;
+        if (!obraEscolhida) { mostrarFeedback("Escolhe a obra onde estás.", "erro"); return; }
+        const { data, error } = MODO_AREA
+          ? await SB.rpc("ponto_marcar_area", {
+              p_device:   getDeviceId(),
+              p_obra_id:  obraEscolhida,
+              p_lat:      lat,
+              p_lon:      lon,
+              p_precisao: pos.coords.accuracy
+            })
+          : await SB.rpc("ponto_marcar", {
+              p_device:  getDeviceId(),
+              p_obra_id: obraID,
+              p_lat:     lat,
+              p_lon:     lon
+            });
         if (error) {
           console.error(error);
           const m = error.message || "";
@@ -201,17 +219,27 @@ async function confirmarMarcacao() {
           );
           return;
         }
-        const tipo = (Array.isArray(data) ? data[0] : data)?.tipo;
-        mostrarFeedback(tipo==="entrada" ? "✓ Entrada registada!" : "✓ Saída registada!", "ok");
+        const r = Array.isArray(data) ? data[0] : data;
+        const tipo = r?.tipo;
+        const feito = tipo==="entrada" ? "✓ Entrada registada" : "✓ Saída registada";
+        if (r?.a_rever) {
+          mostrarFeedback(feito + (r.distancia_m != null
+            ? ` a ${r.distancia_m} m da obra. Fica para o Alcindo confirmar.`
+            : ". Esta obra ainda não tem localização: fica para o Alcindo confirmar."), "info");
+        } else {
+          mostrarFeedback(feito + "!", "ok");
+        }
         await carregarHistorico(funcionario.id);
       } finally {
         btn.classList.remove("disabled");
+        // Se a marcação falhou, o botão volta a dizer Entrada/Saída
+        if (document.getElementById("btnLabel").textContent === "A localizar…") actualizarBotao(ultimoTipoAtual);
       }
     },
     () => {
       mostrarFeedback("Não foi possível obter a localização. Verifique o GPS.", "erro");
       btn.classList.remove("disabled");
-      actualizarBotao(null);
+      actualizarBotao(ultimoTipoAtual);
     },
     { enableHighAccuracy: true, timeout: 15000 }
   );
@@ -222,36 +250,56 @@ async function confirmarMarcacao() {
 // =======================================================
 const urlParams = new URLSearchParams(window.location.search);
 const obraID = urlParams.get("obra");
+// Sem ?obra= no endereço é a área do funcionário: escolhe a obra numa lista
+const MODO_AREA = !obraID;
 let funcionario = null;
 let obra = null;
+let ultimoTipoAtual = null;
+
+// Lista das obras ativas (só nomes), com a última obra já escolhida
+async function carregarObrasArea() {
+  const { data, error } = await SB.rpc("obras_para_marcar", { p_device: getDeviceId() });
+  if (error) { console.error(error); return false; }
+  const sel = document.getElementById("obraEscolha");
+  const lista = data || [];
+  sel.innerHTML = `<option value="">Em que obra estás?</option>` +
+    lista.map(o => `<option value="${esc(o.id)}"${o.ultima ? " selected" : ""}>${esc(o.nome)}</option>`).join("");
+  return true;
+}
 
 document.addEventListener("DOMContentLoaded", async () => {
   mostrarEcrã("ecrãLoading");
 
-  if (!obraID) {
-    mostrarBloqueio("QR inválido", "Este QR não contém uma referência de obra válida.<br>Peça ao responsável um novo QR Code.");
-    return;
-  }
-
   funcionario = await getFuncionario(getDeviceId());
-  if (!funcionario) {
+  if (!funcionario || !funcionario.ativo) {
     mostrarBloqueio("Dispositivo não autorizado", "Este dispositivo não está registado no sistema.<br><br>Contacte o administrador.");
     return;
   }
 
-  obra = await getObra(obraID);
-  if (!obra) {
-    mostrarBloqueio("Obra não encontrada", "Este QR Code é inválido ou a obra foi removida.");
-    return;
+  if (MODO_AREA) {
+    if (!(await carregarObrasArea())) {
+      mostrarBloqueio("Sem ligação", "Não foi possível carregar as obras.<br>Tente novamente daqui a pouco.");
+      return;
+    }
+    document.getElementById("obraNome").style.display = "none";
+    document.getElementById("obraEscolha").style.display = "";
+  } else {
+    obra = await getObra(obraID);
+    if (!obra) {
+      mostrarBloqueio("Obra não encontrada", "Este QR Code é inválido ou a obra foi removida.");
+      return;
+    }
+    document.getElementById("obraNome").textContent = obra.nome;
   }
 
   mostrarEcrã("ecrãPrincipal");
+  const av = document.getElementById("funcAvatar");
+  if (av) av.textContent = (funcionario.nome || "?").charAt(0).toUpperCase();
   document.getElementById("funcNome").textContent = funcionario.nome;
-  document.getElementById("obraNome").textContent = obra.nome;
   document.getElementById("btnMarcacao").addEventListener("click", confirmarMarcacao);
   // Botão de carga — pré-preenche a obra como origem
   const btnCarga = document.getElementById("btnCarga");
-  if (btnCarga) btnCarga.href = "carga.html?origem=" + obraID;
+  if (btnCarga && obraID) btnCarga.href = "carga.html?origem=" + obraID;
   await carregarHistorico(funcionario.id);
 
   // Relógio em tempo real — hora de Lisboa
