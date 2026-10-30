@@ -137,7 +137,9 @@ create or replace view vw_registos_ponto with (security_invoker = on) as
             e.dia,
             e.entrada,
             s.saida,
-            EXTRACT(epoch FROM s.saida - e.entrada) AS segundos
+            -- 1 h de almoço descontada em cada par com mais de 6 h, como no Registo diário
+            EXTRACT(epoch FROM s.saida - e.entrada)
+              - CASE WHEN s.saida - e.entrada > interval '6 hours' THEN 3600 ELSE 0 END AS segundos
            FROM entradas e
              LEFT JOIN saidas s ON e.funcionario = s.funcionario AND e.obra = s.obra AND e.dia = s.dia AND e.rn = s.rn
         ), rever AS (
