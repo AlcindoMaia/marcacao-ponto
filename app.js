@@ -121,20 +121,35 @@ function actualizarEstado(registos) {
 async function carregarHistorico(funcId) {
   const inicio = startOfWeek();
   // A tabela ponto não é acessível sem login: a função devolve apenas as
-  // marcações do funcionário deste dispositivo.
-  const { data, error } = await SB.rpc("ponto_historico", {
+  // marcações do funcionário deste dispositivo. Pede-se pelo menos 4 dias
+  // para trás, para apanhar uma saída esquecida na sexta quando é segunda.
+  const desde = new Date(Math.min(inicio.getTime(), Date.now() - 4 * 86400000));
+  const { data: todos, error } = await SB.rpc("ponto_historico", {
     p_device: getDeviceId(),
-    p_desde:  inicio.toISOString()
+    p_desde:  desde.toISOString()
   });
   if (error) console.error(error);
 
   // Usar diaLocal() para comparar dias em hora de Lisboa (não UTC)
   const hoje = diaLocal(new Date().toISOString());
-  const hojeRegs = (data||[]).filter(r => diaLocal(r.datahora) === hoje);
+  const hojeRegs = (todos||[]).filter(r => diaLocal(r.datahora) === hoje);
   actualizarEstado(hojeRegs);
-  ultimoTipoAtual = data?.[0]?.tipo ?? null;
+  // Uma entrada de outro dia sem saída não faz da próxima marcação uma
+  // saída (o servidor faz o mesmo): a de hoje é uma entrada nova.
+  ultimoTipoAtual = hojeRegs[0]?.tipo ?? null;
   actualizarBotao(ultimoTipoAtual);
   mostrarServicos();
+
+  // Saída esquecida: a última marcação antes de hoje é uma entrada
+  const antes = (todos||[]).find(r => diaLocal(r.datahora) !== hoje);
+  if (antes?.tipo === "entrada") {
+    mostrarPainelSaida("esquecida",
+      `No dia ${diaLocal(antes.datahora).slice(8, 10)}/${diaLocal(antes.datahora).slice(5, 7)} entraste às ${fmtHora(antes.datahora)} e não marcaste a saída. A que horas saíste da obra?`);
+  } else if (_painelCaso === "esquecida") {
+    esconderPainelSaida();
+  }
+
+  const data = (todos||[]).filter(r => new Date(r.datahora) >= inicio);
 
   const lista = document.getElementById("histLista");
   if (!data || data.length === 0) {
@@ -224,6 +239,11 @@ async function confirmarMarcacao() {
           mostrarFeedback(feito + "!", "ok");
         }
         await carregarHistorico(funcionario.id);
+        // Saída longe da obra: talvez tenha sido marcada já em casa
+        if (tipo === "saida" && r?.a_rever && r.distancia_m != null) {
+          mostrarPainelSaida("longe",
+            `Marcaste a saída a ${r.distancia_m >= 1000 ? (r.distancia_m / 1000).toFixed(1).replace(".", ",") + " km" : r.distancia_m + " m"} da obra. Se saíste da obra mais cedo, diz a que horas:`);
+        }
       } finally {
         btn.classList.remove("disabled");
         // Se a marcação falhou, o botão volta a dizer Entrada/Saída
@@ -237,6 +257,48 @@ async function confirmarMarcacao() {
     },
     { enableHighAccuracy: true, timeout: 15000 }
   );
+}
+
+// =======================================================
+// SAÍDA ESQUECIDA / MARCADA LONGE DA OBRA
+// O funcionário diz a que horas saiu; fica "a rever" até o Alcindo ver.
+// =======================================================
+let _painelCaso = null;
+
+function mostrarPainelSaida(caso, texto) {
+  _painelCaso = caso;
+  document.getElementById("painelSaidaTxt").textContent = texto;
+  document.getElementById("painelSaidaHora").value = "";
+  // "Não, saí agora" só faz sentido logo a seguir a marcar
+  document.getElementById("painelSaidaNao").style.display = caso === "longe" ? "" : "none";
+  document.getElementById("painelSaida").style.display = "";
+}
+
+function esconderPainelSaida() {
+  _painelCaso = null;
+  document.getElementById("painelSaida").style.display = "none";
+}
+
+async function enviarSaidaDeclarada() {
+  const hora = document.getElementById("painelSaidaHora").value;
+  if (!/^\d{2}:\d{2}$/.test(hora)) { mostrarFeedback("Escolhe a hora a que saíste.", "erro"); return; }
+  const btn = document.getElementById("painelSaidaEnviar");
+  btn.disabled = true;
+  const { error } = await SB.rpc("ponto_declarar_saida", { p_device: getDeviceId(), p_caso: _painelCaso, p_hora: hora });
+  btn.disabled = false;
+  if (error) {
+    console.error(error);
+    const m = error.message || "";
+    mostrarFeedback(
+      m.includes("saida_antes_da_entrada")   ? "Essa hora é antes da entrada." :
+      m.includes("hora_depois_da_marcacao") ? "Essa hora é depois de teres marcado. Se saíste agora, carrega em «Não, saí agora»." :
+      m.includes("nada_para_declarar")       ? "Já não há nada para acertar. Fala com o Alcindo." :
+      "Não foi possível enviar. Tenta outra vez.", "erro");
+    return;
+  }
+  esconderPainelSaida();
+  mostrarFeedback("✓ Hora de saída enviada. Fica para o Alcindo confirmar.", "ok");
+  await carregarHistorico(funcionario.id);
 }
 
 // =======================================================
@@ -322,6 +384,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (av) av.textContent = (funcionario.nome || "?").charAt(0).toUpperCase();
   document.getElementById("funcNome").textContent = funcionario.nome;
   document.getElementById("btnMarcacao").addEventListener("click", confirmarMarcacao);
+  document.getElementById("painelSaidaEnviar").addEventListener("click", enviarSaidaDeclarada);
+  document.getElementById("painelSaidaNao").addEventListener("click", esconderPainelSaida);
   // Botão de carga — pré-preenche a obra como origem
   const btnCarga = document.getElementById("btnCarga");
   if (btnCarga && obraID) btnCarga.href = "carga.html?origem=" + obraID;
