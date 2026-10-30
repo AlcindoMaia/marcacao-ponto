@@ -29,7 +29,7 @@
 create table if not exists ponto_correcoes (
     id          uuid primary key default gen_random_uuid(),
     ponto_id    uuid,                 -- sem FK: a linha fica mesmo se a marcação for apagada
-    funcionario_id uuid references funcionarios(id) on delete cascade,
+    funcionario_id uuid,                -- sem FK: há marcações antigas de funcionários já apagados
     acao        text not null check (acao in ('alterar', 'adicionar', 'apagar', 'declarar', 'alinhar')),
     tipo        text,
     antes       timestamptz,
