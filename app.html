@@ -310,6 +310,28 @@ html, body {
   padding: 20px 0;
   font-size: 13px; color: var(--muted); text-align: center;
 }
+
+/* Saída esquecida / marcada longe da obra */
+.painel-saida {
+  margin-top: 14px; width: 100%; max-width: 340px;
+  background: var(--surface); border: 1px solid rgba(224,176,122,.35);
+  border-radius: 12px; padding: 14px; text-align: left;
+}
+.painel-saida-txt { font-size: 14px; line-height: 1.5; margin-bottom: 10px; }
+.painel-saida-linha { display: flex; gap: 8px; }
+.painel-saida-linha input {
+  flex: 1; font-size: 18px; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+  color-scheme: dark;
+}
+.painel-saida-linha button {
+  background: var(--primary); color: #131c25; border: none; border-radius: 8px;
+  padding: 0 18px; font-weight: 600; font-size: 15px;
+}
+.painel-saida-nao {
+  margin-top: 8px; background: none; border: none; color: var(--muted);
+  font-size: 13px; text-decoration: underline; padding: 4px 0;
+}
 </style>
 <link rel="stylesheet" href="carregar.css?v=1">
 </head>
@@ -370,6 +392,15 @@ html, body {
         <span id="btnSublabel">Toca para registar entrada</span>
       </button>
       <div class="feedback" id="feedback"></div>
+      <!-- Saída esquecida ou marcada longe da obra: o funcionário diz a hora -->
+      <div class="painel-saida" id="painelSaida" style="display:none">
+        <div class="painel-saida-txt" id="painelSaidaTxt"></div>
+        <div class="painel-saida-linha">
+          <input type="time" id="painelSaidaHora" aria-label="Hora a que saíste">
+          <button type="button" id="painelSaidaEnviar">Enviar</button>
+        </div>
+        <button type="button" class="painel-saida-nao" id="painelSaidaNao">Não, saí agora</button>
+      </div>
     </div>
 
     <div class="divider"></div>
@@ -387,7 +418,7 @@ html, body {
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="config.js?v=3"></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 
 <!-- Modal parecer saída -->
 <div id="modalParecer" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:3000;align-items:flex-end;justify-content:center;padding:0">

@@ -19,6 +19,20 @@
 
 
 <style>
+/* Corrigir ponto: lista "Para corrigir" e janela do dia */
+.pc-item { display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid rgba(127,127,127,.15); font-size:13px; }
+.pc-item:first-of-type { border-top:none; }
+.pc-item .pc-txt { flex:1; min-width:0; }
+.pc-item .pc-sub { font-size:12px; opacity:.7; }
+.cd-linha { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid rgba(127,127,127,.15); }
+.cd-linha.apagada { opacity:.4; text-decoration:line-through; }
+.cd-linha .cd-tipo { width:64px; font-weight:600; font-size:13px; }
+.cd-linha input[type=time] { width:110px; font-size:16px; padding:6px 8px; }
+.cd-linha .cd-info { flex:1; font-size:12px; opacity:.75; min-width:0; }
+.cd-chip { background:rgba(181,136,99,.12); color:var(--primary); border:1px solid rgba(181,136,99,.35); border-radius:16px; padding:4px 10px; font-size:12px; cursor:pointer; }
+.cd-chip.ativo { background:var(--primary); color:#fff; }
+.cd-hist { font-size:12px; opacity:.75; padding:3px 0; }
+
 /* Layout uniforme entre tabs */
 .tab-inner { max-width: 1100px; }
 
@@ -536,6 +550,36 @@ document.getElementById("btnLogin").addEventListener("click", function () {
     </div>
 </div>
 
+<!-- ================= MODAL CORRIGIR DIA DE PONTO ================= -->
+<div id="modalCorrigirDia" class="modal hidden">
+    <div class="modal-content" style="max-width:520px">
+        <div class="modal-header">
+            <div>
+                <h2>Corrigir dia</h2>
+                <div id="cdTitulo" style="font-size:13px;opacity:.7;margin-top:2px"></div>
+            </div>
+            <button class="modal-close" onclick="fecharCorrigirDia()" aria-label="Fechar">×</button>
+        </div>
+        <div id="cdLinhas"></div>
+        <div style="display:flex;gap:8px;margin:10px 0 16px">
+            <button class="btn-pequeno" onclick="cdAdicionarLinha('entrada')">+ Entrada</button>
+            <button class="btn-pequeno" onclick="cdAdicionarLinha('saida')">+ Saída</button>
+        </div>
+        <label style="font-size:12px;opacity:.7">Motivo (fica no histórico)</label>
+        <div id="cdMotivos" style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0">
+            <button type="button" class="cd-chip">Esqueceu-se de marcar a saída</button>
+            <button type="button" class="cd-chip">Marcou a saída em casa</button>
+            <button type="button" class="cd-chip">Marcação errada</button>
+        </div>
+        <input type="text" id="cdMotivo" placeholder="Outro motivo (opcional)" style="width:100%">
+        <div id="cdMsg" style="font-size:13px;color:#e09486;min-height:18px;margin-top:8px"></div>
+        <div class="modal-actions" style="margin-top:8px">
+            <button class="btn-primary" id="cdGuardar" onclick="guardarCorrigirDia()">Guardar e dar o dia como visto</button>
+        </div>
+        <div id="cdHistorico" style="margin-top:18px"></div>
+    </div>
+</div>
+
 <!-- ================= MODAL ARTIGO (fora das tabs para funcionar sempre) ================= -->
 <div id="modalArtigo" class="modal hidden">
 
@@ -1022,6 +1066,9 @@ document.getElementById("btnLogin").addEventListener("click", function () {
     <!-- SUB-TAB: PONTO QR -->
     <div id="regTabContent-ponto" style="display:block">
 
+    <!-- Marcações com problemas: saídas esquecidas, marcadas longe da obra… -->
+    <div id="pontoParaCorrigir" class="card" style="display:none;margin-bottom:16px"></div>
+
     <!-- KPIs de assiduidade -->
     <div class="grid-cards" style="margin-bottom:16px" id="registosKpis">
         <div class="card metric" style="border-left:3px solid #8fbfa0">
@@ -1093,6 +1140,7 @@ document.getElementById("btnLogin").addEventListener("click", function () {
                     <th>Saída</th>
                     <th>Horas</th>
                     <th>Estado</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody></tbody>
@@ -1906,7 +1954,7 @@ document.getElementById("btnLogin").addEventListener("click", function () {
 <script src="cotacoes.js"></script>
 <script src="andamento.js?v=2"></script>
 <script src="rh.js?v=1"></script>
-<script src="admin.js?v=20"></script>
+<script src="admin.js?v=21"></script>
 <script src="telemovel.js?v=5"></script>
 
 

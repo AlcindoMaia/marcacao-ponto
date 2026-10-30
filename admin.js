@@ -783,6 +783,7 @@ async function carregarRegistos() {
 
     _todosRegistos = data || [];
     await carregarFeriados(ano);
+    carregarParaCorrigir(ano, mes);
 
     // ---- KPIs Assiduidade ----
     if (!filtroDia) {
@@ -817,7 +818,7 @@ async function carregarRegistos() {
     }
 
     if (!data || data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;opacity:.6">Sem registos neste período</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;opacity:.6">Sem registos neste período</td></tr>`;
         return;
     }
 
@@ -842,8 +843,8 @@ async function carregarRegistos() {
             <td>${r.funcionario}</td>
             <td>${r.obra}</td>
             <td>${r.dia}</td>
-            <td contenteditable="true" class="editavel" data-id="${r.entrada_id || ""}" data-tipo="entrada">${fmt(r.entrada)}</td>
-            <td contenteditable="true" class="editavel" data-id="${r.saida_id || ""}" data-tipo="saida">${fmt(r.saida)}</td>
+            <td>${fmt(r.entrada)}</td>
+            <td>${fmt(r.saida)}</td>
             <td class="col-horas" style="${temExtras ? "color:#f97316;font-weight:700" : ""}">
                 ${horasDisplay}${temExtras ? ` <span style="font-size:10px;background:rgba(249,115,22,.15);padding:1px 5px;border-radius:4px">+EXT</span>` : ""}
             </td>
@@ -851,11 +852,10 @@ async function carregarRegistos() {
                 ? `<span class="estado-incompleto">Incompleto</span>`
                 : `<span class="estado-ok">OK</span>`
             }${r.a_rever ? ` <span class="estado-incompleto" title="Marcado na área do funcionário, sem o QR">A rever · ${r.distancia_m != null ? esc(r.distancia_m) + " m da obra" : "obra sem GPS"}</span>
-                <button class="btn-icone btn-confirmar-rever" title="Confirmar que estava na obra">✓</button>` : ""}</td>`;
+                <button class="btn-icone btn-confirmar-rever" title="Confirmar que estava na obra">✓</button>` : ""}</td>
+            <td class="acoes-td"><button class="btn-icone btn-corrigir-dia" title="Corrigir as horas deste dia">✏️</button></td>`;
 
-        tr.querySelectorAll(".editavel").forEach(td => {
-            td.addEventListener("blur", () => guardarEdicaoRegisto(tr, td));
-        });
+        tr.querySelector(".btn-corrigir-dia").addEventListener("click", () => abrirCorrigirDia(r.funcionario_id, r.dia, r.funcionario));
 
         // Marcações da área do funcionário fora do raio ou em obra sem GPS
         tr.querySelector(".btn-confirmar-rever")?.addEventListener("click", async () => {
@@ -964,102 +964,261 @@ Os registos completos serão marcados como aprovados.`)) return;
     exportarPontoExcel();
 }
 
-async function guardarEdicaoRegisto(tr, tdEditado) {
-    const dia      = tr.children[2].textContent.trim();
-    const tdEnt    = tr.children[3];
-    const tdSai    = tr.children[4];
-    const tdHoras  = tr.children[5];
+// =======================================================
+// CORRIGIR MARCAÇÕES DE PONTO
+// As correções passam pelas funções ponto_corrigir / ponto_adicionar /
+// ponto_apagar (ponto_correcoes.sql): mudam a hora que conta (datahora), o
+// servidor faz a conta do fuso de Lisboa, as horas do Registo diário são
+// recalculadas e fica no histórico quem corrigiu, quando e porquê.
+// =======================================================
+const lxDia  = iso => new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Europe/Lisbon" });
+const lxHora = iso => new Date(iso).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Lisbon" });
+const lxDiaCurto = dia => dia.slice(8, 10) + "/" + dia.slice(5, 7);
+const distTexto = m => m == null ? "" : m >= 1000 ? (m / 1000).toFixed(1).replace(".", ",") + " km" : m + " m";
 
-    const entHora  = tdEnt.textContent.trim();
-    const saiHora  = tdSai.textContent.trim();
-    const entId    = tdEnt.dataset.id;
-    const saiId    = tdSai.dataset.id;
-    const tipo     = tdEditado.dataset.tipo;
+let _pcObras = {};   // id → nome, para a janela do dia
 
-    // Validar formato HH:MM
-    const reHora = /^([01]\d|2[0-3]):([0-5]\d)$/;
-    const novaHora = tdEditado.textContent.trim();
-    if (novaHora && !reHora.test(novaHora)) {
-        tdEditado.style.color = "#e09486";
-        tdEditado.title = "Formato inválido — use HH:MM";
-        return;
+// Problemas de um dia de um funcionário (marcações já ordenadas)
+function problemasDoDia(marcas, dia, hoje) {
+    const p = [];
+    if (marcas[0].tipo === "saida") p.push("Saída sem entrada");
+    const ult = marcas[marcas.length - 1];
+    if (ult.tipo === "entrada" && dia < hoje) p.push(`Sem saída (entrou às ${lxHora(ult.datahora)})`);
+    marcas.forEach(m => {
+        if (!m.a_rever) return;
+        if (m.tipo === "saida" && m.origem === "declarada") {
+            p.push(`Esqueceu-se da saída: diz que saiu às ${lxHora(m.datahora)}`);
+        } else if (m.tipo === "saida" && new Date(m.created_at) - new Date(m.datahora) > 5 * 60000) {
+            p.push(`Marcou a saída às ${lxHora(m.created_at)}${m.distancia_m != null ? " a " + distTexto(m.distancia_m) + " da obra" : ""}; diz que saiu às ${lxHora(m.datahora)}`);
+        } else if (m.tipo === "saida") {
+            p.push(m.distancia_m != null
+                ? `Saída às ${lxHora(m.datahora)} a ${distTexto(m.distancia_m)} da obra (marcada em casa?)`
+                : `Saída às ${lxHora(m.datahora)} numa obra sem GPS`);
+        } else {
+            p.push(m.distancia_m != null
+                ? `Entrada às ${lxHora(m.datahora)} a ${distTexto(m.distancia_m)} da obra`
+                : `Entrada às ${lxHora(m.datahora)} numa obra sem GPS`);
+        }
+    });
+    for (let i = 0; i + 1 < marcas.length; i++) {
+        const e = marcas[i], s = marcas[i + 1];
+        if (e.tipo !== "entrada" || s.tipo !== "saida") continue;
+        const h = (new Date(s.datahora) - new Date(e.datahora)) / 3600000;
+        if (h > 11) p.push(`Dia de ${h.toFixed(1).replace(".", ",")} h (${lxHora(e.datahora)}–${lxHora(s.datahora)})`);
     }
+    return p;
+}
 
-    // Atualizar o registo correto na tabela ponto
-    let erros = [];
+async function carregarParaCorrigir(ano, mes) {
+    const caixa = document.getElementById("pontoParaCorrigir");
+    if (!caixa) return;
+    const mesStr = `${ano}-${String(mes).padStart(2, "0")}`;
+    // Um dia a mais de cada lado: o mês é contado em hora de Lisboa
+    const ini = new Date(Date.UTC(ano, mes - 1, 1) - 86400000).toISOString();
+    const fim = new Date(Date.UTC(ano, mes, 1) + 86400000).toISOString();
+    const [pontoRes, funcsRes, obrasRes] = await Promise.all([
+        SB.from("ponto").select("id, funcionario_id, obra_id, tipo, datahora, created_at, a_rever, distancia_m, origem")
+            .gte("datahora", ini).lt("datahora", fim).order("datahora"),
+        SB.from("funcionarios").select("id, nome"),
+        SB.from("obras").select("id, nome")
+    ]);
+    if (pontoRes.error) { console.error(pontoRes.error); caixa.style.display = "none"; return; }
+    const nomes = Object.fromEntries((funcsRes.data || []).map(f => [f.id, f.nome]));
+    _pcObras = Object.fromEntries((obrasRes.data || []).map(o => [o.id, o.nome]));
 
-    if (tipo === "entrada" && entId) {
-        const novoTS = entHora ? `${dia}T${entHora}:00` : null;
-        const { error } = await SB.from("ponto")
-            .update({ created_at: novoTS })
-            .eq("id", entId);
-        if (error) erros.push("entrada: " + error.message);
-    }
+    const hoje = lxDia(new Date());
+    const grupos = {};
+    (pontoRes.data || []).forEach(m => {
+        const dia = lxDia(m.datahora);
+        if (!dia.startsWith(mesStr)) return;
+        (grupos[m.funcionario_id + "|" + dia] ||= []).push(m);
+    });
 
-    if (tipo === "saida") {
-        if (saiId) {
-            // Actualizar saída existente
-            const novoTS = saiHora ? `${dia}T${saiHora}:00` : null;
-            const { error } = await SB.from("ponto")
-                .update({ created_at: novoTS })
-                .eq("id", saiId);
-            if (error) erros.push("saída: " + error.message);
-        } else if (saiHora && entId) {
-            // Criar registo de saída que não existia (registo incompleto)
-            // Primeiro buscar funcionario_id e obra_id da entrada
-            const { data: entData } = await SB.from("ponto")
-                .select("funcionario_id, obra_id")
-                .eq("id", entId)
-                .single();
+    const itens = Object.entries(grupos).map(([k, marcas]) => {
+        const [funcId, dia] = k.split("|");
+        const problemas = problemasDoDia(marcas, dia, hoje);
+        // ✓ rápido só quando o único problema é estar "a rever"
+        const soRever = marcas.some(m => m.a_rever) && marcas[0].tipo === "entrada"
+            && !(marcas[marcas.length - 1].tipo === "entrada" && dia < hoje);
+        return { funcId, dia, nome: nomes[funcId] || "—", problemas, idsRever: marcas.filter(m => m.a_rever).map(m => m.id), soRever };
+    }).filter(i => i.problemas.length)
+      .sort((a, b) => b.dia.localeCompare(a.dia) || a.nome.localeCompare(b.nome));
 
-            if (entData) {
-                const { data: novo, error } = await SB.from("ponto")
-                    .insert({
-                        funcionario_id: entData.funcionario_id,
-                        obra_id:        entData.obra_id,
-                        tipo:           "saida",
-                        created_at:     `${dia}T${saiHora}:00`,
-                        datahora:       `${dia}T${saiHora}:00`,
-                        latitude:       0,
-                        longitude:      0
-                    })
-                    .select("id")
-                    .single();
-                if (error) erros.push("criar saída: " + error.message);
-                else tdSai.dataset.id = novo.id;
-            }
+    if (!itens.length) { caixa.style.display = "none"; caixa.innerHTML = ""; return; }
+    caixa.style.display = "";
+    caixa.innerHTML = `<h3 style="margin:0 0 6px;font-size:14px">⚠️ Para corrigir (${itens.length})</h3>
+        <div style="font-size:12px;opacity:.65;margin-bottom:6px">Saídas esquecidas, marcadas longe da obra ou dias muito longos. As marcações "a rever" só contam para as horas depois de vistas.</div>
+        ${itens.map((it, n) => `<div class="pc-item">
+            <div class="pc-txt"><b>${esc(it.nome)}</b> · ${lxDiaCurto(it.dia)}
+                <div class="pc-sub">${it.problemas.map(esc).join(" · ")}</div></div>
+            ${it.soRever ? `<button class="btn-icone" data-ok="${n}" title="Está certo: dar como visto">✓</button>` : ""}
+            <button class="btn-pequeno" data-corrigir="${n}">Corrigir</button>
+        </div>`).join("")}`;
+    caixa.querySelectorAll("[data-corrigir]").forEach(b => b.onclick = () => {
+        const it = itens[b.dataset.corrigir];
+        abrirCorrigirDia(it.funcId, it.dia, it.nome);
+    });
+    caixa.querySelectorAll("[data-ok]").forEach(b => b.onclick = async () => {
+        const it = itens[b.dataset.ok];
+        const { error } = await SB.from("ponto").update({ a_rever: false }).in("id", it.idsRever);
+        if (error) { console.error(error); alert("Não foi possível confirmar."); return; }
+        carregarRegistos();
+    });
+}
+
+// ---- Janela "Corrigir dia" ----
+let _cd = null;
+
+async function abrirCorrigirDia(funcId, dia, nome) {
+    if (!funcId) { alert("Atualiza a página: falta correr ponto_correcoes.sql no Supabase."); return; }
+    const ini = new Date(new Date(dia + "T00:00:00Z").getTime() - 86400000).toISOString();
+    const fim = new Date(new Date(dia + "T00:00:00Z").getTime() + 2 * 86400000).toISOString();
+    const { data, error } = await SB.from("ponto")
+        .select("id, obra_id, tipo, datahora, created_at, a_rever, distancia_m, origem")
+        .eq("funcionario_id", funcId).gte("datahora", ini).lt("datahora", fim).order("datahora");
+    if (error) { console.error(error); alert("Não foi possível abrir as marcações."); return; }
+    const marcas = (data || []).filter(m => lxDia(m.datahora) === dia);
+
+    _cd = {
+        funcId, dia, nome, avisado: false,
+        linhas: marcas.map(m => ({
+            id: m.id, tipo: m.tipo, hora: lxHora(m.datahora), horaOrig: lxHora(m.datahora),
+            obra_id: m.obra_id, a_rever: m.a_rever, apagar: false,
+            info: [
+                _pcObras[m.obra_id] || "",
+                Math.abs(new Date(m.created_at) - new Date(m.datahora)) > 5 * 60000 ? `marcada às ${lxHora(m.created_at)}` : "",
+                m.origem === "declarada" ? "dita pelo funcionário" : m.origem === "painel" ? "posta no painel" : "",
+                m.distancia_m != null ? `a ${distTexto(m.distancia_m)} da obra` : "",
+                m.a_rever ? "a rever" : ""
+            ].filter(Boolean).join(" · ")
+        }))
+    };
+    document.getElementById("cdTitulo").textContent = `${nome} · ${lxDiaCurto(dia)}`;
+    document.getElementById("cdMotivo").value = "";
+    document.getElementById("cdMsg").textContent = "";
+    document.querySelectorAll("#cdMotivos .cd-chip").forEach(c => {
+        c.classList.remove("ativo");
+        c.onclick = () => c.classList.toggle("ativo");
+    });
+    renderCorrigirDia();
+
+    const hist = document.getElementById("cdHistorico");
+    hist.innerHTML = "";
+    if (marcas.length) {
+        const { data: corr } = await SB.from("ponto_correcoes")
+            .select("acao, tipo, antes, depois, motivo, feito_por, feito_em")
+            .in("ponto_id", marcas.map(m => m.id)).order("feito_em");
+        if (corr?.length) {
+            const nomeTipo = t => t === "entrada" ? "a entrada" : "a saída";
+            const h = v => v ? lxHora(v) : "—";
+            hist.innerHTML = `<div style="font-size:12px;font-weight:600;margin-bottom:4px">Histórico</div>` +
+                corr.map(c => {
+                    const quando = `${lxDiaCurto(lxDia(c.feito_em))} ${lxHora(c.feito_em)}`;
+                    const o = c.acao === "alterar"   ? `${esc(c.feito_por)} mudou ${nomeTipo(c.tipo)} de ${h(c.antes)} para ${h(c.depois)}`
+                            : c.acao === "adicionar" ? `${esc(c.feito_por)} acrescentou ${nomeTipo(c.tipo)} às ${h(c.depois)}`
+                            : c.acao === "apagar"    ? `${esc(c.feito_por)} apagou ${nomeTipo(c.tipo)} das ${h(c.antes)}`
+                            : c.acao === "declarar"  ? `O funcionário disse que saiu às ${h(c.depois)}`
+                            : `Correção antiga: ${nomeTipo(c.tipo)} de ${h(c.antes)} para ${h(c.depois)}`;
+                    return `<div class="cd-hist">${quando} · ${o}${c.motivo ? ` · ${esc(c.motivo)}` : ""}</div>`;
+                }).join("");
         }
     }
 
-    if (erros.length > 0) {
-        console.error(erros);
-        tdEditado.style.color = "#e09486";
+    const m = document.getElementById("modalCorrigirDia");
+    m.style.display = "";
+    m.classList.remove("hidden");
+}
+
+function fecharCorrigirDia() {
+    const m = document.getElementById("modalCorrigirDia");
+    m.classList.add("hidden");
+    _cd = null;
+}
+
+function renderCorrigirDia() {
+    const caixa = document.getElementById("cdLinhas");
+    caixa.innerHTML = _cd.linhas.map((l, i) => `<div class="cd-linha${l.apagar ? " apagada" : ""}">
+        <span class="cd-tipo">${l.tipo === "entrada" ? "Entrada" : "Saída"}</span>
+        <input type="time" value="${esc(l.hora)}" data-i="${i}" ${l.apagar ? "disabled" : ""} aria-label="Hora">
+        <span class="cd-info">${esc(l.id ? l.info : "nova")}</span>
+        <button class="btn-icone" data-apagar="${i}" title="${l.apagar ? "Não apagar" : "Apagar esta marcação"}">${l.apagar ? "↺" : "🗑"}</button>
+    </div>`).join("") || `<div style="opacity:.6;font-size:13px">Sem marcações neste dia.</div>`;
+    caixa.querySelectorAll("input[type=time]").forEach(inp => inp.oninput = () => {
+        _cd.linhas[inp.dataset.i].hora = inp.value;
+        _cd.avisado = false;
+    });
+    caixa.querySelectorAll("[data-apagar]").forEach(b => b.onclick = () => {
+        const l = _cd.linhas[b.dataset.apagar];
+        if (!l.id) _cd.linhas.splice(b.dataset.apagar, 1);
+        else l.apagar = !l.apagar;
+        _cd.avisado = false;
+        renderCorrigirDia();
+    });
+}
+
+function cdAdicionarLinha(tipo) {
+    const base = _cd.linhas.filter(l => l.obra_id).pop();
+    if (!base) { document.getElementById("cdMsg").textContent = "Não há obra neste dia para a marcação nova."; return; }
+    _cd.linhas.push({ id: null, tipo, hora: "", obra_id: base.obra_id, apagar: false });
+    _cd.avisado = false;
+    renderCorrigirDia();
+    const ins = document.querySelectorAll("#cdLinhas input[type=time]");
+    ins[ins.length - 1]?.focus();
+}
+
+async function guardarCorrigirDia() {
+    const msg = document.getElementById("cdMsg");
+    msg.textContent = "";
+    const ficam = _cd.linhas.filter(l => !l.apagar);
+    if (ficam.some(l => !/^\d{2}:\d{2}$/.test(l.hora))) { msg.textContent = "Falta a hora numa das marcações."; return; }
+
+    // A sequência do dia deve ser entrada, saída, entrada, saída…
+    const ordem = [...ficam].sort((a, b) => a.hora.localeCompare(b.hora));
+    const alterna = ordem.every((l, i) => l.tipo === (i % 2 ? "saida" : "entrada"));
+    if (!alterna && !_cd.avisado) {
+        msg.textContent = "Por ordem de hora, as marcações não ficam entrada → saída. Carrega outra vez em Guardar para gravar mesmo assim.";
+        _cd.avisado = true;
         return;
     }
 
-    // Recalcular horas no frontend
-    if (entHora && saiHora && reHora.test(entHora) && reHora.test(saiHora)) {
-        const [eh, em] = entHora.split(":").map(Number);
-        const [sh, sm] = saiHora.split(":").map(Number);
-        const totalMin = (sh * 60 + sm) - (eh * 60 + em);
-        if (totalMin >= 0) {
-            const hh = String(Math.floor(totalMin / 60)).padStart(2, "0");
-            const mm = String(totalMin % 60).padStart(2, "0");
-            tdHoras.textContent = `${hh}:${mm}`;
-            // Actualizar estado visual
-            const tdEstado = tr.children[6];
-            const completo = totalMin > 0;
-            tdEstado.innerHTML = completo
-                ? `<span class="estado-ok">OK</span>`
-                : `<span class="estado-incompleto">Incompleto</span>`;
-            if (completo) tr.style.borderLeft = "";
+    const motivo = [...document.querySelectorAll("#cdMotivos .cd-chip.ativo")].map(c => c.textContent)
+        .concat(document.getElementById("cdMotivo").value.trim()).filter(Boolean).join(" · ") || null;
+
+    const btn = document.getElementById("cdGuardar");
+    btn.disabled = true;
+    const erros = [];
+    const correr = async (fn, args) => {
+        const { error } = await SB.rpc(fn, args);
+        if (error) { console.error(fn, error); erros.push(error.message || ""); }
+    };
+    try {
+        for (const l of _cd.linhas) {
+            if (l.id && l.apagar) await correr("ponto_apagar", { p_id: l.id, p_motivo: motivo });
         }
+        // Corrigir também dá como vista a marcação "a rever"
+        for (const l of ficam) {
+            if (l.id && (l.hora !== l.horaOrig || l.a_rever))
+                await correr("ponto_corrigir", { p_id: l.id, p_dia: _cd.dia, p_hora: l.hora, p_motivo: motivo });
+        }
+        for (const l of ficam) {
+            if (!l.id) await correr("ponto_adicionar", {
+                p_funcionario: _cd.funcId, p_obra: l.obra_id, p_tipo: l.tipo,
+                p_dia: _cd.dia, p_hora: l.hora, p_motivo: motivo
+            });
+        }
+    } finally {
+        btn.disabled = false;
     }
 
-    // Destacar células editadas — fica sempre amarelo
-    tdEditado.classList.add("editado");
-    tdEditado.style.cssText += "; background: rgba(181,136,99,0.25) !important; color: #b58863 !important; outline: 2px solid rgba(181,136,99,0.4) !important; outline-offset: -2px !important;";
-    tdEditado.title = "";
+    if (erros.length) {
+        msg.textContent = erros.some(e => e.includes("hora_no_futuro")) ? "Não se pode pôr uma hora que ainda não passou."
+            : erros.some(e => /function|função|schema cache/i.test(e)) ? "Falta correr o ficheiro ponto_correcoes.sql no Supabase."
+            : "Algumas correções não foram gravadas. Abre o dia outra vez para ver como ficou.";
+        carregarRegistos();
+        return;
+    }
+    fecharCorrigirDia();
+    carregarRegistos();
 }
 
 // =======================================================
