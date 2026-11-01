@@ -1152,6 +1152,9 @@ label.cot-ed-chk input { width: auto !important; min-width: 0 !important; }
     }
     #modalPainelObra .painel-tab .pt-ic  { font-size: 16px; line-height: 1; margin-right: 0; }
     #modalPainelObra .painel-tab .pt-txt { text-transform: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+    /* Nomes compridos (Documentos) ficavam cortados: no telemóvel usa-se o curto */
+    #modalPainelObra .painel-tab .pt-txt[data-curto] { font-size: 0; }
+    #modalPainelObra .painel-tab .pt-txt[data-curto]::after { content: attr(data-curto); font-size: 10px; }
     #modalPainelObra .painel-tab-content > div,
     #modalPainelObra .painel-tab-content [style*="grid-template-columns"] { min-width: 0 !important; }
     #modalPainelObra .painel-tab-content [style*="grid-template-columns:1fr 1fr"],
@@ -1438,7 +1441,7 @@ body.dark #filtroMesFinanceiro { background: #18232e; color: #ece5de; border-col
 
 /* Painel da obra › Financeiro: botão "Registar pagamento". A janela do
    movimento abre por cima do painel (que tem z-index 1100). */
-.painel-fin-barra { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+.painel-fin-barra { display: flex; flex-direction: row-reverse; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .painel-fin-novo { width: auto; padding: 0 12px; font-size: 12.5px; font-weight: 600; color: var(--primary); }
 body:has(#modalPainelObra[style*="display: flex"], #modalPainelObra[style*="display:flex"]) .modal:not(.hidden) {
     z-index: 1200;
@@ -1451,3 +1454,42 @@ body:has(#modalPainelObra[style*="display: flex"], #modalPainelObra[style*="disp
 .decl-empresa summary { cursor: pointer; opacity: .7; margin-bottom: 8px; }
 .decl-previa { margin: 10px 0 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px;
                font-size: 13px; line-height: 1.6; opacity: .85; }
+
+/* =======================================================
+   "DE ONDE VEM ESTE VALOR?" — botão ⓘ e janela com as contas (admin.js
+   botaoContas / mostrarContas). Discreto: só se nota ao passar por cima.
+======================================================= */
+.btn-contas {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; padding: 0; margin-left: 4px; vertical-align: middle;
+    border-radius: 50%; border: 1px solid currentColor; background: none;
+    color: inherit; opacity: .35; cursor: pointer;
+    font: italic 600 10px/1 Georgia, serif; flex-shrink: 0;
+}
+.btn-contas:hover, .btn-contas:focus-visible { opacity: 1; color: var(--primary, #b58863); }
+/* No canto dos cartões */
+#modalPainelObra .painel-kpi, #vgNumeros .card.metric, .card-kpi-contas { position: relative; }
+#modalPainelObra .painel-kpi > .btn-contas,
+#vgNumeros .card.metric > .btn-contas,
+.card-kpi-contas > .btn-contas { position: absolute; top: 10px; right: 10px; margin: 0; }
+@media (max-width: 600px) { .btn-contas { width: 20px; height: 20px; font-size: 12px; } }
+
+#modalContas {
+    position: fixed; inset: 0; z-index: 1500; background: rgba(0,0,0,.55);
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+#modalContas .contas-caixa { width: 100%; max-width: 480px; max-height: 85vh; overflow-y: auto; padding: 18px 20px; }
+#modalContas .contas-linha {
+    display: flex; justify-content: space-between; gap: 12px; align-items: baseline;
+    padding: 6px 0; font-size: 13px; border-bottom: 1px solid var(--border, rgba(127,127,127,.2));
+}
+#modalContas .contas-linha b { white-space: nowrap; font-weight: 600; }
+#modalContas .contas-linha.total { border-top: 2px solid currentColor; border-bottom: none; margin-top: 2px; font-weight: 700; }
+#modalContas .contas-linha.info { opacity: .7; font-style: italic; }
+#modalContas .contas-linha.item { font-size: 12px; opacity: .75; padding: 3px 0 3px 14px; border-bottom: none; }
+#modalContas .contas-det > summary { list-style: none; cursor: pointer; }
+#modalContas .contas-det > summary::-webkit-details-marker { display: none; }
+#modalContas .contas-det > summary .contas-linha span::before { content: "▸ "; opacity: .5; }
+#modalContas .contas-det[open] > summary .contas-linha span::before { content: "▾ "; }
+#orcKpiValorContas, .card-kpi-contas > .kpi-contas { position: absolute; top: 10px; right: 10px; }
+#orcKpiValorContas .btn-contas, .card-kpi-contas > .kpi-contas .btn-contas { margin: 0; }

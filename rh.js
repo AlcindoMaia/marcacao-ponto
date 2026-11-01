@@ -435,11 +435,12 @@ function rhAtualizarFora() {
 }
 
 async function rhAbrirDoc(id) {
+    const win = janelaParaDepois();   // admin.js: abre já, por causa do iPhone
     const { data: doc } = await SB.from("rh_documentos").select("caminho").eq("id", id).single();
-    if (!doc?.caminho) return;
+    if (!doc?.caminho) { win?.close(); return; }
     const { data, error } = await SB.storage.from(BUCKET_RH).createSignedUrl(doc.caminho, 600);
-    if (error) { alert("Não foi possível abrir: " + error.message); return; }
-    window.open(data.signedUrl, "_blank", "noopener");
+    if (error) { win?.close(); alert("Não foi possível abrir: " + error.message); return; }
+    irParaNaJanela(win, data.signedUrl);
 }
 
 async function rhEditarValidade(alvo, id, atual) {
@@ -559,6 +560,23 @@ async function rhCarregarObrasFunc() {
 // empregador (injustificadas e baixa, que é paga pela Segurança Social).
 // Valor de um dia = salário × 12 / (52 × 5) (Código do Trabalho, art. 271.º,
 // semana de 5 dias). Sem salário mensal: dias trabalhados × valor por dia.
+// Quanto custa um dia de trabalho de cada pessoa, para as margens e o DRE.
+// Quem tem salário (recibo de vencimento) custa 14 meses de salário mais a
+// TSU da empresa, repartidos pelos dias úteis do ano. O valor/dia é o que se
+// combinou pagar a quem trabalha à jornada (temporários).
+const TSU_EMPRESA = 0.2375, DIAS_UTEIS_ANO = 220;
+function custoDiaFunc(f) {
+    const sal = Number(f?.salario_mensal || 0);
+    if (sal > 0) return sal * 14 * (1 + TSU_EMPRESA) / DIAS_UTEIS_ANO;
+    return Number(f?.valor_dia || 0);
+}
+function textoCustoDia(f) {
+    const sal = Number(f?.salario_mensal || 0);
+    return sal > 0
+        ? `${custoDiaFunc(f).toFixed(2)} €/dia (salário ${sal.toFixed(0)} € × 14 + TSU ÷ ${DIAS_UTEIS_ANO} dias)`
+        : `${Number(f?.valor_dia || 0)} €/dia`;
+}
+
 function rhValorOrdenado(f, dias, faltas = {}) {
     if (!f.salario_mensal) {
         return { valor: f.valor_dia ? dias * f.valor_dia : 0, nota: f.valor_dia ? "" : "sem valor por dia" };

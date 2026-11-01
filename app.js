@@ -57,12 +57,28 @@ function startOfWeek() {
   return dataLocal;
 }
 
-function calcHoras(entIso, saiIso) {
-  const diff = new Date(saiIso) - new Date(entIso);
-  if (diff <= 0) return null;
-  const h = Math.floor(diff / 3600000);
-  const m = Math.floor((diff % 3600000) / 60000);
+function fmtDuracao(ms) {
+  if (!(ms > 0)) return null;
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
   return `${h}h${m > 0 ? String(m).padStart(2, "0") : ""}`;
+}
+
+// Horas de um dia com várias entradas e saídas: soma cada par entrada →
+// saída. Como no painel do Alcindo, um período de mais de 6 h desconta 1 h
+// de almoço, para os dois verem o mesmo número.
+function horasDoDia(registosDia) {
+  const asc = registosDia.slice().sort((a, b) => new Date(a.datahora) - new Date(b.datahora));
+  let total = 0, entrada = null;
+  for (const r of asc) {
+    if (r.tipo === "entrada") entrada = r;
+    else if (r.tipo === "saida" && entrada) {
+      const d = new Date(r.datahora) - new Date(entrada.datahora);
+      if (d > 0) total += d > 6 * 3600000 ? d - 3600000 : d;
+      entrada = null;
+    }
+  }
+  return fmtDuracao(total);
 }
 
 // =======================================================
@@ -171,9 +187,11 @@ async function carregarHistorico(funcId) {
   lista.innerHTML = diasOrdenados.map(dia => {
     const registosDia = porDia[dia];
     const diaLabel = dia === hoje ? "Hoje" : dia === dOntem ? "Ontem" : fmtDia(registosDia[0].datahora);
-    const entrada = registosDia.find(r => r.tipo === "entrada");
-    const saida   = registosDia.find(r => r.tipo === "saida");
-    const horas   = (entrada && saida) ? calcHoras(entrada.datahora, saida.datahora) : null;
+    // Os registos vêm do mais recente para o mais antigo: a primeira entrada
+    // do dia é a última da lista, a última saída é a primeira
+    const entrada = [...registosDia].reverse().find(r => r.tipo === "entrada");
+    const saida   = registosDia[0]?.tipo === "saida" ? registosDia[0] : null;   // ainda lá dentro: sem saída
+    const horas   = horasDoDia(registosDia);
     return `<div class="hist-item">
       <div class="hist-dot ${entrada ? "entrada" : "saida"}"></div>
       <div class="hist-mid">
