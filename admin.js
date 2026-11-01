@@ -398,13 +398,13 @@ async function custosDasObras(ids, periodo = null) {
     const r = {};
     const novo = () => ({ matFat: 0, moFat: 0, moHoras: 0, horas: 0, faturasMat: [], faturasMO: [], regs: [],
                           entrou: [], saiu: [], moEntrou: 0, matEntrou: 0, moSaiu: 0, matSaiu: 0,
-                          mo: 0, mat: 0, total: 0 });
+                          matStock: 0, stock: [], mo: 0, mat: 0, total: 0 });
     ids.forEach(id => r[id] = novo());
     if (!ids.length) return r;
 
     const dPt = d => d ? d.split("-").reverse().join("/") : "";
     const nomeMov = m => m?.fornecedores?.nome || m?.referencia || "Sem nome";
-    const [fat, regs, ligMov, ligReg] = await Promise.all([
+    const [fat, regs, ligMov, ligReg, stk] = await Promise.all([
         lerTudo(() => filtrarData(SB.from("movimentos_financeiros")
             .select("id, obra_id, valor_base, valor_total, referencia, data_documento, fornecedores(nome), categorias_financeiras(nome)")
             .in("obra_id", ids).eq("tipo", "saida").eq("ativo", true), "data_documento").order("data_documento").order("id")),
@@ -418,10 +418,14 @@ async function custosDasObras(ids, periodo = null) {
         lerTudo(() => SB.from("registo_servicos")
             .select("id, horas, obra_servicos(obra_id, nome, obras(nome)), registos_admin(obra_id, data, tipo, funcionarios(nome, valor_dia, salario_mensal), obras(nome))")
             .order("id")),
+        // Stock: tudo (são poucas linhas). As entradas dão o preço médio de cada artigo
+        lerTudo(() => SB.from("movimentos_stock")
+            .select("id, artigo_id, tipo_movimento, quantidade, preco_unitario, data_movimento, obra_origem_id, obra_destino_id, artigos(descricao, tipo_artigo, preco_atual)")
+            .order("id")),
     ]);
     // Uma leitura falhada daria um custo a zero ou incompleto sem ninguém
     // saber: mais vale parar e dizer que não foi possível ler
-    const falhou = [fat, regs, ligMov, ligReg].find(x => x.error);
+    const falhou = [fat, regs, ligMov, ligReg, stk].find(x => x.error);
     if (falhou) throw new Error("Não foi possível ler os custos da obra (" + falhou.error.message + "). Atualiza a página.");
 
     (fat.data || []).forEach(m => {
@@ -456,9 +460,33 @@ async function custosDasObras(ids, periodo = null) {
         if (r[de])   { r[de].saiu.push({ t: `${t} ligadas a "${s.nome}" (${s.obras?.nome || "outra obra"})`, v: -v }); r[de].moSaiu += v; }
         if (r[para]) { r[para].entrou.push({ t: `${t} marcadas em ${g.obras?.nome || "outra obra"}`, v }); r[para].moEntrou += v; }
     });
+    // Material do armazém: o que sai para uma obra conta nessa obra, ao preço
+    // médio a que entrou (sem IVA); o que volta da obra para o armazém desconta.
+    // Ferramentas e equipamentos só mudam de sítio: não são custo.
+    const precoMedio = {};
+    (stk.data || []).forEach(m => {
+        if (m.tipo_movimento !== "entrada" || !(Number(m.preco_unitario) > 0)) return;
+        const p = precoMedio[m.artigo_id] ||= { q: 0, v: 0 };
+        p.q += Number(m.quantidade || 0); p.v += Number(m.quantidade || 0) * Number(m.preco_unitario);
+    });
+    const precoDe = m => { const p = precoMedio[m.artigo_id];
+        return p?.q > 0 ? p.v / p.q : Number(m.preco_unitario || m.artigos?.preco_atual || 0); };
+    (stk.data || []).forEach(m => {
+        const a = m.artigos;
+        if (!a || !["consumivel", "mercadoria"].includes(a.tipo_artigo) || !noPeriodo(m.data_movimento)) return;
+        const q = Number(m.quantidade || 0), v = q * precoDe(m);
+        const t = `${dPt(m.data_movimento)} ${q.toLocaleString("pt-PT")} × ${a.descricao || "artigo"}`;
+        const para = m.obra_destino_id && String(m.obra_destino_id), de = m.obra_origem_id && String(m.obra_origem_id);
+        if (m.tipo_movimento === "saida") {
+            if (para && r[para]) { r[para].matStock += v; r[para].stock.push({ t: t + (de ? " (veio de outra obra)" : " (do armazém)"), v }); }
+            if (de && r[de] && para) { r[de].matStock -= v; r[de].stock.push({ t: t + " (foi para outra obra)", v: -v }); }
+        } else if (m.tipo_movimento === "entrada" && de && !para && r[de]) {
+            r[de].matStock -= v; r[de].stock.push({ t: t + " (voltou ao armazém)", v: -v });
+        }
+    });
     Object.values(r).forEach(o => {
         o.mo    = o.moHoras + o.moFat - o.moSaiu + o.moEntrou;
-        o.mat   = o.matFat - o.matSaiu + o.matEntrou;
+        o.mat   = o.matFat - o.matSaiu + o.matEntrou + o.matStock;
         o.total = o.mo + o.mat;
     });
     return r;
@@ -472,10 +500,11 @@ function linhasContasCusto(c) {
         { t: `Horas do Registo diário (${c.horas.toLocaleString("pt-PT")} h × custo/dia ÷ 8)`, v: c.moHoras, itens: c.regs },
         ...(c.entrou.length ? [{ t: "Ligado a serviços desta obra, mas lançado noutra obra", v: c.moEntrou + c.matEntrou, itens: c.entrou }] : []),
         ...(c.saiu.length ? [{ t: "Lançado aqui, mas ligado a serviços de outra obra (conta lá)", v: -(c.moSaiu + c.matSaiu), itens: c.saiu }] : []),
+        ...(c.stock.length ? [{ t: "Material do armazém (preço médio de compra)", v: c.matStock, itens: c.stock }] : []),
         { t: "Custo real", v: c.total, total: true },
     ];
 }
-const NOTA_CUSTO_REAL = "Tudo sem IVA. A mão de obra é horas × custo/dia ÷ 8: quem tem salário custa 14 meses mais a TSU da empresa (23,75 %) a dividir por 220 dias úteis; os temporários custam o valor/dia combinado. Uma fatura ou horas ligadas a um serviço de outra obra contam nessa obra e não aqui. Os recebimentos do cliente não são custo.";
+const NOTA_CUSTO_REAL = "Tudo sem IVA. A mão de obra é horas × custo/dia ÷ 8: quem tem salário custa 14 meses mais a TSU da empresa (23,75 %) a dividir por 220 dias úteis; os temporários custam o valor/dia combinado. Uma fatura ou horas ligadas a um serviço de outra obra contam nessa obra e não aqui. Os recebimentos do cliente não são custo. O material que sai do armazém para a obra conta ao preço médio a que foi comprado.";
 
 // =======================================================
 // FINANCEIRO — sub-tabs: Fluxo de caixa · DRE · Ordenados
