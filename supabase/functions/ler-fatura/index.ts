@@ -167,21 +167,45 @@ Regras:
 // -------------------------------------------------------
 // RECIBOS
 // -------------------------------------------------------
+// Só letras e algarismos: serve para saber se uma referência tem conteúdo.
+const refLimpa = (v: unknown) => String(v ?? "").replace(/[^0-9A-Za-z]+/g, "").toUpperCase();
+
+// Forma de comparação que guarda a pontuação (série e número não se
+// confundem: "FT1/23" não é "FT12/3") e só tira espaços e os espaços à
+// volta de barras e hífenes ("FCLC0126 / 16088" = "FCLC0126/16088").
+const refCompacta = (v: unknown) => String(v ?? "").toUpperCase()
+    .replace(/\s*([\/\-.])\s*/g, "$1").replace(/\s+/g, " ").trim();
+
+// A referência gravada é esta fatura? Igual, ou acaba nela com um prefixo
+// separado ("FT FCLC0126/16088"). Contida no meio não serve: "FCLC0126/1608"
+// não pode casar com "FCLC0126/16088".
+function mesmaFatura(gravada: unknown, lida: unknown): boolean {
+    const og = refCompacta(gravada), ol = refCompacta(lida);
+    if (!og || !ol || !refLimpa(ol)) return false;
+    if (og === ol) return true;
+    // Prefixo separado por espaço ou pontuação: "FT FCLC0126/16088"
+    return og.length > ol.length && og.endsWith(ol) && /[^0-9A-Z]/.test(og[og.length - ol.length - 1]);
+}
+
 function eRecibo(d: any): boolean {
     const tipo = String(d?.tipo_documento || "").toUpperCase();
     if (tipo === "FR") return false;                  // fatura-recibo é fatura
     if (tipo === "RC" || tipo === "RG") return true;
     const num = String(d?.numero_documento || "").toUpperCase().trim();
     if (/^(RC|RG|REC)[\s\/A-Z0-9]/.test(num)) return true;
-    // A IA leu faturas liquidadas e nada que pareça material
+    // A IA leu faturas liquidadas e nada que pareça material. Só conta como
+    // recibo se TODAS as linhas forem números de fatura (sem quantidade nem
+    // preço unitário): uma fatura de serviços sem quantidades não pode
+    // perder as linhas por engano.
     const liq = Array.isArray(d?.faturas_liquidadas) ? d.faturas_liquidadas : [];
     const linhas = Array.isArray(d?.linhas) ? d.linhas : [];
-    return liq.length > 0 && !linhas.some((l: any) => Number(l?.quantidade) > 0);
+    // A linha tem de ser o número da fatura (ou acabar nele), não só conter
+    // uns algarismos; e com 5 letras/algarismos no mínimo, porque um número
+    // curto como "5" apanhava "Mão de obra piso 5".
+    return liq.length > 0 && linhas.every((l: any) =>
+        !(Number(l?.quantidade) > 0) && l?.preco_unitario == null &&
+        liq.some((f: any) => refLimpa(f?.numero).length >= 5 && mesmaFatura(l?.descricao, f?.numero)));
 }
-
-// Referências comparadas sem espaços e em maiúsculas: "FCLC0126 / 16088"
-// e "fclc0126/16088" são a mesma fatura.
-const refLimpa = (v: unknown) => String(v ?? "").replace(/\s+/g, "").toUpperCase();
 
 async function tratarRecibo(admin: any, d: any, nifEmpresa: string) {
     const avisos: string[] = [];
@@ -214,10 +238,19 @@ async function tratarRecibo(admin: any, d: any, nifEmpresa: string) {
         let { data: ms } = await admin.from("movimentos_financeiros").select(sel)
             .eq("tipo", tipoMov).eq("ativo", true).eq("referencia", String(f.numero).trim()).limit(5);
         if (!ms?.length) {
-            const nucleo = String(f.numero).trim().replace(/[%_]/g, "");
-            const r = await admin.from("movimentos_financeiros").select(sel)
-                .eq("tipo", tipoMov).eq("ativo", true).ilike("referencia", `%${nucleo}%`).limit(5);
-            ms = (r.data || []).filter((m: any) => refLimpa(m.referencia).includes(refLimpa(f.numero)));
+            // Procura larga pelo último número (o que não muda com espaços ou
+            // barras) e decide-se aqui, com a comparação exata acima.
+            // Do mesmo fornecedor quando se sabe qual é, e as mais recentes
+            // primeiro: um número curto ou comum não empurra a fatura certa
+            // para fora da lista.
+            const ultimo = (String(f.numero).match(/\d+(?!.*\d)/) || [""])[0];
+            if (ultimo) {
+                let q = admin.from("movimentos_financeiros").select(sel)
+                    .eq("tipo", tipoMov).eq("ativo", true).ilike("referencia", `%${ultimo}%`);
+                if (fornecedor) q = q.eq("fornecedor_id", fornecedor.id);
+                const r = await q.order("data_documento", { ascending: false }).limit(500);
+                ms = (r.data || []).filter((m: any) => mesmaFatura(m.referencia, f.numero));
+            }
         }
         if (fornecedor && ms && ms.length > 1) {
             const doForn = ms.filter((m: any) => m.fornecedor_id === fornecedor.id);
