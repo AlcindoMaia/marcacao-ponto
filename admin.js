@@ -3416,7 +3416,7 @@ async function lerFicheirosFatura(ficheiros) {
     }
 
     if (!todas.length) {
-        mostrarFeedbackQR("Não foi reconhecida nenhuma fatura.", "err");
+        mostrarFeedbackQR("Não foi reconhecido nenhum documento.", "err");
         return;
     }
 
@@ -3425,7 +3425,7 @@ async function lerFicheirosFatura(ficheiros) {
     await proximaFaturaDaFila();
 
     if (todas.length > 1) {
-        mostrarFeedbackQR(`${todas.length} faturas lidas. Grava esta e a seguinte entra sozinha.`, "ok");
+        mostrarFeedbackQR(`${todas.length} documentos lidos. Grava este e o seguinte entra sozinho.`, "ok");
     }
 }
 
@@ -3442,7 +3442,7 @@ async function lerFicheiroFatura(ficheiro, emFila = false) {
     const btn = document.getElementById("btnLerFatura");
     const textoBtn = btn ? btn.textContent : "";
     if (btn) { btn.disabled = true; btn.textContent = "⏳ A ler…"; }
-    if (!emFila) mostrarFeedbackQR("A ler a fatura… demora alguns segundos.", "warn");
+    if (!emFila) mostrarFeedbackQR("A ler o documento… demora alguns segundos.", "warn");
 
     try {
         const base64 = await new Promise((resolve, reject) => {
@@ -3473,7 +3473,7 @@ async function lerFicheiroFatura(ficheiro, emFila = false) {
         if (emFila) return docs;
 
         if (!docs.length) {
-            mostrarFeedbackQR("Não foi reconhecida nenhuma fatura neste ficheiro.", "err");
+            mostrarFeedbackQR("Não foi reconhecido nenhum documento neste ficheiro.", "err");
             return null;
         }
 
@@ -6353,9 +6353,12 @@ function renderMovimentos() {
     visiveis.forEach(m => {
         const ent = m.tipo === "entrada";
         const tr  = document.createElement("tr");
+        // O recibo não é movimento (contava o dinheiro duas vezes): identifica-se
+        // na fatura que pagou, pela nota que gravarReciboPagamento lhe deixou.
+        const recibo = (m.observacoes || "").match(/Paga pelo recibo (.+?)(?: de \d{2}\/\d{2}\/\d{4})?(?: · |$)/);
         tr.innerHTML = `
             <td>${esc(m.data_documento || "")}</td>
-            <td>${esc(m.referencia || "—")}</td>
+            <td>${esc(m.referencia || "—")}${recibo ? `<div style="font-size:11px;color:#8fbfa0">🧾 Recibo ${esc(recibo[1])}</div>` : ""}</td>
             <td><span class="badge-tipo ${ent ? "entrada" : "saida"}">${ent ? "Entrada" : "Saída"}</span></td>
             <td>${esc(m.fornecedores?.nome || m.cliente_nome || "—")}</td>
             <td>${esc(m.categorias_financeiras?.nome || "—")}</td>
@@ -8444,7 +8447,7 @@ document.addEventListener("click", e => {
 // mesmo; o resto abre a página do assistente já no sítio certo.
 // =======================================================
 const ATALHOS_ASSISTENTE = [
-    { id: "fatura",   ic: "📷", nome: "Ler fatura" },
+    { id: "fatura",   ic: "📷", nome: "Ler documento" },
     { id: "material", ic: "🛒", nome: "Pedir material" },
     { id: "pedidos",  ic: "✅", nome: "Pedidos por validar" },
     { id: "nota",     ic: "📝", nome: "Contar como está uma obra" },

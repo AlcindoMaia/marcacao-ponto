@@ -81,7 +81,7 @@ function semelhancaDeNomes(a: string, b: string): number {
 }
 
 function instrucoes(nifEmpresa: string) {
-    return `És um leitor de faturas de fornecedores de construção civil em Portugal.
+    return `És um leitor de faturas e recibos de fornecedores de construção civil em Portugal.
 
 O ficheiro pode conter MAIS DO QUE UM documento (um scanner de folhas junta
 várias faturas no mesmo PDF). Devolve um documento por cada fatura distinta.
@@ -161,7 +161,7 @@ Regras:
   total_sem_iva e total_iva ficam null.
 - Nos documentos que não são recibos, "faturas_liquidadas" é [] e
   "valor_recebido" é null.
-- Se o ficheiro não tiver nenhuma fatura ou guia, devolve "documentos": [].`;
+- Se o ficheiro não tiver nenhuma fatura, guia ou recibo, devolve "documentos": [].`;
 }
 
 // -------------------------------------------------------

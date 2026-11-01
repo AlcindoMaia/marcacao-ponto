@@ -59,7 +59,7 @@ function arrancar() {
 // conversa só põem o começo da frase na barra; tu acabas e envias.
 // =======================================================
 const ATALHOS = [
-    { id: "fatura",   ic: "📷", nome: "Ler fatura",          sub: "tira foto e ele preenche o movimento" },
+    { id: "fatura",   ic: "📷", nome: "Ler documento",       sub: "tira foto e ele preenche o movimento" },
     { id: "material", ic: "🛒", nome: "Pedir material",      sub: "diz o que falta e para que obra",   frase: "Preciso de " },
     { id: "pedidos",  ic: "✅", nome: "Pedidos por validar", sub: "os rascunhos à tua espera" },
     { id: "nota",     ic: "📝", nome: "Contar como está uma obra", sub: "ponto de situação, decisão, contexto", frase: "Na obra " },
