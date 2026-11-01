@@ -6753,19 +6753,21 @@ async function reverterAceiteOrcamento(o, destino = 'enviado') {
     if (!o?.id) return;
     const eur = v => (Number(v) || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 
-    const [{ data: servs }, { data: docs }, { data: orc }] = await Promise.all([
+    const [{ data: servs, error: e1 }, { data: docs, error: e2 }, { data: orc, error: e3 }] = await Promise.all([
         SB.from('obra_servicos').select('id, nome, valor_orcamento').eq('orcamento_id', o.id),
         SB.from('obra_documentos').select('id').eq('orcamento_id', o.id).eq('visivel_cliente', true),
         SB.from('orcamentos').select('id, numero, estado, total_com_iva, total_sem_iva, taxa_iva, obras(nome)').eq('id', o.id).single(),
     ]);
-    if (!orc) return alert('Não foi possível ler o orçamento.');
+    // Sem a lista certa, o resumo do que muda estaria errado: não se avança
+    if (e1 || e2 || e3 || !orc) { console.error(e1 || e2 || e3); return alert('Não foi possível ler o orçamento e os seus serviços. Tenta outra vez.'); }
     if (orc.estado !== 'aceite') { await carregarOrcamentos(); return alert(`O orçamento ${orc.numero} já não está aceite.`); }
 
     const ids = (servs || []).map(x => x.id);
-    const [{ data: mv }, { data: rg }] = ids.length ? await Promise.all([
+    const [{ data: mv, error: e4 }, { data: rg, error: e5 }] = ids.length ? await Promise.all([
         SB.from('movimento_servicos').select('obra_servico_id').in('obra_servico_id', ids),
         SB.from('registo_servicos').select('obra_servico_id').in('obra_servico_id', ids),
     ]) : [{ data: [] }, { data: [] }];
+    if (e4 || e5) { console.error(e4 || e5); return alert('Não foi possível ver que serviços têm faturas ou horas ligadas. Tenta outra vez.'); }
     const usados = new Set([...(mv || []), ...(rg || [])].map(r => r.obra_servico_id));
     const saem  = (servs || []).filter(x => !usados.has(x.id));
     const ficam = (servs || []).filter(x => usados.has(x.id));
@@ -6817,9 +6819,11 @@ async function reverterAceiteOrcamento(o, destino = 'enviado') {
         const btn = m.querySelector('#revOrcSim');
         btn.disabled = true; btn.textContent = 'A mudar…';
         const estado = sel.value;
-        const { error } = await SB.from('orcamentos').update({ estado, updated_at: new Date().toISOString() })
-            .eq('id', orc.id).eq('estado', 'aceite');
+        const { data: mudou, error } = await SB.from('orcamentos').update({ estado, updated_at: new Date().toISOString() })
+            .eq('id', orc.id).eq('estado', 'aceite').select('id');
         if (error) { btn.disabled = false; btn.textContent = 'Tirar o aceite'; return alert('Não foi possível mudar o estado: ' + error.message); }
+        // Se entretanto deixou de estar aceite (outra janela), não se mexe nos serviços
+        if (!mudou?.length) { fechar(); await carregarOrcamentos(); return alert(`O orçamento ${orc.numero} já não estava aceite. Nada foi mudado.`); }
         await retirarServicosDoOrcamento(orc.id);
         fechar();
         await carregarOrcamentos();
