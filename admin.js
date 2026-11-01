@@ -1645,162 +1645,228 @@ async function toggleAtivoFuncionario(id, nome, ativoAtual) {
 
 
 // =======================================================
-// HISTÓRICO DE FUNCIONÁRIO
+// HISTÓRICO DE FUNCIONÁRIO (ficha 📊) — por mês, a partir do Registo diário
 // =======================================================
-async function abrirHistoricoFuncionario(func) {
-    const hoje = new Date();
-    const ano  = hoje.getFullYear();
-    const inicio = `${ano}-01-01`;
-    const fim    = `${ano}-12-31`;
+// Fonte: registos_admin, o mesmo que paga os Ordenados, por isso o "Ganho"
+// usa rhValorOrdenado (valor/dia × dias, ou salário mensal menos faltas).
+let _histFunc = null;
+let _histMes  = null;   // "AAAA-MM"
+let _histDados = null;  // { presencas, faltas, calc } do mês aberto
 
-    // Fonte: Registo diário (registos_admin), o mesmo que paga os ordenados.
-    // O ponto ainda não é usado por todos, por isso não serve para isto.
-    const { data: linhas } = await SB.from("registos_admin")
-        .select("data, horas, obras(nome)")
-        .eq("funcionario_id", func.id).eq("tipo", "presenca")
-        .gte("data", inicio).lte("data", fim);
-
-    const regs = (linhas || []).map(r => ({
-        dia: r.data, horas: Number(r.horas) || 0, obra: r.obras?.nome || "Sem obra",
-    }));
-    let totalH = 0, diasSet = new Set();
-    regs.forEach(r => { totalH += r.horas; diasSet.add(r.dia); });
-    const totalDias  = diasSet.size;
-    const totalGanho = func.valor_dia ? totalDias * func.valor_dia : null;
-
-    // Obras trabalhadas
-    // Um dia conta uma vez por obra, mesmo com várias linhas nesse dia
-    const diasPorObra = {};
-    regs.forEach(r => { (diasPorObra[r.obra] ||= new Set()).add(r.dia); });
-    const obrasPorNome = Object.fromEntries(
-        Object.entries(diasPorObra).map(([o, set]) => [o, set.size]));
-
-    const modal = document.getElementById("modalHistFuncionario");
-    if (!modal) {
-        // criar modal dinamicamente
-        const div = document.createElement("div");
-        div.id = "modalHistFuncionario";
-        div.style.cssText = "display:flex;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1100;align-items:center;justify-content:center";
-        div.innerHTML = `<div id="modalHistFuncContent" style="background:var(--bg-dark-panel,#3d4d55);border-radius:16px;padding:28px;width:100%;max-width:520px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.5)"></div>`;
-        div.addEventListener("click", e => { if (e.target === div) div.remove(); });
-        document.body.appendChild(div);
-    }
-
-    const content = document.getElementById("modalHistFuncContent");
-    content.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-            <h3 style="font-family:var(--font-title,sans-serif);letter-spacing:.5px">${func.nome}</h3>
-            <button onclick="document.getElementById('modalHistFuncionario').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.5">×</button>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px">
-            <div style="background:rgba(255,255,255,.05);border-radius:8px;padding:12px;text-align:center">
-                <div style="font-size:11px;opacity:.5;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Dias ${ano}</div>
-                <div style="font-size:22px;font-weight:600">${totalDias}</div>
-            </div>
-            <div style="background:rgba(255,255,255,.05);border-radius:8px;padding:12px;text-align:center">
-                <div style="font-size:11px;opacity:.5;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Horas ${ano}</div>
-                <div style="font-size:22px;font-weight:600">${totalH.toFixed(0)}h</div>
-            </div>
-            <div style="background:rgba(255,255,255,.05);border-radius:8px;padding:12px;text-align:center">
-                <div style="font-size:11px;opacity:.5;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Ganho est.</div>
-                <div style="font-size:18px;font-weight:600;color:#f97316">${totalGanho != null ? totalGanho.toFixed(0)+"€" : "—"}</div>
-            </div>
-        </div>
-
-        ${func.categoria || func.telemovel || func.nif || func.iban ? `
-        <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px">
-            ${func.categoria ? `<div style="margin-bottom:4px"><span style="opacity:.5">Categoria:</span> ${func.categoria}</div>` : ""}
-            ${func.telemovel ? `<div style="margin-bottom:4px"><span style="opacity:.5">Telemóvel:</span> ${func.telemovel}</div>` : ""}
-            ${func.nif       ? `<div style="margin-bottom:4px"><span style="opacity:.5">NIF:</span> ${func.nif}</div>` : ""}
-            ${func.iban      ? `<div style="margin-bottom:4px"><span style="opacity:.5">IBAN:</span> <span style="font-family:monospace;font-size:11px">${func.iban}</span></div>` : ""}
-        </div>` : ""}
-
-        <div style="font-family:var(--font-title,sans-serif);font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin-bottom:8px">Obras em ${ano}</div>
-        ${Object.keys(obrasPorNome).length === 0 ? '<p style="opacity:.4;font-size:13px">Sem registos</p>' :
-          Object.entries(obrasPorNome).sort((a,b)=>b[1]-a[1]).map(([obra, dias]) =>
-            `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
-                <span>${esc(obra)}</span>
-                <span style="opacity:.6">${dias} dia(s)</span>
-            </div>`
-          ).join("")}
-
-        <button id="btnPDFFuncionario"
-            style="margin-top:16px;width:100%;background:rgba(181,136,99,.12);border:1px solid rgba(181,136,99,.3);color:var(--primary,#b58863);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;font-weight:600">
-            📄 Exportar PDF do Mês
-        </button>`;
-
-    // Os dados vão pelo ouvinte, não por dentro do onclick: um nome que
-    // contenha &quot; fechava a string do atributo e corria o que quisesse.
-    const btnPDFFunc = document.getElementById("btnPDFFuncionario");
-    if (btnPDFFunc) btnPDFFunc.addEventListener("click", () => exportarPDFFuncionario(func, regs));
-
-    document.getElementById("modalHistFuncionario").style.display = "flex";
+function histLimitesMes(anoMes) {
+    const [a, m] = anoMes.split("-").map(Number);
+    const ultimo = new Date(a, m, 0).getDate();
+    return { inicio: `${anoMes}-01`, fim: `${anoMes}-${String(ultimo).padStart(2, "0")}` };
+}
+function histNomeMes(anoMes) {
+    const [a, m] = anoMes.split("-").map(Number);
+    const s = new Date(a, m - 1, 1).toLocaleString("pt-PT", { month: "long", year: "numeric" });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+}
+function histMudarMes(delta) {
+    const [a, m] = _histMes.split("-").map(Number);
+    const d = new Date(a, m - 1 + delta, 1);
+    carregarFichaMes(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
 }
 
-// ---- Exportar PDF por funcionário ----
-function exportarPDFFuncionario(func, registos) {
+async function abrirHistoricoFuncionario(func) {
+    _histFunc = func;
     const hoje = new Date();
-    const ano = hoje.getFullYear();
-    const mes = hoje.getMonth() + 1;
-    const mesLabel = hoje.toLocaleString("pt-PT", { month:"long", year:"numeric" });
+    const anoMes = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
 
-    const regsDoMes = registos.filter(r => {
-        const d = r.dia || "";
-        return d.startsWith(`${ano}-${String(mes).padStart(2,"0")}`);
+    document.getElementById("modalHistFuncionario")?.remove();
+    const div = document.createElement("div");
+    div.id = "modalHistFuncionario";
+    div.style.cssText = "display:flex;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1100;align-items:center;justify-content:center;padding:12px";
+    div.innerHTML = `
+      <div style="background:var(--bg-dark-panel,#3d4d55);border-radius:16px;padding:22px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.5)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <h3 style="font-family:var(--font-title,sans-serif);letter-spacing:.5px;margin:0">${esc(func.nome)}</h3>
+            <button id="histFechar" aria-label="Fechar" style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.6;color:inherit">×</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
+            <button id="histAnt" class="btn-icone" aria-label="Mês anterior" style="min-width:40px">◀</button>
+            <input id="histMes" type="month" value="${anoMes}" style="flex:1;min-width:0;text-align:center">
+            <button id="histSeg" class="btn-icone" aria-label="Mês seguinte" style="min-width:40px">▶</button>
+        </div>
+        <div id="histCorpo"><p style="opacity:.5;font-size:13px">A carregar…</p></div>
+        <button id="btnPDFFuncionario"
+            style="margin-top:16px;width:100%;background:rgba(181,136,99,.12);border:1px solid rgba(181,136,99,.3);color:var(--primary,#b58863);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;font-weight:600">
+            📄 Exportar PDF do mês
+        </button>
+      </div>`;
+    div.addEventListener("click", e => { if (e.target === div) div.remove(); });
+    document.body.appendChild(div);
+
+    div.querySelector("#histFechar").onclick = () => div.remove();
+    div.querySelector("#histAnt").onclick = () => histMudarMes(-1);
+    div.querySelector("#histSeg").onclick = () => histMudarMes(1);
+    div.querySelector("#histMes").onchange = e => { if (e.target.value) carregarFichaMes(e.target.value); };
+    div.querySelector("#btnPDFFuncionario").onclick = exportarPDFFuncionario;
+
+    await carregarFichaMes(anoMes);
+}
+
+async function carregarFichaMes(anoMes) {
+    _histMes = anoMes;
+    const func = _histFunc;
+    const corpo = document.getElementById("histCorpo");
+    if (!func || !corpo) return;
+    const inpMes = document.getElementById("histMes");
+    if (inpMes) inpMes.value = anoMes;
+    corpo.innerHTML = '<p style="opacity:.5;font-size:13px">A carregar…</p>';
+
+    const { inicio, fim } = histLimitesMes(anoMes);
+    const { data, error } = await SB.from("registos_admin")
+        .select("data, horas, tipo, motivo, observacoes, obras(nome)")
+        .eq("funcionario_id", func.id)
+        .gte("data", inicio).lte("data", fim)
+        .order("data");
+    if (_histMes !== anoMes || _histFunc !== func) return;   // entretanto mudou de mês ou de funcionário
+    if (error) {
+        corpo.innerHTML = `<p style="color:#e09486;font-size:13px">Não foi possível ler o registo diário.</p>`;
+        _histDados = null;
+        return;
+    }
+
+    const presencas = [], faltas = [];
+    (data || []).forEach(r => {
+        if (r.tipo === "falta") faltas.push({ dia: r.data, motivo: r.motivo || "sem_motivo", obs: r.observacoes || "" });
+        else presencas.push({ dia: r.data, horas: Number(r.horas) || 0, obra: r.obras?.nome || "Sem obra", obs: r.observacoes || "" });
     });
 
-    let totalH = 0;
-    const diasMes = new Set(regsDoMes.map(r => r.dia));
-    const totalDias = diasMes.size;
-    regsDoMes.forEach(r => {
-        let h = 0;
-        if (r.horas && typeof r.horas === "string" && r.horas.includes(":")) {
-            const [hh,mm] = r.horas.split(":").map(Number); h = hh+mm/60;
-        } else h = Number(r.horas) || 0;
-        totalH += h;
+    const dias = new Set(presencas.map(r => r.dia)).size;
+    const horas = presencas.reduce((s, r) => s + r.horas, 0);
+    const faltasPorMotivo = {};
+    faltas.forEach(f => { faltasPorMotivo[f.motivo] = (faltasPorMotivo[f.motivo] || 0) + 1; });
+    const calc = rhValorOrdenado(func, dias, faltasPorMotivo);
+    _histDados = { presencas, faltas, dias, horas, faltasPorMotivo, calc };
+
+    // Por obra: um dia conta uma vez por obra, mesmo com várias linhas
+    const porObra = {};
+    presencas.forEach(r => {
+        const o = porObra[r.obra] ||= { dias: new Set(), horas: 0 };
+        o.dias.add(r.dia); o.horas += r.horas;
     });
-    const totalGanho = func.valor_dia ? totalDias * func.valor_dia : null;
+    const obras = Object.entries(porObra).sort((a, b) => b[1].dias.size - a[1].dias.size);
 
-    const html = `<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8">
-    <title>Ponto ${func.nome} — ${mesLabel}</title>
-    <style>
-        body { font-family: Arial, sans-serif; font-size: 12px; color: #222; padding: 32px; }
-        h1 { font-size: 20px; margin-bottom: 4px; }
-        .sub { color: #888; font-size: 13px; margin-bottom: 24px; }
-        .kpis { display: flex; gap: 20px; margin-bottom: 24px; }
-        .kpi { background: #f5f5f5; border-radius: 8px; padding: 12px 20px; text-align: center; }
-        .kpi .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; }
-        .kpi .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-        th { background: #b58863; color: #ffffff; padding: 8px 10px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
-        td { padding: 7px 10px; border-bottom: 1px solid #eee; }
-        tr:nth-child(even) td { background: #fafafa; }
-        .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #eee; font-size: 10px; color: #aaa; text-align: center; }
-    </style></head><body>
-    <h1>${func.nome}</h1>
-    <div class="sub">Registo diário — ${mesLabel}${func.categoria ? " · " + func.categoria : ""}</div>
-    <div class="kpis">
-        <div class="kpi"><div class="label">Dias</div><div class="value">${totalDias}</div></div>
-        <div class="kpi"><div class="label">Horas</div><div class="value">${totalH.toFixed(1)}h</div></div>
-        ${func.valor_dia ? `<div class="kpi"><div class="label">Valor/dia</div><div class="value">${Number(func.valor_dia).toFixed(2)}€</div></div>` : ""}
-        ${totalGanho != null ? `<div class="kpi"><div class="label">Total</div><div class="value" style="color:#a5483d">${totalGanho.toFixed(2)}€</div></div>` : ""}
-    </div>
-    <table>
-        <thead><tr><th>Dia</th><th>Obra</th><th>Horas</th></tr></thead>
-        <tbody>
-            ${regsDoMes.sort((a,b)=>a.dia.localeCompare(b.dia)).map(r =>
-                `<tr><td>${r.dia}</td><td>${r.obra||"—"}</td><td>${r.horas||"—"}</td></tr>`
-            ).join("")}
-        </tbody>
-    </table>
-    <div class="footer">Maia Solutions · Gerado em ${new Date().toLocaleDateString("pt-PT")}</div>
-    <script>window.print();</script>
-    </body></html>`;
+    const kpi = (rot, val, cor) => `
+        <div style="background:rgba(255,255,255,.05);border-radius:8px;padding:12px 6px;text-align:center">
+            <div style="font-size:11px;opacity:.5;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${rot}</div>
+            <div style="font-size:20px;font-weight:600${cor ? ";color:" + cor : ""}">${val}</div>
+        </div>`;
+    const fmtH = h => (Math.round(h * 10) / 10).toLocaleString("pt-PT");
 
-    const win = window.open("", "_blank", "width=800,height=600");
-    win.document.write(html);
-    win.document.close();
+    corpo.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+            ${kpi("Dias", dias)}
+            ${kpi("Horas", fmtH(horas) + "h")}
+            ${kpi("Ganho", calc.valor ? calc.valor.toFixed(0) + "€" : "—", "#f97316")}
+        </div>
+        ${calc.nota ? `<div style="font-size:11px;opacity:.6;margin:-6px 0 12px">${esc(calc.nota)}</div>` : ""}
+
+        ${func.categoria || func.salario_mensal || func.valor_dia || func.telemovel || func.nif || func.iban ? `
+        <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13px">
+            ${func.categoria ? `<div style="margin-bottom:4px"><span style="opacity:.5">Categoria:</span> ${esc(func.categoria)}</div>` : ""}
+            ${func.salario_mensal ? `<div style="margin-bottom:4px"><span style="opacity:.5">Salário mensal:</span> ${Number(func.salario_mensal).toFixed(2)} €</div>`
+              : func.valor_dia ? `<div style="margin-bottom:4px"><span style="opacity:.5">Valor/dia:</span> ${Number(func.valor_dia).toFixed(2)} €</div>` : ""}
+            ${func.telemovel ? `<div style="margin-bottom:4px"><span style="opacity:.5">Telemóvel:</span> ${esc(func.telemovel)}</div>` : ""}
+            ${func.nif       ? `<div style="margin-bottom:4px"><span style="opacity:.5">NIF:</span> ${esc(func.nif)}</div>` : ""}
+            ${func.iban      ? `<div><span style="opacity:.5">IBAN:</span> <span style="font-family:monospace;font-size:11px">${esc(func.iban)}</span></div>` : ""}
+        </div>` : ""}
+
+        <div style="font-family:var(--font-title,sans-serif);font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin-bottom:6px">Obras em ${esc(histNomeMes(anoMes).toLowerCase())}</div>
+        ${obras.length === 0 ? '<p style="opacity:.4;font-size:13px;margin:4px 0 10px">Sem dias no registo diário neste mês.</p>' :
+          obras.map(([obra, o]) =>
+            `<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
+                <span${obra === "Sem obra" ? ' style="color:#fb923c" title="Presenças gravadas sem obra no registo diário"' : ""}>${esc(obra)}</span>
+                <span style="opacity:.6;white-space:nowrap">${o.dias.size} dia(s) · ${fmtH(o.horas)}h</span>
+            </div>`).join("")}
+
+        ${faltas.length ? `
+        <div style="font-family:var(--font-title,sans-serif);font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin:14px 0 6px">Faltas</div>
+        ${Object.entries(faltasPorMotivo).map(([m, n]) =>
+            `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
+                <span>${MOTIVOS_FALTA_RH[m] || esc(m)}</span><span style="opacity:.6">${n} dia(s)</span>
+            </div>`).join("")}` : ""}`;
+}
+
+// ---- PDF do mês aberto na ficha ----
+// Antes abria uma janela e chamava window.print(): no telemóvel saía em branco
+// (imprime antes de a página estar desenhada, ou o popup é bloqueado). Agora
+// é um ficheiro PDF a sério, feito com o jsPDF, como os outros PDFs da app.
+async function exportarPDFFuncionario() {
+    const func = _histFunc, d = _histDados, anoMes = _histMes;
+    if (!func || !d) { alert("Espera que o mês acabe de carregar."); return; }
+    if (!d.presencas.length && !d.faltas.length) { alert("Não há registos neste mês."); return; }
+
+    let jsPDF;
+    try { ({ jsPDF } = await carregarJsPDF()); }
+    catch (e) { alert("Não foi possível preparar o PDF: " + e.message); return; }
+
+    const pdf = new jsPDF({ unit: "pt", format: "a4" });
+    const W = pdf.internal.pageSize.getWidth(), H = pdf.internal.pageSize.getHeight(), M = 40;
+    const fmtH = h => (Math.round(h * 10) / 10).toLocaleString("pt-PT");
+    let y = 50;
+
+    pdf.setFont("helvetica", "bold"); pdf.setFontSize(16);
+    pdf.text(func.nome || "", M, y); y += 16;
+    pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.setTextColor(110);
+    pdf.text(`Registo diário · ${histNomeMes(anoMes)}${func.categoria ? " · " + func.categoria : ""}`, M, y); y += 24;
+    pdf.setTextColor(0);
+
+    // Caixas de totais
+    const caixas = [["Dias", String(d.dias)], ["Horas", fmtH(d.horas) + " h"]];
+    if (func.salario_mensal) caixas.push(["Salário mensal", Number(func.salario_mensal).toFixed(2) + " €"]);
+    else if (func.valor_dia) caixas.push(["Valor/dia", Number(func.valor_dia).toFixed(2) + " €"]);
+    if (d.calc.valor) caixas.push(["Total", d.calc.valor.toFixed(2) + " €"]);
+    const cw = (W - 2 * M - (caixas.length - 1) * 8) / caixas.length;
+    caixas.forEach(([rot, val], i) => {
+        const x = M + i * (cw + 8);
+        pdf.setFillColor(245, 245, 245); pdf.roundedRect(x, y, cw, 44, 4, 4, "F");
+        pdf.setFontSize(8); pdf.setTextColor(120); pdf.text(rot.toUpperCase(), x + cw / 2, y + 15, { align: "center" });
+        pdf.setFontSize(14); pdf.setTextColor(rot === "Total" ? 165 : 0, rot === "Total" ? 72 : 0, rot === "Total" ? 61 : 0);
+        pdf.setFont("helvetica", "bold"); pdf.text(val, x + cw / 2, y + 34, { align: "center" });
+        pdf.setFont("helvetica", "normal");
+    });
+    pdf.setTextColor(0); y += 58;
+    if (d.calc.nota) { pdf.setFontSize(8); pdf.setTextColor(110); pdf.text(pdf.splitTextToSize(d.calc.nota, W - 2 * M), M, y); pdf.setTextColor(0); y += 16; }
+
+    // Tabela dia a dia (presenças e faltas juntas, por data)
+    const linhas = [
+        ...d.presencas.map(r => ({ dia: r.dia, obra: r.obra, horas: fmtH(r.horas), obs: r.obs })),
+        ...d.faltas.map(f => ({ dia: f.dia, obra: "Falta: " + (MOTIVOS_FALTA_RH[f.motivo] || f.motivo).replace(/^\S+\s/, ""), horas: "—", obs: f.obs })),
+    ].sort((a, b) => a.dia.localeCompare(b.dia));
+
+    const cols = [
+        { t: "Dia",         x: M,       w: 70 },
+        { t: "Obra",        x: M + 70,  w: 190 },
+        { t: "Horas",       x: M + 260, w: 45 },
+        { t: "Observações", x: M + 305, w: W - 2 * M - 305 },
+    ];
+    const cabecalho = () => {
+        pdf.setFillColor(181, 136, 99); pdf.rect(M, y - 12, W - 2 * M, 18, "F");
+        pdf.setFont("helvetica", "bold"); pdf.setFontSize(8.5); pdf.setTextColor(255);
+        cols.forEach(c => pdf.text(c.t.toUpperCase(), c.x + 4, y));
+        pdf.setFont("helvetica", "normal"); pdf.setTextColor(0); y += 18;
+    };
+    cabecalho();
+    pdf.setFontSize(9.5);
+    linhas.forEach((l, i) => {
+        const vals = [rhData(l.dia), l.obra, l.horas, l.obs || ""];
+        const partidos = vals.map((v, k) => pdf.splitTextToSize(String(v), cols[k].w - 8));
+        // y = linha de base do texto; a linha fica a meio do espaço entre linhas
+        const alt = Math.max(...partidos.map(p => p.length)) * 11;
+        if (y + alt > H - 50) { pdf.addPage(); y = 50; cabecalho(); pdf.setFontSize(9.5); }
+        if (i % 2) { pdf.setFillColor(248, 248, 248); pdf.rect(M, y - 10, W - 2 * M, alt + 6, "F"); }
+        partidos.forEach((txt, k) => pdf.text(txt, cols[k].x + 4, y));
+        pdf.setDrawColor(230); pdf.line(M, y + alt - 4, W - M, y + alt - 4);
+        y += alt + 6;
+    });
+
+    pdf.setFontSize(8); pdf.setTextColor(150);
+    pdf.text(`Maia Solutions · Gerado em ${new Date().toLocaleDateString("pt-PT")}`, W / 2, H - 24, { align: "center" });
+    pdf.save(`${func.nome} - ${anoMes}.pdf`);
 }
 
 async function toggleAcessoStock(id, nome, temAcesso) {
