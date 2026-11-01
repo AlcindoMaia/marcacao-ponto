@@ -18,6 +18,13 @@
 // com emitida_por_nos, com o cliente e a obra provável, e sem os controlos
 // de fornecedor (o IBAN impresso é o nosso).
 //
+// RECIBOS de fornecedor (ex.: "Recibo Cliente" da Casa Alves) também
+// chegam aqui. Um recibo não é despesa nova: só diz que faturas já
+// lançadas foram pagas. As linhas dele são números de FATURAS, nunca
+// material, por isso o código esvazia as linhas (nada vai para stock nem
+// para preços) e devolve as faturas da app que o recibo liquida, para o
+// ecrã as marcar como pagas.
+//
 // Segredos (Supabase → Edge Functions → Secrets):
 //   ANTHROPIC_API_KEY    a chave da API
 //   ASSISTENTE_TETO_DIA  opcional, leituras por dia (defeito 50)
@@ -87,7 +94,7 @@ Devolves SEMPRE este JSON, sem texto à volta:
 {
   "documentos": [
     {
-      "tipo_documento": "FT"|"FR"|"FS"|"NC"|"GT"|"outro"|null,
+      "tipo_documento": "FT"|"FR"|"FS"|"NC"|"GT"|"RC"|"outro"|null,
       "numero_documento": string|null,
       "atcud": string|null,
       "data": "AAAA-MM-DD"|null,
@@ -112,6 +119,10 @@ Devolves SEMPRE este JSON, sem texto à volta:
           "valor_total": number|null,
           "taxa_iva": number|null
         }
+      ],
+      "valor_recebido": number|null,
+      "faturas_liquidadas": [
+        { "numero": string, "data": "AAAA-MM-DD"|null, "valor_pago": number|null }
       ],
       "observacoes": string|null
     }
@@ -140,7 +151,119 @@ Regras:
 - Nas linhas copia os preços tal como estão impressos. Se a fatura mostrar
   preço sem IVA e com IVA, usa o SEM IVA.
 - Linhas de portes ou taxas entram como linha própria, com a descrição original.
+- RECIBO: se o documento se chama "Recibo", "Recibo Cliente", "Recibo de
+  pagamento" ou tem número RC/RG/REC (e NÃO é uma "Fatura-Recibo", que é FR),
+  é um recibo de pagamento. Então: tipo_documento "RC", "linhas": [] (as
+  linhas de um recibo são as faturas que ele paga, NÃO são material), cada
+  fatura paga vai para "faturas_liquidadas" com o número exatamente como
+  impresso (ex.: "FCLC0126/16088"), a data de emissão e o valor pago, e o
+  total recebido vai para "valor_recebido" e para "total_com_iva".
+  total_sem_iva e total_iva ficam null.
+- Nos documentos que não são recibos, "faturas_liquidadas" é [] e
+  "valor_recebido" é null.
 - Se o ficheiro não tiver nenhuma fatura ou guia, devolve "documentos": [].`;
+}
+
+// -------------------------------------------------------
+// RECIBOS
+// -------------------------------------------------------
+function eRecibo(d: any): boolean {
+    const tipo = String(d?.tipo_documento || "").toUpperCase();
+    if (tipo === "FR") return false;                  // fatura-recibo é fatura
+    if (tipo === "RC" || tipo === "RG") return true;
+    const num = String(d?.numero_documento || "").toUpperCase().trim();
+    if (/^(RC|RG|REC)[\s\/A-Z0-9]/.test(num)) return true;
+    // A IA leu faturas liquidadas e nada que pareça material
+    const liq = Array.isArray(d?.faturas_liquidadas) ? d.faturas_liquidadas : [];
+    const linhas = Array.isArray(d?.linhas) ? d.linhas : [];
+    return liq.length > 0 && !linhas.some((l: any) => Number(l?.quantidade) > 0);
+}
+
+// Referências comparadas sem espaços e em maiúsculas: "FCLC0126 / 16088"
+// e "fclc0126/16088" são a mesma fatura.
+const refLimpa = (v: unknown) => String(v ?? "").replace(/\s+/g, "").toUpperCase();
+
+async function tratarRecibo(admin: any, d: any, nifEmpresa: string) {
+    const avisos: string[] = [];
+    const soDigitos = (v: unknown) => String(v ?? "").replace(/\D/g, "");
+    // Recibo emitido por nós a um cliente: as faturas são entradas
+    const nossa = soDigitos(d.fornecedor_nif) === nifEmpresa;
+    const tipoMov = nossa ? "entrada" : "saida";
+
+    // Fornecedor (só para desempatar referências iguais de fornecedores diferentes)
+    let fornecedor: any = null;
+    const nifForn = soDigitos(d.fornecedor_nif);
+    if (!nossa && nifForn) {
+        const { data: f } = await admin.from("fornecedores")
+            .select("id, nome").eq("nif", nifForn).limit(1);
+        fornecedor = f?.[0] || null;
+    }
+
+    const liquidadas = (Array.isArray(d.faturas_liquidadas) ? d.faturas_liquidadas : [])
+        .filter((f: any) => f?.numero);
+    const faturas_encontradas: any[] = [];
+    let somaPaga = 0;
+
+    for (const f of liquidadas) {
+        const valorPago = f.valor_pago != null ? Number(f.valor_pago) : null;
+        if (valorPago != null) somaPaga += valorPago;
+
+        // Pelo número exato e, se falhar, pelo número contido na referência
+        // (há referências gravadas como "FT FCLC0126/16088").
+        const sel = "id, referencia, data_documento, valor_total, estado_pagamento, observacoes, fornecedor_id, obras(nome)";
+        let { data: ms } = await admin.from("movimentos_financeiros").select(sel)
+            .eq("tipo", tipoMov).eq("ativo", true).eq("referencia", String(f.numero).trim()).limit(5);
+        if (!ms?.length) {
+            const nucleo = String(f.numero).trim().replace(/[%_]/g, "");
+            const r = await admin.from("movimentos_financeiros").select(sel)
+                .eq("tipo", tipoMov).eq("ativo", true).ilike("referencia", `%${nucleo}%`).limit(5);
+            ms = (r.data || []).filter((m: any) => refLimpa(m.referencia).includes(refLimpa(f.numero)));
+        }
+        if (fornecedor && ms && ms.length > 1) {
+            const doForn = ms.filter((m: any) => m.fornecedor_id === fornecedor.id);
+            if (doForn.length) ms = doForn;
+        }
+        const m = ms?.[0];
+        if (!m) {
+            avisos.push(`A fatura ${f.numero} ainda não está na app: lança-a primeiro para a poder dar como paga.`);
+            faturas_encontradas.push({ numero: f.numero, valor_pago: valorPago, encontrada: false });
+            continue;
+        }
+
+        const total = Number(m.valor_total) || 0;
+        const parcial = valorPago != null && valorPago < total - 0.05;
+        if (m.estado_pagamento === "pago") avisos.push(`A fatura ${m.referencia} já está marcada como paga.`);
+        if (parcial) avisos.push(`A fatura ${m.referencia} tem ${total.toFixed(2)} € e o recibo só paga ${valorPago!.toFixed(2)} €: pagamento parcial, confirma antes de a dar como paga.`);
+        if (valorPago != null && valorPago > total + 0.05) avisos.push(`O recibo paga ${valorPago.toFixed(2)} € pela fatura ${m.referencia}, que na app tem ${total.toFixed(2)} €.`);
+        if (fornecedor && m.fornecedor_id && m.fornecedor_id !== fornecedor.id) avisos.push(`A fatura ${m.referencia} na app é de outro fornecedor.`);
+
+        faturas_encontradas.push({
+            numero: f.numero, valor_pago: valorPago, encontrada: true,
+            id: m.id, referencia: m.referencia, data_documento: m.data_documento,
+            valor_total: total, estado_pagamento: m.estado_pagamento,
+            observacoes: m.observacoes || null, obra: m.obras?.nome || null,
+            parcial,
+        });
+    }
+
+    const recebido = d.valor_recebido != null ? Number(d.valor_recebido)
+                   : d.total_com_iva != null ? Number(d.total_com_iva) : null;
+    if (!liquidadas.length) avisos.push("Não consegui ver que faturas este recibo paga.");
+    else if (recebido != null && Math.abs(somaPaga - recebido) > 0.05 && somaPaga > 0) {
+        avisos.push(`A soma das faturas (${somaPaga.toFixed(2)} €) não bate com o valor recebido (${recebido.toFixed(2)} €).`);
+    }
+
+    return {
+        ...d,
+        tipo_documento: "RC",
+        e_recibo: true,
+        emitida_por_nos: nossa,
+        valor_recebido: recebido,
+        linhas: [],                      // nunca linhas de fatura, nunca stock
+        fornecedor_conhecido: fornecedor,
+        faturas_encontradas,
+        avisos,
+    };
 }
 
 Deno.serve(async (req) => {
@@ -249,6 +372,14 @@ Deno.serve(async (req) => {
 
     for (const d of documentos) {
         const avisos: string[] = [];
+
+        // ---- Recibo de pagamento? ----
+        // Decide o código: tipo RC/RG, ou número de recibo sem ser fatura-recibo,
+        // ou a IA trouxe faturas liquidadas e nenhuma linha com quantidade.
+        if (eRecibo(d)) {
+            saida.push(await tratarRecibo(admin, d, nifEmpresa));
+            continue;
+        }
         const linhas = Array.isArray(d.linhas) ? d.linhas : [];
         let soma = linhas.reduce((s: number, l: any) => s + (Number(l.valor_total) || 0), 0);
 
