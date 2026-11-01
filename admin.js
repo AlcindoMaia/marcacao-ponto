@@ -1653,31 +1653,27 @@ async function abrirHistoricoFuncionario(func) {
     const inicio = `${ano}-01-01`;
     const fim    = `${ano}-12-31`;
 
-    // Buscar registos pelo nome (a view usa texto)
-    const { data: registos } = await SB.from("vw_registos_ponto")
-        .select("funcionario, horas, dia, obra")
-        .ilike("funcionario", func.nome)
-        .gte("dia", inicio).lte("dia", fim);
+    // Fonte: Registo diário (registos_admin), o mesmo que paga os ordenados.
+    // O ponto ainda não é usado por todos, por isso não serve para isto.
+    const { data: linhas } = await SB.from("registos_admin")
+        .select("data, horas, obras(nome)")
+        .eq("funcionario_id", func.id).eq("tipo", "presenca")
+        .gte("data", inicio).lte("data", fim);
 
-    const regs = registos || [];
+    const regs = (linhas || []).map(r => ({
+        dia: r.data, horas: Number(r.horas) || 0, obra: r.obras?.nome || "Sem obra",
+    }));
     let totalH = 0, diasSet = new Set();
-    regs.forEach(r => {
-        let h = 0;
-        if (r.horas && typeof r.horas === "string" && r.horas.includes(":")) {
-            const [hh,mm] = r.horas.split(":").map(Number); h = hh+mm/60;
-        } else h = Number(r.horas) || 0;
-        totalH += h;
-        if (r.dia) diasSet.add(r.dia);
-    });
+    regs.forEach(r => { totalH += r.horas; diasSet.add(r.dia); });
     const totalDias  = diasSet.size;
     const totalGanho = func.valor_dia ? totalDias * func.valor_dia : null;
 
     // Obras trabalhadas
-    const obrasPorNome = {};
-    regs.forEach(r => {
-        if (!r.obra) return;
-        obrasPorNome[r.obra] = (obrasPorNome[r.obra] || 0) + 1;
-    });
+    // Um dia conta uma vez por obra, mesmo com várias linhas nesse dia
+    const diasPorObra = {};
+    regs.forEach(r => { (diasPorObra[r.obra] ||= new Set()).add(r.dia); });
+    const obrasPorNome = Object.fromEntries(
+        Object.entries(diasPorObra).map(([o, set]) => [o, set.size]));
 
     const modal = document.getElementById("modalHistFuncionario");
     if (!modal) {
@@ -1724,7 +1720,7 @@ async function abrirHistoricoFuncionario(func) {
         ${Object.keys(obrasPorNome).length === 0 ? '<p style="opacity:.4;font-size:13px">Sem registos</p>' :
           Object.entries(obrasPorNome).sort((a,b)=>b[1]-a[1]).map(([obra, dias]) =>
             `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
-                <span>${obra}</span>
+                <span>${esc(obra)}</span>
                 <span style="opacity:.6">${dias} dia(s)</span>
             </div>`
           ).join("")}
@@ -1754,14 +1750,15 @@ function exportarPDFFuncionario(func, registos) {
         return d.startsWith(`${ano}-${String(mes).padStart(2,"0")}`);
     });
 
-    let totalH = 0, totalDias = 0;
+    let totalH = 0;
+    const diasMes = new Set(regsDoMes.map(r => r.dia));
+    const totalDias = diasMes.size;
     regsDoMes.forEach(r => {
         let h = 0;
         if (r.horas && typeof r.horas === "string" && r.horas.includes(":")) {
             const [hh,mm] = r.horas.split(":").map(Number); h = hh+mm/60;
         } else h = Number(r.horas) || 0;
         totalH += h;
-        totalDias++;
     });
     const totalGanho = func.valor_dia ? totalDias * func.valor_dia : null;
 
@@ -1782,7 +1779,7 @@ function exportarPDFFuncionario(func, registos) {
         .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #eee; font-size: 10px; color: #aaa; text-align: center; }
     </style></head><body>
     <h1>${func.nome}</h1>
-    <div class="sub">Registo de Ponto — ${mesLabel}${func.categoria ? " · " + func.categoria : ""}</div>
+    <div class="sub">Registo diário — ${mesLabel}${func.categoria ? " · " + func.categoria : ""}</div>
     <div class="kpis">
         <div class="kpi"><div class="label">Dias</div><div class="value">${totalDias}</div></div>
         <div class="kpi"><div class="label">Horas</div><div class="value">${totalH.toFixed(1)}h</div></div>
