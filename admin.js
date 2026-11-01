@@ -2026,6 +2026,17 @@ async function carregarObras() {
     document.getElementById("obrasKpiTotal").textContent     = total;
     document.getElementById("obrasKpiAtivas").textContent    = ativas;
     document.getElementById("obrasKpiConcluidas").textContent = concluidas;
+    // Botão (i): que obras entram em cada número
+    const listaObras = l => l.map(o => ({ t: `${o.codigo ? o.codigo + " · " : ""}${o.nome || "—"}`, v: o.estado || "ativa" }));
+    const porContas = (id, titulo, lista, nota) => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = botaoContas(titulo, [...listaObras(lista), { t: "Total", v: String(lista.length), total: true }], nota);
+    };
+    porContas("obrasKpiTotalContas", "Obras: total", data || [], "Todas as obras registadas, em qualquer estado.");
+    porContas("obrasKpiAtivasContas", "Obras ativas", (data || []).filter(o => !o.estado || o.estado === "ativa"),
+        "Obras com estado Ativa (ou sem estado). É o estado que escolhes ao editar a obra.");
+    porContas("obrasKpiConcluidasContas", "Obras concluídas", (data || []).filter(o => o.estado === "concluida"),
+        "Obras com estado Concluída.");
 
     tbody.innerHTML = "";
     if (!data || data.length === 0) {
@@ -4341,18 +4352,33 @@ async function carregarArtigos() {
         SB.from("movimentos_stock").select("artigo_id, tipo_movimento, quantidade")
     ]);
 
-    // Calcular stock actual por artigo
-    const stockPorArtigo = {};
+    // Calcular stock actual por artigo (e guardar as parcelas para o botão (i))
+    const stockPorArtigo = {}, parcelas = {};
     if (movs) {
         movs.forEach(m => {
             if (!stockPorArtigo[m.artigo_id]) stockPorArtigo[m.artigo_id] = 0;
+            const p = (parcelas[m.artigo_id] ||= {});
+            const q = Number(m.quantidade);
+            p[m.tipo_movimento] = (p[m.tipo_movimento] || 0) + q;
             if (m.tipo_movimento === "entrada" || m.tipo_movimento === "ajuste_entrada") {
-                stockPorArtigo[m.artigo_id] += Number(m.quantidade);
+                stockPorArtigo[m.artigo_id] += q;
             } else {
-                stockPorArtigo[m.artigo_id] -= Number(m.quantidade);
+                stockPorArtigo[m.artigo_id] -= q;
             }
         });
     }
+    const NOME_MOV = { entrada: "Entradas", ajuste_entrada: "Acertos para mais", saida: "Saídas para obras",
+                       ajuste_saida: "Acertos para menos", transferencia: "Transferências", devolucao: "Devoluções" };
+    const contasStock = a => {
+        const p = parcelas[a.id] || {};
+        const entra = t => t === "entrada" || t === "ajuste_entrada";
+        return botaoContas(`Stock: ${a.descricao || ""}`, [
+            { t: "Stock inicial", v: String(Number(a.stock_inicial || 0)) },
+            ...Object.entries(p).map(([t, q]) => ({ t: (entra(t) ? "+ " : "− ") + (NOME_MOV[t] || t), v: (entra(t) ? "+" : "−") + q })),
+            { t: "Stock atual", v: String(a.quantidade ?? 0), total: true },
+            ...(a.stock_minimo ? [{ t: "Mínimo definido", v: String(a.stock_minimo), info: true }] : []),
+        ], "Stock inicial do artigo mais as entradas e menos as saídas registadas em Movimentos de stock.");
+    };
 
     // Adicionar stock calculado a cada artigo
     const dataComStock = (data || []).filter(a => a.ativo !== false).map(a => ({
@@ -4382,7 +4408,7 @@ async function carregarArtigos() {
             <td>${esc(a.tipo_artigo || "")}</td>
             <td>${Number(a.preco_atual || 0).toFixed(2)} €</td>
             <td style="color:${stockBaixo ? "#f97316" : "inherit"};font-weight:${stockBaixo ? "700" : "400"}">
-                <span>${a.quantidade ?? 0}${stockBaixo ? " ⚠️" : ""}${a.stock_minimo ? `<span style="font-size:10px;opacity:.5;margin-left:4px">(mín: ${a.stock_minimo})</span>` : ""}</span>
+                <span>${a.quantidade ?? 0}${stockBaixo ? " ⚠️" : ""}${a.stock_minimo ? `<span style="font-size:10px;opacity:.5;margin-left:4px">(mín: ${a.stock_minimo})</span>` : ""}</span>${contasStock(a)}
             </td>
             <td>${esc(a.local_armazenamento || "")}</td>
             <td class="acoes-td">
