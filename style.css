@@ -1451,3 +1451,42 @@ body:has(#modalPainelObra[style*="display: flex"], #modalPainelObra[style*="disp
 .decl-empresa summary { cursor: pointer; opacity: .7; margin-bottom: 8px; }
 .decl-previa { margin: 10px 0 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px;
                font-size: 13px; line-height: 1.6; opacity: .85; }
+
+/* =======================================================
+   "DE ONDE VEM ESTE VALOR?" — botão ⓘ e janela com as contas (admin.js
+   botaoContas / mostrarContas). Discreto: só se nota ao passar por cima.
+======================================================= */
+.btn-contas {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; padding: 0; margin-left: 4px; vertical-align: middle;
+    border-radius: 50%; border: 1px solid currentColor; background: none;
+    color: inherit; opacity: .35; cursor: pointer;
+    font: italic 600 10px/1 Georgia, serif; flex-shrink: 0;
+}
+.btn-contas:hover, .btn-contas:focus-visible { opacity: 1; color: var(--primary, #b58863); }
+/* No canto dos cartões */
+#modalPainelObra .painel-kpi, #vgNumeros .card.metric, .card-kpi-contas { position: relative; }
+#modalPainelObra .painel-kpi > .btn-contas,
+#vgNumeros .card.metric > .btn-contas,
+.card-kpi-contas > .btn-contas { position: absolute; top: 10px; right: 10px; margin: 0; }
+@media (max-width: 600px) { .btn-contas { width: 20px; height: 20px; font-size: 12px; } }
+
+#modalContas {
+    position: fixed; inset: 0; z-index: 1500; background: rgba(0,0,0,.55);
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+#modalContas .contas-caixa { width: 100%; max-width: 480px; max-height: 85vh; overflow-y: auto; padding: 18px 20px; }
+#modalContas .contas-linha {
+    display: flex; justify-content: space-between; gap: 12px; align-items: baseline;
+    padding: 6px 0; font-size: 13px; border-bottom: 1px solid var(--border, rgba(127,127,127,.2));
+}
+#modalContas .contas-linha b { white-space: nowrap; font-weight: 600; }
+#modalContas .contas-linha.total { border-top: 2px solid currentColor; border-bottom: none; margin-top: 2px; font-weight: 700; }
+#modalContas .contas-linha.info { opacity: .7; font-style: italic; }
+#modalContas .contas-linha.item { font-size: 12px; opacity: .75; padding: 3px 0 3px 14px; border-bottom: none; }
+#modalContas .contas-det > summary { list-style: none; cursor: pointer; }
+#modalContas .contas-det > summary::-webkit-details-marker { display: none; }
+#modalContas .contas-det > summary .contas-linha span::before { content: "▸ "; opacity: .5; }
+#modalContas .contas-det[open] > summary .contas-linha span::before { content: "▾ "; }
+#orcKpiValorContas { position: absolute; top: 10px; right: 10px; }
+#orcKpiValorContas .btn-contas { margin: 0; }

@@ -7,7 +7,7 @@
 
 <title>Painel Administrativo — Maia Solutions</title>
 
-<link rel="stylesheet" href="style.css?v=15">
+<link rel="stylesheet" href="style.css?v=16">
 <link rel="stylesheet" href="telemovel.css?v=7">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
@@ -1355,7 +1355,7 @@ document.getElementById("btnLogin").addEventListener("click", function () {
             <h3>Pendentes</h3>
             <div id="orcKpiPendentes" class="value" style="color:var(--color-warn)">–</div>
         </div>
-        <div class="card metric">
+        <div class="card metric card-kpi-contas"><span id="orcKpiValorContas"></span>
             <h3>Valor aceite</h3>
             <div id="orcKpiValor" class="value">–</div>
         </div>
@@ -1599,13 +1599,15 @@ document.getElementById("btnLogin").addEventListener("click", function () {
         </div>
 
         <!-- KPIs (preenchidos pelo admin.js) -->
-        <div id="painelObraKpis" style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0"></div>
+        <div id="painelObraKpis" style="display:none;grid-template-columns:repeat(4,1fr);border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0"></div>
 
         <!-- Conteúdo -->
         <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column">
 
-            <!-- Serviços: sempre visíveis, fora dos separadores, porque os
-                 separadores reescrevem o seu próprio conteúdo -->
+            <!-- Tabela dos serviços: só se vê no separador Serviços (junto com
+                 os KPIs de cima). Fica fora do separador porque o bloco de gerir
+                 serviços é mudado para lá e os outros reescrevem o conteúdo. -->
+            <div id="painelServicosBloco" style="display:none;flex-shrink:0">
             <div style="padding:16px 28px 10px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
                 <div style="font-family:var(--font-title,sans-serif);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.4)">Serviços da Obra</div>
                 <div id="painelObraProgresso" style="font-size:12px;color:rgba(255,255,255,.4)"></div>
@@ -1622,12 +1624,13 @@ document.getElementById("btnLogin").addEventListener("click", function () {
                 <span style="text-align:center">Estado</span>
             </div>
 
-            <div id="painelServicosTbody" style="margin:0 12px 16px;border:1px solid rgba(255,255,255,.06);border-top:none;border-radius:0 0 8px 8px;overflow:hidden">
+            <div id="painelServicosTbody" style="margin:0 12px 16px;border:1px solid rgba(255,255,255,.06);border-top:none;border-radius:0 0 8px 8px;overflow:hidden;flex-shrink:0">
                 <div style="padding:32px;text-align:center;color:rgba(255,255,255,.3);font-size:13px">A carregar…</div>
+            </div>
             </div>
 
             <!-- Conteúdo dos separadores -->
-            <div style="padding:0 12px 16px">
+            <div style="padding:0 12px 16px;flex-shrink:0">
                 <div id="painelTab-resumo"     class="painel-tab-content" style="display:block"></div>
                 <!-- Recebe o separador Serviços da ficha da obra (o mesmo bloco,
                      mudado para aqui enquanto este separador está aberto) -->
@@ -1961,7 +1964,7 @@ document.getElementById("btnLogin").addEventListener("click", function () {
 <script src="cotacoes.js"></script>
 <script src="andamento.js?v=2"></script>
 <script src="rh.js?v=1"></script>
-<script src="admin.js?v=25"></script>
+<script src="admin.js?v=26"></script>
 <script src="telemovel.js?v=5"></script>
 
 

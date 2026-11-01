@@ -296,6 +296,52 @@ function taxaIvaMov(m) {
     const base = Number(m.valor_base || 0);
     return base > 0 ? Math.round(ivaMov(m) / base * 100) : 0;
 }
+// =======================================================
+// "DE ONDE VEM ESTE VALOR?" — botão ⓘ discreto ao lado de um número
+// botaoContas(titulo, linhas, nota) devolve o HTML do botão; ao carregar,
+// abre uma janela com as contas. Cada linha: { t: texto, v: número ou
+// texto, total: true na linha do resultado, itens: [{ t, v }] com o
+// detalhe (fica fechado), info: true para linhas que não entram na conta }.
+// =======================================================
+const _contas = new Map();
+let _contasSeq = 0;
+
+function botaoContas(titulo, linhas, nota = "") {
+    const id = "ct" + (++_contasSeq);
+    _contas.set(id, { titulo, linhas, nota });
+    if (_contas.size > 400) _contas.delete(_contas.keys().next().value);   // não cresce sem fim
+    return `<button type="button" class="btn-contas" title="Ver as contas deste valor" aria-label="Ver as contas"
+        onclick="event.stopPropagation();mostrarContas('${id}')">i</button>`;
+}
+
+function mostrarContas(id) {
+    const c = _contas.get(id);
+    if (!c) return;
+    const fmt = v => typeof v === "number"
+        ? v.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €" : esc(String(v ?? ""));
+    const linha = l => {
+        const cab = `<div class="contas-linha${l.total ? " total" : ""}${l.info ? " info" : ""}">
+            <span>${esc(l.t)}</span><b>${fmt(l.v)}</b></div>`;
+        if (!l.itens?.length) return cab;
+        return `<details class="contas-det"><summary>${cab}</summary>
+            ${l.itens.map(x => `<div class="contas-linha item"><span>${esc(x.t)}</span><span>${fmt(x.v)}</span></div>`).join("")}
+        </details>`;
+    };
+    document.getElementById("modalContas")?.remove();
+    const m = document.createElement("div");
+    m.id = "modalContas";
+    m.innerHTML = `<div class="card contas-caixa" role="dialog" aria-label="${esc(c.titulo)}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px">
+            <h3 style="margin:0;font-size:16px">${esc(c.titulo)}</h3>
+            <button type="button" class="btn-secondary" style="padding:2px 10px" onclick="document.getElementById('modalContas').remove()">×</button>
+        </div>
+        ${c.linhas.length ? c.linhas.map(linha).join("") : '<div style="opacity:.6;font-size:13px">Sem dados.</div>'}
+        ${c.nota ? `<div style="font-size:12px;opacity:.65;margin-top:12px;line-height:1.45">${esc(c.nota)}</div>` : ""}
+    </div>`;
+    m.onclick = e => { if (e.target === m) m.remove(); };
+    document.body.appendChild(m);
+}
+
 // Orçamento sem IVA; nos importados de PDF pode faltar o total sem IVA
 function orcSemIva(o) {
     const sem = Number(o.total_sem_iva || 0);
@@ -2356,12 +2402,18 @@ async function carregarServicosModal() {
     const ids = (data||[]).map(s=>s.id);
     const [regRes, movRes] = ids.length ? await Promise.all([
         SB.from("registo_servicos").select("obra_servico_id, horas").in("obra_servico_id", ids),
-        SB.from("movimento_servicos").select("obra_servico_id, valor").in("obra_servico_id", ids),
+        SB.from("movimento_servicos").select("obra_servico_id, valor, movimentos_financeiros(tipo, ativo)").in("obra_servico_id", ids),
     ]) : [{data:[]},{data:[]}];
 
-    const horasP = {}, matP = {};
+    // As entradas ligadas a um serviço são o que o cliente pagou, não material
+    const horasP = {}, matP = {}, recP = {};
     (regRes.data||[]).forEach(r => horasP[r.obra_servico_id] = (horasP[r.obra_servico_id]||0)+Number(r.horas||0));
-    (movRes.data||[]).forEach(r => matP[r.obra_servico_id]   = (matP[r.obra_servico_id]||0)+Number(r.valor||0));
+    (movRes.data||[]).forEach(r => {
+        const m = r.movimentos_financeiros;
+        if (m?.ativo === false) return;
+        const alvo = m?.tipo === "entrada" ? recP : matP;
+        alvo[r.obra_servico_id] = (alvo[r.obra_servico_id]||0) + Number(r.valor||0);
+    });
 
     const lista = document.getElementById("listaServicos");
     if (!data?.length) {
@@ -2383,7 +2435,8 @@ async function carregarServicosModal() {
                 </div>
                 <div style="display:flex;gap:14px;font-size:11px;opacity:.6">
                     <span>💶 ${vS ? vS.toFixed(0)+"€ valor" : "sem valor"}</span>
-                    <span>🧱 ${mR.toFixed(0)}€ material ligado</span>
+                    <span>🧱 ${mR.toFixed(0)}€ custos ligados</span>
+                    ${recP[s.id] ? `<span>💰 ${Number(recP[s.id]).toFixed(0)}€ recebido</span>` : ""}
                 </div>
                 ${pct!==null?`<div style="margin-top:6px;background:rgba(255,255,255,.1);border-radius:3px;height:3px"><div style="width:${pct}%;height:100%;background:${barCol};border-radius:3px"></div></div>`:""}
             </div>
@@ -2492,7 +2545,7 @@ async function abrirPainelObra(obra, tabInicial = "resumo") {
             <div style="padding:48px 24px;text-align:center">
                 <div style="font-size:36px;margin-bottom:12px;opacity:.3">📋</div>
                 <div style="font-family:var(--font-title,'Oswald',sans-serif);font-size:14px;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:8px">Sem serviços definidos</div>
-                <div style="font-size:12px;color:rgba(255,255,255,.2)">Abre o separador 📋 Serviços, aqui em baixo, para começar</div>
+                <div style="font-size:12px;color:rgba(255,255,255,.2)">Adiciona o primeiro serviço aqui em baixo</div>
             </div>`;
         // Sem serviços, os separadores continuam a ter conteúdo útil
         // (financeiro, ponto e stock não dependem dos serviços)
@@ -2500,91 +2553,136 @@ async function abrirPainelObra(obra, tabInicial = "resumo") {
         return;
     }
 
-    // Buscar horas imputadas por serviço
+    // Horas ligadas a serviços, com o registo de origem (valor/dia e obra
+    // onde a presença foi marcada)
     const { data: regServs } = await SB.from("registo_servicos")
-        .select("obra_servico_id, horas, registo_id")
+        .select("obra_servico_id, horas, registos_admin(obra_id, data, funcionarios(nome, valor_dia))")
         .in("obra_servico_id", ids);
 
-    // Buscar valor_dia via registos_admin
-    const registoIds = [...new Set((regServs||[]).map(r=>r.registo_id).filter(Boolean))];
-    let valorDiaPorRegisto = {};
-    if (registoIds.length) {
-        const { data: regsAdmin } = await SB.from("registos_admin")
-            .select("id, funcionarios(valor_dia)")
-            .in("id", registoIds);
-        (regsAdmin||[]).forEach(r => { valorDiaPorRegisto[r.id] = r.funcionarios?.valor_dia || 0; });
-    }
-
-    // Buscar materiais
+    // Faturas e recebimentos ligados a serviços. Só as saídas são custo: as
+    // entradas ligadas a um serviço são o que o cliente pagou por ele.
     const { data: movServs } = await SB.from("movimento_servicos")
-        .select("obra_servico_id, valor")
+        .select("obra_servico_id, valor, movimentos_financeiros(tipo, obra_id, ativo, referencia, data_documento, fornecedores(nome), categorias_financeiras(nome), obras(nome))")
         .in("obra_servico_id", ids);
 
     // Custos da obra inteira (sem IVA), para mostrar o que não está ligado a
     // nenhum serviço: sem isto a soma das margens dos serviços engana.
     const [{ data: faturasObra }, { data: regsObra }] = await Promise.all([
-        SB.from("movimentos_financeiros").select("valor_base, valor_total")
-            .eq("obra_id", obra.id).eq("tipo", "saida").eq("ativo", true),
-        SB.from("registos_admin").select("horas, funcionarios(valor_dia)")
-            .eq("obra_id", obra.id).eq("tipo", "presenca"),
+        SB.from("movimentos_financeiros").select("valor_base, valor_total, referencia, data_documento, fornecedores(nome), categorias_financeiras(nome)")
+            .eq("obra_id", obra.id).eq("tipo", "saida").eq("ativo", true).order("data_documento"),
+        SB.from("registos_admin").select("horas, data, funcionarios(nome, valor_dia)")
+            .eq("obra_id", obra.id).eq("tipo", "presenca").order("data"),
     ]);
 
-    const moP = {}, matP = {};
-    (regServs||[]).forEach(r => {
-        const sid = r.obra_servico_id;
-        const vd = valorDiaPorRegisto[r.registo_id] || 0;
-        if (vd) moP[sid] = (moP[sid]||0) + Number(r.horas||0) * (vd/8);
-    });
-    (movServs||[]).forEach(r => { matP[r.obra_servico_id] = (matP[r.obra_servico_id]||0)+Number(r.valor||0); });
+    const eur = v => Math.round(v).toLocaleString("pt-PT") + " €";
+    const dataPt = d => d ? d.split("-").reverse().join("/") : "";
+    const nomeMov = m => m?.fornecedores?.nome || m?.referencia || "Sem nome";
+    // Faturas de categoria Ordenados / Mão de obra contam como mão de obra
+    const eMO = m => /ordenad|m[ãa]o de obra|sal[áa]ri/i.test(m?.categorias_financeiras?.nome || "");
 
+    // Por serviço: mão de obra, material e recebido, com o detalhe para as contas
+    const moP = {}, matP = {}, recP = {}, detP = {};
+    const det = sid => (detP[sid] ||= { mo: [], mat: [], rec: [] });
+    const somaEm = (o, k, v) => { o[k] = (o[k] || 0) + v; };
+    let moFora = 0, matFora = 0; const fora = [];
+    (regServs || []).forEach(r => {
+        const reg = r.registos_admin, vd = Number(reg?.funcionarios?.valor_dia || 0), h = Number(r.horas || 0);
+        const c = h * vd / 8;
+        somaEm(moP, r.obra_servico_id, c);
+        det(r.obra_servico_id).mo.push({ t: `${dataPt(reg?.data)} ${reg?.funcionarios?.nome || ""}: ${h} h × ${vd} €/dia ÷ 8`, v: c });
+        if (reg && reg.obra_id !== obra.id) { moFora += c; fora.push({ t: `Horas de ${reg?.funcionarios?.nome || "—"} (${dataPt(reg.data)}) marcadas noutra obra`, v: c }); }
+    });
+    (movServs || []).forEach(r => {
+        const m = r.movimentos_financeiros, v = Number(r.valor || 0), sid = r.obra_servico_id;
+        if (!m || m.ativo === false) return;
+        const t = `${dataPt(m.data_documento)} ${nomeMov(m)}`;
+        if (m.tipo === "entrada") { somaEm(recP, sid, v); det(sid).rec.push({ t, v }); return; }
+        if (eMO(m)) { somaEm(moP, sid, v); det(sid).mo.push({ t: t + " (fatura de mão de obra)", v }); }
+        else        { somaEm(matP, sid, v); det(sid).mat.push({ t, v }); }
+        if (m.obra_id !== obra.id) {
+            if (eMO(m)) moFora += v; else matFora += v;
+            fora.push({ t: `${t}: fatura lançada em ${m.obras?.nome || "nenhuma obra"}`, v });
+        }
+    });
+
+    const faturasMat = (faturasObra || []).filter(m => !eMO(m));
+    const faturasMO  = (faturasObra || []).filter(eMO);
     const totValor = (servicos||[]).reduce((s,v)=>s+Number(v.valor_orcamento||0),0);
     const totMO    = Object.values(moP).reduce((s,v)=>s+v,0);
     const totMat   = Object.values(matP).reduce((s,v)=>s+v,0);
-    const matObra  = (faturasObra||[]).reduce((s,m)=>s+semIva(m),0);
-    const moObra   = (regsObra||[]).reduce((s,r)=>s+Number(r.horas||0)*Number(r.funcionarios?.valor_dia||0)/8,0);
-    const matSemServ = Math.max(matObra - totMat, 0);
-    const moSemServ  = Math.max(moObra - totMO, 0);
-    const custoObra  = Math.max(matObra, totMat) + Math.max(moObra, totMO);
+    const matObra  = faturasMat.reduce((s,m)=>s+semIva(m),0);
+    const moFat    = faturasMO.reduce((s,m)=>s+semIva(m),0);
+    const horasObra = (regsObra||[]).reduce((s,r)=>s+Number(r.horas||0),0);
+    const moHoras  = (regsObra||[]).reduce((s,r)=>s+Number(r.horas||0)*Number(r.funcionarios?.valor_dia||0)/8,0);
+    const custoMO  = moHoras + moFat + moFora;
+    const custoMat = matObra + matFora;
+    const matSemServ = Math.max(custoMat - totMat, 0);
+    const moSemServ  = Math.max(custoMO - totMO, 0);
+    const custoObra  = custoMO + custoMat;
     const margemObra = totValor - custoObra;
     const margemPctObra = totValor > 0 ? margemObra / totValor * 100 : null;
     const concluidosCount = (servicos||[]).filter(s=>s.concluido).length;
-    const eur = v => Math.round(v).toLocaleString("pt-PT") + " €";
     const corMg = v => v === null ? "rgba(255,255,255,.3)" : v < 0 ? "#e09486" : "#8fbfa0";
+    const itensMov = lista => lista.map(m => ({ t: `${dataPt(m.data_documento)} ${nomeMov(m)}`, v: semIva(m) }));
+    const recTotal = Object.values(recP).reduce((s,v)=>s+v,0);
 
-    // KPIs: valor dos serviços contra o custo real, tudo sem IVA
+    // KPIs: valor dos serviços contra o custo real, tudo sem IVA. Cada um
+    // tem o botão ⓘ com as contas.
     const kpis = [
         {
             label: "Valor dos serviços",
             val: totValor > 0 ? eur(totValor) : "—",
             sub: "sem IVA",
             cor: "rgba(255,255,255,.85)",
-            accent: "#b58863"
+            accent: "#b58863",
+            contas: botaoContas("Valor dos serviços", [
+                ...(servicos || []).map(x => ({ t: x.nome + (x.extra ? " (extra)" : ""), v: Number(x.valor_orcamento || 0) })),
+                { t: "Total", v: totValor, total: true },
+            ], "Soma do valor sem IVA de cada serviço. Os serviços de um orçamento aceite trazem o valor do orçamento; os outros têm o valor que lhes deste à mão."),
         },
         {
             label: "Custo real",
             val: custoObra > 0 ? eur(custoObra) : "—",
-            sub: `${eur(Math.max(moObra, totMO))} mão de obra · ${eur(Math.max(matObra, totMat))} material`,
+            sub: `${eur(custoMO)} mão de obra · ${eur(custoMat)} material`,
             cor: "#e09486",
-            accent: "#e09486"
+            accent: "#e09486",
+            contas: botaoContas("Custo real", [
+                { t: `Faturas de material desta obra (${faturasMat.length})`, v: matObra, itens: itensMov(faturasMat) },
+                ...(faturasMO.length ? [{ t: `Faturas de mão de obra desta obra (${faturasMO.length})`, v: moFat, itens: itensMov(faturasMO) }] : []),
+                { t: `Horas marcadas nesta obra (${horasObra.toLocaleString("pt-PT")} h × valor/dia ÷ 8)`, v: moHoras,
+                  itens: (regsObra || []).map(r => ({ t: `${dataPt(r.data)} ${r.funcionarios?.nome || ""}: ${Number(r.horas || 0)} h × ${Number(r.funcionarios?.valor_dia || 0)} €/dia ÷ 8`,
+                                                      v: Number(r.horas || 0) * Number(r.funcionarios?.valor_dia || 0) / 8 })) },
+                ...(fora.length ? [{ t: "Ligado a serviços desta obra, mas lançado noutra obra", v: moFora + matFora, itens: fora }] : []),
+                { t: "Custo real", v: custoObra, total: true },
+            ], "Tudo sem IVA. Os recebimentos do cliente (entradas) não contam como custo" + (recTotal ? `: os ${eur(recTotal)} recebidos e ligados a serviços aparecem nas contas de cada serviço.` : ".")),
         },
         {
             label: "Margem",
             val: totValor > 0 ? eur(margemObra) : "—",
             sub: margemPctObra !== null ? `${margemPctObra.toFixed(1)}% do valor` : "Sem valor nos serviços",
             cor: totValor > 0 ? corMg(margemObra) : "rgba(255,255,255,.6)",
-            accent: "#a78bfa"
+            accent: "#a78bfa",
+            contas: botaoContas("Margem", [
+                { t: "Valor dos serviços", v: totValor },
+                { t: "− Custo real", v: -custoObra },
+                { t: "Margem", v: margemObra, total: true },
+                ...(margemPctObra !== null ? [{ t: "Margem ÷ valor", v: margemPctObra.toFixed(1) + " %" }] : []),
+            ], "É o que sobra do valor dos serviços depois de tirar o custo real, sem IVA. Não é o dinheiro em caixa: para isso vê o Resumo (recebido menos gasto)."),
         },
         {
             label: "Serviços",
             val: `${concluidosCount}/${(servicos||[]).length}`,
             sub: "concluídos",
             cor: concluidosCount === (servicos||[]).length ? "#8fbfa0" : "rgba(255,255,255,.7)",
-            accent: "#8fbfa0"
+            accent: "#8fbfa0",
+            contas: botaoContas("Serviços concluídos", (servicos || []).map(x => ({ t: x.nome, v: x.concluido ? "✓ Feito" : "Em curso" })),
+                "Marcas um serviço como feito no separador Serviços, com o botão ✓."),
         },
     ];
 
     document.getElementById("painelObraKpis").innerHTML = kpis.map((k,i) => `
         <div class="painel-kpi" style="border-top:3px solid ${k.accent}">
+            ${k.contas}
             <div class="kpi-label">${k.label}</div>
             <div class="kpi-val" style="color:${k.cor}">${k.val}</div>
             <div class="kpi-sub">${k.sub}</div>
@@ -2599,13 +2697,13 @@ async function abrirPainelObra(obra, tabInicial = "resumo") {
     }
 
     // Linhas de serviços: valor contra custo real e a margem que fica
-    const linhaServ = (nome, badges, valor, mo, mat, estado, pctBar) => {
+    const linhaServ = (nome, badges, valor, mo, mat, estado, pctBar, contas = "") => {
         const custo  = mo + mat;
         const margem = valor ? valor - custo : null;
         const mPct   = valor ? margem / valor * 100 : null;
         return `<div class="serv-row">
             <div>
-                <div style="font-weight:500;font-size:13px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">${nome}${badges}</div>
+                <div style="font-weight:500;font-size:13px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">${nome}${badges}${contas}</div>
                 ${pctBar !== null ? `
                 <div style="display:flex;align-items:center;gap:6px;margin-top:5px" title="Custo em % do valor">
                     <div style="flex:1;max-width:100px;background:rgba(255,255,255,.08);border-radius:3px;height:3px">
@@ -2634,8 +2732,16 @@ async function abrirPainelObra(obra, tabInicial = "resumo") {
         const extraBadge = s.extra
             ? `<span style="background:rgba(251,146,60,.15);color:#fb923c;padding:1px 6px;border-radius:6px;font-size:9px;font-weight:600;margin-left:4px">Extra</span>`
             : "";
+        const d = detP[s.id] || { mo: [], mat: [], rec: [] };
+        const contas = botaoContas(s.nome, [
+            { t: "Valor do serviço", v: valor },
+            { t: `Mão de obra ligada (${d.mo.length})`, v: -mo, itens: d.mo.map(x => ({ ...x, v: -x.v })) },
+            { t: `Material ligado (${d.mat.length})`, v: -mat, itens: d.mat.map(x => ({ ...x, v: -x.v })) },
+            { t: "Margem do serviço", v: valor - mo - mat, total: true },
+            ...(d.rec.length ? [{ t: `Recebido do cliente para este serviço (${d.rec.length})`, v: recP[s.id] || 0, itens: d.rec, info: true }] : []),
+        ], "Só conta o que ligaste a este serviço (no movimento, no Registo diário ou em \"Custos sem serviço\"). Sem IVA. O recebido é informação e não entra na margem.");
         return linhaServ(esc(s.nome), extraBadge, valor, mo, mat, estadoBadge,
-            valor > 0 && (mo + mat) > 0 ? Math.round((mo + mat) / valor * 100) : null);
+            valor > 0 && (mo + mat) > 0 ? Math.round((mo + mat) / valor * 100) : null, " " + contas);
     }).join("") + (matSemServ + moSemServ >= 1 ? linhaServ(
         `<span style="opacity:.6;font-style:italic">Custos sem serviço</span>`,
         `<span style="color:var(--primary,#b58863);font-size:11px;margin-left:6px;white-space:nowrap">▸ ligar a serviço</span>`,
@@ -3909,7 +4015,8 @@ async function vgCarregarNumeros() {
     const mesAnterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1).toISOString().slice(0, 10);
 
     const [{ data: esteMes }, { data: anterior }, { count: obras }, { count: funcs }] = await Promise.all([
-        SB.from("movimentos_financeiros").select("valor_total, tipo").gte("data_documento", mes).eq("ativo", true),
+        SB.from("movimentos_financeiros").select("valor_total, tipo, data_documento, referencia, fornecedores(nome), obras(nome)")
+          .gte("data_documento", mes).eq("ativo", true).order("data_documento"),
         SB.from("movimentos_financeiros").select("valor_total, tipo")
           .gte("data_documento", mesAnterior).lt("data_documento", mes).eq("ativo", true),
         SB.from("obras").select("id", { count: "exact", head: true }).eq("estado", "ativa"),
@@ -3937,16 +4044,27 @@ async function vgCarregarNumeros() {
         }
     }
 
-    const cartao = (titulo, valor, extra = "") => `
-        <div class="card metric">
+    const cartao = (titulo, valor, extra = "", contas = "") => `
+        <div class="card metric">${contas}
             <h3>${titulo}</h3>
             <div class="value">${valor}</div>
             ${extra}
         </div>`;
 
+    const dataPt = d => d ? d.split("-").reverse().join("/") : "";
+    const itens = tipo => (esteMes || []).filter(m => m.tipo === tipo).map(m => ({
+        t: `${dataPt(m.data_documento)} ${m.fornecedores?.nome || m.referencia || "—"}${m.obras?.nome ? " · " + m.obras.nome : ""}`,
+        v: Number(m.valor_total || 0) }));
+    const contasMes = (titulo, tipo, total) => {
+        const it = itens(tipo);
+        return botaoContas(titulo, [{ t: `${it.length} movimento(s) com data deste mês`, v: total, itens: it },
+                                    ...(tipo === "saida" && saidasAnt > 0 ? [{ t: "Saídas do mês passado", v: saidasAnt, info: true }] : [])],
+            "Valores com IVA, tal como estão no Fluxo de caixa. Conta a data do documento, não a data do pagamento, e só os movimentos activos.");
+    };
+
     cont.innerHTML =
-        cartao("Saídas este mês",   vgEuros(saidas), variacao) +
-        cartao("Entradas este mês", vgEuros(entradas)) +
+        cartao("Saídas este mês",   vgEuros(saidas), variacao, contasMes("Saídas este mês", "saida", saidas)) +
+        cartao("Entradas este mês", vgEuros(entradas), "", contasMes("Entradas este mês", "entrada", entradas)) +
         cartao("Obras activas",     obras ?? "–") +
         cartao("Funcionários",      funcs ?? "–");
 }
@@ -4795,6 +4913,10 @@ function abrirPainelTab(tab) {
     if (btn) { btn.classList.add("active"); btn.style.borderBottomColor = "var(--primary)"; btn.style.color = "var(--primary)"; }
     const el = document.getElementById(`painelTab-${tab}`);
     if (el) el.style.display = "block";
+    // Os KPIs e a tabela dos serviços só fazem sentido no separador Serviços
+    const kp = document.getElementById("painelObraKpis"), sb = document.getElementById("painelServicosBloco");
+    if (kp) kp.style.display = tab === "servicos" && kp.innerHTML.trim() ? "grid" : "none";
+    if (sb) sb.style.display = tab === "servicos" ? "block" : "none";
     if (_painelObraActual) guardarSitio({ painelTab: tab });
     if (tab === "resumo")     carregarPainelResumo();
     if (tab === "financeiro") carregarPainelFinanceiro();
@@ -5652,12 +5774,12 @@ async function carregarPainelResumo() {
     el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">A carregar...</div>`;
 
     const [movsRes, orcRes, pontoRes, regRes] = await Promise.all([
-        SB.from("movimentos_financeiros").select("tipo, valor_base, valor_total, categorias_financeiras(nome)").eq("obra_id", obraId).eq("ativo", true),
+        SB.from("movimentos_financeiros").select("tipo, valor_base, valor_total, referencia, data_documento, fornecedores(nome), categorias_financeiras(nome)").eq("obra_id", obraId).eq("ativo", true).order("data_documento"),
         SB.from("orcamentos").select("id, numero, estado, taxa_iva, total_com_iva, total_sem_iva, subtotal_mao_obra, subtotal_materiais").eq("obra_id", obraId),
         SB.from("vw_registos_ponto").select("funcionario, horas, dia").eq("obra", _painelObraActual.nome),
         // registos_admin é a fonte de verdade das horas pagas (é daí que
         // saem os salários), por isso é daí que sai o custo de mão de obra.
-        SB.from("registos_admin").select("horas, funcionarios(valor_dia)").eq("obra_id", obraId).eq("tipo", "presenca")
+        SB.from("registos_admin").select("horas, data, funcionarios(nome, valor_dia)").eq("obra_id", obraId).eq("tipo", "presenca").order("data")
     ]);
 
     const movs  = movsRes.data  || [];
@@ -5686,30 +5808,59 @@ async function carregarPainelResumo() {
     const fmt = v => Number(v).toFixed(2) + " €";
     const corMargem = margem >= 0 ? "#8fbfa0" : "#e09486";
 
+    // As contas de cada número (botão ⓘ)
+    const dataPt = d => d ? d.split("-").reverse().join("/") : "";
+    const itMov = lista => lista.map(m => ({ t: `${dataPt(m.data_documento)} ${m.referencia || m.fornecedores?.nome || m.categorias_financeiras?.nome || ""}`, v: semIva(m) }));
+    const itReg = regs.map(r => ({ t: `${dataPt(r.data)} ${r.funcionarios?.nome || ""}: ${Number(r.horas || 0)} h × ${Number(r.funcionarios?.valor_dia || 0)} €/dia ÷ 8`,
+                                   v: Number(r.horas || 0) * Number(r.funcionarios?.valor_dia || 0) / 8 }));
+    const entradasL = movs.filter(m => m.tipo === "entrada"), saidasL = movs.filter(m => m.tipo === "saida");
+    const cRecebido = botaoContas("Recebido sem IVA", [
+        ...itMov(entradasL), { t: `Total (${entradasL.length} entradas)`, v: totalEntradas, total: true }],
+        "Soma das entradas desta obra no Financeiro, sem IVA (valor base). Quando a entrada não tem IVA separado, conta o valor total.");
+    const cGasto = botaoContas("Gasto sem IVA", [
+        { t: `Faturas e despesas desta obra (${saidasL.length})`, v: totalFaturas, itens: itMov(saidasL) },
+        { t: `Mão de obra: ${horasRegistos.toLocaleString("pt-PT")} h no Registo diário × valor/dia ÷ 8`, v: custoMaoObra, itens: itReg },
+        { t: "Gasto", v: totalSaidas, total: true }],
+        "Só conta o que está lançado nesta obra. O Custo real do separador Serviços pode ser maior: também soma faturas de outras obras que ligaste a serviços desta.");
+    const cMargem = botaoContas("Margem bruta", [
+        { t: "Recebido sem IVA", v: totalEntradas }, { t: "− Gasto sem IVA", v: -totalSaidas },
+        { t: "Margem bruta", v: margem, total: true },
+        ...(margemPct ? [{ t: "Margem ÷ recebido", v: margemPct + " %" }] : [])],
+        "Compara o dinheiro que já entrou com o que já se gastou. É diferente da Margem dos serviços, que compara o valor orçamentado com o custo.");
+    const cHoras = botaoContas("Horas da obra", [
+        { t: "Horas no Registo diário", v: horasRegistos.toFixed(1) + " h" },
+        { t: "Horas no ponto (marcações)", v: horasPonto.toFixed(1) + " h" },
+        { t: "Mostrado", v: (horasRegistos ? "Registo diário" : "Ponto"), total: true }],
+        "Mostra as horas do Registo diário, que são as que se pagam. Só usa o ponto quando a obra não tem nenhum registo.");
+
     el.innerHTML = `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
-            <div class="card" style="padding:16px;text-align:center">
+            <div class="card card-kpi-contas" style="padding:16px;text-align:center">${cRecebido}
                 <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">RECEBIDO S/ IVA</div>
                 <div style="font-size:20px;font-weight:800;color:#8fbfa0">${fmt(totalEntradas)}</div>
             </div>
-            <div class="card" style="padding:16px;text-align:center">
+            <div class="card card-kpi-contas" style="padding:16px;text-align:center">${cGasto}
                 <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">GASTO S/ IVA</div>
                 <div style="font-size:20px;font-weight:800;color:#e09486">${fmt(totalSaidas)}</div>
                 <div style="font-size:11px;opacity:.55;margin-top:4px">${fmt(totalFaturas)} faturas · ${fmt(custoMaoObra)} mão de obra</div>
             </div>
-            <div class="card" style="padding:16px;text-align:center">
+            <div class="card card-kpi-contas" style="padding:16px;text-align:center">${cMargem}
                 <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">MARGEM BRUTA</div>
                 <div style="font-size:20px;font-weight:800;color:${corMargem}">${fmt(margem)}</div>
                 ${margemPct ? `<div style="font-size:12px;color:${corMargem};opacity:.8">${margemPct}%</div>` : ""}
             </div>
-            <div class="card" style="padding:16px;text-align:center">
+            <div class="card card-kpi-contas" style="padding:16px;text-align:center">${cHoras}
                 <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">HORAS OBRA</div>
                 <div style="font-size:20px;font-weight:800;color:var(--primary)">${totalHoras.toFixed(1)}h</div>
                 <div style="font-size:11px;opacity:.55;margin-top:4px">${horasRegistos ? `registos · ${horasPonto.toFixed(1)}h no ponto` : "do ponto"}</div>
             </div>
         </div>
         ${totalOrc > 0 ? `
-        <div class="card" style="padding:16px;margin-bottom:12px">
+        <div class="card card-kpi-contas" style="padding:16px;margin-bottom:12px">${botaoContas("Orçamento vs real", [
+                ...orcAceite.map(o => ({ t: `Orçamento ${o.numero} aceite, sem IVA`, v: orcSemIva(o) })),
+                { t: "− Gasto sem IVA (faturas + mão de obra)", v: -totalSaidas },
+                { t: "Desvio (o que ainda sobra do orçamento)", v: desvio, total: true }],
+                "Soma dos orçamentos aceites desta obra, sem IVA, menos o que já se gastou nela. Positivo: ainda há margem; negativo: já se gastou mais do que o orçado.")}
             <div style="font-size:11px;opacity:.5;margin-bottom:12px;font-family:var(--font-title);letter-spacing:.5px">ORÇAMENTO VS REAL</div>
             <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Orçamento aceite (s/ IVA)</span><span style="font-weight:700">${fmt(totalOrc)}</span></div>
             <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Faturas (s/ IVA)</span><span style="font-weight:700">${fmt(totalFaturas)}</span></div>
@@ -5738,14 +5889,18 @@ async function carregarPainelFinanceiro() {
     const barra = `<div class="painel-fin-barra"><button class="btn-icone painel-fin-novo" onclick="novoMovimentoDaObra()"
         title="Registar um pagamento ou recebimento desta obra">＋ Registar pagamento</button></div>`;
     if (!data?.length) { el.innerHTML = barra + `<div style="padding:24px;text-align:center;opacity:.5">Sem movimentos financeiros.</div>`; return; }
-    const porCat = {};
+    // Entradas todas juntas (adjudicação, reforços, pagamentos parciais…),
+    // em primeiro lugar; as saídas ficam agrupadas por categoria
+    const ENTRADAS = "Recebido do cliente";
+    const porCat = { [ENTRADAS]: { entradas:0, saidas:0, items:[] } };
     data.forEach(m => {
-        const cat = m.categorias_financeiras?.nome || "Sem categoria";
+        const cat = m.tipo === "entrada" ? ENTRADAS : (m.categorias_financeiras?.nome || "Sem categoria");
         if (!porCat[cat]) porCat[cat] = { entradas:0, saidas:0, items:[] };
         if (m.tipo === "entrada") porCat[cat].entradas += Number(m.valor_total);
         else porCat[cat].saidas += Number(m.valor_total);
         porCat[cat].items.push(m);
     });
+    if (!porCat[ENTRADAS].items.length) delete porCat[ENTRADAS];
     el.innerHTML = barra + Object.entries(porCat).map(([cat, d]) => `
         <div class="card" style="margin-bottom:10px;padding:0;overflow:hidden">
             <div style="padding:10px 14px;background:rgba(181,136,99,.08);display:flex;justify-content:space-between;align-items:center">
@@ -5755,7 +5910,11 @@ async function carregarPainelFinanceiro() {
                 </span>
             </div>
             ${d.items.map(m => `<div style="padding:8px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12px">
-                <div><div style="opacity:.6">${esc(m.data_documento)}</div><div style="font-weight:500">${esc(m.fornecedores?.nome || m.observacoes || m.referencia || "—")}</div></div>
+                <div><div style="opacity:.6">${esc(m.data_documento)}${m.tipo === "entrada" && m.categorias_financeiras?.nome
+                        ? ` · <span style="color:var(--primary)">${esc(m.categorias_financeiras.nome)}</span>` : ""}</div>
+                    <div style="font-weight:500">${esc(m.tipo === "entrada"
+                        ? (m.referencia || m.observacoes || "—")
+                        : (m.fornecedores?.nome || m.observacoes || m.referencia || "—"))}</div></div>
                 <div style="display:flex;align-items:center;gap:8px">
                     <div style="font-weight:700;color:${m.tipo === "entrada" ? "#8fbfa0" : "#e09486"}">${m.tipo === "entrada" ? "+" : "−"}${Number(m.valor_total).toFixed(2)} €</div>
                     ${m.tipo === "entrada" ? `<button class="btn-icone" title="Gerar declaração de valores" onclick="abrirDeclaracaoValores('${m.id}')">📄</button>` : ""}
@@ -6980,6 +7139,11 @@ async function carregarOrcamentos() {
     document.getElementById('orcKpiAceites').textContent  = aceites;
     document.getElementById('orcKpiPendentes').textContent= pendentes;
     document.getElementById('orcKpiValor').textContent    = Math.round(valor).toLocaleString('pt-PT') + ' €';
+    const ct = document.getElementById('orcKpiValorContas');
+    if (ct) ct.outerHTML = `<span id="orcKpiValorContas">${botaoContas('Valor aceite', [
+        ..._orcamentos.filter(o => o.estado === 'aceite').map(o => ({ t: `${o.numero || '—'} ${o.cliente_nome || ''}${o.obras?.nome ? ' · ' + o.obras.nome : ''}`, v: Number(o.total_com_iva || 0) })),
+        { t: `Total (${aceites} aceites)`, v: valor, total: true }],
+        'Soma dos orçamentos com estado Aceite, com IVA, de todas as obras e de sempre (não só deste ano).')}</span>`;
 
     // Respeita a pesquisa já escrita (a Visão geral escreve o nome da obra)
     filtrarTabelaOrc();
