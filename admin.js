@@ -3357,14 +3357,14 @@ function actualizarBarraFila() {
 
     const actual = _filaTotal - _filaFaturas.length;   // a que está no ecrã
     barra.innerHTML =
-        `<span style="font-weight:600">Fatura ${actual} de ${_filaTotal}</span>` +
+        `<span style="font-weight:600">Documento ${actual} de ${_filaTotal}</span>` +
         `<span style="opacity:.7;flex:1">${_filaFaturas.length} por lançar neste lote</span>` +
-        `<button type="button" id="btnSaltarFatura" class="btn-secondary" style="font-size:12px;padding:3px 10px">Saltar esta</button>` +
+        `<button type="button" id="btnSaltarFatura" class="btn-secondary" style="font-size:12px;padding:3px 10px">Saltar este</button>` +
         `<button type="button" id="btnDescartarFila" class="btn-secondary" style="font-size:12px;padding:3px 10px">Descartar lote</button>`;
     barra.style.display = "flex";
 
     document.getElementById("btnSaltarFatura").onclick = async () => {
-        if (!_filaFaturas.length) { limparFilaFaturas(); mostrarFeedbackQR("Era a última do lote.", "warn"); return; }
+        if (!_filaFaturas.length) { limparFilaFaturas(); mostrarFeedbackQR("Era o último do lote.", "warn"); return; }
         await proximaFaturaDaFila();
     };
     document.getElementById("btnDescartarFila").onclick = () => {
@@ -3416,7 +3416,7 @@ async function lerFicheirosFatura(ficheiros) {
     }
 
     if (!todas.length) {
-        mostrarFeedbackQR("Não foi reconhecida nenhuma fatura.", "err");
+        mostrarFeedbackQR("Não foi reconhecido nenhum documento (fatura ou recibo).", "err");
         return;
     }
 
@@ -3425,7 +3425,7 @@ async function lerFicheirosFatura(ficheiros) {
     await proximaFaturaDaFila();
 
     if (todas.length > 1) {
-        mostrarFeedbackQR(`${todas.length} faturas lidas. Grava esta e a seguinte entra sozinha.`, "ok");
+        mostrarFeedbackQR(`${todas.length} documentos lidos. Grava este e o seguinte entra sozinho.`, "ok");
     }
 }
 
@@ -3442,7 +3442,7 @@ async function lerFicheiroFatura(ficheiro, emFila = false) {
     const btn = document.getElementById("btnLerFatura");
     const textoBtn = btn ? btn.textContent : "";
     if (btn) { btn.disabled = true; btn.textContent = "⏳ A ler…"; }
-    if (!emFila) mostrarFeedbackQR("A ler a fatura… demora alguns segundos.", "warn");
+    if (!emFila) mostrarFeedbackQR("A ler o documento… demora alguns segundos.", "warn");
 
     try {
         const base64 = await new Promise((resolve, reject) => {
@@ -3473,7 +3473,7 @@ async function lerFicheiroFatura(ficheiro, emFila = false) {
         if (emFila) return docs;
 
         if (!docs.length) {
-            mostrarFeedbackQR("Não foi reconhecida nenhuma fatura neste ficheiro.", "err");
+            mostrarFeedbackQR("Não foi reconhecido nenhum documento (fatura ou recibo) neste ficheiro.", "err");
             return null;
         }
 
@@ -6338,6 +6338,13 @@ function ligarFiltrosFluxo() {
 }
 
 
+// Fatura dada como paga por um recibo lido em "Ler documento": mostra o
+// número do recibo por baixo do estado, para se ver no Fluxo de caixa.
+function reciboDoMovimento(m) {
+    const r = /Paga pelo recibo (\S+)/.exec(m.observacoes || "");
+    return r ? `<div style="font-size:10px;opacity:.7;margin-top:3px" title="${esc(m.observacoes)}">✅ recibo ${esc(r[1])}</div>` : "";
+}
+
 function renderMovimentos() {
     const tbody = document.querySelector("#tabelaMovimentos tbody");
     if (!tbody) return;
@@ -6361,7 +6368,7 @@ function renderMovimentos() {
             <td>${esc(m.categorias_financeiras?.nome || "—")}</td>
             <td>${esc(m.obras?.nome || "—")}</td>
             <td style="text-align:right;font-weight:500;color:${ent ? "#8fbfa0" : "#e09486"}">${ent ? "+" : "–"}${Number(m.valor_total).toFixed(2)} €</td>
-            <td><span class="badge-estado ${m.estado_pagamento}">${m.estado_pagamento === "pago" ? (ent ? "Recebido" : "Pago") : (ent ? "Por receber" : "Por pagar")}</span></td>
+            <td><span class="badge-estado ${m.estado_pagamento}">${m.estado_pagamento === "pago" ? (ent ? "Recebido" : "Pago") : (ent ? "Por receber" : "Por pagar")}</span>${reciboDoMovimento(m)}</td>
             <td class="acoes-td">
                 <button class="btn-acao" title="Editar">✏️</button>
                 <button class="btn-acao" title="Apagar">🗑️</button>
@@ -8444,7 +8451,7 @@ document.addEventListener("click", e => {
 // mesmo; o resto abre a página do assistente já no sítio certo.
 // =======================================================
 const ATALHOS_ASSISTENTE = [
-    { id: "fatura",   ic: "📷", nome: "Ler fatura" },
+    { id: "fatura",   ic: "📷", nome: "Ler documento" },
     { id: "material", ic: "🛒", nome: "Pedir material" },
     { id: "pedidos",  ic: "✅", nome: "Pedidos por validar" },
     { id: "nota",     ic: "📝", nome: "Contar como está uma obra" },
