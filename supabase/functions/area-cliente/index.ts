@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
     if (corpo.acao === "responder_orcamento") return responderOrcamento(db, req, cliente.id, corpo);
 
     const { data: obras } = await db.from("obras")
-        .select("id, codigo, nome, local, estado, percentagem_conclusao, data_conclusao_prevista")
+        .select("id, codigo, nome, local, estado, percentagem_conclusao, data_conclusao_prevista, mostrar_contas_cliente")
         .eq("cliente_id", cliente.id)
         .order("created_at", { ascending: false });
 
@@ -143,9 +143,40 @@ Deno.serve(async (req) => {
         });
     }
 
+    // Contas da obra (valor, já pago, falta), só nas obras em que o Alcindo
+    // ligou "Mostrar contas ao cliente". Tudo sem IVA: muitos recebimentos não
+    // têm IVA, e misturar com e sem IVA dava números errados.
+    const comContas = (obras || []).filter((o: any) => o.mostrar_contas_cliente).map((o: any) => o.id);
+    const contas: Record<string, any> = {};
+    if (comContas.length) {
+        const [serv, orcs, ent] = await Promise.all([
+            db.from("obra_servicos").select("obra_id, orcamento_id, valor_orcamento").in("obra_id", comContas),
+            db.from("orcamentos").select("id, obra_id, total_sem_iva, total_com_iva, taxa_iva").in("obra_id", comContas).eq("estado", "aceite"),
+            db.from("movimentos_financeiros").select("obra_id, valor_base").in("obra_id", comContas)
+                .eq("tipo", "entrada").eq("ativo", true).eq("estado_pagamento", "pago"),
+        ]);
+        if (!serv.error && !orcs.error && !ent.error) {
+            const r2 = (n: number) => Math.round(n * 100) / 100;
+            for (const id of comContas) {
+                // Orçamento aceite: o valor dos seus serviços (tem os ajustes), senão o total sem IVA
+                const valor = (orcs.data || []).filter((o: any) => o.obra_id === id).reduce((s: number, o: any) => {
+                    const sv = (serv.data || []).filter((x: any) => x.orcamento_id === o.id)
+                        .reduce((t: number, x: any) => t + Number(x.valor_orcamento || 0), 0);
+                    const sem = Number(o.total_sem_iva || 0) || Number(o.total_com_iva || 0) / (1 + Number(o.taxa_iva ?? 23) / 100);
+                    return s + (sv > 0 ? sv : sem);
+                }, 0) + (serv.data || []).filter((x: any) => x.obra_id === id && !x.orcamento_id)
+                    .reduce((t: number, x: any) => t + Number(x.valor_orcamento || 0), 0);
+                const pago = (ent.data || []).filter((m: any) => m.obra_id === id)
+                    .reduce((t: number, m: any) => t + Number(m.valor_base || 0), 0);
+                contas[id] = { valor: r2(valor), pago: r2(pago), falta: r2(Math.max(0, valor - pago)) };
+            }
+        }
+    }
+    const obrasCliente = (obras || []).map(({ mostrar_contas_cliente, ...o }: any) => ({ ...o, contas: contas[o.id] || null }));
+
     await db.from("clientes").update({ ultimo_acesso: new Date().toISOString() }).eq("id", cliente.id);
 
-    return resposta({ cliente: { nome: cliente.nome }, obras: obras || [], documentos, fases, autos, diario });
+    return resposta({ cliente: { nome: cliente.nome }, obras: obrasCliente, documentos, fases, autos, diario });
 });
 
 // Resposta do cliente a um orçamento. Só vale para um documento de orçamento

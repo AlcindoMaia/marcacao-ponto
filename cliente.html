@@ -44,6 +44,11 @@
     .selo.feita { background: rgba(143,191,160,.16); color: var(--ok); }
     .barra { height: 8px; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; margin: 14px 0 6px; }
     .barra > div { height: 100%; background: var(--caramelo); border-radius: 99px; }
+    .contas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0 4px; }
+    .contas div { background: rgba(127,127,127,.08); border-radius: 10px; padding: 10px; text-align: center; }
+    .contas span { display: block; font-size: 11px; color: var(--suave); text-transform: uppercase; letter-spacing: .5px; }
+    .contas b { display: block; font-size: 15px; margin-top: 2px; }
+    .contas-nota { font-size: 12px; color: var(--suave); margin: 4px 0 0; }
     .meta { display: flex; justify-content: space-between; font-size: 13px; color: var(--suave); flex-wrap: wrap; gap: 6px; }
     .doc { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--linha); text-decoration: none; color: inherit; }
     .doc:first-child { border-top: none; }
@@ -248,6 +253,15 @@ function htmlDiario(notas) {
         <div class="dt">${esc(dia(n.data))}</div><div class="tx">${esc(n.notas)}</div></div>`).join("")}</div>`;
 }
 
+function htmlContas(c) {
+    if (!c) return "";
+    return `<div class="contas">
+        <div><span>Valor da obra</span><b>${euros(c.valor)}</b></div>
+        <div><span>Já pago</span><b>${euros(c.pago)}</b></div>
+        <div><span>Falta pagar</span><b>${euros(c.falta)}</b></div>
+    </div><p class="contas-nota">Valores sem IVA.</p>`;
+}
+
 function seccao(titulo, itens, vazio) {
     return `<h2>${titulo}</h2>${itens.length ? itens.join("") : `<div class="vazio">${vazio}</div>`}`;
 }
@@ -288,6 +302,7 @@ function htmlObra(o, docs, fases, autos, diario) {
             ${pct != null ? `<span>${pct}% concluída</span>` : ""}
             ${o.data_conclusao_prevista && !feita ? `<span>Conclusão prevista: ${esc(dataPT(o.data_conclusao_prevista))}</span>` : ""}
         </div>
+        ${htmlContas(o.contas)}
         ${htmlFases(fases)}
         ${htmlDiario(diario)}
         ${seccao("Orçamentos", orcs, "Ainda não há orçamentos.")}

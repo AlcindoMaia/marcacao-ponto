@@ -75,7 +75,7 @@ async function carregarPainelAndamento() {
 
     const desde = new Date(Date.now() - DIAS_DIARIO * 86400000).toISOString().slice(0, 10);
     const hoje  = new Date().toISOString().slice(0, 10);
-    const [fasesRes, autosRes, servRes, diarioRes, regRes, tarRes, fotRes] = await Promise.all([
+    const [fasesRes, autosRes, servRes, diarioRes, regRes, tarRes, fotRes, contasRes] = await Promise.all([
         SB.from("obra_fases").select("*").eq("obra_id", obraId).order("ordem").order("created_at"),
         SB.from("autos_medicao").select("*, auto_linhas(obra_servico_id, percentagem, valor)").eq("obra_id", obraId).order("numero"),
         SB.from("obra_servicos").select("id, nome, valor_orcamento, ordem").eq("obra_id", obraId).order("ordem").order("created_at"),
@@ -86,6 +86,7 @@ async function carregarPainelAndamento() {
             .eq("obra_id", obraId).gte("data_prevista", desde).lte("data_prevista", hoje).neq("estado", "cancelada"),
         SB.from("obra_documentos").select("id, nome_ficheiro, created_at")
             .eq("obra_id", obraId).eq("tipo", "foto").gte("created_at", desde),
+        SB.from("obras").select("mostrar_contas_cliente").eq("id", obraId).maybeSingle(),
     ]);
     const erro = fasesRes.error || autosRes.error || servRes.error || diarioRes.error;
     if (erro) {
@@ -93,7 +94,9 @@ async function carregarPainelAndamento() {
         return;
     }
     _andamento = { obraId, fases: fasesRes.data || [], autos: autosRes.data || [], servicos: servRes.data || [],
-        diario: diarioRes.data || [], registos: regRes.data || [], tarefas: tarRes.data || [], fotos: fotRes.data || [] };
+        diario: diarioRes.data || [], registos: regRes.data || [], tarefas: tarRes.data || [], fotos: fotRes.data || [],
+        // null = a coluna ainda não existe (SQL por correr): não se mostra a opção
+        contasCliente: contasRes.error ? null : !!contasRes.data?.mostrar_contas_cliente };
     desenharAndamento();
 }
 
@@ -305,7 +308,11 @@ function htmlAutos() {
             onchange="gravarPlanoPagamentos(this.value)" title="% de cada prestação, separadas por /. Vazio = sem plano.">
         <span style="opacity:.5">% de cada prestação</span>
     </div>`;
-    const resumo = linhaPlano + `<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;margin-bottom:10px;opacity:.85">
+    const linhaContas = _andamento.contasCliente == null ? "" : `<label style="font-size:12px;margin-bottom:8px;display:flex;gap:6px;align-items:center;cursor:pointer">
+        <input type="checkbox" ${_andamento.contasCliente ? "checked" : ""} onchange="gravarContasCliente(this)">
+        <span>Mostrar ao cliente quanto vale a obra, quanto já pagou e quanto falta (sem IVA)</span>
+    </label>`;
+    const resumo = linhaPlano + linhaContas + `<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;margin-bottom:10px;opacity:.85">
         <span>Valor dos serviços: <b>${eurAnd(totalServ)}</b></span>
         <span>Já pedido: <b>${eurAnd(pedido)}</b>${totalServ > 0 ? ` (${Math.round(pedido / totalServ * 100)}%)` : ""}</span>
         <span>Falta: <b>${eurAnd(totalServ - pedido)}</b></span>
@@ -340,6 +347,13 @@ async function gravarPlanoPagamentos(txt) {
     const { error } = await SB.from("obras").update({ plano_pagamentos: plano || null }).eq("id", _painelObraActual.id);
     if (error) return msgAndamento("Não foi possível gravar o plano: " + error.message, "err");
     _painelObraActual.plano_pagamentos = plano || null;
+}
+
+async function gravarContasCliente(caixa) {
+    const { error } = await SB.from("obras").update({ mostrar_contas_cliente: caixa.checked }).eq("id", _painelObraActual.id);
+    if (error) { caixa.checked = !caixa.checked; return msgAndamento("Não foi possível gravar: " + error.message, "err"); }
+    _andamento.contasCliente = caixa.checked;
+    msgAndamento(caixa.checked ? "O cliente passa a ver as contas desta obra na área dele." : "As contas deixaram de aparecer ao cliente.", "ok");
 }
 
 function novoAuto() {
