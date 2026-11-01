@@ -167,21 +167,41 @@ Regras:
 // -------------------------------------------------------
 // RECIBOS
 // -------------------------------------------------------
+// Referências comparadas só com letras e algarismos, em maiúsculas:
+// "FCLC0126 / 16088" e "fclc0126/16088" são a mesma fatura.
+const refLimpa = (v: unknown) => String(v ?? "").replace(/[^0-9A-Za-z]+/g, "").toUpperCase();
+
+// A referência gravada é esta fatura? Igual, ou acaba nela com um prefixo
+// separado ("FT FCLC0126/16088"). Contida no meio não serve: "FCLC0126/1608"
+// não pode casar com "FCLC0126/16088".
+function mesmaFatura(gravada: unknown, lida: unknown): boolean {
+    const g = refLimpa(gravada), l = refLimpa(lida);
+    if (!g || !l) return false;
+    if (g === l) return true;
+    // Prefixo separado por espaço ou pontuação, comparado sem os espaços
+    // à volta das barras: "FT FCLC0126/16088" acaba em "FCLC0126/16088".
+    const compacto = (v: unknown) => String(v ?? "").toUpperCase().replace(/\s*([\/\-.])\s*/g, "$1").trim();
+    const og = compacto(gravada), ol = compacto(lida);
+    return og.length > ol.length && og.endsWith(ol) && /[^0-9A-Z]/.test(og[og.length - ol.length - 1]);
+}
+
 function eRecibo(d: any): boolean {
     const tipo = String(d?.tipo_documento || "").toUpperCase();
     if (tipo === "FR") return false;                  // fatura-recibo é fatura
     if (tipo === "RC" || tipo === "RG") return true;
     const num = String(d?.numero_documento || "").toUpperCase().trim();
     if (/^(RC|RG|REC)[\s\/A-Z0-9]/.test(num)) return true;
-    // A IA leu faturas liquidadas e nada que pareça material
+    // A IA leu faturas liquidadas e nada que pareça material. Só conta como
+    // recibo se TODAS as linhas forem números de fatura (sem quantidade nem
+    // preço unitário): uma fatura de serviços sem quantidades não pode
+    // perder as linhas por engano.
     const liq = Array.isArray(d?.faturas_liquidadas) ? d.faturas_liquidadas : [];
     const linhas = Array.isArray(d?.linhas) ? d.linhas : [];
-    return liq.length > 0 && !linhas.some((l: any) => Number(l?.quantidade) > 0);
+    const numerosLiq = new Set(liq.map((f: any) => refLimpa(f?.numero)).filter(Boolean));
+    return liq.length > 0 && linhas.every((l: any) =>
+        !(Number(l?.quantidade) > 0) && l?.preco_unitario == null &&
+        [...numerosLiq].some(n => refLimpa(l?.descricao).includes(n)));
 }
-
-// Referências comparadas sem espaços e em maiúsculas: "FCLC0126 / 16088"
-// e "fclc0126/16088" são a mesma fatura.
-const refLimpa = (v: unknown) => String(v ?? "").replace(/\s+/g, "").toUpperCase();
 
 async function tratarRecibo(admin: any, d: any, nifEmpresa: string) {
     const avisos: string[] = [];
@@ -214,10 +234,14 @@ async function tratarRecibo(admin: any, d: any, nifEmpresa: string) {
         let { data: ms } = await admin.from("movimentos_financeiros").select(sel)
             .eq("tipo", tipoMov).eq("ativo", true).eq("referencia", String(f.numero).trim()).limit(5);
         if (!ms?.length) {
-            const nucleo = String(f.numero).trim().replace(/[%_]/g, "");
-            const r = await admin.from("movimentos_financeiros").select(sel)
-                .eq("tipo", tipoMov).eq("ativo", true).ilike("referencia", `%${nucleo}%`).limit(5);
-            ms = (r.data || []).filter((m: any) => refLimpa(m.referencia).includes(refLimpa(f.numero)));
+            // Procura larga pelo último número (o que não muda com espaços ou
+            // barras) e decide-se aqui, com a comparação exata acima.
+            const ultimo = (String(f.numero).match(/\d+(?!.*\d)/) || [""])[0];
+            if (ultimo.length >= 3) {
+                const r = await admin.from("movimentos_financeiros").select(sel)
+                    .eq("tipo", tipoMov).eq("ativo", true).ilike("referencia", `%${ultimo}%`).limit(50);
+                ms = (r.data || []).filter((m: any) => mesmaFatura(m.referencia, f.numero));
+            }
         }
         if (fornecedor && ms && ms.length > 1) {
             const doForn = ms.filter((m: any) => m.fornecedor_id === fornecedor.id);
