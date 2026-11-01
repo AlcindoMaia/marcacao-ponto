@@ -1647,6 +1647,8 @@ async function toggleAtivoFuncionario(id, nome, ativoAtual) {
 // =======================================================
 // HISTÓRICO DE FUNCIONÁRIO (ficha 📊) — por mês, a partir do Registo diário
 // =======================================================
+// Os ids começam por fichaFunc: "histCorpo" já existe no admin.html (outra
+// tabela) e o getElementById devolvia essa, por isso a ficha ficava a carregar.
 // Fonte: registos_admin, o mesmo que paga os Ordenados, por isso o "Ganho"
 // usa rhValorOrdenado (valor/dia × dias, ou salário mensal menos faltas).
 let _histFunc = null;
@@ -1682,14 +1684,14 @@ async function abrirHistoricoFuncionario(func) {
       <div style="background:var(--bg-dark-panel,#3d4d55);border-radius:16px;padding:22px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.5)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
             <h3 style="font-family:var(--font-title,sans-serif);letter-spacing:.5px;margin:0">${esc(func.nome)}</h3>
-            <button id="histFechar" aria-label="Fechar" style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.6;color:inherit">×</button>
+            <button id="fichaFuncFechar" aria-label="Fechar" style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.6;color:inherit">×</button>
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
-            <button id="histAnt" class="btn-icone" aria-label="Mês anterior" style="min-width:40px">◀</button>
-            <input id="histMes" type="month" value="${anoMes}" style="flex:1;min-width:0;text-align:center">
-            <button id="histSeg" class="btn-icone" aria-label="Mês seguinte" style="min-width:40px">▶</button>
+            <button id="fichaFuncAnt" class="btn-icone" aria-label="Mês anterior" style="min-width:40px">◀</button>
+            <input id="fichaFuncMes" type="month" value="${anoMes}" style="flex:1;min-width:0;text-align:center">
+            <button id="fichaFuncSeg" class="btn-icone" aria-label="Mês seguinte" style="min-width:40px">▶</button>
         </div>
-        <div id="histCorpo"><p style="opacity:.5;font-size:13px">A carregar…</p></div>
+        <div id="fichaFuncCorpo"><p style="opacity:.5;font-size:13px">A carregar…</p></div>
         <button id="btnPDFFuncionario"
             style="margin-top:16px;width:100%;background:rgba(181,136,99,.12);border:1px solid rgba(181,136,99,.3);color:var(--primary,#b58863);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;font-weight:600">
             📄 Exportar PDF do mês
@@ -1698,10 +1700,10 @@ async function abrirHistoricoFuncionario(func) {
     div.addEventListener("click", e => { if (e.target === div) div.remove(); });
     document.body.appendChild(div);
 
-    div.querySelector("#histFechar").onclick = () => div.remove();
-    div.querySelector("#histAnt").onclick = () => histMudarMes(-1);
-    div.querySelector("#histSeg").onclick = () => histMudarMes(1);
-    div.querySelector("#histMes").onchange = e => { if (e.target.value) carregarFichaMes(e.target.value); };
+    div.querySelector("#fichaFuncFechar").onclick = () => div.remove();
+    div.querySelector("#fichaFuncAnt").onclick = () => histMudarMes(-1);
+    div.querySelector("#fichaFuncSeg").onclick = () => histMudarMes(1);
+    div.querySelector("#fichaFuncMes").onchange = e => { if (e.target.value) carregarFichaMes(e.target.value); };
     div.querySelector("#btnPDFFuncionario").onclick = exportarPDFFuncionario;
 
     await carregarFichaMes(anoMes);
@@ -1710,9 +1712,9 @@ async function abrirHistoricoFuncionario(func) {
 async function carregarFichaMes(anoMes) {
     _histMes = anoMes;
     const func = _histFunc;
-    const corpo = document.getElementById("histCorpo");
+    const corpo = document.getElementById("fichaFuncCorpo");
     if (!func || !corpo) return;
-    const inpMes = document.getElementById("histMes");
+    const inpMes = document.getElementById("fichaFuncMes");
     if (inpMes) inpMes.value = anoMes;
     corpo.innerHTML = '<p style="opacity:.5;font-size:13px">A carregar…</p>';
 
