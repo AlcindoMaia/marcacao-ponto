@@ -2076,7 +2076,45 @@ function switchObraTab(tab) {
         }
         if (cont) cont.style.display = active ? "block" : "none";
     });
-    if (tab === "servicos") carregarServicosModal();
+    if (tab === "servicos") {
+        devolverServicosAoModal();
+        carregarServicosModal();
+    }
+}
+
+// ── O separador Serviços também no painel da obra ───────────
+// É o mesmo bloco da ficha (lista + novo serviço): muda-se de sítio em vez
+// de haver uma segunda cópia. No painel, cada alteração redesenha também a
+// tabela e os KPIs de cima.
+let _servicosCasaOriginal = null;   // { pai, seguinte } dentro da ficha
+
+function servicosNoPainel() {
+    return document.getElementById("obraTabContent-servicos")?.parentElement?.id === "painelTab-servicos";
+}
+
+function levarServicosParaPainel(obra) {
+    const bloco = document.getElementById("obraTabContent-servicos");
+    const destino = document.getElementById("painelTab-servicos");
+    if (!bloco || !destino || !obra) return;
+    if (!servicosNoPainel()) {
+        _servicosCasaOriginal = { pai: bloco.parentElement, seguinte: bloco.nextSibling };
+        destino.appendChild(bloco);
+    }
+    document.getElementById("editObraId").value = obra.id;
+    bloco.style.display = "block";
+    carregarServicosModal();
+}
+
+function devolverServicosAoModal() {
+    const bloco = document.getElementById("obraTabContent-servicos");
+    if (!bloco || !servicosNoPainel() || !_servicosCasaOriginal) return;
+    _servicosCasaOriginal.pai.insertBefore(bloco, _servicosCasaOriginal.seguinte);
+}
+
+// Depois de criar, mudar ou apagar um serviço
+async function servicosMudaram() {
+    if (servicosNoPainel() && _painelObraActual) await abrirPainelObra(_painelObraActual, "servicos");   // também relê a lista
+    else await carregarServicosModal();
 }
 
 
@@ -2137,6 +2175,7 @@ async function editarObra(obra) {
         const _drv0 = document.getElementById("editObraDrive"); if (_drv0) _drv0.value = "";
         mostrarGpsDaObra(null, null);
         document.getElementById("editObraTitulo").textContent = "✏️ Nova Obra";
+        devolverServicosAoModal();
         switchObraTab("detalhes");
         const _mo = document.getElementById("modalEditarObra"); _mo.style.display = "flex"; _mo.classList.remove("hidden");
         return;
@@ -2152,6 +2191,7 @@ async function editarObra(obra) {
     const _codE = document.getElementById("editObraCodigo"); if (_codE) _codE.value = obra.codigo || "";
     mostrarGpsDaObra(obra.latitude, obra.longitude);
     document.getElementById("editObraTitulo").textContent = `✏️ ${obra.nome || "Editar Obra"}`;
+    devolverServicosAoModal();
     switchObraTab("detalhes");
     const _moE = document.getElementById("modalEditarObra"); _moE.style.display = "flex"; _moE.classList.remove("hidden");
 }
@@ -2325,7 +2365,7 @@ async function carregarServicosModal() {
 
     const lista = document.getElementById("listaServicos");
     if (!data?.length) {
-        lista.innerHTML = `<div style="opacity:.4;font-size:13px;text-align:center;padding:16px">Sem serviços. Adicione o primeiro acima.</div>`;
+        lista.innerHTML = `<div style="opacity:.4;font-size:13px;text-align:center;padding:16px">Sem serviços. Adicione o primeiro aqui em baixo.</div>`;
         return;
     }
     _servicosModal = Object.fromEntries(data.map(s => [s.id, s]));
@@ -2375,7 +2415,7 @@ async function adicionarServico() {
     document.getElementById("novoServHoras").value = "";
     document.getElementById("novoServValor").value = "";
     document.getElementById("novoServExtra").checked = false;
-    await carregarServicosModal();
+    await servicosMudaram();
 }
 
 // Editar nome, valor e "extra" de um serviço, ali mesmo na lista
@@ -2404,28 +2444,28 @@ async function gravarServico(id) {
     const extra = document.getElementById("servEdExtra-" + id).checked;
     const { error } = await SB.from("obra_servicos").update({ nome, valor_orcamento: valor, extra }).eq("id", id);
     if (error) { console.error(error); alert("Não foi possível gravar o serviço: " + error.message); return; }
-    await carregarServicosModal();
+    await servicosMudaram();
 }
 
 async function toggleServicoConcluido(id, concluido) {
     await SB.from("obra_servicos").update({ concluido: !concluido }).eq("id", id);
-    await carregarServicosModal();
+    await servicosMudaram();
 }
 
 async function eliminarServico(id, nome) {
     if (!confirm(`Eliminar serviço "${nome}"?\nAs imputações associadas também serão removidas.`)) return;
     await SB.from("obra_servicos").delete().eq("id", id);
-    await carregarServicosModal();
+    await servicosMudaram();
 }
 
 // ═══════════════════════════════════════════════════════
 // PAINEL DE OBRA — orçamentado vs real
 // ═══════════════════════════════════════════════════════
-async function abrirPainelObra(obra) {
+async function abrirPainelObra(obra, tabInicial = "resumo") {
     const modal = document.getElementById("modalPainelObra");
     _painelObraActual = obra;   // os separadores (resumo, financeiro, ponto,
                                 // stock) leem a obra daqui
-    guardarSitio({ obra: obra.id, painelTab: "resumo" });
+    guardarSitio({ obra: obra.id, painelTab: tabInicial });
     document.getElementById("painelObraNome").textContent = obra.nome;
 
     // Meta: data prevista + estado
@@ -2452,11 +2492,11 @@ async function abrirPainelObra(obra) {
             <div style="padding:48px 24px;text-align:center">
                 <div style="font-size:36px;margin-bottom:12px;opacity:.3">📋</div>
                 <div style="font-family:var(--font-title,'Oswald',sans-serif);font-size:14px;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:8px">Sem serviços definidos</div>
-                <div style="font-size:12px;color:rgba(255,255,255,.2)">Edita a obra e vai ao separador Serviços para começar</div>
+                <div style="font-size:12px;color:rgba(255,255,255,.2)">Abre o separador 📋 Serviços, aqui em baixo, para começar</div>
             </div>`;
         // Sem serviços, os separadores continuam a ter conteúdo útil
         // (financeiro, ponto e stock não dependem dos serviços)
-        abrirPainelTab("resumo");
+        abrirPainelTab(tabInicial);
         return;
     }
 
@@ -2605,8 +2645,9 @@ async function abrirPainelObra(obra) {
         + `<div id="gavetaSemServ" style="display:none"></div>` : "");
     _servicosPainel = servicos || [];
 
-    // Abrir o primeiro separador: é o que dispara o carregamento do resumo
-    abrirPainelTab("resumo");
+    // Abrir o separador pedido (por omissão o resumo): é o que dispara o
+    // carregamento do seu conteúdo
+    abrirPainelTab(tabInicial);
 }
 
 // =======================================================
@@ -2745,8 +2786,7 @@ async function ligarGavetaSemServico() {
 
     // Redesenhar o painel com os novos números, no mesmo separador
     const tab = document.querySelector(".painel-tab.active")?.dataset.tab || "resumo";
-    await abrirPainelObra(_painelObraActual);
-    if (tab !== "resumo") abrirPainelTab(tab);
+    await abrirPainelObra(_painelObraActual, tab);
     if (!document.getElementById("gavetaSemServ")) return;   // já não há custos por ligar
     await abrirGavetaSemServico(true);
     const m2 = document.getElementById("gsMsg");
@@ -3711,7 +3751,11 @@ async function vgCarregarAlertas() {
     if (!cont) return;
     cont.innerHTML = '<div style="padding:14px 0;font-size:13px;opacity:.6">A ver…</div>';
 
+    // As respostas dos clientes vêm primeiro, uma linha cada, com o
+    // comentário à vista: é o cliente à espera de uma resposta nossa.
     const alertas = [];
+    try { alertas.push(...await vgRespostasClientes()); }
+    catch (e) { console.warn("vgRespostasClientes", e); }
     for (const procurar of [vgPedidosPorValidar, vgPrecosSubiram, vgDespesasSemObra,
                             vgFaturasPorPagar, vgStockAbaixoMinimo, vgTarefasAtrasadas]) {
         try { const a = await procurar(); if (a) alertas.push(a); }
@@ -3731,10 +3775,38 @@ async function vgCarregarAlertas() {
                 <div style="font-weight:600;font-size:14.5px">${esc(a.titulo)}</div>
                 <div style="font-size:12.5px;opacity:.65;margin-top:1px">${esc(a.sub)}</div>
             </div>
-            ${a.fluxo || a.tab || a.ir ? `<button class="btn-secondary" style="font-size:12px;padding:4px 12px;flex-shrink:0"
+            ${a.fluxo || a.tab || a.ir || a.orc ? `<button class="btn-secondary" style="font-size:12px;padding:4px 12px;flex-shrink:0"
                         onclick="${a.fluxo ? `abrirFluxoFiltrado(${esc(JSON.stringify(a.fluxo))})`
+                                 : a.orc ? `abrirOrcamentoPeloNumero(${esc(JSON.stringify(a.orc))})`
                                  : a.tab ? `abrirTab('${a.tab}')` : `location.href='${a.ir}'`}">Ver</button>` : ""}
         </div>`).join("");
+}
+
+async function vgRespostasClientes() {
+    const { data } = await SB.from("orcamento_respostas")
+        .select("resposta, comentario, created_at, orcamentos(numero, cliente_nome, obras(nome))")
+        .is("tratada_em", null).order("created_at");
+    return (data || []).map(r => {
+        const o = r.orcamentos || {};
+        const quando = new Date(r.created_at).toLocaleString("pt-PT",
+            { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+        const quem = o.cliente_nome || o.obras?.nome || "Cliente";
+        const aceite = r.resposta === "aceite";
+        return { icone: aceite ? "✅" : "💬", cor: "rgba(181,136,99,.22)",
+                 titulo: `${quem} ${aceite ? "aceitou" : "comentou"} o orçamento ${o.numero || ""}`.trim(),
+                 sub: (r.comentario ? `"${r.comentario}"` : aceite ? "Falta confirmares o aceite" : "Sem comentário")
+                      + ` · ${quando}`,
+                 orc: o.numero || "" };
+    });
+}
+
+// Abre a lista de orçamentos já filtrada por um número (a resposta do
+// cliente aparece por baixo do estado, com os botões para a tratar)
+function abrirOrcamentoPeloNumero(numero) {
+    const pesq = document.getElementById("pesquisaOrcamentos");
+    if (pesq) pesq.value = numero || "";
+    abrirTab("orcamentos");
+    if (typeof switchOrcSub === "function") switchOrcSub("clientes");
 }
 
 async function vgPedidosPorValidar() {
@@ -4730,6 +4802,7 @@ function abrirPainelTab(tab) {
     if (tab === "stock")      carregarPainelStock();
     if (tab === "documentos") carregarPainelDocumentos();
     if (tab === "andamento")  carregarPainelAndamento();
+    if (tab === "servicos")   levarServicosParaPainel(_painelObraActual);
 }
 
 // ── Documentos da obra (Google Drive) ────────────────────────
@@ -5580,7 +5653,7 @@ async function carregarPainelResumo() {
 
     const [movsRes, orcRes, pontoRes, regRes] = await Promise.all([
         SB.from("movimentos_financeiros").select("tipo, valor_base, valor_total, categorias_financeiras(nome)").eq("obra_id", obraId).eq("ativo", true),
-        SB.from("orcamentos").select("numero, estado, taxa_iva, total_com_iva, total_sem_iva, subtotal_mao_obra, subtotal_materiais").eq("obra_id", obraId),
+        SB.from("orcamentos").select("id, numero, estado, taxa_iva, total_com_iva, total_sem_iva, subtotal_mao_obra, subtotal_materiais").eq("obra_id", obraId),
         SB.from("vw_registos_ponto").select("funcionario, horas, dia").eq("obra", _painelObraActual.nome),
         // registos_admin é a fonte de verdade das horas pagas (é daí que
         // saem os salários), por isso é daí que sai o custo de mão de obra.
@@ -5589,6 +5662,7 @@ async function carregarPainelResumo() {
 
     const movs  = movsRes.data  || [];
     const orcs  = orcRes.data   || [];
+    _painelOrcs = orcs;   // o botão "Tirar aceite" lê daqui
     const ponto = pontoRes.data || [];
     const regs  = regRes.data   || [];
 
@@ -5650,7 +5724,7 @@ async function carregarPainelResumo() {
             </div>
             <div style="font-size:11px;opacity:.5;margin-top:4px;text-align:right">${((totalSaidas/totalOrc)*100).toFixed(0)}% do orçamento utilizado</div>
         </div>` : `<div class="card" style="padding:14px;opacity:.5;font-size:13px;text-align:center;margin-bottom:12px">Sem orçamento aceite associado.</div>`}
-        ${orcs.length > 0 ? `<div class="card" style="padding:14px"><div style="font-size:11px;opacity:.5;margin-bottom:10px;font-family:var(--font-title);letter-spacing:.5px">ORÇAMENTOS</div>${orcs.map(o => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;font-family:monospace">${o.numero}</span><span class="badge-estado ${o.estado === "aceite" ? "pago" : "por_pagar"}" style="font-size:10px">${o.estado}</span><span style="font-size:13px;font-weight:700" title="${fmt(o.total_com_iva)} com IVA">${fmt(orcSemIva(o))} <span style="font-size:10px;font-weight:400;opacity:.6">s/ IVA</span></span></div>`).join("")}</div>` : ""}`;
+        ${orcs.length > 0 ? `<div class="card" style="padding:14px"><div style="font-size:11px;opacity:.5;margin-bottom:10px;font-family:var(--font-title);letter-spacing:.5px">ORÇAMENTOS</div>${orcs.map((o, i) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;font-family:monospace">${esc(o.numero || "—")}</span><span class="badge-estado ${o.estado === "aceite" ? "pago" : "por_pagar"}" style="font-size:10px">${esc(o.estado)}</span><span style="font-size:13px;font-weight:700" title="${fmt(o.total_com_iva)} com IVA">${fmt(orcSemIva(o))} <span style="font-size:10px;font-weight:400;opacity:.6">s/ IVA</span></span>${o.estado === "aceite" ? `<button class="btn-secondary" style="font-size:11px;padding:3px 9px;white-space:nowrap" onclick="reverterAceiteOrcamento(_painelOrcs[${i}])" title="Cancelar o aceite deste orçamento">↩ Tirar aceite</button>` : ""}</div>`).join("")}</div>` : ""}`;
 }
 
 async function carregarPainelFinanceiro() {
@@ -6648,6 +6722,9 @@ async function initOrcamentos() {
 // não aceite (recusado). Carregar outra vez no mesmo botão volta a "enviado".
 async function mudarEstadoOrcamento(o, novo) {
     const estado = o.estado === novo ? 'enviado' : novo;
+    // Tirar o aceite mexe nos serviços da obra e na área do cliente:
+    // mostra-se antes o que muda
+    if (o.estado === 'aceite' && estado !== 'aceite') return reverterAceiteOrcamento(o, estado);
     const { error } = await SB.from('orcamentos').update({ estado }).eq('id', o.id);
     if (error) { alert('Não foi possível mudar o estado: ' + error.message); return; }
     // Uma resposta do cliente por tratar fica tratada com a decisão tomada aqui
@@ -6661,6 +6738,96 @@ async function mudarEstadoOrcamento(o, novo) {
         await retirarServicosDoOrcamento(o.id);
     }
     await carregarOrcamentos();
+}
+
+// =======================================================
+// TIRAR O ACEITE A UM ORÇAMENTO
+// Na lista (✓ ou ✕ num aceite) ou no resumo do painel da obra. Antes de
+// mudar, mostra o que isso afeta: serviços da obra, valores, área do
+// cliente. Escolhe-se para onde vai: Enviado (o cliente pode voltar a
+// responder), Não aceite ou Cancelado.
+// =======================================================
+let _painelOrcs = [];
+
+async function reverterAceiteOrcamento(o, destino = 'enviado') {
+    if (!o?.id) return;
+    const eur = v => (Number(v) || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+
+    const [{ data: servs }, { data: docs }, { data: orc }] = await Promise.all([
+        SB.from('obra_servicos').select('id, nome, valor_orcamento').eq('orcamento_id', o.id),
+        SB.from('obra_documentos').select('id').eq('orcamento_id', o.id).eq('visivel_cliente', true),
+        SB.from('orcamentos').select('id, numero, estado, total_com_iva, total_sem_iva, taxa_iva, obras(nome)').eq('id', o.id).single(),
+    ]);
+    if (!orc) return alert('Não foi possível ler o orçamento.');
+    if (orc.estado !== 'aceite') { await carregarOrcamentos(); return alert(`O orçamento ${orc.numero} já não está aceite.`); }
+
+    const ids = (servs || []).map(x => x.id);
+    const [{ data: mv }, { data: rg }] = ids.length ? await Promise.all([
+        SB.from('movimento_servicos').select('obra_servico_id').in('obra_servico_id', ids),
+        SB.from('registo_servicos').select('obra_servico_id').in('obra_servico_id', ids),
+    ]) : [{ data: [] }, { data: [] }];
+    const usados = new Set([...(mv || []), ...(rg || [])].map(r => r.obra_servico_id));
+    const saem  = (servs || []).filter(x => !usados.has(x.id));
+    const ficam = (servs || []).filter(x => usados.has(x.id));
+    const somaSaem = saem.reduce((t, x) => t + Number(x.valor_orcamento || 0), 0);
+    const visivel = (docs || []).length > 0;
+
+    const li = t => `<li style="margin:4px 0">${t}</li>`;
+    const efeitos = d => [
+        li(`<b>Serviços da obra:</b> ` + (!servs?.length ? 'este orçamento não tinha serviços criados.'
+            : (saem.length ? `saem ${saem.length} (${esc(saem.map(x => x.nome).join(', '))}), ${eur(somaSaem)} sem IVA.` : '')
+              + (ficam.length ? ` Ficam ${ficam.length} (${esc(ficam.map(x => x.nome).join(', '))}) porque já têm faturas ou horas ligadas; apaga-os à mão se já não fizerem sentido.` : ''))),
+        li(`<b>Valores:</b> o valor dos serviços e a margem no painel da obra descem ${eur(somaSaem)}; o "Orçamento aceite" do resumo da obra e o valor aceite em Orçamentos deixam de contar ${eur(orc.total_com_iva)} com IVA.`),
+        li(`<b>Área do cliente:</b> ` + (!visivel ? 'o orçamento não está visível ao cliente, nada muda lá.'
+            : d === 'enviado' ? 'o cliente volta a ver "A aguardar a sua resposta" e os botões para aceitar ou pedir alterações.'
+            : 'o cliente deixa de ver "Aceite" e fica sem botões para responder.')),
+        li(`<b>Obra:</b> continua no estado em que está (não é concluída nem apagada). Faturas, recibos e o link do cliente não mudam.`),
+    ].join('');
+
+    document.getElementById('modalReverterOrc')?.remove();
+    const m = document.createElement('div');
+    m.id = 'modalReverterOrc';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1300;display:flex;align-items:center;justify-content:center;padding:16px';
+    m.innerHTML = `<div class="card" style="max-width:520px;width:100%;max-height:90vh;overflow-y:auto;padding:20px 22px">
+        <h3 style="margin:0 0 4px">Tirar o aceite ao orçamento ${esc(orc.numero || '')}</h3>
+        <div style="font-size:12px;opacity:.6;margin-bottom:12px">${esc(orc.obras?.nome || '')} · ${eur(orc.total_com_iva)} com IVA</div>
+        <label style="font-size:12px;opacity:.75;display:block;margin-bottom:4px">Passa a</label>
+        <select id="revOrcDestino" style="width:100%;margin-bottom:12px">
+            <option value="enviado">Enviado: à espera de resposta do cliente</option>
+            <option value="recusado">Não aceite: o cliente recusou</option>
+            <option value="cancelado">Cancelado: já não vai avançar</option>
+        </select>
+        <div style="font-size:12px;opacity:.75;margin-bottom:2px">O que isto muda:</div>
+        <ul id="revOrcEfeitos" style="font-size:13px;line-height:1.45;padding-left:18px;margin:0 0 16px"></ul>
+        <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+            <button class="btn-secondary" id="revOrcNao">Não mexer</button>
+            <button class="btn-primary" id="revOrcSim">Tirar o aceite</button>
+        </div>
+    </div>`;
+    document.body.appendChild(m);
+    const sel = m.querySelector('#revOrcDestino');
+    sel.value = ['enviado', 'recusado', 'cancelado'].includes(destino) ? destino : 'enviado';
+    const desenhar = () => { m.querySelector('#revOrcEfeitos').innerHTML = efeitos(sel.value); };
+    sel.onchange = desenhar;
+    desenhar();
+    const fechar = () => m.remove();
+    m.querySelector('#revOrcNao').onclick = fechar;
+    m.onclick = e => { if (e.target === m) fechar(); };
+    m.querySelector('#revOrcSim').onclick = async () => {
+        const btn = m.querySelector('#revOrcSim');
+        btn.disabled = true; btn.textContent = 'A mudar…';
+        const estado = sel.value;
+        const { error } = await SB.from('orcamentos').update({ estado, updated_at: new Date().toISOString() })
+            .eq('id', orc.id).eq('estado', 'aceite');
+        if (error) { btn.disabled = false; btn.textContent = 'Tirar o aceite'; return alert('Não foi possível mudar o estado: ' + error.message); }
+        await retirarServicosDoOrcamento(orc.id);
+        fechar();
+        await carregarOrcamentos();
+        if (_painelObraActual && document.getElementById('modalPainelObra')?.style.display === 'flex') {
+            const tab = document.querySelector('.painel-tab.active')?.dataset.tab || 'resumo';
+            await abrirPainelObra(_painelObraActual, tab);
+        }
+    };
 }
 
 // =======================================================
@@ -7195,6 +7362,12 @@ async function guardarOrcamento(estado = 'rascunho') {
     const ivaP   = parseFloat(document.getElementById('orcIva').value)||23;
     const totalI = semIva*(ivaP/100);
     const comIva = semIva+totalI;
+
+    // Editar um orçamento já decidido (aceite, não aceite, cancelado) não lhe
+    // muda o estado: antes, "Guardar" punha um aceite em rascunho e os
+    // serviços da obra ficavam lá sem orçamento aceite por trás.
+    const estadoActual = _orcEditId ? _orcamentos.find(x => x.id === _orcEditId)?.estado : null;
+    if (['aceite', 'recusado', 'cancelado'].includes(estadoActual)) estado = estadoActual;
 
     const payload = {
         estado,
