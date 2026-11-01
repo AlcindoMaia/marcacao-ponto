@@ -419,6 +419,10 @@ async function custosDasObras(ids, periodo = null) {
             .select("id, horas, obra_servicos(obra_id, nome, obras(nome)), registos_admin(obra_id, data, tipo, funcionarios(nome, valor_dia, salario_mensal), obras(nome))")
             .order("id")),
     ]);
+    // Uma leitura falhada daria um custo a zero ou incompleto sem ninguém
+    // saber: mais vale parar e dizer que não foi possível ler
+    const falhou = [fat, regs, ligMov, ligReg].find(x => x.error);
+    if (falhou) throw new Error("Não foi possível ler os custos da obra (" + falhou.error.message + "). Atualiza a página.");
 
     (fat.data || []).forEach(m => {
         const o = r[String(m.obra_id)]; if (!o) return;
@@ -444,7 +448,7 @@ async function custosDasObras(ids, periodo = null) {
     });
     (ligReg.data || []).forEach(l => {
         const g = l.registos_admin, s = l.obra_servicos;
-        if (!g || !s || g.tipo === "falta" || !noPeriodo(g.data)) return;
+        if (!g || !s || g.tipo !== "presenca" || !noPeriodo(g.data)) return;   // só presenças, como as horas da obra
         const de = String(g.obra_id), para = String(s.obra_id);
         if (de === para) return;
         const cd = custoDiaFunc(g.funcionarios), v = Number(l.horas || 0) * cd / 8;
@@ -494,6 +498,7 @@ function switchFinTab(tab) {
     if (tab === "fluxo")      initFluxo();
 }
 
+let _pedidoOrdenados = 0;
 async function carregarFinanceiro() {
     // Determinar mês a consultar
     const filtroEl = document.getElementById("filtroMesFinanceiro");
@@ -508,6 +513,7 @@ async function carregarFinanceiro() {
     if (!tbody) return;
 
     // Buscar registos_admin do mês (fonte de verdade para salários)
+    const pedido = ++_pedidoOrdenados;
     const [registosRes, funcsRes] = await Promise.all([
         SB.from("registos_admin")
             .select("funcionario_id, horas, data, tipo, motivo, obra_id, obras(nome)")
@@ -515,6 +521,7 @@ async function carregarFinanceiro() {
         SB.from("funcionarios")
             .select("id, nome, valor_dia, salario_mensal, ativo")
     ]);
+    if (pedido !== _pedidoOrdenados) return; // já se pediu outro mês entretanto
 
     const registos = registosRes.data || [];
     // Ativos, e também quem já saiu mas trabalhou nesse mês: sem isto os
@@ -586,7 +593,8 @@ async function carregarFinanceiro() {
 let _ordenadosMes = null;
 function exportarOrdenadosExcel() {
     if (!_ordenadosMes?.linhas.length) { alert("Sem ordenados para exportar neste mês."); return; }
-    const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    // Texto começado por = + - @ seria lido pelo Excel como fórmula: prefixar com '
+    const q = v => { let t = String(v ?? ""); if (/^[=+\-@]/.test(t)) t = "'" + t; return `"${t.replace(/"/g, '""')}"`; };
     const linhas = ["Funcionário;Tipo;Horas;Dias;Valor a pagar (€);Notas"];
     _ordenadosMes.linhas.forEach(l => linhas.push([
         q(l.f.nome), q(l.f.salario_mensal ? "Salário" : "À jornada"), l.horas.toFixed(2).replace(".", ","),
@@ -2513,7 +2521,15 @@ async function abrirPainelObra(obra, tabInicial = "resumo") {
     // Custo real da obra inteira (sem IVA), a mesma conta do Resumo e da
     // Visão geral: mostra também o que não está ligado a nenhum serviço,
     // senão a soma das margens dos serviços engana.
-    const custo = (await custosDasObras([obra.id]))[String(obra.id)];
+    let custo;
+    try { custo = (await custosDasObras([obra.id]))[String(obra.id)]; }
+    catch (e) {
+        console.error(e);
+        document.getElementById("painelServicosTbody").innerHTML =
+            `<div style="padding:24px;text-align:center;color:#e09486;font-size:13px">${esc(e.message)}</div>`;
+        abrirPainelTab(tabInicial);
+        return;
+    }
 
     const eur = v => Math.round(v).toLocaleString("pt-PT") + " €";
     const dataPt = d => d ? d.split("-").reverse().join("/") : "";
@@ -4018,11 +4034,18 @@ async function vgCarregarObras() {
     const ids = obras.map(o => o.id);
     // Gasto = Custo real do painel (sem IVA, com mão de obra), para a
     // etiqueta comparar coisas iguais com o valor dos serviços (sem IVA)
-    const [{ data: servicos }, custos, { data: fases }] = await Promise.all([
-        SB.from("obra_servicos").select("obra_id, nome, valor_orcamento, horas_orcamento, concluido, ordem").in("obra_id", ids),
-        custosDasObras(ids),
-        SB.from("obra_fases").select("obra_id, estado").in("obra_id", ids),
-    ]);
+    let servicos, custos, fases;
+    try {
+        [{ data: servicos }, custos, { data: fases }] = await Promise.all([
+            SB.from("obra_servicos").select("obra_id, nome, valor_orcamento, horas_orcamento, concluido, ordem").in("obra_id", ids),
+            custosDasObras(ids),
+            SB.from("obra_fases").select("obra_id, estado").in("obra_id", ids),
+        ]);
+    } catch (e) {
+        console.error(e);
+        cont.innerHTML = `<div style="padding:14px 0;font-size:13px;color:#a5483d">${esc(e.message)}</div>`;
+        return;
+    }
 
     const somar = (lista, campo) => (lista || []).reduce((acc, r) => {
         acc[r.obra_id] = (acc[r.obra_id] || 0) + (Number(r[campo]) || 0); return acc;
@@ -5738,14 +5761,19 @@ async function carregarPainelResumo() {
     const el = document.getElementById("painelTab-resumo");
     el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">A carregar...</div>`;
 
-    const [movsRes, orcRes, pontoRes, servRes, custos] = await Promise.all([
+    let movsRes, orcRes, pontoRes, servRes, custos;
+    try { [movsRes, orcRes, pontoRes, servRes, custos] = await Promise.all([
         SB.from("movimentos_financeiros").select("tipo, valor_base, valor_total, referencia, data_documento, fornecedores(nome), categorias_financeiras(nome)").eq("obra_id", obraId).eq("tipo", "entrada").eq("ativo", true).order("data_documento"),
         SB.from("orcamentos").select("id, numero, estado, taxa_iva, total_com_iva, total_sem_iva, subtotal_mao_obra, subtotal_materiais").eq("obra_id", obraId),
         SB.from("vw_registos_ponto").select("funcionario, horas, dia").eq("obra", _painelObraActual.nome),
         SB.from("obra_servicos").select("orcamento_id, valor_orcamento").eq("obra_id", obraId),
         // O gasto é o mesmo Custo real do separador Serviços e da Visão geral
         custosDasObras([obraId]),
-    ]);
+    ]); } catch (e) {
+        console.error(e);
+        el.innerHTML = `<div style="padding:24px;text-align:center;color:#e09486;font-size:13px">${esc(e.message)}</div>`;
+        return;
+    }
 
     const movs  = movsRes.data  || [];
     const orcs  = orcRes.data   || [];
@@ -8009,16 +8037,26 @@ async function carregarDRE() {
         if (obraId) q = q.eq("obra_id", obraId);
         return q.order("data_documento").order("id");
     };
-    const [movRes, regRes, custos] = await Promise.all([
+    let movRes, regRes, custos;
+    try { [movRes, regRes, custos] = await Promise.all([
         lerTudo(montar),
         obraId ? Promise.resolve({ data: [] }) : lerTudo(() => SB.from("registos_admin")
             .select("horas, data, funcionarios(nome, valor_dia, salario_mensal)")
             .eq("tipo", "presenca").gte("data", inicio).lte("data", fim).order("data").order("id")),
         obraId ? custosDasObras([obraId], { inicio, fim }) : Promise.resolve(null),
     ]);
+        const falhou = movRes.error || regRes.error;
+        if (falhou) throw new Error("Não foi possível ler os dados do DRE (" + falhou.message + "). Atualiza a página.");
+    } catch (e) {
+        if (pedido !== _pedidoDRE) return;
+        console.error(e);
+        ["dreReceitas", "dreCustos", "dreResultado", "dreMargem"].forEach(id => document.getElementById(id).textContent = "–");
+        document.getElementById("dreDetalheCustos").innerHTML = `<p style="color:#e09486;font-size:13px">${esc(e.message)}</p>`;
+        document.getElementById("dreDetalheReceitas").innerHTML = "";
+        return;
+    }
     if (pedido !== _pedidoDRE) return;   // entretanto mudou o período
     const data = movRes.data;
-    if (!data) { console.error(movRes.error); return; }
 
     const dPt = d => d ? d.split("-").reverse().join("/") : "";
     const it  = l => l.map(m => ({ t: `${dPt(m.data_documento)} ${m.fornecedores?.nome || m.referencia || "—"}`, v: semIva(m) }));
