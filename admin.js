@@ -1722,7 +1722,7 @@ async function carregarFichaMes(anoMes) {
         .eq("funcionario_id", func.id)
         .gte("data", inicio).lte("data", fim)
         .order("data");
-    if (_histMes !== anoMes) return;   // entretanto mudou de mês
+    if (_histMes !== anoMes || _histFunc !== func) return;   // entretanto mudou de mês ou de funcionário
     if (error) {
         corpo.innerHTML = `<p style="color:#e09486;font-size:13px">Não foi possível ler o registo diário.</p>`;
         _histDados = null;
