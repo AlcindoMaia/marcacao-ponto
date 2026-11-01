@@ -7,7 +7,7 @@
 
 <title>Painel Administrativo — Maia Solutions</title>
 
-<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="style.css?v=17">
 <link rel="stylesheet" href="telemovel.css?v=7">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
@@ -177,60 +177,6 @@ document.getElementById("btnLogin").addEventListener("click", function () {
 
 <div class="tabs-wrapper" style="padding-top:4px">
 
-<!-- ================= TAB DASHBOARD ================= -->
-<div class="tab-content" id="tab-dashboard">
-
-    <!-- Seletor de ano -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
-        <h2 style="margin:0;font-size:18px;font-weight:600">Dashboard Anual</h2>
-        <div style="display:flex;align-items:center;gap:10px">
-            <label style="font-size:13px;opacity:.7">Ano</label>
-            <select id="dashAno" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:var(--bg-dark-panel);color:var(--text-light);font-size:13px"></select>
-            <button class="btn-primary" onclick="carregarDashboard()" style="padding:6px 16px;font-size:13px">Atualizar</button>
-        </div>
-    </div>
-
-    <!-- KPIs rápidos -->
-    <div class="grid-cards">
-        <div class="card metric">
-            <h3>Receita</h3>
-            <div id="dashReceita" class="value" style="color:#8fbfa0">–</div>
-        </div>
-        <div class="card metric">
-            <h3>Despesa</h3>
-            <div id="dashDespesa" class="value" style="color:#e09486">–</div>
-        </div>
-        <div class="card metric">
-            <h3>Saldo</h3>
-            <div id="dashSaldo" class="value">–</div>
-        </div>
-        <div class="card metric">
-            <h3>Obras ativas</h3>
-            <div id="dashObras" class="value">–</div>
-        </div>
-    </div>
-
-    <!-- Linha 1: Entradas vs Saídas + Custo por obra -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
-        <div class="card">
-            <h3 style="margin-bottom:16px;font-size:14px;opacity:.7">Entradas vs Saídas por mês</h3>
-            <canvas id="chartLinhas" height="200"></canvas>
-        </div>
-        <div class="card">
-            <h3 style="margin-bottom:16px;font-size:14px;opacity:.7">Custo por obra</h3>
-            <canvas id="chartObras" height="200"></canvas>
-        </div>
-    </div>
-
-    <!-- Linha 2: Top funcionários -->
-    <div class="card">
-        <h3 style="margin-bottom:16px;font-size:14px;opacity:.7">Top funcionários — horas trabalhadas no ano</h3>
-        <canvas id="chartFuncionarios" height="120"></canvas>
-    </div>
-
-</div>
-
-
 <!-- ================= TAB FINANCEIRO ================= -->
     <div class="tab-content" id="tab-financeiro">
 
@@ -256,19 +202,19 @@ document.getElementById("btnLogin").addEventListener("click", function () {
 
         <!-- KPIs -->
         <div class="grid-cards">
-            <div class="card metric">
+            <div class="card metric card-kpi-contas"><span class="kpi-contas" id="kpiFuncionariosContas"></span>
                 <h3>Funcionários</h3>
                 <div id="kpiFuncionarios" class="value">–</div>
             </div>
-            <div class="card metric">
+            <div class="card metric card-kpi-contas"><span class="kpi-contas" id="kpiHorasContas"></span>
                 <h3>Horas do mês</h3>
                 <div id="kpiHoras" class="value">–</div>
             </div>
-            <div class="card metric">
+            <div class="card metric card-kpi-contas"><span class="kpi-contas" id="kpiDiasContas"></span>
                 <h3>Dias trabalhados</h3>
                 <div id="kpiDias" class="value">–</div>
             </div>
-<div class="card metric primary">
+            <div class="card metric primary card-kpi-contas"><span class="kpi-contas" id="kpiTotalContas"></span>
                 <h3>Total a pagar</h3>
                 <div id="kpiTotal" class="value">–</div>
             </div>
@@ -319,10 +265,10 @@ document.getElementById("btnLogin").addEventListener("click", function () {
                 <button class="btn-primary" onclick="carregarDRE()" style="margin-top:18px">Calcular</button>
             </div>
             <div class="grid-cards" style="margin-bottom:16px">
-                <div class="card metric" style="border-left:3px solid #8fbfa0"><h3>Receitas s/ IVA</h3><div id="dreReceitas" class="value" style="color:#8fbfa0">–</div></div>
-                <div class="card metric" style="border-left:3px solid #e09486"><h3>Custos s/ IVA</h3><div id="dreCustos" class="value" style="color:#e09486">–</div></div>
-                <div class="card metric primary"><h3>Resultado</h3><div id="dreResultado" class="value">–</div></div>
-                <div class="card metric" style="border-left:3px solid #a78bfa"><h3>Margem</h3><div id="dreMargem" class="value" style="color:#a78bfa">–</div></div>
+                <div class="card metric card-kpi-contas" style="border-left:3px solid #8fbfa0"><span class="kpi-contas" id="dreReceitasContas"></span><h3>Receitas s/ IVA</h3><div id="dreReceitas" class="value" style="color:#8fbfa0">–</div></div>
+                <div class="card metric card-kpi-contas" style="border-left:3px solid #e09486"><span class="kpi-contas" id="dreCustosContas"></span><h3>Custos s/ IVA</h3><div id="dreCustos" class="value" style="color:#e09486">–</div></div>
+                <div class="card metric primary card-kpi-contas"><span class="kpi-contas" id="dreResultadoContas"></span><h3>Resultado</h3><div id="dreResultado" class="value">–</div></div>
+                <div class="card metric card-kpi-contas" style="border-left:3px solid #a78bfa"><span class="kpi-contas" id="dreMargemContas"></span><h3>Margem</h3><div id="dreMargem" class="value" style="color:#a78bfa">–</div></div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
                 <div class="card"><h3 style="color:#8fbfa0;margin-bottom:12px">📥 RECEITAS</h3><div id="dreDetalheReceitas"></div></div>
@@ -340,19 +286,22 @@ document.getElementById("btnLogin").addEventListener("click", function () {
 
             <!-- KPIs -->
             <div class="grid-cards">
-                <div class="card metric">
-                    <h3>Entradas</h3>
+                <div class="card metric card-kpi-contas"><span class="kpi-contas" id="totalEntradasContas"></span>
+                    <h3>Recebido</h3>
                     <div id="totalEntradas" class="value" style="color:#8fbfa0">–</div>
+                    <div id="totalEntradasSub" style="font-size:11px;opacity:.55;margin-top:4px"></div>
                 </div>
-                <div class="card metric">
-                    <h3>Saídas</h3>
+                <div class="card metric card-kpi-contas"><span class="kpi-contas" id="totalSaidasContas"></span>
+                    <h3>Pago</h3>
                     <div id="totalSaidas" class="value" style="color:#e09486">–</div>
+                    <div id="totalSaidasSub" style="font-size:11px;opacity:.55;margin-top:4px"></div>
                 </div>
-                <div class="card metric">
+                <div class="card metric card-kpi-contas"><span class="kpi-contas" id="saldoFluxoContas"></span>
                     <h3>Saldo</h3>
                     <div id="saldoFluxo" class="value">–</div>
+                    <div id="saldoFluxoSub" style="font-size:11px;opacity:.55;margin-top:4px"></div>
                 </div>
-                <div class="card metric" title="IVA das faturas da Maia Solutions menos o IVA das faturas de compra, nos movimentos da lista">
+                <div class="card metric card-kpi-contas" title="IVA das faturas da Maia Solutions menos o IVA das faturas de compra, nos movimentos da lista"><span class="kpi-contas" id="ivaPorDeParteContas"></span>
                     <h3>IVA a pôr de parte</h3>
                     <div id="ivaPorDeParte" class="value" style="color:#a78bfa">–</div>
                     <div id="ivaPorDeParteSub" style="font-size:11px;opacity:.55;margin-top:4px"></div>
@@ -1593,7 +1542,7 @@ document.getElementById("btnLogin").addEventListener("click", function () {
                 </button>
                 <button class="painel-tab" data-tab="documentos" onclick="abrirPainelTab('documentos')"
                     style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title,sans-serif);letter-spacing:.5px;white-space:nowrap">
-                    <span class="pt-ic">📁</span><span class="pt-txt">Documentos</span>
+                    <span class="pt-ic">📁</span><span class="pt-txt" data-curto="Docs">Documentos</span>
                 </button>
             </div>
         </div>
@@ -1950,7 +1899,6 @@ document.getElementById("btnLogin").addEventListener("click", function () {
 </div>
 
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js" integrity="sha384-Dr98ddmUw2QkdCarNQ+OL7xLty7cSxgR0T7v1tq4UErS/qLV0132sBYTolRAFuOV" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <!-- Se o jsDelivr falhar, o mesmo ficheiro (mesma integrity) vem do unpkg -->
@@ -1963,8 +1911,8 @@ document.getElementById("btnLogin").addEventListener("click", function () {
 <script src="planeamento.js?v=4"></script>
 <script src="cotacoes.js"></script>
 <script src="andamento.js?v=2"></script>
-<script src="rh.js?v=1"></script>
-<script src="admin.js?v=26"></script>
+<script src="rh.js?v=2"></script>
+<script src="admin.js?v=27"></script>
 <script src="telemovel.js?v=5"></script>
 
 

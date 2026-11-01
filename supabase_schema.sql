@@ -690,7 +690,7 @@ begin
      where p.funcionario_id = v_func
        and p.datahora >= coalesce(p_desde, now() - interval '7 days')
      order by p.datahora desc
-     limit 12;
+     limit 60;
 end;
 $$;
 

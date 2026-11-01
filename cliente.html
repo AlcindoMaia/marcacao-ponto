@@ -253,8 +253,13 @@ function seccao(titulo, itens, vazio) {
 }
 
 function htmlObra(o, docs, fases, autos, diario) {
-    const pct = Math.max(0, Math.min(100, Number(o.percentagem_conclusao) || 0));
+    // % escrita na obra; se estiver vazia, sai das fases (concluídas contam
+    // inteiras, as a decorrer metade). Sem nenhuma das duas, não há barra.
+    let pct = null;
+    if (o.percentagem_conclusao != null) pct = Math.max(0, Math.min(100, Number(o.percentagem_conclusao) || 0));
+    else if (fases.length) pct = Math.round(fases.reduce((s, f) => s + (f.estado === "concluida" ? 1 : f.estado === "a_decorrer" ? .5 : 0), 0) / fases.length * 100);
     const feita = o.estado === "concluida";
+    if (feita) pct = 100;
     const de = t => docs.filter(d => d.tipo === t);
 
     const orcs = de("orcamento").map(d => linhaDoc(d, "🧾", estadoOrcamento(d)) + respostaOrcamento(d));
@@ -278,9 +283,9 @@ function htmlObra(o, docs, fases, autos, diario) {
             </div>
             <span class="selo ${feita ? "feita" : "curso"}">${feita ? "✓ Concluída" : "Em curso"}</span>
         </div>
-        <div class="barra"><div style="width:${pct}%"></div></div>
+        ${pct != null ? `<div class="barra"><div style="width:${pct}%"></div></div>` : ""}
         <div class="meta">
-            <span>${pct}% concluída</span>
+            ${pct != null ? `<span>${pct}% concluída</span>` : ""}
             ${o.data_conclusao_prevista && !feita ? `<span>Conclusão prevista: ${esc(dataPT(o.data_conclusao_prevista))}</span>` : ""}
         </div>
         ${htmlFases(fases)}
