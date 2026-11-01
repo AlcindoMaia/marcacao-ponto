@@ -3378,6 +3378,15 @@ async function proximaFaturaDaFila() {
     const doc = _filaFaturas.shift();
     if (!doc) { limparFilaFaturas(); return; }
 
+    // Recibo de pagamento: não é despesa nova nem tem material. Não enche o
+    // formulário do movimento; abre o painel que dá as faturas como pagas.
+    if (doc.e_recibo) {
+        limparLinhasFatura();
+        actualizarBarraFila();
+        abrirReciboPagamento(doc);
+        return;
+    }
+
     preencherMovimentoComFatura(doc);
     await mostrarLinhasFatura(doc);
     actualizarBarraFila();
@@ -3483,6 +3492,113 @@ async function lerFicheiroFatura(ficheiro, emFila = false) {
         if (btn) { btn.disabled = false; btn.textContent = textoBtn; }
         const inp = document.getElementById("ficheiroFatura");
         if (inp) inp.value = "";   // permite reler o mesmo ficheiro
+    }
+}
+
+// -------------------------------------------------------
+// RECIBO DE PAGAMENTO (ex.: "Recibo Cliente" da Casa Alves)
+// O servidor já ligou o recibo às faturas da app. Aqui mostra-se a lista,
+// e ao confirmar as escolhidas passam a "pago", com o recibo nas
+// observações. Não se cria movimento, linhas de fatura nem stock.
+// -------------------------------------------------------
+let _reciboAberto = null;
+
+function abrirReciboPagamento(doc) {
+    document.getElementById("modalReciboPagamento")?.remove();
+    _reciboAberto = doc;
+    const eur = v => v == null ? "—" : Number(v).toFixed(2).replace(".", ",") + " €";
+    const fats = doc.faturas_encontradas || [];
+    const quem = doc.fornecedor_conhecido?.nome || doc.fornecedor_nome || "fornecedor";
+
+    const linhas = fats.map((f, i) => {
+        if (!f.encontrada) return `
+            <div style="display:flex;gap:8px;padding:6px 0;font-size:13px;opacity:.65">
+                <span style="width:18px">✕</span>
+                <span>Fatura <b>${esc(f.numero)}</b> · ${eur(f.valor_pago)} · <i>não está na app</i></span>
+            </div>`;
+        const jaPaga = f.estado_pagamento === "pago";
+        const marcar = !jaPaga && !f.parcial;
+        return `
+            <label style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;font-size:13px;cursor:pointer">
+                <input type="checkbox" class="reciboFatura" data-i="${i}" ${marcar ? "checked" : ""} ${jaPaga ? "disabled" : ""}
+                    style="width:16px;height:16px;margin:2px 0 0">
+                <span>Fatura <b>${esc(f.referencia)}</b> de ${esc(f.data_documento || "")} · ${eur(f.valor_total)}
+                    ${f.obra ? `· obra ${esc(f.obra)}` : ""}
+                    <span style="opacity:.7">· pago no recibo ${eur(f.valor_pago)}</span>
+                    ${jaPaga ? ` <span style="color:#8fbfa0">(já está paga)</span>` : ""}
+                    ${f.parcial ? ` <span style="color:#fb923c">(pagamento parcial)</span>` : ""}
+                </span>
+            </label>`;
+    }).join("") || `<div style="font-size:12px;opacity:.6">Não consegui ver que faturas este recibo paga.</div>`;
+
+    const avisos = (doc.avisos || []).map(a => `<li>${esc(a)}</li>`).join("");
+    const m = document.createElement("div");
+    m.id = "modalReciboPagamento";
+    m.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1400;display:flex;align-items:center;justify-content:center;padding:16px";
+    m.innerHTML = `
+    <div style="background:#25363f;border-radius:14px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;padding:22px;border:1px solid rgba(255,255,255,.08)">
+        <div style="font-family:var(--font-title,sans-serif);font-size:18px;margin-bottom:4px">✅ Recibo de pagamento</div>
+        <div style="font-size:12px;opacity:.65;margin-bottom:12px">
+            ${esc(doc.numero_documento || "Recibo")} · ${esc(quem)} · ${esc(doc.data || "")} · recebido <b>${eur(doc.valor_recebido)}</b><br>
+            Um recibo não é despesa nova nem material: só dá como pagas as faturas que já estão na app.
+        </div>
+        ${avisos ? `<ul style="background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.3);color:#fb923c;border-radius:8px;padding:10px 10px 10px 28px;font-size:12px;margin:0 0 12px">${avisos}</ul>` : ""}
+        <div style="font-size:12px;font-weight:600;margin-bottom:4px">Dar como pagas:</div>
+        ${linhas}
+        <div id="reciboMsg" style="display:none;color:#e09486;font-size:12px;margin-top:10px"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
+            <button type="button" class="btn-secondary" onclick="fecharReciboPagamento(false)">Agora não</button>
+            <button type="button" class="btn-primary" id="btnGravarRecibo" onclick="gravarReciboPagamento()">✓ Dar como pagas</button>
+        </div>
+    </div>`;
+    document.body.appendChild(m);
+}
+
+// Fecha o recibo e segue o lote: a seguinte do lote, ou fecha o movimento
+// que ficou vazio por baixo.
+async function fecharReciboPagamento(gravou) {
+    document.getElementById("modalReciboPagamento")?.remove();
+    _reciboAberto = null;
+    if (gravou) {
+        await carregarMovimentos();
+        if (_painelObraActual) carregarPainelFinanceiro();
+    }
+    if (_filaFaturas.length) await proximaFaturaDaFila();
+    else fecharModalMovimento();
+}
+
+async function gravarReciboPagamento() {
+    const doc = _reciboAberto;
+    if (!doc) return;
+    const fats = doc.faturas_encontradas || [];
+    const escolhidas = [...document.querySelectorAll("#modalReciboPagamento .reciboFatura:checked")]
+        .map(x => fats[Number(x.dataset.i)]).filter(f => f?.id);
+    const msg = document.getElementById("reciboMsg");
+    if (!escolhidas.length) {
+        msg.style.display = "block";
+        msg.textContent = "Não escolheste nenhuma fatura. Usa \"Agora não\" para sair sem gravar.";
+        return;
+    }
+
+    const btn = document.getElementById("btnGravarRecibo");
+    btn.disabled = true; btn.textContent = "⏳ A gravar…";
+    const nota = `Paga pelo recibo ${doc.numero_documento || "?"}` +
+        (doc.data ? ` de ${doc.data.split("-").reverse().join("/")}` : "");
+    try {
+        for (const f of escolhidas) {
+            const obs = f.observacoes && f.observacoes.includes(nota) ? f.observacoes
+                      : [f.observacoes, nota].filter(Boolean).join(" · ");
+            const { error } = await SB.from("movimentos_financeiros")
+                .update({ estado_pagamento: "pago", observacoes: obs }).eq("id", f.id);
+            if (error) throw new Error(error.message);
+        }
+        mostrarFeedbackQR(`Recibo ${doc.numero_documento || ""}: ${escolhidas.length} fatura${escolhidas.length === 1 ? "" : "s"} dada${escolhidas.length === 1 ? "" : "s"} como paga${escolhidas.length === 1 ? "" : "s"}.`, "ok");
+        await fecharReciboPagamento(true);
+    } catch (e) {
+        console.error("gravarReciboPagamento:", e);
+        msg.style.display = "block";
+        msg.textContent = "Não foi possível gravar: " + e.message;
+        btn.disabled = false; btn.textContent = "✓ Dar como pagas";
     }
 }
 
