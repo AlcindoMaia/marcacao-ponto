@@ -121,8 +121,9 @@ async function confirmarMovimentoStock() {
       tipo_movimento: tipo,
       quantidade:     qtd,
       data_movimento: new Date().toLocaleDateString("sv-SE", { timeZone: TZ }),
-      obra_destino_id: tipo === "entrada" ? (obra !== "armazem" ? obra : null) : null,
-      obra_origem_id:  tipo === "saida"   ? (obra !== "armazem" ? obra : null) : null,
+      // Saída: vai PARA a obra escolhida. Entrada: volta DA obra para o armazém
+      obra_destino_id: tipo === "saida"   ? (obra !== "armazem" ? obra : null) : null,
+      obra_origem_id:  tipo === "entrada" ? (obra !== "armazem" ? obra : null) : null,
       observacoes:    `Via QR — ${tipo === "entrada" ? "Entrou de" : "Saiu para"}: ${obra === "armazem" ? "Armazém" : obras.find(o=>o.id===obra)?.nome || obra}`
     }]
   });
