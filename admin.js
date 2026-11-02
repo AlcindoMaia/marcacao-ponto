@@ -3436,16 +3436,25 @@ async function lerFicheirosFatura(ficheiros) {
     if (!lista.length) return;
 
     const todas = [];
+    const falhas = [];   // [{nome, erro}] para dizer no fim porque falhou
     for (let i = 0; i < lista.length; i++) {
         if (lista.length > 1) {
             mostrarFeedbackQR(`A ler ficheiro ${i + 1} de ${lista.length}…`, "warn");
         }
-        const docs = await lerFicheiroFatura(lista[i], true);
+        const docs = await lerFicheiroFatura(lista[i], true, falhas);
         todas.push(...(docs || []));
     }
 
+    // Antes só se dizia "nenhum documento", e o erro de cada ficheiro
+    // ficava escondido por baixo da mensagem seguinte.
+    const resumoFalhas = () => {
+        const motivos = [...new Set(falhas.map(f => f.erro))];
+        return `${falhas.length} de ${lista.length} ficheiro${lista.length > 1 ? "s" : ""} não ` +
+               `${falhas.length > 1 ? "foram lidos" : "foi lido"}: ${motivos.slice(0, 2).join(" · ")}`;
+    };
+
     if (!todas.length) {
-        mostrarFeedbackQR("Não foi reconhecido nenhum documento.", "err");
+        mostrarFeedbackQR(falhas.length ? resumoFalhas() : "Não foi reconhecido nenhum documento.", "err");
         return;
     }
 
@@ -3453,20 +3462,17 @@ async function lerFicheirosFatura(ficheiros) {
     _filaTotal   = todas.length;
     await proximaFaturaDaFila();
 
-    if (todas.length > 1) {
+    if (falhas.length) {
+        mostrarFeedbackQR(`${todas.length} documento${todas.length > 1 ? "s" : ""} lido${todas.length > 1 ? "s" : ""}. ` + resumoFalhas(), "warn");
+    } else if (todas.length > 1) {
         mostrarFeedbackQR(`${todas.length} documentos lidos. Grava este e o seguinte entra sozinho.`, "ok");
     }
 }
 
-// Lê um ficheiro. Com emFila=true devolve as faturas em vez de as mostrar.
-async function lerFicheiroFatura(ficheiro, emFila = false) {
+// Lê um ficheiro. Com emFila=true devolve as faturas em vez de as mostrar;
+// se falhar, junta {nome, erro} a `falhas` para o lote o dizer no fim.
+async function lerFicheiroFatura(ficheiro, emFila = false, falhas = null) {
     if (!ficheiro) return null;
-
-    const MAX = 8 * 1024 * 1024;
-    if (ficheiro.size > MAX) {
-        mostrarFeedbackQR(`"${ficheiro.name}" tem mais de 8 MB. Digitaliza com menos qualidade.`, "err");
-        return null;
-    }
 
     const btn = document.getElementById("btnLerFatura");
     const textoBtn = btn ? btn.textContent : "";
@@ -3474,6 +3480,16 @@ async function lerFicheiroFatura(ficheiro, emFila = false) {
     if (!emFila) mostrarFeedbackQR("A ler o documento… demora alguns segundos.", "warn");
 
     try {
+        // Fotos do iPhone vêm em HEIC, que a IA não aceita (só JPEG, PNG,
+        // GIF, WebP), e com 5–7 MB. Passam a JPEG reduzido antes de enviar.
+        if (ehImagem(ficheiro)) {
+            try { ficheiro = await prepararFoto(ficheiro); }
+            catch (e) { throw new Error(`não consegui converter a foto (${e.message})`); }
+        }
+
+        const MAX = 8 * 1024 * 1024;
+        if (ficheiro.size > MAX) throw new Error("tem mais de 8 MB. Digitaliza com menos qualidade.");
+
         const base64 = await new Promise((resolve, reject) => {
             const fr = new FileReader();
             fr.onload  = () => resolve(String(fr.result).split(",")[1]);
@@ -3515,7 +3531,8 @@ async function lerFicheiroFatura(ficheiro, emFila = false) {
 
     } catch (e) {
         console.error("lerFicheiroFatura:", e);
-        mostrarFeedbackQR("Não foi possível ler: " + e.message, "err");
+        falhas?.push({ nome: ficheiro.name, erro: e.message });
+        mostrarFeedbackQR(`Não foi possível ler "${ficheiro.name}": ` + e.message, "err");
         return null;
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = textoBtn; }

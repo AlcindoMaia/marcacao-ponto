@@ -765,7 +765,7 @@ document.getElementById("btnLogin").addEventListener("click", function () {
                     style="background:rgba(181,136,99,.15);border:1px solid rgba(181,136,99,.4);color:var(--primary-dk,#a06d00);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">
                     📄 Ler Documento
                 </button>
-                <input type="file" id="ficheiroFatura" accept="image/*,application/pdf" multiple style="display:none">
+                <input type="file" id="ficheiroFatura" accept="image/*,application/pdf,.heic,.heif" multiple style="display:none">
                 <button id="fecharModalMovBtn" class="modal-close" style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.5">×</button>
             </div>
         </div>
@@ -1356,7 +1356,7 @@ document.getElementById("btnLogin").addEventListener("click", function () {
             </div>
             <div class="cot-topo-acoes">
                 <button id="cotCarregar" class="btn-secondary" title="Ler PDFs ou fotos de orçamentos de fornecedores">📄 Carregar orçamentos</button>
-                <input type="file" id="cotFicheiros" accept="application/pdf,image/*" multiple style="display:none">
+                <input type="file" id="cotFicheiros" accept="application/pdf,image/*,.heic,.heif" multiple style="display:none">
                 <button id="cotImprimir" class="btn-secondary">Imprimir</button>
                 <button id="cotEditar" class="btn-primary">Editar</button>
             </div>
@@ -1909,10 +1909,10 @@ document.getElementById("btnLogin").addEventListener("click", function () {
 <script src="dados-publicos.js"></script>
 <script src="fotos.js"></script>
 <script src="planeamento.js?v=4"></script>
-<script src="cotacoes.js"></script>
+<script src="cotacoes.js?v=2"></script>
 <script src="andamento.js?v=3"></script>
 <script src="rh.js?v=2"></script>
-<script src="admin.js?v=30"></script>
+<script src="admin.js?v=31"></script>
 <script src="telemovel.js?v=5"></script>
 
 

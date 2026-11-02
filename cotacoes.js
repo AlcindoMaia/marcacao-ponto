@@ -718,6 +718,8 @@ async function cotLerFicheiros(ficheiros) {
 }
 
 async function cotLerUm(ficheiro) {
+    // HEIC do iPhone não é aceite pela IA; passa a JPEG reduzido (fotos.js).
+    if (ehImagem(ficheiro)) ficheiro = await prepararFoto(ficheiro);
     if (ficheiro.size > 8 * 1024 * 1024) throw new Error("tem mais de 8 MB. Digitaliza com menos qualidade.");
     const base64 = await new Promise((resolve, reject) => {
         const fr = new FileReader();
