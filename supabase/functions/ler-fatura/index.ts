@@ -329,7 +329,8 @@ Deno.serve(async (req) => {
         .from("assistente_registo")
         .select("id", { count: "exact", head: true })
         .eq("accao", "ler_fatura")
-        .gte("criado_em", hoje);
+        .is("erro", null)          // só as leituras que a IA fez (e cobrou);
+        .gte("criado_em", hoje);   // tentativas falhadas não gastam o teto
     if ((count ?? 0) >= teto) {
         return resposta({ erro: `Limite diário atingido (${teto} leituras).` }, 429);
     }

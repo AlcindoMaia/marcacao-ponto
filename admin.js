@@ -3443,6 +3443,12 @@ async function lerFicheirosFatura(ficheiros) {
         }
         const docs = await lerFicheiroFatura(lista[i], true, falhas);
         todas.push(...(docs || []));
+        // Teto diário atingido: os ficheiros seguintes falhavam todos à toa.
+        if (falhas.some(f => f.limite)) {
+            const resto = lista.length - i - 1;
+            if (resto) falhas.push({ nome: `${resto} por ler`, erro: `${resto} ficheiro${resto > 1 ? "s" : ""} ficou por ler` });
+            break;
+        }
     }
 
     // Antes só se dizia "nenhum documento", e o erro de cada ficheiro
@@ -3509,8 +3515,12 @@ async function lerFicheiroFatura(ficheiro, emFila = false, falhas = null) {
             body: JSON.stringify({ ficheiro_base64: base64, tipo: ficheiro.type || "image/jpeg" }),
         });
 
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.erro || `Erro ${r.status}`);
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) {
+            const e = new Error(j.erro || `Erro ${r.status}`);
+            e.limite = r.status === 429;
+            throw e;
+        }
 
         const docs = j.documentos || [];
 
@@ -3531,7 +3541,7 @@ async function lerFicheiroFatura(ficheiro, emFila = false, falhas = null) {
 
     } catch (e) {
         console.error("lerFicheiroFatura:", e);
-        falhas?.push({ nome: ficheiro.name, erro: e.message });
+        falhas?.push({ nome: ficheiro.name, erro: e.message, limite: !!e.limite });
         mostrarFeedbackQR(`Não foi possível ler "${ficheiro.name}": ` + e.message, "err");
         return null;
     } finally {
