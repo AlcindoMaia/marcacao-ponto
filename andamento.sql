@@ -104,3 +104,6 @@ create policy "obra_diario: admin gere tudo" on obra_diario
 
 revoke all on obra_diario from anon;
 grant select, insert, update, delete on obra_diario to authenticated;
+
+-- Área do cliente: interruptor por obra para mostrar valor / já pago / falta pagar (sem IVA)
+alter table obras add column if not exists mostrar_contas_cliente boolean not null default false;

@@ -1493,3 +1493,16 @@ body:has(#modalPainelObra[style*="display: flex"], #modalPainelObra[style*="disp
 #modalContas .contas-det[open] > summary .contas-linha span::before { content: "▾ "; }
 #orcKpiValorContas, .card-kpi-contas > .kpi-contas { position: absolute; top: 10px; right: 10px; }
 #orcKpiValorContas .btn-contas, .card-kpi-contas > .kpi-contas .btn-contas { margin: 0; }
+
+/* Telemóvel: ⓘ pequeno no canto, e o título do cartão deixa-lhe espaço (não fica por cima das letras) */
+@media (max-width: 600px) {
+    .btn-contas { width: 15px; height: 15px; font-size: 10px; }
+    #modalPainelObra .painel-kpi > .btn-contas,
+    #vgNumeros .card.metric > .btn-contas,
+    .card-kpi-contas > .btn-contas,
+    #orcKpiValorContas, .card-kpi-contas > .kpi-contas { top: 4px; right: 4px; }
+    .card-kpi-contas > .btn-contas + *, .card-kpi-contas > .kpi-contas + *, .card-kpi-contas > #orcKpiValorContas + *,
+    #modalPainelObra .painel-kpi > .btn-contas + *, #vgNumeros .card.metric > .btn-contas + * { padding-right: 16px; }
+    /* o número grande começa abaixo do ⓘ */
+    .card-kpi-contas > h3, #vgNumeros .card.metric > h3 { min-height: 15px; }
+}
