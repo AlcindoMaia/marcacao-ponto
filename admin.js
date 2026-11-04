@@ -1248,9 +1248,10 @@ function problemasDoDia(marcas, dia, hoje) {
     return p;
 }
 
-async function carregarParaCorrigir(ano, mes) {
-    const caixa = document.getElementById("pontoParaCorrigir");
-    if (!caixa) return;
+// Os dias de um mês com marcações de ponto por ver ou por corrigir.
+// Serve a caixa "Para corrigir" dos Registos e o aviso da Visão geral.
+// Devolve null se não deu para ler.
+async function itensParaCorrigir(ano, mes) {
     const mesStr = `${ano}-${String(mes).padStart(2, "0")}`;
     // Um dia a mais de cada lado: o mês é contado em hora de Lisboa
     const ini = new Date(Date.UTC(ano, mes - 1, 1) - 86400000).toISOString();
@@ -1261,7 +1262,7 @@ async function carregarParaCorrigir(ano, mes) {
         SB.from("funcionarios").select("id, nome"),
         SB.from("obras").select("id, nome")
     ]);
-    if (pontoRes.error) { console.error(pontoRes.error); caixa.style.display = "none"; return; }
+    if (pontoRes.error) { console.error(pontoRes.error); return null; }
     const nomes = Object.fromEntries((funcsRes.data || []).map(f => [f.id, f.nome]));
     _pcObras = Object.fromEntries((obrasRes.data || []).map(o => [o.id, o.nome]));
 
@@ -1282,7 +1283,14 @@ async function carregarParaCorrigir(ano, mes) {
         return { funcId, dia, nome: nomes[funcId] || "—", problemas, idsRever: marcas.filter(m => m.a_rever).map(m => m.id), soRever };
     }).filter(i => i.problemas.length)
       .sort((a, b) => b.dia.localeCompare(a.dia) || a.nome.localeCompare(b.nome));
+    return itens;
+}
 
+async function carregarParaCorrigir(ano, mes) {
+    const caixa = document.getElementById("pontoParaCorrigir");
+    if (!caixa) return;
+    const itens = await itensParaCorrigir(ano, mes);
+    if (!itens) { caixa.style.display = "none"; return; }
     if (!itens.length) { caixa.style.display = "none"; caixa.innerHTML = ""; return; }
     caixa.style.display = "";
     caixa.innerHTML = `<h3 style="margin:0 0 6px;font-size:14px">⚠️ Para corrigir (${itens.length})</h3>
@@ -3938,6 +3946,7 @@ function mostrarFeedbackQR(msg, tipo) {
 // reunido para não se ter de ir a cada um ver se há alguma coisa.
 // =======================================================
 const VG_SUBIDA_PC = 5;    // a partir daqui, um preço que sobe é para avisar
+const _vgListas = {};      // o que cada aviso encontrou, para a lista rápida
 
 async function initVisaoGeral() {
     document.getElementById("vgActualizar")?.addEventListener("click", carregarVisaoGeral, { once: true });
@@ -3972,7 +3981,7 @@ async function vgCarregarAlertas() {
     try { alertas.push(...await vgRespostasClientes()); }
     catch (e) { console.warn("vgRespostasClientes", e); }
     for (const procurar of [vgPedidosPorValidar, vgPrecosSubiram, vgDespesasSemObra,
-                            vgFaturasPorPagar, vgStockAbaixoMinimo, vgTarefasAtrasadas]) {
+                            vgFaturasPorPagar, vgStockAbaixoMinimo, vgTarefasAtrasadas, vgPontoParaCorrigir]) {
         try { const a = await procurar(); if (a) alertas.push(a); }
         catch (e) { console.warn(procurar.name, e); }
     }
@@ -3990,8 +3999,10 @@ async function vgCarregarAlertas() {
                 <div style="font-weight:600;font-size:14.5px">${esc(a.titulo)}</div>
                 <div style="font-size:12.5px;opacity:.65;margin-top:1px">${esc(a.sub)}</div>
             </div>
-            ${a.fluxo || a.tab || a.ir || a.orc ? `<button class="btn-secondary" style="font-size:12px;padding:4px 12px;flex-shrink:0"
-                        onclick="${a.fluxo ? `abrirFluxoFiltrado(${esc(JSON.stringify(a.fluxo))})`
+            ${a.lista || a.fluxo || a.tab || a.ir || a.orc || a.accao ? `<button class="btn-secondary" style="font-size:12px;padding:4px 12px;flex-shrink:0"
+                        onclick="${a.lista ? `abrirListaRapida('${a.lista}')`
+                                 : a.accao ? a.accao
+                                 : a.fluxo ? `abrirFluxoFiltrado(${esc(JSON.stringify(a.fluxo))})`
                                  : a.orc ? `abrirOrcamentoPeloNumero(${esc(JSON.stringify(a.orc))})`
                                  : a.tab ? `abrirTab('${a.tab}')` : `location.href='${a.ir}'`}">Ver</button>` : ""}
         </div>`).join("");
@@ -4033,6 +4044,7 @@ async function vgPedidosPorValidar() {
 }
 
 async function vgPrecosSubiram() {
+    _vgListas.precos = [];
     const { data } = await SB.from("precos")
         .select("artigo_id, preco, data, artigos(descricao)")
         .order("data", { ascending: false }).limit(400);
@@ -4048,14 +4060,16 @@ async function vgPrecosSubiram() {
         const a = Number(anterior.preco), n = Number(novo.preco);
         if (!(a > 0) || !(n > a)) return;
         const pc = ((n - a) / a) * 100;
-        if (pc >= VG_SUBIDA_PC) subidas.push({ nome: novo.artigos?.descricao || "artigo", pc });
+        if (pc >= VG_SUBIDA_PC) subidas.push({ id: novo.artigo_id, nome: novo.artigos?.descricao || "artigo", pc,
+                                               antes: a, agora: n, dAntes: anterior.data, dAgora: novo.data });
     });
     if (!subidas.length) return null;
 
     subidas.sort((x, y) => y.pc - x.pc);
+    _vgListas.precos = subidas;
     return { icone: "📄", cor: "rgba(181,136,99,.22)",
              titulo: subidas.length === 1 ? "Preço acima do anterior" : `${subidas.length} preços acima do anterior`,
-             sub: `+${subidas[0].pc.toFixed(0)}% em ${subidas[0].nome}`, tab: "inventario" };
+             sub: `+${subidas[0].pc.toFixed(0)}% em ${subidas[0].nome}`, lista: "precos" };
 }
 
 async function vgDespesasSemObra() {
@@ -4065,8 +4079,7 @@ async function vgDespesasSemObra() {
     if (!count) return null;
     return { icone: "🧾", cor: "rgba(0,0,0,.06)",
              titulo: count === 1 ? "1 despesa sem obra" : `${count} despesas sem obra`,
-             sub: "Não entram no custo de nenhuma obra",
-             fluxo: { filtroObra: SEM_OBRA, filtroTipo: "saida" } };
+             sub: "Não entram no custo de nenhuma obra", lista: "semObra" };
 }
 
 async function vgFaturasPorPagar() {
@@ -4077,11 +4090,11 @@ async function vgFaturasPorPagar() {
     const soma = (data || []).reduce((s, m) => s + Number(m.valor_total || 0), 0);
     return { icone: "💶", cor: "rgba(165,72,61,.10)",
              titulo: count === 1 ? "1 fatura por pagar" : `${count} faturas por pagar`,
-             sub: vgEuros(soma),
-             fluxo: { filtroEstadoPag: "por_pagar", filtroTipo: "saida" } };
+             sub: vgEuros(soma), lista: "porPagar" };
 }
 
 async function vgStockAbaixoMinimo() {
+    _vgListas.stock = [];
     const [{ data: arts }, { data: movs }] = await Promise.all([
         SB.from("artigos").select("id, descricao, stock_inicial, stock_minimo").eq("ativo", true).gt("stock_minimo", 0),
         SB.from("movimentos_stock").select("artigo_id, tipo_movimento, quantidade"),
@@ -4094,24 +4107,312 @@ async function vgStockAbaixoMinimo() {
         const entra = m.tipo_movimento === "entrada" || m.tipo_movimento === "ajuste_entrada";
         saldo[m.artigo_id] = (saldo[m.artigo_id] || 0) + (entra ? q : -q);
     });
-    const abaixo = arts.filter(a => (Number(a.stock_inicial) || 0) + (saldo[a.id] || 0) < Number(a.stock_minimo));
+    const abaixo = arts.filter(a => (Number(a.stock_inicial) || 0) + (saldo[a.id] || 0) < Number(a.stock_minimo))
+        .map(a => ({ ...a, actual: (Number(a.stock_inicial) || 0) + (saldo[a.id] || 0) }));
     if (!abaixo.length) return null;
+    _vgListas.stock = abaixo;
 
     return { icone: "📦", cor: "rgba(0,0,0,.06)",
              titulo: abaixo.length === 1 ? "1 artigo abaixo do mínimo" : `${abaixo.length} artigos abaixo do mínimo`,
              sub: abaixo.slice(0, 3).map(a => a.descricao).join(", ") + (abaixo.length > 3 ? "…" : ""),
-             tab: "inventario" };
+             lista: "stock" };
 }
 
 async function vgTarefasAtrasadas() {
     const hoje = new Date().toISOString().slice(0, 10);
     const { data, count } = await SB.from("tarefas")
         .select("descricao, obras(nome)", { count: "exact" })
-        .lt("data_prevista", hoje).neq("estado", "concluida").limit(5);
+        .lt("data_prevista", hoje).not("estado", "in", "(concluida,cancelada)").limit(5);
     if (!count) return null;
     return { icone: "⏰", cor: "rgba(181,136,99,.22)",
              titulo: count === 1 ? "1 tarefa atrasada" : `${count} tarefas atrasadas`,
-             sub: data?.[0]?.obras?.nome || "sem obra", tab: "planeamento" };
+             sub: data?.[0]?.obras?.nome || "sem obra", lista: "tarefas" };
+}
+
+// Marcações de ponto por ver ou corrigir, neste mês e no anterior (no
+// início do mês as do mês passado ainda contam para os ordenados).
+async function vgPontoParaCorrigir() {
+    if (typeof itensParaCorrigir !== "function") return null;
+    const hoje = new Date();
+    const meses = [[hoje.getFullYear(), hoje.getMonth() + 1],
+                   [new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1).getFullYear(),
+                    new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1).getMonth() + 1]];
+    const listas = await Promise.all(meses.map(([a, m]) => itensParaCorrigir(a, m)));
+    const itens = listas.flatMap(l => l || []);
+    if (!itens.length) return null;
+    const maisRecente = itens.reduce((x, y) => (y.dia > x.dia ? y : x));
+    const nomes = [...new Set(itens.map(i => i.nome))];
+    // Com dias nos dois meses, diz quantos são de cada (a caixa mostra um mês de cada vez)
+    const nomeMes = ([a, m]) => new Date(a, m - 1, 1).toLocaleDateString("pt-PT", { month: "long" });
+    const porMes = listas.every(l => l?.length)
+        ? " · " + listas.map((l, i) => `${l.length} em ${nomeMes(meses[i])}`).join(", ") : "";
+    return { icone: "🕐", cor: "rgba(181,136,99,.22)",
+             titulo: itens.length === 1 ? "1 dia de ponto para corrigir" : `${itens.length} dias de ponto para corrigir`,
+             sub: nomes.slice(0, 3).join(", ") + (nomes.length > 3 ? "…" : "") + porMes,
+             accao: `abrirPontoParaCorrigir('${maisRecente.dia}')` };
+}
+
+// Abre os Registos de ponto no mês do dia pedido, já na caixa "Para corrigir"
+function abrirPontoParaCorrigir(dia) {
+    if (dia) currentDate = new Date(Number(dia.slice(0, 4)), Number(dia.slice(5, 7)) - 1, 1);
+    abrirTab("funcionarios", "registos");
+    const caixa = document.getElementById("pontoParaCorrigir");
+    let tentativas = 0;
+    const ir = () => {
+        if (caixa && caixa.style.display !== "none" && caixa.innerHTML) {
+            caixa.scrollIntoView({ behavior: "smooth", block: "start" });
+        } else if (++tentativas < 20) setTimeout(ir, 250);
+    };
+    ir();
+}
+
+// =======================================================
+// LISTA RÁPIDA — o "Ver" dos avisos abre aqui só as linhas do aviso,
+// com a acção à mão (marcar como paga, escolher a obra, concluir a
+// tarefa), sem ir a outro separador procurar no meio de tudo.
+// =======================================================
+let _listaRapidaTipo = null;
+
+function fecharListaRapida() {
+    document.getElementById("modalLista")?.remove();
+    _listaRapidaTipo = null;
+}
+
+async function abrirListaRapida(tipo) {
+    _listaRapidaTipo = tipo;
+    document.getElementById("modalLista")?.remove();
+    document.getElementById("notifPainel") && (document.getElementById("notifPainel").style.display = "none");
+    const m = document.createElement("div");
+    m.id = "modalLista";
+    m.innerHTML = `<div class="card lista-caixa" role="dialog">
+        <div class="lista-topo">
+            <h3 id="listaTitulo">A ler…</h3>
+            <button type="button" class="btn-secondary" style="padding:2px 10px" onclick="fecharListaRapida()" aria-label="Fechar">×</button>
+        </div>
+        <div id="listaSub" class="lista-sub"></div>
+        <div id="listaCorpo"><div style="opacity:.6;font-size:13px;padding:10px 0">A ler…</div></div>
+        <div id="listaRodape" class="lista-rodape"></div>
+    </div>`;
+    m.onclick = e => { if (e.target === m) fecharListaRapida(); };
+    document.body.appendChild(m);
+    try { await LISTAS_RAPIDAS[tipo](); }
+    catch (e) {
+        console.error("abrirListaRapida", tipo, e);
+        const c = document.getElementById("listaCorpo");
+        if (c) c.innerHTML = '<div style="opacity:.7;font-size:13px">Não foi possível ler a lista.</div>';
+    }
+}
+
+// Escreve título, subtítulo, linhas e rodapé da janela
+function listaPreencher(titulo, sub, linhasHtml, rodape = "") {
+    const $ = id => document.getElementById(id);
+    if (!$("listaCorpo")) return false;
+    $("listaTitulo").textContent = titulo;
+    $("listaSub").textContent = sub || "";
+    $("listaCorpo").innerHTML = linhasHtml || '<div style="opacity:.7;font-size:13px;padding:10px 0">Já não há nada aqui. ✓</div>';
+    $("listaRodape").innerHTML = rodape;
+    return true;
+}
+
+const dataCurta = d => d ? d.slice(8, 10) + "/" + d.slice(5, 7) + "/" + d.slice(2, 4) : "";
+const diasDesde = d => d ? Math.floor((Date.now() - new Date(d + "T00:00:00")) / 86400000) : 0;
+
+// Quando a lista muda, a Visão geral e o sino acompanham
+function listaMudou() {
+    vgCarregarAlertas();
+    if (typeof carregarNotificacoes === "function") carregarNotificacoes();
+}
+
+const LISTAS_RAPIDAS = {
+    // ---- Faturas por pagar (e pagamentos em atraso do sino) ----
+    async porPagar() {
+        const { data, error } = await SB.from("movimentos_financeiros")
+            .select(`id, referencia, data_documento, tipo, valor_base, iva, valor_total, estado_pagamento, observacoes,
+                     obra_id, categoria_id, fornecedor_id, cliente_nome, fornecedores(id, nome, nif), obras(id, nome)`)
+            .eq("estado_pagamento", "por_pagar").eq("tipo", "saida").eq("ativo", true)
+            .order("data_documento");
+        if (error) throw error;
+        const lista = data || [];
+        _vgListas.porPagarMovs = lista;
+        const soma = lista.reduce((s, m) => s + Number(m.valor_total || 0), 0);
+        listaPreencher(lista.length === 1 ? "1 fatura por pagar" : `${lista.length} faturas por pagar`,
+            lista.length ? `${vgEuros(soma)} · as mais antigas primeiro` : "",
+            lista.map((m, i) => {
+                const dias = diasDesde(m.data_documento);
+                return `<div class="lista-linha" data-i="${i}">
+                    <div class="lista-txt">
+                        <b>${esc(m.fornecedores?.nome || m.cliente_nome || "Sem fornecedor")}</b>
+                        <div class="lista-det">${esc(m.referencia || "sem n.º")} · ${dataCurta(m.data_documento)}${m.obras?.nome ? " · " + esc(m.obras.nome) : ""}
+                            ${dias > 0 ? `<span class="lista-atraso">${dias} dia${dias === 1 ? "" : "s"}</span>` : ""}</div>
+                    </div>
+                    <b class="lista-valor">${vgEuros(m.valor_total)}</b>
+                    <div class="lista-accoes">
+                        <button type="button" class="btn-icone" title="Abrir a fatura" onclick="listaEditarMov(${i})">✏️</button>
+                        <button type="button" class="btn-primary lista-ok" onclick="listaMarcarPaga(${i}, this)">✓ Paga</button>
+                    </div>
+                </div>`;
+            }).join(""),
+            `<button type="button" class="btn-secondary" onclick="fecharListaRapida();abrirFluxoFiltrado({filtroEstadoPag:'por_pagar',filtroTipo:'saida'})">Ver no Fluxo de caixa</button>`);
+    },
+
+    // ---- Despesas sem obra: escolhe-se a obra ali mesmo ----
+    async semObra() {
+        const [{ data, error }, { data: obras }] = await Promise.all([
+            SB.from("movimentos_financeiros")
+                .select("id, referencia, data_documento, valor_total, fornecedores(nome)")
+                .is("obra_id", null).eq("tipo", "saida").eq("ativo", true).order("data_documento", { ascending: false }),
+            SB.from("obras").select("id, nome, estado").order("nome"),
+        ]);
+        if (error) throw error;
+        const lista = data || [];
+        // As activas primeiro; as outras ficam para despesas de obras já acabadas
+        const ord = [...(obras || [])].sort((a, b) => (a.estado === "ativa" ? 0 : 1) - (b.estado === "ativa" ? 0 : 1));
+        const opcoes = '<option value="">— Escolher obra —</option>' +
+            ord.map(o => `<option value="${esc(o.id)}">${esc(o.nome)}${o.estado === "ativa" ? "" : " (" + esc(o.estado || "") + ")"}</option>`).join("");
+        listaPreencher(lista.length === 1 ? "1 despesa sem obra" : `${lista.length} despesas sem obra`,
+            "Escolhe a obra e fica gravado. Sem obra, a despesa não entra no custo de nenhuma.",
+            lista.map(m => `<div class="lista-linha">
+                <div class="lista-txt">
+                    <b>${esc(m.fornecedores?.nome || "Sem fornecedor")}</b>
+                    <div class="lista-det">${esc(m.referencia || "sem n.º")} · ${dataCurta(m.data_documento)}</div>
+                </div>
+                <b class="lista-valor">${vgEuros(m.valor_total)}</b>
+                <div class="lista-accoes lista-larga">
+                    <select onchange="listaPorObra('${esc(m.id)}', this)">${opcoes}</select>
+                </div>
+            </div>`).join(""),
+            `<button type="button" class="btn-secondary" onclick="fecharListaRapida();abrirFluxoFiltrado({filtroObra:SEM_OBRA,filtroTipo:'saida'})">Ver no Fluxo de caixa</button>`);
+    },
+
+    // ---- Preços acima do anterior ----
+    async precos() {
+        if (!_vgListas.precos) await vgPrecosSubiram();
+        const lista = _vgListas.precos || [];
+        const pr = v => Number(v).toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 4 }) + " €";
+        listaPreencher(lista.length === 1 ? "1 preço acima do anterior" : `${lista.length} preços acima do anterior`,
+            `Subidas de ${VG_SUBIDA_PC}% ou mais face à compra anterior do mesmo artigo.`,
+            lista.map(p => `<div class="lista-linha">
+                <div class="lista-txt">
+                    <b>${esc(p.nome)}</b>
+                    <div class="lista-det">${pr(p.antes)} (${dataCurta(p.dAntes)}) → ${pr(p.agora)} (${dataCurta(p.dAgora)})</div>
+                </div>
+                <b class="lista-valor lista-sobe">+${p.pc.toFixed(0)}%</b>
+                <div class="lista-accoes">
+                    <button type="button" class="btn-icone" title="Abrir o artigo" onclick="fecharListaRapida();abrirTab('inventario');abrirModalArtigo({id:'${esc(p.id)}'})">✏️</button>
+                </div>
+            </div>`).join(""),
+            `<button type="button" class="btn-secondary" onclick="fecharListaRapida();abrirTab('inventario')">Ver o Stock</button>`);
+    },
+
+    // ---- Artigos abaixo do mínimo ----
+    async stock() {
+        await vgStockAbaixoMinimo();
+        const lista = _vgListas.stock || [];
+        listaPreencher(lista.length === 1 ? "1 artigo abaixo do mínimo" : `${lista.length} artigos abaixo do mínimo`,
+            "Quanto há, o mínimo que definiste e quanto falta para lá chegar.",
+            lista.map(a => `<div class="lista-linha">
+                <div class="lista-txt">
+                    <b>${esc(a.descricao)}</b>
+                    <div class="lista-det">Há ${esc(a.actual)} · mínimo ${esc(a.stock_minimo)}</div>
+                </div>
+                <b class="lista-valor lista-sobe">faltam ${esc(Number(a.stock_minimo) - a.actual)}</b>
+                <div class="lista-accoes">
+                    <button type="button" class="btn-icone" title="Abrir o artigo" onclick="fecharListaRapida();abrirTab('inventario');abrirModalArtigo({id:'${esc(a.id)}'})">✏️</button>
+                </div>
+            </div>`).join(""),
+            `<button type="button" class="btn-secondary" onclick="fecharListaRapida();abrirTab('inventario')">Ver o Stock</button>`);
+    },
+
+    // ---- Tarefas atrasadas ----
+    async tarefas() {
+        const hoje = new Date().toISOString().slice(0, 10);
+        const { data, error } = await SB.from("tarefas")
+            .select("id, descricao, data_prevista, estado, obras(nome)")
+            .lt("data_prevista", hoje).not("estado", "in", "(concluida,cancelada)").order("data_prevista");
+        if (error) throw error;
+        const lista = data || [];
+        listaPreencher(lista.length === 1 ? "1 tarefa atrasada" : `${lista.length} tarefas atrasadas`,
+            "Tarefas com data já passada e ainda não concluídas.",
+            lista.map(t => {
+                const dias = diasDesde(t.data_prevista);
+                return `<div class="lista-linha">
+                    <div class="lista-txt">
+                        <b>${esc(t.descricao || "Tarefa")}</b>
+                        <div class="lista-det">${esc(t.obras?.nome || "sem obra")} · era para ${dataCurta(t.data_prevista)}
+                            <span class="lista-atraso">${dias} dia${dias === 1 ? "" : "s"}</span></div>
+                    </div>
+                    <div class="lista-accoes">
+                        <button type="button" class="btn-primary lista-ok" onclick="listaTarefaFeita('${esc(t.id)}', this)">✓ Feita</button>
+                    </div>
+                </div>`;
+            }).join(""),
+            `<button type="button" class="btn-secondary" onclick="fecharListaRapida();abrirTab('planeamento')">Ver o Planeamento</button>`);
+    },
+};
+
+// ✓ Paga: grava logo e deixa desfazer. Fica uma nota nas observações
+// para se saber depois que foi dada como paga daqui.
+async function listaMarcarPaga(i, btn) {
+    const m = _vgListas.porPagarMovs?.[i];
+    if (!m) return;
+    btn.disabled = true;
+    const nota = `Dada como paga a ${new Date().toLocaleDateString("pt-PT")}`;
+    const obs = m.observacoes ? `${m.observacoes} · ${nota}` : nota;
+    const { error } = await SB.from("movimentos_financeiros")
+        .update({ estado_pagamento: "pago", observacoes: obs }).eq("id", m.id);
+    if (error) { console.error(error); alert("Não foi possível marcar como paga."); btn.disabled = false; return; }
+    const linha = btn.closest(".lista-linha");
+    linha.classList.add("feita");
+    linha.querySelector(".lista-accoes").innerHTML =
+        `<span class="lista-feito">Paga ✓</span><button type="button" class="btn-secondary lista-desfazer">Desfazer</button>`;
+    linha.querySelector(".lista-desfazer").onclick = async (e) => {
+        e.target.disabled = true;
+        const { error: err } = await SB.from("movimentos_financeiros")
+            .update({ estado_pagamento: "por_pagar", observacoes: m.observacoes ?? null }).eq("id", m.id);
+        if (err) { console.error(err); alert("Não foi possível desfazer."); e.target.disabled = false; return; }
+        await LISTAS_RAPIDAS.porPagar();
+        listaMudou();
+    };
+    listaMudou();
+}
+
+// Do sino: abre a ficha do trabalhador já no separador Documentos
+async function abrirDocsFuncionario(id) {
+    document.getElementById("notifPainel") && (document.getElementById("notifPainel").style.display = "none");
+    abrirTab("funcionarios");
+    const { data: f, error } = await SB.from("funcionarios").select("*").eq("id", id).maybeSingle();
+    if (error || !f) { console.error(error); return; }
+    abrirModalFuncionario(f);
+    if (typeof rhMostrarFichaTab === "function") rhMostrarFichaTab("documentos");
+}
+
+function listaEditarMov(i) {
+    const m = _vgListas.porPagarMovs?.[i];
+    if (!m) return;
+    fecharListaRapida();
+    abrirModalMovimento(m);
+}
+
+async function listaPorObra(movId, sel) {
+    if (!sel.value) return;
+    const nome = sel.options[sel.selectedIndex].text;
+    sel.disabled = true;
+    const { error } = await SB.from("movimentos_financeiros").update({ obra_id: sel.value }).eq("id", movId);
+    if (error) { console.error(error); alert("Não foi possível gravar a obra."); sel.disabled = false; sel.value = ""; return; }
+    const linha = sel.closest(".lista-linha");
+    linha.classList.add("feita");
+    linha.querySelector(".lista-accoes").innerHTML = `<span class="lista-feito">${esc(nome)} ✓</span>`;
+    listaMudou();
+}
+
+async function listaTarefaFeita(id, btn) {
+    btn.disabled = true;
+    const { error } = await SB.from("tarefas").update({ estado: "concluida", concluida_em: new Date().toISOString() }).eq("id", id);
+    if (error) { console.error(error); alert("Não foi possível concluir a tarefa."); btn.disabled = false; return; }
+    const linha = btn.closest(".lista-linha");
+    linha.classList.add("feita");
+    linha.querySelector(".lista-accoes").innerHTML = `<span class="lista-feito">Feita ✓</span>`;
+    listaMudou();
 }
 
 // ---------- Números do mês ----------
@@ -8421,7 +8722,7 @@ async function carregarNotificacoes() {
         html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:700;letter-spacing:.05em;opacity:.5;text-transform:uppercase">
             🧾 ${respostas.length} Resposta(s) de clientes a orçamentos</div>`;
         respostas.forEach(r => {
-            html += `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer" onclick="abrirTab('orcamentos')">
+            html += `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer" onclick="abrirOrcamentoPeloNumero(${esc(JSON.stringify(r.orcamentos?.numero || ""))})">
                 <div style="font-size:13px;font-weight:500;color:var(--text-dark)">${esc(r.orcamentos?.cliente_nome || "Cliente")} · ${esc(r.orcamentos?.numero || "")}</div>
                 <div style="font-size:11px;color:var(--primary);margin-top:2px">${r.resposta === "aceite" ? "Aceitou o orçamento: falta confirmares" : "Pediu alterações"}</div>
             </div>`;
@@ -8437,7 +8738,7 @@ async function carregarNotificacoes() {
             const dias = Math.floor((new Date() - new Date(m.data_documento)) / 86400000);
             html += `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:background .1s"
                 onmouseenter="this.style.background='rgba(0,0,0,.04)'" onmouseleave="this.style.background=''"
-                onclick="abrirTab('fluxo')">
+                onclick="abrirListaRapida('porPagar')">
                 <div>
                     <div style="font-size:13px;font-weight:500;color:var(--text-dark)">${esc(desc)}</div>
                     <div style="font-size:11px;color:#e05c5c;margin-top:2px">${esc(m.data_documento)} · ${dias} dia(s) atraso</div>
@@ -8452,7 +8753,7 @@ async function carregarNotificacoes() {
             📦 ${stockAlertas.length} Artigo(s) com Stock Baixo</div>`;
         stockAlertas.forEach(a => {
             html += `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;cursor:pointer"
-                onclick="abrirTab('inventario')">
+                onclick="abrirListaRapida('stock')">
                 <div style="font-size:13px;font-weight:500;color:var(--text-dark)">${esc(a.descricao)}</div>
                 <div style="font-size:11px;color:#f97316;white-space:nowrap;margin-left:12px">Abaixo do mínimo (${a.stock_minimo})</div>
             </div>`;

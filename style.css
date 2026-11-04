@@ -1506,3 +1506,43 @@ body:has(#modalPainelObra[style*="display: flex"], #modalPainelObra[style*="disp
     /* o número grande começa abaixo do ⓘ */
     .card-kpi-contas > h3, #vgNumeros .card.metric > h3 { min-height: 15px; }
 }
+
+/* ---------- Lista rápida (o "Ver" dos avisos da Visão geral e do sino) ---------- */
+#modalLista {
+    position: fixed; inset: 0; z-index: 1500; background: rgba(0,0,0,.55);
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+#modalLista .lista-caixa { width: 100%; max-width: 560px; max-height: 88vh; overflow-y: auto; padding: 18px 20px; }
+#modalLista .lista-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+#modalLista .lista-topo h3 { margin: 0; font-size: 16px; }
+#modalLista .lista-sub { font-size: 12.5px; opacity: .65; margin: 4px 0 8px; }
+#modalLista .lista-linha {
+    display: grid; grid-template-columns: 1fr auto auto; gap: 6px 12px; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--border, rgba(127,127,127,.2));
+}
+#modalLista .lista-txt { min-width: 0; font-size: 14px; }
+#modalLista .lista-txt b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#modalLista .lista-det { font-size: 12px; opacity: .7; margin-top: 2px; }
+#modalLista .lista-atraso { color: #e09486; font-weight: 600; margin-left: 4px; white-space: nowrap; }
+#modalLista .lista-valor { white-space: nowrap; font-size: 14px; }
+#modalLista .lista-sobe { color: #e09486; }
+#modalLista .lista-accoes { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
+#modalLista .lista-accoes select { max-width: 200px; height: 34px; font-size: 13px; }
+#modalLista .lista-ok { padding: 6px 12px; font-size: 13px; white-space: nowrap; }
+#modalLista .lista-desfazer { padding: 4px 10px; font-size: 12px; }
+#modalLista .lista-feito { color: #8fbfa0; font-weight: 600; font-size: 13px; white-space: nowrap; }
+#modalLista .lista-linha.feita .lista-txt, #modalLista .lista-linha.feita .lista-valor { opacity: .45; text-decoration: line-through; }
+#modalLista .lista-rodape { margin-top: 14px; display: flex; justify-content: flex-end; }
+#modalLista .lista-rodape:empty { display: none; }
+
+/* Telemóvel: a janela ocupa o ecrã de baixo para cima e os botões ficam
+   numa linha própria, largos para o dedo */
+@media (max-width: 600px) {
+    #modalLista { align-items: flex-end; padding: 0; }
+    #modalLista .lista-caixa { max-width: none; max-height: 92vh; border-radius: 16px 16px 0 0; padding: 16px; }
+    #modalLista .lista-linha { grid-template-columns: 1fr auto; }
+    #modalLista .lista-accoes { grid-column: 1 / -1; }
+    #modalLista .lista-accoes .lista-ok { flex: 1; padding: 10px 12px; font-size: 14px; }
+    #modalLista .lista-accoes.lista-larga select { max-width: none; flex: 1; height: 40px; }
+    #modalLista .lista-rodape .btn-secondary { width: 100%; }
+}

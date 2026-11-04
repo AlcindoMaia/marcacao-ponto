@@ -624,7 +624,7 @@ async function rhAlertas() {
         if (!prob.length) return;
         const vermelhos = prob.filter(p => p.cor === "vermelho").length;
         linhasDocs.push(item(`${vermelhos ? "🔴" : "🟡"} ${esc(f.nome)}`, esc(prob.map(p => p.texto).slice(0, 4).join("\n") + (prob.length > 4 ? `\n… e mais ${prob.length - 4}` : "")),
-            vermelhos ? "#e05c5c" : "#f97316", "abrirTab('funcionarios')"));
+            vermelhos ? "#e05c5c" : "#f97316", `abrirDocsFuncionario('${f.id}')`));
     });
     const docsEmp = docs.filter(d => !d.funcionario_id);
     Object.entries(TIPOS_DOC_EMPRESA).forEach(([k, t]) => {
