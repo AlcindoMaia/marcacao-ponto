@@ -12,12 +12,15 @@
 //   - os documentos dessas obras marcados "Visível ao cliente", com um link
 //     temporário (1 hora) para abrir o ficheiro;
 //   - nas faturas, o total e se está paga; nos orçamentos, o estado, o total
-//     e a resposta do cliente que ainda está por tratar.
+//     e a resposta do cliente que ainda está por tratar;
+//   - o avanço da obra pelos pacotes de trabalho (zona, nome, % feita, se
+//     está atrasado) e o último corte semanal aprovado (o que avançou). Sem
+//     valores dos pacotes nem notas de quem mediu.
 // Nunca devolve custos, margens, fornecedores, horas ou outras obras.
 //
 // A única coisa que o cliente pode escrever é a resposta a um orçamento
-// enviado (acao "responder_orcamento"): "aceite" ou "alteracoes" com um
-// comentário. Fica em orcamento_respostas e não muda o orçamento; quem o
+// enviado (acao "responder_orcamento"): "aceite", "alteracoes" com um
+// comentário ou "recusa" com um motivo opcional. Fica em orcamento_respostas e não muda o orçamento; quem o
 // passa a aceite é o Alcindo, na app.
 //
 // O código está em clientes.token_acesso e só vale com acesso_ativo = true.
@@ -69,6 +72,9 @@ Deno.serve(async (req) => {
     const idsObras = (obras || []).map(o => o.id);
     let documentos: any[] = [];
     let fases: any[] = [], autos: any[] = [], diario: any[] = [];
+    let pacotes: any[] = [], cortes: any[] = [];
+    let avanco: Record<string, number> = {};
+    let linksFalharam = false;
 
     if (idsObras.length) {
         const [f, a, n] = await Promise.all([
@@ -82,6 +88,7 @@ Deno.serve(async (req) => {
         ]);
         fases = f.data || [];
         diario = n.data || [];
+        ({ pacotes, cortes, avanco } = await pacotesECortes(db, idsObras));
         autos = (a.data || []).map((x: any) => {
             const linhas = (x.auto_linhas || [])
                 .sort((p: any, q: any) => (p.obra_servicos?.ordem || 0) - (q.obra_servicos?.ordem || 0))
@@ -117,9 +124,15 @@ Deno.serve(async (req) => {
             : { data: [] };
         const pendente = new Map((pend || []).map((p: any) => [p.orcamento_id, p]));
 
-        const assinados = lista.length
-            ? (await db.storage.from(BUCKET).createSignedUrls(lista.map(d => d.caminho), VALIDADE_LINK)).data || []
-            : [];
+        let assinados: any[] = [];
+        if (lista.length) {
+            const r = await db.storage.from(BUCKET).createSignedUrls(lista.map(d => d.caminho), VALIDADE_LINK);
+            if (r.error) console.error("createSignedUrls", r.error);
+            assinados = r.data || [];
+            // Um link em falta: a página diz ao cliente para atualizar, em vez
+            // de mostrar um botão que não abre nada
+            linksFalharam = !!r.error || assinados.some((x: any) => !x.signedUrl || x.error);
+        }
         const urlDe = new Map(assinados.map((s: any) => [s.path, s.signedUrl]));
 
         documentos = lista.map(d => {
@@ -172,12 +185,68 @@ Deno.serve(async (req) => {
             }
         }
     }
-    const obrasCliente = (obras || []).map(({ mostrar_contas_cliente, ...o }: any) => ({ ...o, contas: contas[o.id] || null }));
+    const obrasCliente = (obras || []).map(({ mostrar_contas_cliente, ...o }: any) => ({ ...o, contas: contas[o.id] || null, avanco: avanco[o.id] ?? null }));
 
     await db.from("clientes").update({ ultimo_acesso: new Date().toISOString() }).eq("id", cliente.id);
 
-    return resposta({ cliente: { nome: cliente.nome }, obras: obrasCliente, documentos, fases, autos, diario });
+    return resposta({ cliente: { nome: cliente.nome }, obras: obrasCliente, documentos, fases, autos, diario,
+                      pacotes, cortes, links_falharam: linksFalharam });
 });
+
+// Pacotes da obra e último corte semanal aprovado. Se o SQL dos pacotes
+// ainda não foi corrido, as colunas não existem: devolve listas vazias e a
+// página continua a usar a % da obra ou as fases.
+async function pacotesECortes(db: any, idsObras: string[]) {
+    const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Lisbon" });
+    const [p, c] = await Promise.all([
+        db.from("obra_servicos")
+            .select("id, obra_id, zona, nome, ordem, valor_orcamento, percentagem, concluido, data_fim_prevista")
+            .in("obra_id", idsObras),
+        db.from("cortes_semanais")
+            .select("obra_id, semana, tratado_em, corte_linhas(percentagem_antes, percentagem, obra_servicos(zona, nome))")
+            .in("obra_id", idsObras).eq("estado", "aprovado").order("semana", { ascending: false }),
+    ]);
+    if (p.error) { console.error("pacotes", p.error); return { pacotes: [], cortes: [], avanco: {} }; }
+    // O peso de cada pacote (o valor) fica no servidor: o cliente só recebe a
+    // % já calculada da obra e a % de cada pacote
+    const pacotes = (p.data || [])
+        .sort((a: any, b: any) => String(a.zona || "\uffff").localeCompare(String(b.zona || "\uffff"), "pt") || (a.ordem || 0) - (b.ordem || 0))
+        .map((x: any) => {
+            const pct = x.concluido ? 100 : Math.max(0, Math.min(100, Number(x.percentagem || 0)));
+            return { obra_id: x.obra_id, zona: x.zona || "", nome: x.nome, percentagem: Math.round(pct),
+                     atrasado: pct < 100 && !!x.data_fim_prevista && x.data_fim_prevista < hoje,
+                     peso: Number(x.valor_orcamento || 0) };
+        });
+    const avanco: Record<string, number> = {};
+    for (const id of idsObras) {
+        const l = pacotes.filter((x: any) => x.obra_id === id);
+        if (!l.length) continue;
+        const tot = l.reduce((t: number, x: any) => t + x.peso, 0);
+        avanco[id] = Math.round(tot > 0
+            ? l.reduce((t: number, x: any) => t + x.peso * x.percentagem, 0) / tot
+            : l.reduce((t: number, x: any) => t + x.percentagem, 0) / l.length);
+    }
+    const cortes: any[] = [];
+    if (!c.error) {
+        const vistos = new Set();
+        for (const x of c.data || []) {
+            if (vistos.has(x.obra_id)) continue;   // só o mais recente de cada obra
+            vistos.add(x.obra_id);
+            cortes.push({
+                obra_id: x.obra_id, semana: x.semana,
+                avancou: (x.corte_linhas || [])
+                    .filter((l: any) => Number(l.percentagem) > Number(l.percentagem_antes))
+                    .map((l: any) => ({ zona: l.obra_servicos?.zona || "", nome: l.obra_servicos?.nome || "",
+                                        antes: Math.round(Number(l.percentagem_antes)), depois: Math.round(Number(l.percentagem)) })),
+            });
+        }
+    }
+    return {
+        pacotes: pacotes.map(({ peso, ...x }: any) => x),
+        cortes,
+        avanco,
+    };
+}
 
 // Resposta do cliente a um orçamento. Só vale para um documento de orçamento
 // visível de uma obra deste cliente, com o orçamento ainda "enviado" e sem
@@ -187,7 +256,7 @@ async function responderOrcamento(db: any, req: Request, clienteId: string,
     const docId = String(corpo.documento_id || "");
     if (!/^[0-9a-f-]{36}$/i.test(docId)) return resposta({ erro: "Documento inválido" }, 400);
     const tipo = corpo.resposta;
-    if (tipo !== "aceite" && tipo !== "alteracoes") return resposta({ erro: "Resposta inválida" }, 400);
+    if (tipo !== "aceite" && tipo !== "alteracoes" && tipo !== "recusa") return resposta({ erro: "Resposta inválida" }, 400);
     const comentario = String(corpo.comentario || "").trim().slice(0, 2000);
     if (tipo === "alteracoes" && !comentario) return resposta({ erro: "Escreva o que gostaria de alterar." }, 400);
 

@@ -1546,3 +1546,8 @@ body:has(#modalPainelObra[style*="display: flex"], #modalPainelObra[style*="disp
     #modalLista .lista-accoes.lista-larga select { max-width: none; flex: 1; height: 40px; }
     #modalLista .lista-rodape .btn-secondary { width: 100%; }
 }
+
+/* Novo pacote da obra: no telemóvel, zona e nome numa linha, valor e botão noutra */
+@media (max-width: 600px) {
+    .novo-serv-grelha { grid-template-columns: 1fr 1fr !important; }
+}

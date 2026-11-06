@@ -357,6 +357,87 @@ function servicoEscolhido() {
   return sel && sel.style.display !== "none" ? (sel.value || null) : null;
 }
 
+// =======================================================
+// AVANÇO DA SEMANA (corte semanal)
+// Quem está na obra marca a % de cada pacote. Vai para o Alcindo aprovar;
+// só depois o cliente vê. Pode corrigir-se até ser aprovado.
+// =======================================================
+let pacotesCorte = [];
+const obraDoCorte = () => MODO_AREA ? document.getElementById("obraEscolha").value : obraID;
+
+async function carregarCorte() {
+  const sec = document.getElementById("corteSection");
+  const obraId = obraDoCorte();
+  pacotesCorte = [];
+  document.getElementById("cortePainel").style.display = "none";
+  if (!obraId) { sec.style.display = "none"; return; }
+  const { data, error } = await SB.rpc("corte_pacotes", { p_device: getDeviceId(), p_obra_id: obraId });
+  // Sem pacotes (ou sem a função no servidor) não aparece nada
+  if (error) { console.error(error); sec.style.display = "none"; return; }
+  pacotesCorte = data || [];
+  sec.style.display = pacotesCorte.length ? "" : "none";
+  const estado = pacotesCorte[0]?.estado_corte;
+  document.getElementById("corteEstado").textContent =
+    estado === "aprovado" ? "Aprovado ✓" : estado === "pendente" ? "Enviado, à espera" : estado === "rejeitado" ? "Devolvido: mede outra vez" : "Por medir";
+  // À sexta, o botão chama mais a atenção
+  const diaSemana = new Date(new Date().toLocaleDateString("sv-SE", { timeZone: TZ }) + "T12:00:00").getDay();
+  document.getElementById("corteAbrir").classList.toggle("sexta", diaSemana === 5 && !estado);
+}
+
+function abrirCorte() {
+  const painel = document.getElementById("cortePainel");
+  if (painel.style.display !== "none") { painel.style.display = "none"; return; }
+  const aprovado = pacotesCorte[0]?.estado_corte === "aprovado";
+  let zonaAnt = null;
+  painel.innerHTML = `<div class="corte-info">${aprovado
+      ? "O avanço desta semana já foi aprovado. Para mudar alguma coisa, fala com o Alcindo."
+      : "Marca quanto está feito de cada parte da obra, a contar desde o início (não só esta semana). Conta só o que está mesmo terminado. O Alcindo aprova antes de o cliente ver."}</div>` +
+    pacotesCorte.map((p, i) => {
+      const z = p.zona || "";
+      const tit = z !== zonaAnt ? `<div class="corte-zona">${esc(z || "Sem zona")}</div>` : "";
+      zonaAnt = z;
+      const v = Math.round(Number(p.proposta ?? p.percentagem ?? 0));
+      return `${tit}<div class="corte-linha">
+        <div class="corte-nome">${esc(p.nome)}</div>
+        ${p.criterio_fim ? `<div class="corte-crit">Terminado quando: ${esc(p.criterio_fim)}</div>` : ""}
+        <div class="corte-medir">
+          <input type="range" min="0" max="100" step="5" value="${v}" data-i="${i}" ${aprovado ? "disabled" : ""}
+                 aria-label="% feita de ${esc(p.nome)}" oninput="this.nextElementSibling.textContent=this.value+'%'">
+          <output>${v}%</output>
+        </div>
+        <div class="corte-crit">Última aprovada: ${Math.round(Number(p.percentagem || 0))}%</div>
+      </div>`;
+    }).join("") +
+    (aprovado ? "" : `<textarea id="corteNotas" rows="2" maxlength="2000" placeholder="O que ficou feito esta semana? O que atrasou? (opcional)"></textarea>
+      <button type="button" class="corte-enviar" id="corteEnviar">Enviar para aprovar</button>`) +
+    `<div class="corte-msg" id="corteMsg"></div>`;
+  painel.style.display = "";
+  document.getElementById("corteEnviar")?.addEventListener("click", enviarCorte);
+}
+
+async function enviarCorte() {
+  const btn = document.getElementById("corteEnviar"), msg = document.getElementById("corteMsg");
+  const linhas = [...document.querySelectorAll("#cortePainel input[type=range]")].map(r => ({
+    id: pacotesCorte[Number(r.dataset.i)].id, percentagem: Number(r.value),
+  }));
+  btn.disabled = true;
+  msg.textContent = "A enviar…";
+  const { error } = await SB.rpc("corte_gravar", {
+    p_device: getDeviceId(), p_obra_id: obraDoCorte(), p_linhas: linhas,
+    p_notas: document.getElementById("corteNotas")?.value || "",
+  });
+  if (error) {
+    console.error(error);
+    btn.disabled = false;
+    msg.textContent = /corte_ja_aprovado/.test(error.message)
+      ? "O avanço desta semana já foi aprovado." : "Não foi possível enviar. Tenta outra vez daqui a pouco.";
+    return;
+  }
+  await carregarCorte();
+  const est = document.getElementById("corteEstado");
+  if (est) est.textContent = "Enviado ✓ À espera de aprovação";
+}
+
 // Lista das obras ativas (só nomes), com a última obra já escolhida
 async function carregarObrasArea() {
   const { data, error } = await SB.rpc("obras_para_marcar", { p_device: getDeviceId() });
@@ -385,7 +466,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("obraNome").style.display = "none";
     const selObra = document.getElementById("obraEscolha");
     selObra.style.display = "";
-    selObra.addEventListener("change", () => carregarServicos(selObra.value));
+    selObra.addEventListener("change", () => { carregarServicos(selObra.value); carregarCorte(); });
     await carregarServicos(selObra.value);
   } else {
     obra = await getObra(obraID);
@@ -404,6 +485,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btnMarcacao").addEventListener("click", confirmarMarcacao);
   document.getElementById("painelSaidaEnviar").addEventListener("click", enviarSaidaDeclarada);
   document.getElementById("painelSaidaNao").addEventListener("click", esconderPainelSaida);
+  document.getElementById("corteAbrir").addEventListener("click", abrirCorte);
+  carregarCorte();
   // Botão de carga — pré-preenche a obra como origem
   const btnCarga = document.getElementById("btnCarga");
   if (btnCarga && obraID) btnCarga.href = "carga.html?origem=" + obraID;

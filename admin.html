@@ -7,7 +7,7 @@
 
 <title>Painel Administrativo — Maia Solutions</title>
 
-<link rel="stylesheet" href="style.css?v=19">
+<link rel="stylesheet" href="style.css?v=20">
 <link rel="stylesheet" href="telemovel.css?v=7">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
@@ -1912,7 +1912,7 @@ document.getElementById("btnLogin").addEventListener("click", function () {
 <script src="cotacoes.js?v=2"></script>
 <script src="andamento.js?v=3"></script>
 <script src="rh.js?v=3"></script>
-<script src="admin.js?v=33"></script>
+<script src="admin.js?v=34"></script>
 <script src="telemovel.js?v=5"></script>
 
 
@@ -2027,15 +2027,17 @@ document.getElementById("btnLogin").addEventListener("click", function () {
 
                 <!-- Novo serviço -->
                 <div style="border-top:1px solid rgba(255,255,255,.08);padding-top:12px">
-                    <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin-bottom:8px">Novo serviço</div>
-                    <div style="display:grid;grid-template-columns:1fr 120px auto;gap:8px;align-items:center">
-                        <input id="novoServNome" placeholder="Nome do serviço"
+                    <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin-bottom:8px">Novo pacote</div>
+                    <div class="novo-serv-grelha" style="display:grid;grid-template-columns:130px 1fr 120px auto;gap:8px;align-items:center">
+                        <input id="novoServZona" placeholder="Zona (ex.: WC)" list="zonasObra"
+                               style="padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
+                        <input id="novoServNome" placeholder="Pacote (ex.: Tomadas e luz)"
                                style="padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
                         <input id="novoServHoras" type="hidden"
                                style="display:none;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
                         <input id="novoServValor" type="number" step="0.01" min="0" placeholder="€ valor s/ IVA"
                                style="padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
-                        <button onclick="adicionarServico()" class="btn-primary" style="white-space:nowrap">+ Serviço</button>
+                        <button onclick="adicionarServico()" class="btn-primary" style="white-space:nowrap">+ Pacote</button>
                     </div>
                     <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;opacity:.7;cursor:pointer">
                         <input type="checkbox" id="novoServExtra" style="width:auto;margin:0">
