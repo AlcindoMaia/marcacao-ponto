@@ -57,7 +57,7 @@ function getDeviceId() {
 function popularSelects() {
   const opcoes = `<option value="">— Selecionar —</option>
     <option value="armazem">📦 Armazém</option>
-    ${obras.map(o => `<option value="${o.id}">${o.nome}</option>`).join("")}`;
+    ${obras.map(o => `<option value="${esc(o.id)}">${esc(o.nome)}</option>`).join("")}`;
   document.getElementById("selOrigem").innerHTML = opcoes;
   document.getElementById("selDestino").innerHTML = opcoes;
 }
@@ -285,8 +285,8 @@ function renderListaItens() {
     <div class="item-carga">
       <div class="item-tipo">${tipoIcon(item.artigo.tipo_artigo)}</div>
       <div class="item-info">
-        <div class="item-nome">${item.artigo.descricao}</div>
-        <div class="item-codigo">${item.artigo.codigo}</div>
+        <div class="item-nome">${esc(item.artigo.descricao)}</div>
+        <div class="item-codigo">${esc(item.artigo.codigo)}</div>
       </div>
       <div class="item-qtd">${temStock(item.artigo.tipo_artigo) ? item.quantidade : "1×"}</div>
       <button class="item-remover" onclick="removerItem(${idx})">✕</button>
@@ -362,8 +362,8 @@ function mostrarResumo() {
     lista.innerHTML = sessao.itens.map(item => `
       <div class="resumo-item">
         <div class="resumo-item-info">
-          <div class="nome">${item.artigo.descricao}</div>
-          <div class="codigo">${item.artigo.codigo} · ${tipoLabel(item.artigo.tipo_artigo)}</div>
+          <div class="nome">${esc(item.artigo.descricao)}</div>
+          <div class="codigo">${esc(item.artigo.codigo)} · ${esc(tipoLabel(item.artigo.tipo_artigo))}</div>
         </div>
         <div class="resumo-item-qtd">${temStock(item.artigo.tipo_artigo) ? item.quantidade + " un." : "1×"}</div>
       </div>`).join("");
@@ -383,10 +383,10 @@ function imprimirGuia() {
   const linhas = sessao.itens.map((item, i) => `
     <tr>
       <td>${i + 1}</td>
-      <td style="font-family:monospace;font-size:10pt">${item.artigo.codigo}</td>
-      <td>${item.artigo.descricao}</td>
+      <td style="font-family:monospace;font-size:10pt">${esc(item.artigo.codigo)}</td>
+      <td>${esc(item.artigo.descricao)}</td>
       <td>${tipoLabel(item.artigo.tipo_artigo)}</td>
-      <td style="text-align:right;font-weight:700">${temStock(item.artigo.tipo_artigo) ? item.quantidade + " un." : "1×"}</td>
+      <td style="text-align:right;font-weight:700">${temStock(item.artigo.tipo_artigo) ? esc(item.quantidade) + " un." : "1×"}</td>
     </tr>`).join("");
 
   const html = `<!DOCTYPE html>
@@ -456,19 +456,19 @@ function imprimirGuia() {
 <div class="rota-box">
   <div class="rota-local">
     <label>Origem</label>
-    <span>${sessao.origem.nome}</span>
+    <span>${esc(sessao.origem.nome)}</span>
   </div>
   <div class="rota-seta">→</div>
   <div class="rota-local">
     <label>Destino</label>
-    <span>${sessao.destino.nome}</span>
+    <span>${esc(sessao.destino.nome)}</span>
   </div>
 </div>
 
 <div class="info-linha">
   <div class="info-item">
     <label>Responsável</label>
-    <span>${funcionario.nome}</span>
+    <span>${esc(funcionario.nome)}</span>
   </div>
   <div class="info-item">
     <label>Total de artigos</label>
@@ -497,7 +497,7 @@ function imprimirGuia() {
   <div class="assin">
     <h3>Entregue por</h3>
     <div class="assin-linha"></div>
-    <div class="assin-leg">${funcionario.nome} — Assinatura</div>
+    <div class="assin-leg">${esc(funcionario.nome)} — Assinatura</div>
   </div>
   <div class="assin">
     <h3>Recebido por</h3>

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://npyosbigynxmxdakcymg.supabase.co; connect-src https://npyosbigynxmxdakcymg.supabase.co; object-src 'none'; base-uri 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Relatório semanal da obra · Maia Solutions</title>
+<!--
+  RELATÓRIO SEMANAL DA OBRA (relatorio.html?t=<código do cliente>&obra=<id>)
+  Página branca, pronta a imprimir ou a guardar em PDF (botão no topo).
+  Usa os mesmos dados da Área do cliente (função area-cliente): o avanço
+  pelos pacotes, a curva feito vs previsto, o último corte semanal aprovado
+  e as fotografias dessa semana. Nada de custos nem de notas internas.
+-->
+<style>
+    * { box-sizing: border-box; }
+    html, body { background: #fff; color: #1d2a37; margin: 0; }
+    body { font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 780px; margin: 0 auto; padding: 24px 20px 40px; }
+    .barra-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 12px; }
+    .barra-acoes button { font: inherit; border: none; border-radius: 8px; padding: 9px 16px; background: #b58863; color: #fff; font-weight: 600; cursor: pointer; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 2px solid #b58863; padding-bottom: 12px; }
+    header img { height: 46px; }
+    header .tit { text-align: right; }
+    header .tit b { display: block; font-size: 18px; }
+    header .tit span { font-size: 12px; color: #6b7480; }
+    h2 { font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #8a6a4f; margin: 22px 0 8px; }
+    .resumo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
+    .resumo div { border: 1px solid #e3ddd6; border-radius: 10px; padding: 10px; text-align: center; }
+    .resumo span { display: block; font-size: 11px; color: #6b7480; text-transform: uppercase; letter-spacing: .5px; }
+    .resumo b { font-size: 20px; }
+    ul { margin: 4px 0; padding-left: 18px; }
+    .pac { display: grid; grid-template-columns: 1fr 120px 46px; gap: 10px; align-items: center; padding: 4px 0; border-bottom: 1px solid #f0ebe5; }
+    .pac .mini { height: 7px; background: #eee6dd; border-radius: 99px; overflow: hidden; }
+    .pac .mini > div { height: 100%; background: #b58863; }
+    .pac.feito .mini > div { background: #6fa883; }
+    .pac .pc { text-align: right; font-variant-numeric: tabular-nums; }
+    .zona { font-weight: 600; margin-top: 10px; }
+    .atr { color: #b5652f; font-size: 12px; }
+    .fotos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .fotos img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; display: block; }
+    .rodape { margin-top: 28px; font-size: 11px; color: #8a929b; text-align: center; }
+    .centro { text-align: center; padding: 60px 0; color: #6b7480; }
+    @media print {
+        .barra-acoes { display: none; }
+        main { padding: 0; }
+        .pac, .fotos img { break-inside: avoid; }
+        @page { margin: 14mm; }
+    }
+</style>
+</head>
+<body>
+<main id="conteudo"><div class="centro">A preparar o relatório…</div></main>
+<script src="curva.js?v=2"></script>
+<script>
+const FUNCAO = "https://npyosbigynxmxdakcymg.supabase.co/functions/v1/area-cliente";
+const q = new URLSearchParams(location.search);
+const TOKEN = q.get("t") || "", OBRA = q.get("obra") || "";
+const esc = s => String(s ?? "").replace(/[&<>"']/g,
+    c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const dataPT = d => d ? new Date(d + "T12:00:00").toLocaleDateString("pt-PT") : "";
+const urlSegura = u => typeof u === "string" && u.startsWith("https://npyosbigynxmxdakcymg.supabase.co/") ? u : "";
+
+function relatorio(j) {
+    const o = (j.obras || []).find(x => x.id === OBRA) || (j.obras || [])[0];
+    if (!o) return `<div class="centro">Obra não encontrada.</div>`;
+    const corte = (j.cortes || []).find(c => c.obra_id === o.id);
+    const pacotes = (j.pacotes || []).filter(p => p.obra_id === o.id);
+    const ini = corte?.semana;
+    const fim = ini ? new Date(new Date(ini + "T12:00:00").getTime() + 6 * 86400000).toISOString().slice(0, 10) : null;
+    const fotos = (j.documentos || []).filter(d => d.obra_id === o.id && d.tipo === "foto" && urlSegura(d.url)
+        && (!ini || (d.data >= ini && d.data <= fim))).slice(0, 9);
+    const atrasados = pacotes.filter(p => p.atrasado).length;
+    const ultimoPrev = (o.curva || []).filter(p => p.real != null).slice(-1)[0];
+    let zonaAnt = null;
+    return `<div class="barra-acoes"><button type="button" onclick="window.print()">Guardar em PDF / Imprimir</button></div>
+    <header>
+        <img src="Logo.png" alt="Maia Solutions">
+        <div class="tit"><b>${esc(o.nome)}</b><span>Relatório semanal${ini ? " · semana de " + esc(dataPT(ini)) + " a " + esc(dataPT(fim)) : ""}</span></div>
+    </header>
+    <div class="resumo">
+        <div><span>Obra feita</span><b>${o.avanco != null ? esc(o.avanco) + "%" : "—"}</b></div>
+        <div><span>Previsto até agora</span><b>${ultimoPrev?.previsto != null ? esc(ultimoPrev.previsto) + "%" : "—"}</b></div>
+        <div><span>Partes atrasadas</span><b>${atrasados}</b></div>
+    </div>
+    ${o.curva ? `<h2>Feito vs previsto</h2>${htmlCurva(o.curva, { real: "#b58863", previsto: "#7d8a96", grelha: "#e6e1db", texto: "#6b7480", largura: 640 })}` : ""}
+    <h2>O que avançou esta semana</h2>
+    ${corte?.avancou?.length
+        ? `<ul>${corte.avancou.map(l => `<li>${esc([l.zona, l.nome].filter(Boolean).join(" · "))}: ${esc(l.antes)}% → <b>${esc(l.depois)}%</b></li>`).join("")}</ul>`
+        : `<p>Sem avanço registado.</p>`}
+    ${pacotes.length ? `<h2>Avanço por zona</h2>${pacotes.map(p => {
+        const z = p.zona || "Geral";
+        const tit = z !== zonaAnt ? `<div class="zona">${esc(z)}</div>` : "";
+        zonaAnt = z;
+        return `${tit}<div class="pac${p.percentagem >= 100 ? " feito" : ""}"><span>${esc(p.nome)}${p.atrasado ? ` <span class="atr">· atrasado</span>` : ""}</span>
+            <span class="mini"><div style="width:${Number(p.percentagem) || 0}%"></div></span><span class="pc">${esc(p.percentagem)}%</span></div>`;
+    }).join("")}` : ""}
+    ${fotos.length ? `<h2>Fotografias da semana</h2><div class="fotos">${fotos.map(d => `<img src="${esc(urlSegura(d.url))}" alt="Fotografia da obra">`).join("")}</div>` : ""}
+    <div class="rodape">Maia Solutions · relatório gerado a ${esc(new Date().toLocaleDateString("pt-PT"))} a partir da Área do cliente</div>`;
+}
+
+(async () => {
+    const el = document.getElementById("conteudo");
+    if (!/^[A-Za-z0-9_-]{32,64}$/.test(TOKEN)) { el.innerHTML = `<div class="centro">Link incompleto.</div>`; return; }
+    try {
+        const r = await fetch(FUNCAO, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: TOKEN }) });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.erro || "Erro " + r.status);
+        el.innerHTML = relatorio(j);
+    } catch (e) {
+        el.innerHTML = `<div class="centro">Não foi possível preparar o relatório.<br>${esc(e.message)}</div>`;
+    }
+})();
+</script>
+</body>
+</html>

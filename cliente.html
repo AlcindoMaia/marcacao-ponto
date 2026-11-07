@@ -105,6 +105,34 @@
     .resp textarea { width: 100%; min-height: 90px; font: inherit; font-size: 14px; color: var(--texto); background: var(--bg); border: 1px solid var(--linha); border-radius: 10px; padding: 10px; margin-bottom: 10px; resize: vertical; }
     .resp .erro { color: #e59a8f; font-size: 13px; margin-top: 8px; }
     .rodape { text-align: center; color: var(--suave); font-size: 12px; margin-top: 30px; }
+    .doc.sem-link { cursor: default; } .doc.sem-link .abrir { color: var(--suave); }
+    .aviso-links { background: rgba(224,176,122,.12); border: 1px solid rgba(224,176,122,.35); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; margin-bottom: 14px; }
+    .aviso-links button { font: inherit; font-size: 13px; margin-left: 6px; background: none; border: none; color: var(--primary); text-decoration: underline; cursor: pointer; padding: 0; }
+    /* Avanço por pacotes e corte da semana */
+    .pacotes .zona { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--suave); margin: 12px 0 4px; }
+    .pacotes .zona:first-child { margin-top: 0; }
+    .pac { display: grid; grid-template-columns: 1fr 90px 44px; gap: 10px; align-items: center; padding: 6px 0; font-size: 14px; }
+    .pac .mini { height: 6px; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; }
+    .pac .mini > div { height: 100%; background: var(--caramelo); }
+    .pac.feito .mini > div { background: var(--ok); }
+    .pac .pc { text-align: right; font-variant-numeric: tabular-nums; color: var(--suave); font-size: 13px; }
+    .pac .atr { color: var(--aviso); font-size: 12px; }
+    .semana { background: rgba(255,255,255,.04); border: 1px solid var(--linha); border-radius: 12px; padding: 12px 14px; }
+    .semana ul { margin: 6px 0 0; padding-left: 18px; font-size: 14px; }
+    .semana .fotos { margin-top: 10px; }
+    .pedidos .ped { border-top: 1px solid var(--linha); padding: 10px 0; font-size: 14px; }
+    .pedidos .ped:first-child { border-top: none; }
+    .pedidos .ped .cab { font-size: 12px; color: var(--suave); }
+    .pedidos .ped .msg { white-space: pre-wrap; }
+    .pedidos .ped .rsp { margin-top: 6px; padding: 8px 10px; border-left: 3px solid var(--caramelo); background: rgba(255,255,255,.03); white-space: pre-wrap; }
+    .novo-pedido { margin-top: 10px; }
+    .novo-pedido select, .novo-pedido textarea { width: 100%; font: inherit; font-size: 14px; color: var(--texto); background: var(--bg); border: 1px solid var(--linha); border-radius: 10px; padding: 10px; margin-bottom: 8px; }
+    .novo-pedido textarea { min-height: 80px; resize: vertical; }
+    .novo-pedido button { font: inherit; font-size: 14px; font-weight: 600; border-radius: 10px; padding: 9px 14px; cursor: pointer; border: none; background: var(--caramelo); color: #131c25; }
+    .novo-pedido button:disabled { opacity: .5; }
+    .novo-pedido .erro { color: #e59a8f; font-size: 13px; }
+    .novo-pedido .ok { color: var(--ok); font-size: 13px; }
+    .resp button.recusar { border-color: rgba(229,154,143,.6); color: #e59a8f; }
 </style>
 <link rel="stylesheet" href="carregar.css?v=1">
 </head>
@@ -124,6 +152,7 @@
     </div>
 </main>
 
+<script src="curva.js?v=2"></script>
 <script>
 const FUNCAO = "https://npyosbigynxmxdakcymg.supabase.co/functions/v1/area-cliente";
 const TOKEN  = new URLSearchParams(location.search).get("t") || "";
@@ -136,6 +165,15 @@ const euros  = v => v == null ? "" : Number(v).toLocaleString("pt-PT", { style: 
 const urlSegura = u => typeof u === "string" && u.startsWith("https://npyosbigynxmxdakcymg.supabase.co/") ? u : "#";
 
 function linhaDoc(d, icone, extra = "") {
+    // Sem link (falhou ao gerar): não se mostra um botão que não abre nada
+    if (urlSegura(d.url) === "#") return `<div class="doc sem-link">
+        <span class="ic">${icone}</span>
+        <span class="tx">
+            <span class="nm">${esc(d.numero || d.nome)}</span>
+            <span class="dt">${esc(dataPT(d.data))}${extra ? " · " + extra : ""}</span>
+        </span>
+        <span class="abrir">Indisponível</span>
+    </div>`;
     return `<a class="doc" href="${esc(urlSegura(d.url))}" target="_blank" rel="noopener noreferrer">
         <span class="ic">${icone}</span>
         <span class="tx">
@@ -148,8 +186,10 @@ function linhaDoc(d, icone, extra = "") {
 
 function estadoOrcamento(d) {
     const est = d.estado_orcamento === "aceite" ? `<span class="estado ok">Aceite</span>`
+        : d.estado_orcamento === "recusado" ? `<span class="estado">Recusado</span>`
         : d.resposta_pendente ? `<span class="estado pend">${d.resposta_pendente.resposta === "aceite"
-            ? "Aceitou · a aguardar confirmação" : "Pediu alterações · a aguardar"}</span>`
+            ? "Aceitou · a aguardar confirmação" : d.resposta_pendente.resposta === "recusa"
+            ? "Recusou · a aguardar" : "Pediu alterações · a aguardar"}</span>`
         : d.estado_orcamento === "enviado" ? `<span class="estado pend">A aguardar a sua resposta</span>` : "";
     return [d.total != null ? euros(d.total) + " com IVA" : "", est].filter(Boolean).join(" · ");
 }
@@ -162,6 +202,7 @@ function respostaOrcamento(d) {
 const BOTOES_RESPOSTA = `<div class="botoes">
     <button type="button" class="principal" data-passo="aceitar">Aceito este orçamento</button>
     <button type="button" data-passo="alterar">Pedir alterações</button>
+    <button type="button" class="recusar" data-passo="recusar">Recusar</button>
 </div>`;
 
 function caixaResposta(el, passo) {
@@ -183,11 +224,20 @@ function caixaResposta(el, passo) {
                 <button type="button" data-passo="voltar">Cancelar</button>
             </div></div>`;
         el.querySelector("textarea").focus();
+    } else if (passo === "recusar") {
+        el.innerHTML = `<div class="caixa">
+            <p>Confirma que recusa o orçamento <b>${num}</b>? Se quiser, diga-nos porquê: ajuda-nos a fazer melhor.</p>
+            <textarea maxlength="2000" placeholder="Motivo (opcional). Ex.: preço acima do previsto, adiámos a obra…"></textarea>
+            <div class="botoes">
+                <button type="button" class="principal" data-passo="enviar-recusa">Sim, recuso</button>
+                <button type="button" data-passo="voltar">Cancelar</button>
+            </div></div>`;
+        el.querySelector("textarea").focus();
     }
 }
 
 async function enviarResposta(el, tipo) {
-    const comentario = tipo === "alteracoes" ? el.querySelector("textarea").value.trim() : "";
+    const comentario = tipo !== "aceite" ? (el.querySelector("textarea")?.value.trim() || "") : "";
     const avisar = msg => {
         el.querySelector(".erro")?.remove();
         el.querySelector(".caixa").insertAdjacentHTML("beforeend", `<div class="erro">${esc(msg)}</div>`);
@@ -215,6 +265,7 @@ document.addEventListener("click", e => {
     const el = b.closest(".resp"), passo = b.dataset.passo;
     if (passo === "enviar-aceite") enviarResposta(el, "aceite");
     else if (passo === "enviar-alteracoes") enviarResposta(el, "alteracoes");
+    else if (passo === "enviar-recusa") enviarResposta(el, "recusa");
     else if (passo === "voltar") el.innerHTML = BOTOES_RESPOSTA;
     else caixaResposta(el, passo);
 });
@@ -246,6 +297,84 @@ function htmlAutos(autos) {
     </details>`).join("")}`;
 }
 
+// Avanço por pacotes: a % de cada parte da obra, agrupada por zona
+function htmlPacotes(pacotes) {
+    if (!pacotes.length) return "";
+    let zonaAnt = null;
+    const variasZonas = new Set(pacotes.map(p => p.zona)).size > 1 || pacotes[0].zona;
+    return `<h2>Avanço por zona</h2><div class="pacotes">${pacotes.map(p => {
+        const tit = variasZonas && p.zona !== zonaAnt ? `<div class="zona">${esc(p.zona || "Geral")}</div>` : "";
+        zonaAnt = p.zona;
+        return `${tit}<div class="pac${p.percentagem >= 100 ? " feito" : ""}">
+            <span>${esc(p.nome)}${p.atrasado ? ` <span class="atr">· atrasado</span>` : ""}</span>
+            <span class="mini"><div style="width:${Number(p.percentagem) || 0}%"></div></span>
+            <span class="pc">${p.percentagem >= 100 ? "✓" : esc(p.percentagem) + "%"}</span>
+        </div>`;
+    }).join("")}</div>`;
+}
+
+// O último corte semanal aprovado: o que avançou e as fotografias dessa semana
+function htmlSemana(corte, fotos, obraId) {
+    if (!corte) return "";
+    const ini = corte.semana, fim = new Date(new Date(ini + "T12:00:00").getTime() + 6 * 86400000).toISOString().slice(0, 10);
+    const daSemana = fotos.filter(d => d.data >= ini && d.data <= fim).slice(0, 8);
+    return `<h2>Semana de ${esc(dataPT(ini))}</h2><div class="semana">
+        ${corte.avancou.length
+            ? `<div>O que avançou:</div><ul>${corte.avancou.map(l => `<li>${esc([l.zona, l.nome].filter(Boolean).join(" · "))}: ${esc(l.antes)}% → <b>${esc(l.depois)}%</b></li>`).join("")}</ul>`
+            : `<div>Sem avanço registado nesta semana.</div>`}
+        ${daSemana.length ? `<div class="fotos">${daSemana.map(htmlFoto).join("")}</div>` : ""}
+        <p style="margin:10px 0 0"><a href="relatorio.html?t=${encodeURIComponent(TOKEN)}&obra=${encodeURIComponent(obraId)}" target="_blank" rel="noopener">📄 Relatório da semana (PDF)</a></p>
+    </div>`;
+}
+
+function htmlFoto(d) {
+    return `<a href="${esc(urlSegura(d.url))}" target="_blank" rel="noopener noreferrer" title="${esc(d.nome)}">
+        <img src="${esc(urlSegura(d.url))}" alt="Fotografia da obra" loading="lazy" onerror="this.parentNode.classList.add('falhou')">
+        <span class="sem-pre"><b>📷</b>Abrir fotografia</span></a>`;
+}
+
+// Pedidos ao Alcindo: os já feitos, com a resposta, e o formulário para um novo
+const TIPO_PEDIDO = { informacao: "Pedido de informação", extra: "Trabalho extra", reclamacao: "Reclamação", sugestao: "Sugestão" };
+function htmlPedidos(obraId, pedidos) {
+    const quando = d => new Date(d).toLocaleDateString("pt-PT");
+    return `<h2>Pedidos e mensagens</h2><div class="pedidos">${pedidos.map(p => `<div class="ped">
+        <div class="cab">${esc(TIPO_PEDIDO[p.tipo] || "Pedido")} · ${esc(quando(p.created_at))} · ${p.resposta ? "Respondido" : p.estado === "fechado" ? "Tratado" : "Aguarda resposta"}</div>
+        <div class="msg">${esc(p.mensagem)}</div>
+        ${p.resposta ? `<div class="rsp">${esc(p.resposta)}</div>` : ""}
+    </div>`).join("")}</div>
+    <form class="novo-pedido" data-obra="${esc(obraId)}">
+        <select name="tipo" aria-label="Tipo de pedido">
+            <option value="">Que tipo de pedido?</option>
+            ${Object.entries(TIPO_PEDIDO).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}
+        </select>
+        <textarea name="mensagem" maxlength="2000" placeholder="Escreva aqui a sua mensagem para a Maia Solutions."></textarea>
+        <button type="submit">Enviar pedido</button>
+        <div class="estado-envio"></div>
+    </form>`;
+}
+
+document.addEventListener("submit", async e => {
+    const f = e.target.closest(".novo-pedido");
+    if (!f) return;
+    e.preventDefault();
+    const est = f.querySelector(".estado-envio"), btn = f.querySelector("button");
+    const tipo = f.tipo.value, mensagem = f.mensagem.value.trim();
+    const aviso = (t, cls = "erro") => { est.className = "estado-envio " + cls; est.textContent = t; };
+    if (!tipo) return aviso("Escolha o tipo de pedido.");
+    if (!mensagem) return aviso("Escreva o seu pedido.");
+    btn.disabled = true;
+    try {
+        const r = await fetch(FUNCAO, { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: TOKEN, acao: "pedido", obra_id: f.dataset.obra, tipo, mensagem }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.erro || "Erro " + r.status);
+        await iniciar();
+    } catch (err) {
+        btn.disabled = false;
+        aviso(err.message);
+    }
+});
+
 function htmlDiario(notas) {
     if (!notas.length) return "";
     const dia = d => new Date(d + "T12:00:00").toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
@@ -266,11 +395,13 @@ function seccao(titulo, itens, vazio) {
     return `<h2>${titulo}</h2>${itens.length ? itens.join("") : `<div class="vazio">${vazio}</div>`}`;
 }
 
-function htmlObra(o, docs, fases, autos, diario) {
-    // % escrita na obra; se estiver vazia, sai das fases (concluídas contam
-    // inteiras, as a decorrer metade). Sem nenhuma das duas, não há barra.
+function htmlObra(o, docs, fases, autos, diario, pacotes, corte, pedidos) {
+    // % pelos pacotes de trabalho (cada um pesado pelo valor, calculada no
+    // servidor); sem pacotes, a % escrita na obra; sem ela, as fases
+    // (concluídas contam inteiras, as a decorrer metade). Sem nada, não há barra.
     let pct = null;
-    if (o.percentagem_conclusao != null) pct = Math.max(0, Math.min(100, Number(o.percentagem_conclusao) || 0));
+    if (o.avanco != null) pct = Math.max(0, Math.min(100, Number(o.avanco) || 0));
+    else if (o.percentagem_conclusao != null) pct = Math.max(0, Math.min(100, Number(o.percentagem_conclusao) || 0));
     else if (fases.length) pct = Math.round(fases.reduce((s, f) => s + (f.estado === "concluida" ? 1 : f.estado === "a_decorrer" ? .5 : 0), 0) / fases.length * 100);
     const feita = o.estado === "concluida";
     if (feita) pct = 100;
@@ -284,9 +415,7 @@ function htmlObra(o, docs, fases, autos, diario) {
             : linhaDoc(d, "💶", [euros(d.total),
                 d.paga == null ? "" : d.paga ? `<span class="estado ok">Paga</span>` : `<span class="estado pend">Por pagar</span>`]
                 .filter(Boolean).join(" · ")));
-    const fotos = de("foto").map(d => `<a href="${esc(urlSegura(d.url))}" target="_blank" rel="noopener noreferrer" title="${esc(d.nome)}">
-        <img src="${esc(urlSegura(d.url))}" alt="Fotografia da obra" loading="lazy" onerror="this.parentNode.classList.add('falhou')">
-        <span class="sem-pre"><b>📷</b>Abrir fotografia</span></a>`);
+    const fotos = de("foto").map(htmlFoto);
     const outros = de("outro").map(d => linhaDoc(d, "📄"));
 
     return `<section class="obra">
@@ -303,6 +432,9 @@ function htmlObra(o, docs, fases, autos, diario) {
             ${o.data_conclusao_prevista && !feita ? `<span>Conclusão prevista: ${esc(dataPT(o.data_conclusao_prevista))}</span>` : ""}
         </div>
         ${htmlContas(o.contas)}
+        ${o.curva ? `<h2>Feito vs previsto</h2>${htmlCurva(o.curva)}` : ""}
+        ${htmlSemana(corte, de("foto"), o.id)}
+        ${htmlPacotes(pacotes)}
         ${htmlFases(fases)}
         ${htmlDiario(diario)}
         ${seccao("Orçamentos", orcs, "Ainda não há orçamentos.")}
@@ -310,6 +442,7 @@ function htmlObra(o, docs, fases, autos, diario) {
         ${seccao("Faturas e recibos", fats, "Ainda não há faturas.")}
         ${fotos.length ? `<h2>Fotografias</h2><div class="fotos">${fotos.join("")}</div>` : ""}
         ${outros.length ? seccao("Outros documentos", outros, "") : ""}
+        ${pedidos ? htmlPedidos(o.id, pedidos) : ""}
     </section>`;
 }
 
@@ -333,10 +466,13 @@ async function iniciar() {
         el.innerHTML = `
             <h1>Olá${primeiro ? ", " + esc(primeiro) : ""}</h1>
             <p class="sub">Aqui pode acompanhar ${obras.length === 1 ? "a sua obra" : "as suas obras"} e consultar os documentos.</p>
+            ${j.links_falharam ? `<div class="aviso-links">Alguns documentos não abriram desta vez.<button type="button" onclick="location.reload()">Atualizar a página</button></div>` : ""}
             ${obras.length
                 ? obras.map(o => htmlObra(o, docs.filter(d => d.obra_id === o.id),
                     (j.fases || []).filter(f => f.obra_id === o.id), (j.autos || []).filter(a => a.obra_id === o.id),
-                    (j.diario || []).filter(n => n.obra_id === o.id))).join("")
+                    (j.diario || []).filter(n => n.obra_id === o.id), (j.pacotes || []).filter(p => p.obra_id === o.id),
+                    (j.cortes || []).find(c => c.obra_id === o.id),
+                    j.pedidos ? j.pedidos.filter(p => p.obra_id === o.id) : null)).join("")
                 : `<div class="centro">Ainda não há obras associadas.</div>`}
             <div class="rodape">Os links dos documentos valem 1 hora. Se algum não abrir, atualize a página.<br>Maia Solutions</div>`;
     } catch (e) {
