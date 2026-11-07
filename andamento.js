@@ -2,7 +2,10 @@
 // ANDAMENTO DA OBRA (separador do painel da obra)
 // Três partes, todas visíveis ao cliente na Área do cliente:
 //   - Fases: linha do tempo simples com datas e estado (sem percentagens).
-//     Uma obra sem fases pode começar com as fases-tipo de cada tipo de obra.
+//     Uma obra sem fases pode começar com as fases-tipo de cada tipo de obra,
+//     ou com a sugestão do assistente a partir do orçamento aceite (função
+//     sugerir-fases). Os pacotes da obra (obra_servicos) são as subfases:
+//     cada um liga-se a uma fase por fase_id e aparece por baixo dela.
 //   - Autos de medição: a % feita (acumulada) de cada serviço da obra; o
 //     valor do auto é o que essa % acrescenta ao auto anterior, sem IVA.
 //     A fatura continua a sair do TOCONLINE: o auto é o pedido de pagamento.
@@ -75,10 +78,11 @@ async function carregarPainelAndamento() {
 
     const desde = new Date(Date.now() - DIAS_DIARIO * 86400000).toISOString().slice(0, 10);
     const hoje  = new Date().toISOString().slice(0, 10);
-    const [fasesRes, autosRes, servRes, diarioRes, regRes, tarRes, fotRes, contasRes] = await Promise.all([
+    const servicosDaObra = campos => SB.from("obra_servicos").select(campos).eq("obra_id", obraId).order("ordem").order("created_at");
+    const [fasesRes, autosRes, servRes0, diarioRes, regRes, tarRes, fotRes, contasRes, orcsRes] = await Promise.all([
         SB.from("obra_fases").select("*").eq("obra_id", obraId).order("ordem").order("created_at"),
         SB.from("autos_medicao").select("*, auto_linhas(obra_servico_id, percentagem, valor)").eq("obra_id", obraId).order("numero"),
-        SB.from("obra_servicos").select("id, nome, valor_orcamento, ordem").eq("obra_id", obraId).order("ordem").order("created_at"),
+        servicosDaObra("id, nome, valor_orcamento, ordem, percentagem, concluido, fase_id"),
         SB.from("obra_diario").select("*").eq("obra_id", obraId).gte("data", desde),
         SB.from("registos_admin").select("data, horas, observacoes, funcionarios(nome)")
             .eq("obra_id", obraId).eq("tipo", "presenca").gte("data", desde).lte("data", hoje),
@@ -87,7 +91,10 @@ async function carregarPainelAndamento() {
         SB.from("obra_documentos").select("id, nome_ficheiro, created_at")
             .eq("obra_id", obraId).eq("tipo", "foto").gte("created_at", desde),
         SB.from("obras").select("mostrar_contas_cliente").eq("id", obraId).maybeSingle(),
+        SB.from("orcamentos").select("id, numero").eq("obra_id", obraId).eq("estado", "aceite").order("data"),
     ]);
+    // Sem o SQL novo não há fase_id: lê os pacotes sem a ligação às fases
+    const servRes = servRes0.error ? await servicosDaObra("id, nome, valor_orcamento, ordem") : servRes0;
     const erro = fasesRes.error || autosRes.error || servRes.error || diarioRes.error;
     if (erro) {
         el.innerHTML = `<div style="padding:24px;text-align:center;color:#e09486">Não foi possível carregar o andamento: ${esc(erro.message)}</div>`;
@@ -96,7 +103,8 @@ async function carregarPainelAndamento() {
     _andamento = { obraId, fases: fasesRes.data || [], autos: autosRes.data || [], servicos: servRes.data || [],
         diario: diarioRes.data || [], registos: regRes.data || [], tarefas: tarRes.data || [], fotos: fotRes.data || [],
         // null = a coluna ainda não existe (SQL por correr): não se mostra a opção
-        contasCliente: contasRes.error ? null : !!contasRes.data?.mostrar_contas_cliente };
+        contasCliente: contasRes.error ? null : !!contasRes.data?.mostrar_contas_cliente,
+        orcsAceites: orcsRes.data || [], comFaseId: !servRes0.error };
     desenharAndamento();
 }
 
@@ -115,7 +123,8 @@ function desenharAndamento() {
 function htmlFases() {
     const titulo = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
         <div style="font-family:var(--font-title,sans-serif);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;opacity:.6">Fases da obra</div>
-        ${_andamento.fases.length ? `<div style="display:flex;gap:6px">
+        ${_andamento.fases.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${btnSugerirFases()}
             <button class="btn-secondary" style="padding:4px 12px;font-size:12px" onclick="mostrarTrocaFases()" title="Substituir pelas fases de outro tipo de obra">Trocar fases</button>
             <button class="btn-secondary" style="padding:4px 12px;font-size:12px" onclick="novaFase()">+ Fase</button>
         </div>` : ""}
@@ -130,7 +139,10 @@ function htmlFases() {
     </div>` : ""}`;
 
     if (!_andamento.fases.length) {
-        return titulo + `<div style="font-size:13px;opacity:.7;margin-bottom:10px">Esta obra ainda não tem fases. Começa com as fases habituais e depois ajusta:</div>
+        return titulo + (_andamento.orcsAceites?.length ? `<div style="font-size:13px;opacity:.7;margin-bottom:8px">Esta obra ainda não tem fases. O assistente propõe-nas a partir do orçamento aceite:</div>
+            <div style="margin-bottom:12px">${btnSugerirFases()}</div>
+            <div style="font-size:12px;opacity:.55;margin-bottom:8px">Ou começa com as fases habituais e depois ajusta:</div>`
+            : `<div style="font-size:13px;opacity:.7;margin-bottom:10px">Esta obra ainda não tem fases. Começa com as fases habituais e depois ajusta:</div>`) + `
             <div style="display:flex;gap:8px;flex-wrap:wrap">
                 ${Object.entries(FASES_TIPO).map(([k, t]) =>
                     `<button class="btn-secondary" style="font-size:12px" onclick="criarFasesTipo('${k}')">${esc(t.nome)}</button>`).join("")}
@@ -144,7 +156,7 @@ function htmlFases() {
             <div style="min-width:0">
                 <div style="font-weight:600;font-size:13px">${esc(f.nome)}${f.visivel_cliente ? "" : ` <span title="O cliente não vê esta fase" style="opacity:.5;font-size:11px">🔒</span>`}</div>
                 <div style="font-size:11px;opacity:.55">${f.data_inicio || f.data_fim
-                    ? `${dataAnd(f.data_inicio) || "?"} → ${dataAnd(f.data_fim) || "?"}` : "Sem datas"}</div>
+                    ? `${dataAnd(f.data_inicio) || "?"} → ${dataAnd(f.data_fim) || "?"}` : "Sem datas"}${resumoPacotesFase(f.id)}</div>
             </div>
             <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
                 <select onchange="mudarEstadoFase('${f.id}', this.value)" style="font-size:12px;padding:3px 6px;color:${e.cor};background:${e.bg};border-radius:8px;width:auto">
@@ -154,10 +166,48 @@ function htmlFases() {
                 <button class="btn-acao" title="Editar" onclick="editarFase('${f.id}')">✏️</button>
                 <button class="btn-acao" title="Apagar" style="opacity:.5" onclick="apagarFase('${f.id}')">🗑️</button>
             </div>
+            ${htmlPacotesFase(f.id)}
             <div id="faseEd-${f.id}" style="grid-column:1/-1;display:none"></div>
         </div>`;
     }).join("");
-    return titulo + linhas + `<div id="faseEd-nova" style="display:none"></div>`;
+    const semFase = _andamento.comFaseId ? _andamento.servicos.filter(s => !s.fase_id || !_andamento.fases.some(f => f.id === s.fase_id)) : [];
+    const avisoSemFase = semFase.length && _andamento.servicos.some(s => s.fase_id)
+        ? `<div style="font-size:11px;opacity:.6;margin-top:8px">${semFase.length} pacote(s) sem fase. Liga-os à fase no separador Serviços (✏️ › Fase da obra).</div>` : "";
+    return titulo + linhas + avisoSemFase + `<div id="faseEd-nova" style="display:none"></div>`;
+}
+
+// ── Pacotes (subfases) de cada fase ──────────────────────────
+const pctPacoteAnd = s => s?.concluido ? 100 : Math.max(0, Math.min(100, Number(s?.percentagem || 0)));
+
+function pacotesDaFase(faseId) {
+    return _andamento.comFaseId ? _andamento.servicos.filter(s => s.fase_id === faseId) : [];
+}
+
+// % da fase pesada pelo valor dos pacotes (por igual se não houver valores)
+function pctFase(pacotes) {
+    const total = pacotes.reduce((t, s) => t + Number(s.valor_orcamento || 0), 0);
+    if (!pacotes.length) return null;
+    return total > 0
+        ? pacotes.reduce((t, s) => t + Number(s.valor_orcamento || 0) * pctPacoteAnd(s), 0) / total
+        : pacotes.reduce((t, s) => t + pctPacoteAnd(s), 0) / pacotes.length;
+}
+
+function resumoPacotesFase(faseId) {
+    const p = pacotesDaFase(faseId);
+    if (!p.length) return "";
+    const valor = p.reduce((t, s) => t + Number(s.valor_orcamento || 0), 0);
+    return ` · ${p.length} pacote${p.length > 1 ? "s" : ""}${valor ? " · " + eurAnd(valor) : ""} · ${Math.round(pctFase(p))}% feito`;
+}
+
+function htmlPacotesFase(faseId) {
+    const p = pacotesDaFase(faseId);
+    if (!p.length) return "";
+    return `<div style="grid-column:1/-1;display:flex;flex-direction:column;gap:2px;padding-left:12px;border-left:2px solid rgba(255,255,255,.08)">
+        ${p.map(s => `<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;opacity:.8">
+            <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.nome)}</span>
+            <span style="white-space:nowrap;opacity:.7">${s.valor_orcamento != null ? eurAnd(s.valor_orcamento) + " · " : ""}${Math.round(pctPacoteAnd(s))}%</span>
+        </div>`).join("")}
+    </div>`;
 }
 
 async function criarFasesTipo(tipo) {
@@ -655,4 +705,261 @@ async function pdfAuto(id) {
     pdf.text("Este auto não é uma fatura. A fatura correspondente é emitida em separado.", M, Math.max(y, 780));
 
     pdf.save(`Auto ${a.numero} - ${obra.nome}.pdf`);
+}
+
+// =======================================================
+// SUGESTÃO DE FASES A PARTIR DO ORÇAMENTO (assistente)
+// A função sugerir-fases lê o orçamento aceite (linhas da app ou o PDF
+// guardado na obra) e propõe fases e, em cada uma, os pacotes com as
+// linhas que lhes cabem. Os valores são somados pelo código. Aqui o
+// Alcindo corrige nomes, muda pacotes de fase e só depois aceita.
+// Ao aceitar: as fases novas juntam-se às que já existem (mesmo nome =
+// mesma fase) e os pacotes desse orçamento são trocados pelos sugeridos,
+// a não ser que já tenham horas, faturas, cortes ou autos ligados.
+// =======================================================
+let _sugFases = null;   // { obraId, orcamento, fases: [{ nome, fase_id, pacotes: [...] }], linhas, avisos, notas }
+let _sugFasesEmCurso = false;
+
+function btnSugerirFases() {
+    if (!_andamento.orcsAceites?.length) return "";
+    return `<button class="btn-secondary" style="padding:4px 12px;font-size:12px" onclick="sugerirFasesDoOrcamento()"
+        title="O assistente lê o orçamento aceite e propõe as fases e os pacotes de cada uma">✨ Sugerir do orçamento</button>`;
+}
+
+async function sugerirFasesDoOrcamento(orcId = null) {
+    const obra = _painelObraActual;
+    if (!obra || _sugFasesEmCurso) return;
+    if (!orcId) {
+        let orcs = _andamento.obraId === obra.id ? _andamento.orcsAceites : null;
+        if (!orcs) orcs = (await SB.from("orcamentos").select("id, numero").eq("obra_id", obra.id).eq("estado", "aceite").order("data")).data || [];
+        if (!orcs.length) return alert("Esta obra não tem nenhum orçamento aceite.");
+        if (orcs.length === 1) orcId = orcs[0].id;
+        else return abrirEscolhaOrcamentoFases(orcs);
+    }
+    document.getElementById("modalEscolhaOrcFases")?.remove();
+    _sugFasesEmCurso = true;
+    abrirModalSugestaoFases(`<div style="padding:30px 10px;text-align:center;opacity:.8">✨ O assistente está a ler o orçamento e a organizar as fases…<br><span style="font-size:12px;opacity:.6">Demora uns 20 a 40 segundos.</span></div>`);
+    try {
+        const { data: { session } } = await SB.auth.getSession();
+        if (!session) throw new Error("Sessão expirada. Volta a entrar.");
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/sugerir-fases`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
+            body: JSON.stringify({ obra_id: obra.id, orcamento_id: orcId }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.erro || `Erro ${r.status}`);
+        if (!document.getElementById("modalSugFases")) return;   // fechou entretanto
+        _sugFases = {
+            obraId: obra.id, orcamento: j.orcamento, linhas: j.linhas || [], avisos: j.avisos || [], notas: j.notas || [],
+            fases: (j.fases || []).map(f => ({ nome: f.nome, fase_id: f.fase_id || null,
+                pacotes: (f.pacotes || []).map(p => ({ nome: p.nome, criterio_fim: p.criterio_fim || "", valor: Number(p.valor || 0), linhas: p.linhas || [] })) })),
+        };
+        desenharSugestaoFases();
+    } catch (e) {
+        console.error("sugerirFasesDoOrcamento:", e);
+        abrirModalSugestaoFases(`<div style="padding:20px 6px;color:#e09486">Não foi possível fazer a sugestão: ${esc(e.message)}</div>
+            <div style="display:flex;justify-content:flex-end"><button class="btn-secondary" onclick="fecharSugestaoFases()">Fechar</button></div>`);
+    } finally {
+        _sugFasesEmCurso = false;
+    }
+}
+
+function abrirEscolhaOrcamentoFases(orcs) {
+    document.getElementById("modalEscolhaOrcFases")?.remove();
+    const m = document.createElement("div");
+    m.id = "modalEscolhaOrcFases";
+    m.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1300;display:flex;align-items:center;justify-content:center;padding:16px";
+    m.innerHTML = `<div style="background:#25363f;border-radius:14px;width:100%;max-width:420px;padding:20px;border:1px solid rgba(255,255,255,.08)">
+        <div style="font-family:var(--font-title,sans-serif);font-size:16px;margin-bottom:12px">✨ De que orçamento?</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+            ${orcs.map(o => `<button class="btn-secondary" onclick="sugerirFasesDoOrcamento('${esc(o.id)}')">${esc(o.numero || "Sem número")}</button>`).join("")}
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn-secondary" onclick="document.getElementById('modalEscolhaOrcFases').remove()">Cancelar</button></div>
+    </div>`;
+    document.body.appendChild(m);
+}
+
+function abrirModalSugestaoFases(html) {
+    let m = document.getElementById("modalSugFases");
+    if (!m) {
+        m = document.createElement("div");
+        m.id = "modalSugFases";
+        m.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1300;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto";
+        document.body.appendChild(m);
+    }
+    m.innerHTML = `<div style="background:#25363f;border-radius:14px;width:100%;max-width:760px;padding:20px;border:1px solid rgba(255,255,255,.08);margin:auto 0">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div style="font-family:var(--font-title,sans-serif);font-size:17px">✨ Fases sugeridas pelo assistente</div>
+            <button onclick="fecharSugestaoFases()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer">×</button>
+        </div>
+        <div id="sugFasesCorpo">${html}</div>
+    </div>`;
+}
+
+function fecharSugestaoFases() {
+    document.getElementById("modalSugFases")?.remove();
+    _sugFases = null;
+}
+
+function desenharSugestaoFases() {
+    const s = _sugFases;
+    if (!s) return;
+    const descLinha = n => s.linhas.find(l => l.n === n)?.descricao || "";
+    const somaPac = s.fases.reduce((t, f) => t + f.pacotes.reduce((u, p) => u + p.valor, 0), 0);
+    const total = s.orcamento?.total_sem_iva;
+    const opcoesFase = sel => s.fases.map((f, k) => `<option value="${k}"${k === sel ? " selected" : ""}>${k + 1}. ${esc(f.nome)}</option>`).join("");
+
+    const blocos = s.fases.map((f, i) => {
+        const valorFase = f.pacotes.reduce((t, p) => t + p.valor, 0);
+        return `<div style="border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px;margin-bottom:10px">
+            <div style="display:flex;gap:6px;align-items:center">
+                <span style="opacity:.6;font-size:13px">${i + 1}.</span>
+                <input value="${esc(f.nome)}" maxlength="120" oninput="_sugFases.fases[${i}].nome=this.value" style="flex:1;font-weight:600">
+                ${f.fase_id ? `<span title="Já existe uma fase com este nome nesta obra: os pacotes entram nela" style="font-size:11px;opacity:.6;white-space:nowrap">já existe</span>` : ""}
+                <span style="font-size:12px;opacity:.7;white-space:nowrap">${eurAnd(valorFase)}</span>
+                <button class="btn-acao" title="Subir" onclick="moverFaseSugerida(${i},-1)"${i ? "" : " disabled style=\"opacity:.25\""}>↑</button>
+                <button class="btn-acao" title="Tirar esta fase (os pacotes passam para a fase de cima)" style="opacity:.6" onclick="tirarFaseSugerida(${i})">✕</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;padding-left:16px">
+                ${f.pacotes.map((p, j) => `<div style="display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-items:center">
+                    <input value="${esc(p.nome)}" maxlength="120" oninput="_sugFases.fases[${i}].pacotes[${j}].nome=this.value" style="font-size:13px">
+                    <span style="font-size:12px;white-space:nowrap">${eurAnd(p.valor)}</span>
+                    <input value="${esc(p.criterio_fim)}" maxlength="200" placeholder="Terminado quando…" oninput="_sugFases.fases[${i}].pacotes[${j}].criterio_fim=this.value" style="font-size:12px;opacity:.85">
+                    <select style="font-size:12px;width:auto;max-width:170px" title="Mudar de fase" onchange="moverPacoteSugerido(${i},${j},Number(this.value))">${opcoesFase(i)}</select>
+                    <div style="grid-column:1/-1;font-size:11px;opacity:.45">${p.linhas.map(n => esc(descLinha(n))).filter(Boolean).join(" · ")}</div>
+                </div>`).join("")}
+            </div>
+        </div>`;
+    }).join("");
+
+    const difTotal = total != null && Math.abs(somaPac - total) > 0.5;
+    document.getElementById("sugFasesCorpo").innerHTML = `
+        <div style="font-size:13px;opacity:.8;margin-bottom:10px">Orçamento <b>${esc(s.orcamento?.numero || "")}</b> · ${s.linhas.length} linhas ·
+            pacotes somam <b style="color:${difTotal ? "#e09486" : "inherit"}">${eurAnd(somaPac)}</b>${total != null ? ` de ${eurAnd(total)} sem IVA` : ""}</div>
+        ${s.avisos.map(a => `<div style="font-size:12px;color:#e0b486;margin-bottom:6px">⚠️ ${esc(a)}</div>`).join("")}
+        ${s.notas.map(a => `<div style="font-size:12px;opacity:.7;margin-bottom:6px">💬 ${esc(a)}</div>`).join("")}
+        <div style="font-size:12px;opacity:.6;margin:8px 0 12px">Muda os nomes, passa pacotes de uma fase para outra com a lista, tira fases com ✕. Nada fica gravado até carregares em Aceitar.
+            Os pacotes deste orçamento que já estão na obra são trocados por estes.</div>
+        ${blocos || `<div style="opacity:.6">O assistente não propôs nenhuma fase.</div>`}
+        <div id="sugFasesMsg" style="font-size:12px;color:#e09486;min-height:16px;margin-top:6px"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
+            <button class="btn-secondary" onclick="fecharSugestaoFases()">Agora não</button>
+            <button class="btn-primary" id="btnAceitarSugFases" onclick="aceitarSugestaoFases()"${s.fases.length ? "" : " disabled"}>✓ Aceitar</button>
+        </div>`;
+}
+
+function moverFaseSugerida(i, dir) {
+    const f = _sugFases?.fases, j = i + dir;
+    if (!f || j < 0 || j >= f.length) return;
+    [f[i], f[j]] = [f[j], f[i]];
+    desenharSugestaoFases();
+}
+
+function moverPacoteSugerido(i, j, destino) {
+    const f = _sugFases?.fases;
+    if (!f?.[i] || !f[destino] || i === destino) return;
+    const [p] = f[i].pacotes.splice(j, 1);
+    f[destino].pacotes.push(p);
+    if (!f[i].pacotes.length) f.splice(i, 1);   // fase vazia sai
+    desenharSugestaoFases();
+}
+
+function tirarFaseSugerida(i) {
+    const f = _sugFases?.fases;
+    if (!f?.[i]) return;
+    if (f.length === 1) return alert("É a única fase: fecha a sugestão com \"Agora não\" se não a queres.");
+    const destino = i > 0 ? i - 1 : 1;
+    f[destino].pacotes.push(...f[i].pacotes);
+    f.splice(i, 1);
+    desenharSugestaoFases();
+}
+
+async function aceitarSugestaoFases() {
+    const s = _sugFases;
+    if (!s || s.obraId !== _painelObraActual?.id) return;
+    const msg = t => { const el = document.getElementById("sugFasesMsg"); if (el) el.textContent = t; };
+    const fases = s.fases.map(f => ({ ...f, nome: f.nome.trim(),
+        pacotes: f.pacotes.map(p => ({ ...p, nome: p.nome.trim(), criterio_fim: p.criterio_fim.trim() })) }));
+    if (fases.some(f => !f.nome)) return msg("Há uma fase sem nome.");
+    if (fases.some(f => f.pacotes.some(p => !p.nome))) return msg("Há um pacote sem nome.");
+
+    const btn = document.getElementById("btnAceitarSugFases");
+    btn.disabled = true; btn.textContent = "⏳ A gravar…";
+    try {
+        const obraId = s.obraId, orcId = s.orcamento.id;
+
+        // 1. Os pacotes que já vieram deste orçamento: só se trocam se ainda
+        //    não tiverem nada ligado (horas, faturas, cortes, autos) nem avanço
+        const { data: antigos, error: eAnt } = await SB.from("obra_servicos")
+            .select("id, extra, percentagem, concluido").eq("orcamento_id", orcId);
+        if (eAnt) throw new Error(eAnt.message);
+        const ids = (antigos || []).map(x => x.id);
+        let ligados = 0;
+        if (ids.length) {
+            const res = await Promise.all(["registo_servicos", "movimento_servicos", "corte_linhas", "auto_linhas"].map(t =>
+                SB.from(t).select("obra_servico_id", { count: "exact", head: true }).in("obra_servico_id", ids)));
+            ligados = res.reduce((t, r) => t + (r.count || 0), 0)
+                + (antigos || []).filter(x => x.concluido || Number(x.percentagem || 0) > 0).length;
+        }
+        let trocarPacotes = true;
+        if (ligados) {
+            trocarPacotes = false;
+            if (!confirm(`Os pacotes deste orçamento já têm horas, faturas, cortes ou avanço marcados, por isso não os troco.\n\nCrio só as fases? Depois ligas cada pacote à sua fase no separador Serviços.`)) {
+                btn.disabled = false; btn.textContent = "✓ Aceitar"; return;
+            }
+        }
+
+        // 2. Fases: as que já existem (mesmo nome) reaproveitam-se; as outras entram no fim
+        const { data: existentes } = await SB.from("obra_fases").select("id, nome, ordem").eq("obra_id", obraId);
+        const porNome = new Map((existentes || []).map(f => [f.nome.trim().toLowerCase(), f.id]));
+        let ordem = Math.max(0, ...(existentes || []).map(f => f.ordem || 0));
+        const novas = fases.filter(f => !porNome.has(f.nome.toLowerCase()));
+        if (novas.length) {
+            const { data: criadas, error } = await SB.from("obra_fases")
+                .insert(novas.map(f => ({ obra_id: obraId, nome: f.nome, ordem: ++ordem }))).select("id, nome");
+            if (error) throw new Error("fases: " + error.message);
+            (criadas || []).forEach(f => porNome.set(f.nome.trim().toLowerCase(), f.id));
+        }
+
+        // 3. Pacotes novos primeiro; os antigos só saem depois de os novos entrarem
+        let semLigacao = false;
+        if (trocarPacotes) {
+            const { data: todos } = await SB.from("obra_servicos").select("id, ordem").eq("obra_id", obraId);
+            let ordemP = Math.max(0, ...(todos || []).filter(x => !ids.includes(x.id)).map(x => x.ordem || 0));
+            const extra = (antigos || []).some(x => x.extra);
+            const linhas = fases.flatMap(f => f.pacotes.map(p => ({
+                obra_id: obraId, orcamento_id: orcId, nome: p.nome, criterio_fim: p.criterio_fim || null,
+                valor_orcamento: Math.round(p.valor * 100) / 100, extra, ordem: ++ordemP,
+                concluido: false, percentagem: 0, fase_id: porNome.get(f.nome.toLowerCase()) || null,
+            })));
+            let { data: inseridos, error } = await SB.from("obra_servicos").insert(linhas).select("id");
+            if (error && /fase_id/.test(error.message)) {
+                // SQL ainda por correr: grava os pacotes sem a ligação à fase
+                semLigacao = true;
+                ({ data: inseridos, error } = await SB.from("obra_servicos")
+                    .insert(linhas.map(({ fase_id, ...l }) => l)).select("id"));
+            }
+            if (error) throw new Error("pacotes: " + error.message);
+            if (ids.length) {
+                const { error: eDel } = await SB.from("obra_servicos").delete().in("id", ids);
+                if (eDel) {
+                    // Não deixa a obra com o valor a dobrar
+                    await SB.from("obra_servicos").delete().in("id", (inseridos || []).map(x => x.id));
+                    throw new Error("não foi possível tirar os pacotes antigos: " + eDel.message);
+                }
+            }
+        }
+
+        fecharSugestaoFases();
+        // Relê o painel todo (os KPIs e o separador Serviços usam os pacotes) e fica no Andamento
+        if (trocarPacotes) await abrirPainelObra(_painelObraActual, "andamento");
+        await carregarPainelAndamento();   // espera pelo desenho para a mensagem não se perder
+        msgAndamento(`${fases.length} fases${trocarPacotes ? ` e ${fases.reduce((t, f) => t + f.pacotes.length, 0)} pacotes` : ""} gravados.`
+            + (semLigacao ? " Falta correr o SQL das fases para ligar cada pacote à sua fase." : ""), semLigacao ? "err" : "ok");
+    } catch (e) {
+        console.error("aceitarSugestaoFases:", e);
+        msg("Não foi possível gravar: " + e.message);
+        btn.disabled = false; btn.textContent = "✓ Aceitar";
+    }
 }

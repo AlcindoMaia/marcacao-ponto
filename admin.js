@@ -2651,6 +2651,8 @@ function editarServico(id) {
                 <input id="servEdExt-${id}" value="${esc(s.responsavel_externo || "")}" placeholder="Nome do subempreiteiro" style="margin-top:4px;${respVal === "x" ? "" : "display:none"}">
             </label>
             <label style="font-size:11px;opacity:.7">Terminar até<input id="servEdData-${id}" type="date" value="${esc(s.data_fim_prevista || "")}"></label>
+            ${"fase_id" in s ? `<label style="font-size:11px;opacity:.7;grid-column:1/-1">Fase da obra (aba Andamento)
+                <select id="servEdFase-${id}"><option value="">— sem fase —</option></select></label>` : ""}
             <label style="font-size:11px;opacity:.7;grid-column:1/-1">Terminado quando…<input id="servEdCrit-${id}" value="${esc(s.criterio_fim || "")}" placeholder="Ex.: tomadas e interruptores ligados e testados"></label>
             <label style="font-size:12px;display:flex;gap:6px;align-items:center"><input id="servEdExtra-${id}" type="checkbox" style="width:auto"${s.extra ? " checked" : ""}> Extra</label>
             <div style="display:flex;gap:6px;justify-content:flex-end">
@@ -2659,6 +2661,17 @@ function editarServico(id) {
             </div>
         </div>`;
     document.getElementById("servEdZona-" + id).focus();
+    if ("fase_id" in s) preencherFasesDoPacote(id, s);
+}
+
+// As fases vêm da aba Andamento; o pacote fica ligado a uma delas
+async function preencherFasesDoPacote(id, s) {
+    const { data } = await SB.from("obra_fases").select("id, nome").eq("obra_id", s.obra_id).order("ordem");
+    const sel = document.getElementById("servEdFase-" + id);
+    if (!sel) return;
+    sel.innerHTML = `<option value="">— sem fase —</option>` + (data || []).map(f =>
+        `<option value="${esc(f.id)}"${f.id === s.fase_id ? " selected" : ""}>${esc(f.nome)}</option>`).join("");
+    sel.dataset.pronto = "1";
 }
 
 async function gravarServico(id) {
@@ -2683,6 +2696,9 @@ async function gravarServico(id) {
         percentagem: pct, concluido,
         concluido_em: concluido ? (antes.concluido_em || hojeISO()) : null,
     };
+    // Só mexe na fase se a lista de fases chegou a carregar
+    const selFase = $("servEdFase-");
+    if (selFase?.dataset.pronto) upd.fase_id = selFase.value || null;
     const { error } = await SB.from("obra_servicos").update(upd).eq("id", id);
     if (error) { console.error(error); alert("Não foi possível gravar o pacote: " + error.message
         + (/column/.test(error.message) ? "\n\nFalta correr o ficheiro novidades_novembro.sql no Supabase." : "")); return; }
@@ -2777,6 +2793,8 @@ async function _gravarPartir(id) {
         obra_id: s.obra_id, orcamento_id: s.orcamento_id, extra: s.extra,
         nome: l.nome, zona: l.zona, valor_orcamento: l.valor,
         percentagem: s.percentagem || 0, ordem: ordemBase + i + 1,
+        // Ficam na mesma fase do serviço partido (só se a coluna existir)
+        ...("fase_id" in s ? { fase_id: s.fase_id } : {}),
     })));
     if (e2) {
         console.error(e2);
@@ -6572,6 +6590,7 @@ async function gravarPropostaDocumento() {
         }
 
         const ligacao = { orcamento_id: null, movimento_id: null };
+        let sugerirFasesDe = null;   // orçamento aceite com pacotes novos: o assistente propõe as fases
 
         if (tipo === "orcamento") {
             const taxa = semIva && iva != null ? Math.round(iva / semIva * 100) : 23;
@@ -6589,6 +6608,7 @@ async function gravarPropostaDocumento() {
             if (val("propEstadoOrc") === "aceite") {
                 const r = await criarServicosDoOrcamento(o.id);
                 if (r.aviso) alert(r.aviso);
+                else if (r.criados > 0) sugerirFasesDe = o.id;
             }
         }
 
@@ -6635,6 +6655,10 @@ async function gravarPropostaDocumento() {
             fatura:    `Fatura ${numero} lançada no Financeiro.`,
             recibo:    "Recibo registado" + (ligacao.movimento_id ? " e fatura marcada como paga." : "."),
         }[tipo]);
+        if (sugerirFasesDe) {
+            abrirPainelTab("andamento");
+            sugerirFasesDoOrcamento(sugerirFasesDe);
+        }
     } catch (e) {
         console.error("gravarPropostaDocumento:", e);
         falha("Não foi possível gravar: " + e.message);
@@ -6949,7 +6973,12 @@ async function carregarPainelResumo() {
 async function criarServicosDoPainel(orcId) {
     const r = await criarServicosDoOrcamento(orcId);
     if (r.aviso) { alert(r.aviso); return; }
-    if (_painelObraActual) abrirPainelObra(_painelObraActual, "resumo");
+    if (!_painelObraActual) return;
+    // Serviços acabados de criar: o assistente propõe logo as fases
+    if (r.criados > 0) {
+        await abrirPainelObra(_painelObraActual, "andamento");
+        sugerirFasesDoOrcamento(orcId);
+    } else abrirPainelObra(_painelObraActual, "resumo");
 }
 
 async function carregarPainelFinanceiro() {
