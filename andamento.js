@@ -729,15 +729,27 @@ function btnSugerirFases() {
 async function sugerirFasesDoOrcamento(orcId = null) {
     const obra = _painelObraActual;
     if (!obra || _sugFasesEmCurso) return;
-    if (!orcId) {
-        let orcs = _andamento.obraId === obra.id ? _andamento.orcsAceites : null;
-        if (!orcs) orcs = (await SB.from("orcamentos").select("id, numero").eq("obra_id", obra.id).eq("estado", "aceite").order("data")).data || [];
-        if (!orcs.length) return alert("Esta obra não tem nenhum orçamento aceite.");
-        if (orcs.length === 1) orcId = orcs[0].id;
-        else return abrirEscolhaOrcamentoFases(orcs);
+    _sugFasesEmCurso = true;   // antes de qualquer espera: um duplo clique não pede duas sugestões
+    try {
+        if (!orcId) {
+            let orcs = _andamento.obraId === obra.id ? _andamento.orcsAceites : null;
+            if (!orcs) {
+                const r = await SB.from("orcamentos").select("id, numero").eq("obra_id", obra.id).eq("estado", "aceite").order("data");
+                if (r.error) return alert("Não foi possível ler os orçamentos: " + r.error.message);
+                orcs = r.data || [];
+            }
+            if (!orcs.length) return alert("Esta obra não tem nenhum orçamento aceite.");
+            if (orcs.length === 1) orcId = orcs[0].id;
+            else return abrirEscolhaOrcamentoFases(orcs);
+        }
+        await pedirSugestaoFases(obra, orcId);
+    } finally {
+        _sugFasesEmCurso = false;
     }
+}
+
+async function pedirSugestaoFases(obra, orcId) {
     document.getElementById("modalEscolhaOrcFases")?.remove();
-    _sugFasesEmCurso = true;
     abrirModalSugestaoFases(`<div style="padding:30px 10px;text-align:center;opacity:.8">✨ O assistente está a ler o orçamento e a organizar as fases…<br><span style="font-size:12px;opacity:.6">Demora uns 20 a 40 segundos.</span></div>`);
     try {
         const { data: { session } } = await SB.auth.getSession();
@@ -760,8 +772,6 @@ async function sugerirFasesDoOrcamento(orcId = null) {
         console.error("sugerirFasesDoOrcamento:", e);
         abrirModalSugestaoFases(`<div style="padding:20px 6px;color:#e09486">Não foi possível fazer a sugestão: ${esc(e.message)}</div>
             <div style="display:flex;justify-content:flex-end"><button class="btn-secondary" onclick="fecharSugestaoFases()">Fechar</button></div>`);
-    } finally {
-        _sugFasesEmCurso = false;
     }
 }
 
@@ -899,6 +909,9 @@ async function aceitarSugestaoFases() {
         if (ids.length) {
             const res = await Promise.all(["registo_servicos", "movimento_servicos", "corte_linhas", "auto_linhas"].map(t =>
                 SB.from(t).select("obra_servico_id", { count: "exact", head: true }).in("obra_servico_id", ids)));
+            // Na dúvida não se apaga: um erro nesta verificação pára tudo
+            const erroLig = res.find(r => r.error)?.error;
+            if (erroLig) throw new Error("não foi possível ver o que está ligado aos pacotes: " + erroLig.message);
             ligados = res.reduce((t, r) => t + (r.count || 0), 0)
                 + (antigos || []).filter(x => x.concluido || Number(x.percentagem || 0) > 0).length;
         }
@@ -911,7 +924,8 @@ async function aceitarSugestaoFases() {
         }
 
         // 2. Fases: as que já existem (mesmo nome) reaproveitam-se; as outras entram no fim
-        const { data: existentes } = await SB.from("obra_fases").select("id, nome, ordem").eq("obra_id", obraId);
+        const { data: existentes, error: eFases } = await SB.from("obra_fases").select("id, nome, ordem").eq("obra_id", obraId);
+        if (eFases) throw new Error("fases: " + eFases.message);
         const porNome = new Map((existentes || []).map(f => [f.nome.trim().toLowerCase(), f.id]));
         let ordem = Math.max(0, ...(existentes || []).map(f => f.ordem || 0));
         const novas = fases.filter(f => !porNome.has(f.nome.toLowerCase()));
@@ -925,7 +939,8 @@ async function aceitarSugestaoFases() {
         // 3. Pacotes novos primeiro; os antigos só saem depois de os novos entrarem
         let semLigacao = false;
         if (trocarPacotes) {
-            const { data: todos } = await SB.from("obra_servicos").select("id, ordem").eq("obra_id", obraId);
+            const { data: todos, error: eTodos } = await SB.from("obra_servicos").select("id, ordem").eq("obra_id", obraId);
+            if (eTodos) throw new Error("pacotes: " + eTodos.message);
             let ordemP = Math.max(0, ...(todos || []).filter(x => !ids.includes(x.id)).map(x => x.ordem || 0));
             const extra = (antigos || []).some(x => x.extra);
             const linhas = fases.flatMap(f => f.pacotes.map(p => ({
@@ -934,7 +949,10 @@ async function aceitarSugestaoFases() {
                 concluido: false, percentagem: 0, fase_id: porNome.get(f.nome.toLowerCase()) || null,
             })));
             let { data: inseridos, error } = await SB.from("obra_servicos").insert(linhas).select("id");
-            if (error && /fase_id/.test(error.message)) {
+            // Só a coluna em falta (SQL por correr); um erro de chave estrangeira não cai aqui
+            const semColuna = error && /fase_id/.test(error.message)
+                && (error.code === "PGRST204" || error.code === "42703" || /column/i.test(error.message)) && !/foreign key/i.test(error.message);
+            if (semColuna) {
                 // SQL ainda por correr: grava os pacotes sem a ligação à fase
                 semLigacao = true;
                 ({ data: inseridos, error } = await SB.from("obra_servicos")
