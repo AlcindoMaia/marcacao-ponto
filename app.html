@@ -332,6 +332,42 @@ html, body {
   margin-top: 8px; background: none; border: none; color: var(--muted);
   font-size: 13px; text-decoration: underline; padding: 4px 0;
 }
+
+/* Avanço da semana (corte semanal) */
+.corte-section { padding: 14px 20px 0; flex-shrink: 0; }
+.corte-abrir {
+  width: 100%; background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
+  font-size: 14px; text-align: left; display: flex; justify-content: space-between; align-items: center;
+}
+.corte-abrir.sexta { border-color: rgba(181,136,99,.6); }
+.corte-abrir small { color: var(--muted); font-size: 12px; }
+.corte-painel {
+  margin-top: 10px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px;
+}
+.corte-info { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin-bottom: 10px; }
+.corte-zona {
+  font-family: var(--font-t); font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--muted); margin: 12px 0 6px;
+}
+.corte-linha { padding: 8px 0; border-top: 1px solid var(--border); }
+.corte-linha:first-of-type { border-top: none; }
+.corte-nome { font-size: 14px; font-weight: 500; }
+.corte-crit { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.corte-medir { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.corte-medir input[type=range] { flex: 1; accent-color: var(--primary); }
+.corte-medir output { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.corte-painel textarea {
+  width: 100%; margin-top: 10px; background: var(--surface2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-size: 14px;
+  font-family: inherit; resize: vertical;
+}
+.corte-enviar {
+  width: 100%; margin-top: 10px; background: var(--primary); color: #131c25; border: none;
+  border-radius: 10px; padding: 12px; font-weight: 700; font-size: 15px;
+}
+.corte-msg { font-size: 13px; margin-top: 8px; }
 </style>
 <link rel="stylesheet" href="carregar.css?v=1">
 </head>
@@ -403,6 +439,14 @@ html, body {
       </div>
     </div>
 
+    <!-- Avanço da semana: quem está na obra mede a % de cada pacote -->
+    <div class="corte-section" id="corteSection" style="display:none">
+      <button type="button" class="corte-abrir" id="corteAbrir">
+        <span>📏 Avanço da obra esta semana</span><small id="corteEstado"></small>
+      </button>
+      <div class="corte-painel" id="cortePainel" style="display:none"></div>
+    </div>
+
     <div class="divider"></div>
 
     <!-- Histórico -->
@@ -418,7 +462,7 @@ html, body {
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="config.js?v=3"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 
 <!-- Modal parecer saída -->
 <div id="modalParecer" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:3000;align-items:flex-end;justify-content:center;padding:0">

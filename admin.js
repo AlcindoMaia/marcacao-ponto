@@ -2378,6 +2378,120 @@ async function guardarEditObra() {
 // ═══════════════════════════════════════════════════════
 // SERVIÇOS DA OBRA
 // ═══════════════════════════════════════════════════════
+// Os serviços da obra são pacotes de trabalho entregável, agrupados por zona
+// (Cozinha, WC, Fachada…). Cada pacote diz quem responde por ele, o que quer
+// dizer "terminado", até quando devia estar feito e a % feita (a aprovada no
+// último corte semanal, ou 100 % quando se marca ✓).
+const pctPacote = s => s?.concluido ? 100 : Math.max(0, Math.min(100, Number(s?.percentagem || 0)));
+// Um pacote com mais de 1/4 do valor da obra é grande demais para se medir
+// numa semana: o botão "Partir" divide-o por zona.
+const PACOTE_GRANDE = 0.25;
+
+// Modelos de pacotes por tipo de obra (as fases-tipo estão em andamento.js).
+// Só um ponto de partida: [zona, pacote, terminado quando…]. Os valores
+// escrevem-se depois, ou vêm do serviço que se parte.
+const PACOTES_TIPO = {
+    remodelacao: { nome: "Remodelação", pacotes: [
+        ["Geral", "Demolições e remoções", "entulho retirado e espaço limpo"],
+        ["Geral", "Eletricidade (quadro e circuitos)", "quadro montado e circuitos testados"],
+        ["Geral", "Canalização e esgotos", "redes testadas sem fugas"],
+        ["Geral", "Paredes e tetos (pladur/estuque)", "superfícies prontas para pintar"],
+        ["Cozinha", "Revestimentos", "azulejo e pavimento assentes e betumados"],
+        ["Cozinha", "Móveis e equipamentos", "móveis montados e equipamentos a funcionar"],
+        ["Casa de banho", "Revestimentos", "azulejo e pavimento assentes e betumados"],
+        ["Casa de banho", "Loiças e torneiras", "loiças e torneiras montadas, sem fugas"],
+        ["Geral", "Pavimentos", "pavimento assente com rodapés"],
+        ["Geral", "Carpintarias e portas", "portas a abrir e fechar, ferragens montadas"],
+        ["Geral", "Pinturas", "duas demãos, sem manchas"],
+        ["Geral", "Limpeza e entrega", "obra limpa e visita final com o cliente"]] },
+    alvenaria: { nome: "Construção nova (alvenaria)", pacotes: [
+        ["Exterior", "Estaleiro e implantação", "estaleiro montado e obra implantada"],
+        ["Estrutura", "Fundações", "sapatas e lintéis betonados"],
+        ["Estrutura", "Pilares, vigas e lajes", "lajes betonadas e descofradas"],
+        ["Estrutura", "Alvenarias", "paredes levantadas até à cobertura"],
+        ["Cobertura", "Cobertura e impermeabilização", "telhado fechado e sem infiltrações"],
+        ["Interior", "Redes (águas, esgotos, eletricidade)", "redes embutidas e testadas"],
+        ["Exterior", "Caixilharia", "janelas e portas exteriores montadas"],
+        ["Exterior", "Isolamento e capoto", "capoto com acabamento final"],
+        ["Interior", "Rebocos e estuques", "paredes prontas para pintar"],
+        ["Interior", "Revestimentos e pavimentos", "pavimentos e azulejos assentes"],
+        ["Interior", "Carpintarias e loiças", "portas, cozinha e loiças montadas"],
+        ["Interior", "Pinturas", "duas demãos interior e exterior"],
+        ["Exterior", "Arranjos exteriores e limpeza final", "exterior arrumado e obra limpa"]] },
+    steelframe: { nome: "Steel frame", pacotes: [
+        ["Estrutura", "Fundações / laje", "laje betonada e nivelada"],
+        ["Estrutura", "Estrutura LSF", "estrutura montada e aparafusada"],
+        ["Cobertura", "Cobertura", "cobertura fechada e sem infiltrações"],
+        ["Exterior", "Fechamento exterior (OSB e membrana)", "OSB e membrana aplicados em todas as faces"],
+        ["Exterior", "Caixilharia", "janelas e portas exteriores montadas"],
+        ["Interior", "Redes (águas, esgotos, eletricidade)", "redes passadas e testadas"],
+        ["Interior", "Isolamento e placas interiores", "lã e gesso cartonado fechados"],
+        ["Exterior", "Capoto / revestimento exterior", "acabamento final aplicado"],
+        ["Interior", "Acabamentos interiores", "pavimentos, azulejos e carpintarias montados"],
+        ["Interior", "Pinturas", "duas demãos, sem manchas"],
+        ["Geral", "Limpeza e entrega", "obra limpa e visita final com o cliente"]] },
+};
+
+// Obra sem pacotes: criar os do modelo de uma vez (sem valores)
+async function criarPacotesTipo(tipo) {
+    const obraId = document.getElementById("editObraId").value;
+    const t = PACOTES_TIPO[tipo];
+    if (!obraId || !t) return;
+    if (!confirm(`Criar ${t.pacotes.length} pacotes de "${t.nome}"? Depois apagas os que não se aplicam e pões os valores.`)) return;
+    const { error } = await SB.from("obra_servicos").insert(t.pacotes.map(([zona, nome, criterio_fim], i) =>
+        ({ obra_id: obraId, zona, nome, criterio_fim, ordem: i + 1 })));
+    if (error) { console.error(error); alert("Não foi possível criar os pacotes: " + error.message
+        + (/column/.test(error.message) ? "\n\nFalta correr o ficheiro novidades_novembro.sql no Supabase." : "")); return; }
+    await servicosMudaram();
+}
+
+// No ✂️ Partir: enche as linhas com os pacotes do modelo (valores em branco)
+function partirComModelo(id, tipo) {
+    const t = PACOTES_TIPO[tipo], cont = document.getElementById("partirLinhas-" + id);
+    if (!t || !cont) return;
+    cont.innerHTML = "";
+    t.pacotes.forEach(([zona, nome]) => partirLinha(id, zona, nome, ""));
+}
+
+// Avanço da obra: a % de cada pacote pesada pelo seu valor. Sem valores,
+// conta cada pacote por igual.
+function avancoDosPacotes(servicos) {
+    const l = servicos || [];
+    if (!l.length) return null;
+    const tot = l.reduce((t, s) => t + Number(s.valor_orcamento || 0), 0);
+    if (tot > 0) return Math.round(l.reduce((t, s) => t + Number(s.valor_orcamento || 0) * pctPacote(s), 0) / tot);
+    return Math.round(l.reduce((t, s) => t + pctPacote(s), 0) / l.length);
+}
+
+// O que falta definir num pacote (aparece como aviso na linha)
+function avisosPacote(s, totalObra) {
+    if (s.concluido) return [];
+    const a = [];
+    if (!s.responsavel_funcionario_id && !s.responsavel_externo) a.push("sem responsável");
+    if (!s.criterio_fim) a.push('sem "terminado quando"');
+    if (s.data_fim_prevista && s.data_fim_prevista < hojeISO()) a.push("atrasado");
+    if (totalObra > 0 && Number(s.valor_orcamento || 0) > totalObra * PACOTE_GRANDE) a.push("grande demais: parte-o");
+    return a;
+}
+
+function hojeISO() {
+    return new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Lisbon" });
+}
+
+let _funcsPacote = null;   // funcionários ativos para "quem responde"
+async function funcionariosParaPacotes() {
+    if (!_funcsPacote) {
+        const { data, error } = await SB.from("funcionarios").select("id, nome").eq("ativo", true).order("nome");
+        if (error) { console.error(error); return []; }
+        _funcsPacote = data || [];
+    }
+    return _funcsPacote;
+}
+function nomeResponsavel(s) {
+    if (s.responsavel_funcionario_id) return (_funcsPacote || []).find(f => f.id === s.responsavel_funcionario_id)?.nome || "funcionário";
+    return s.responsavel_externo || "";
+}
+
 async function carregarServicosModal() {
     const obraId = document.getElementById("editObraId").value;
     if (!obraId) {
@@ -2385,8 +2499,16 @@ async function carregarServicosModal() {
             `<div style="opacity:.4;font-size:13px;text-align:center;padding:16px">Guarda a obra primeiro para adicionar serviços.</div>`;
         return;
     }
-    const { data } = await SB.from("obra_servicos")
-        .select("*").eq("obra_id", obraId).order("ordem").order("created_at");
+    const [servRes, , cortesRes] = await Promise.all([
+        SB.from("obra_servicos").select("*").eq("obra_id", obraId)
+            .order("zona", { nullsFirst: false }).order("ordem").order("created_at")
+            // Sem o SQL novo não há coluna zona: lê pela ordem antiga
+            .then(r => r.error ? SB.from("obra_servicos").select("*").eq("obra_id", obraId).order("ordem").order("created_at") : r),
+        funcionariosParaPacotes(),
+        SB.from("cortes_semanais").select("id, semana, estado, notas, created_at, atualizado_em, funcionarios(nome), corte_linhas(obra_servico_id, percentagem_antes, percentagem)")
+            .eq("obra_id", obraId).eq("estado", "pendente").order("semana", { ascending: false }).limit(1),
+    ]);
+    const data = servRes.data;
 
     // Buscar horas e materiais em paralelo
     const ids = (data||[]).map(s=>s.id);
@@ -2407,36 +2529,74 @@ async function carregarServicosModal() {
 
     const lista = document.getElementById("listaServicos");
     if (!data?.length) {
-        lista.innerHTML = `<div style="opacity:.4;font-size:13px;text-align:center;padding:16px">Sem serviços. Adicione o primeiro aqui em baixo.</div>`;
+        lista.innerHTML = `<div style="opacity:.6;font-size:13px;text-align:center;padding:12px 8px">Sem pacotes. Começa pelo modelo do tipo de obra, ou adiciona um a um aqui em baixo.</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:6px">
+                ${Object.entries(PACOTES_TIPO).map(([k, t]) => `<button class="btn-secondary" style="font-size:12px" onclick="criarPacotesTipo('${k}')">${esc(t.nome)}</button>`).join("")}
+            </div>`;
         return;
     }
     _servicosModal = Object.fromEntries(data.map(s => [s.id, s]));
-    lista.innerHTML = data.map(s => {
+    const totalObra = data.reduce((t, s) => t + Number(s.valor_orcamento || 0), 0);
+
+    // Corte semanal à espera de aprovação (a tabela pode ainda não existir
+    // se o SQL não foi corrido: aí não aparece nada)
+    const corte = cortesRes?.error ? null : cortesRes?.data?.[0];
+    const htmlCorte = corte ? htmlCortePendente(corte, _servicosModal) : "";
+
+    const linha = s => {
         const mR  = matP[s.id]||0;
         const vS  = Number(s.valor_orcamento||0);
-        const pct = vS > 0 && mR > 0 ? Math.min(Math.round(mR/vS*100),100) : null;
-        const barCol = s.concluido ? "#8fbfa0" : pct>=75 ? "#fb923c" : "var(--primary,#b58863)";
-        return `<div id="servRow-${s.id}" style="background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;border:1px solid ${s.concluido?"rgba(143,191,160,.2)":"rgba(255,255,255,.06)"}">
+        const pct = pctPacote(s);
+        const resp = nomeResponsavel(s);
+        const av = avisosPacote(s, totalObra);
+        const det = [
+            `💶 ${vS ? vS.toFixed(0)+"€ valor" : "sem valor"}`,
+            `🧱 ${mR.toFixed(0)}€ custos ligados`,
+            recP[s.id] ? `💰 ${Number(recP[s.id]).toFixed(0)}€ recebido` : "",
+            resp ? `👷 ${esc(resp)}` : "",
+            s.data_fim_prevista ? `📅 até ${esc(s.data_fim_prevista.split("-").reverse().join("/"))}` : "",
+        ].filter(Boolean);
+        return `<div id="servRow-${esc(s.id)}" style="background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;border:1px solid ${s.concluido?"rgba(143,191,160,.2)":"rgba(255,255,255,.06)"}">
             <div style="flex:1;min-width:0">
-                <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">
                     <span style="font-size:13px;font-weight:600">${esc(s.nome)}</span>
                     ${s.extra?`<span style="font-size:10px;background:rgba(251,146,60,.15);color:#fb923c;padding:1px 6px;border-radius:10px">Extra</span>`:""}
-                    ${s.concluido?`<span style="font-size:10px;background:rgba(143,191,160,.15);color:#8fbfa0;padding:1px 6px;border-radius:10px">✓ Concluído</span>`:""}
+                    ${s.concluido?`<span style="font-size:10px;background:rgba(143,191,160,.15);color:#8fbfa0;padding:1px 6px;border-radius:10px">✓ Concluído</span>`
+                                 :`<span style="font-size:10px;background:rgba(181,136,99,.15);color:var(--primary,#b58863);padding:1px 6px;border-radius:10px">${pct.toFixed(0)}% feito</span>`}
                 </div>
-                <div style="display:flex;gap:14px;font-size:11px;opacity:.6">
-                    <span>💶 ${vS ? vS.toFixed(0)+"€ valor" : "sem valor"}</span>
-                    <span>🧱 ${mR.toFixed(0)}€ custos ligados</span>
-                    ${recP[s.id] ? `<span>💰 ${Number(recP[s.id]).toFixed(0)}€ recebido</span>` : ""}
-                </div>
-                ${pct!==null?`<div style="margin-top:6px;background:rgba(255,255,255,.1);border-radius:3px;height:3px"><div style="width:${pct}%;height:100%;background:${barCol};border-radius:3px"></div></div>`:""}
+                <div style="display:flex;gap:4px 14px;font-size:11px;opacity:.6;flex-wrap:wrap">${det.map(d => `<span>${d}</span>`).join("")}</div>
+                ${s.criterio_fim ? `<div style="font-size:11px;opacity:.6;margin-top:3px">Terminado quando: ${esc(s.criterio_fim)}</div>` : ""}
+                ${av.length ? `<div style="font-size:11px;color:#fb923c;margin-top:3px">⚠ ${esc(av.join(" · "))}</div>` : ""}
+                <div style="margin-top:6px;background:rgba(255,255,255,.1);border-radius:3px;height:3px"><div style="width:${pct}%;height:100%;background:${s.concluido ? "#8fbfa0" : "var(--primary,#b58863)"};border-radius:3px"></div></div>
             </div>
-            <div style="display:flex;gap:4px;flex-shrink:0">
-                <button onclick="editarServico('${s.id}')" style="background:rgba(255,255,255,.07);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px" title="Editar nome e valor">✏️</button>
-                <button onclick="toggleServicoConcluido('${s.id}',${s.concluido})" style="background:${s.concluido?"rgba(143,191,160,.15)":"rgba(255,255,255,.07)"};border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px" title="${s.concluido?"Reabrir":"Concluir"}">${s.concluido?"↩":"✓"}</button>
+            <div style="display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
+                <button onclick="editarServico('${esc(s.id)}')" style="background:rgba(255,255,255,.07);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px" title="Editar o pacote">✏️</button>
+                ${!s.concluido ? `<button onclick="partirServico('${esc(s.id)}')" style="background:rgba(255,255,255,.07);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:12px" title="Partir em pacotes por zona">✂️</button>` : ""}
+                <button onclick="toggleServicoConcluido('${esc(s.id)}',${s.concluido ? "true" : "false"})" style="background:${s.concluido?"rgba(143,191,160,.15)":"rgba(255,255,255,.07)"};border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px" title="${s.concluido?"Reabrir":"Concluir"}">${s.concluido?"↩":"✓"}</button>
                 <button data-servico-id="${esc(s.id)}" data-servico-nome="${esc(s.nome)}" class="btn-elim-servico" style="background:rgba(224,148,134,.1);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;opacity:.6">🗑</button>
             </div>
         </div>`;
-    }).join("");
+    };
+
+    // Agrupar por zona (sem zona fica no fim)
+    const zonas = [];
+    data.forEach(s => {
+        const z = (s.zona || "").trim();
+        let g = zonas.find(x => x.zona === z);
+        if (!g) zonas.push(g = { zona: z, itens: [] });
+        g.itens.push(s);
+    });
+    zonas.sort((a, b) => (a.zona === "") - (b.zona === ""));
+    const avanco = avancoDosPacotes(data);
+    lista.innerHTML = datalistZonas() + htmlCorte
+        + `<div style="font-size:12px;opacity:.7;margin-bottom:2px">Avanço da obra: <b>${avanco}%</b> (a % de cada pacote, pesada pelo valor)</div>`
+        + zonas.map(g => {
+            const vz = g.itens.reduce((t, s) => t + Number(s.valor_orcamento || 0), 0);
+            const titulo = g.zona || (zonas.length > 1 ? "Sem zona" : "");
+            return (titulo ? `<div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.55;margin:8px 0 2px;display:flex;justify-content:space-between;gap:8px">
+                    <span>${esc(titulo)}</span><span>${avancoDosPacotes(g.itens)}% · ${vz ? vz.toFixed(0) + " €" : ""}</span></div>` : "")
+                + g.itens.map(linha).join("");
+        }).join("");
 
     // O nome do serviço ia interpolado dentro do onclick; agora vem do dataset.
     lista.querySelectorAll(".btn-elim-servico").forEach(b => {
@@ -2452,7 +2612,10 @@ async function adicionarServico() {
     const horas = parseFloat(document.getElementById("novoServHoras").value) || null;
     const valor = parseFloat(document.getElementById("novoServValor").value) || null;
     const extra = document.getElementById("novoServExtra").checked;
-    const { error } = await SB.from("obra_servicos").insert({ obra_id: obraId, nome, horas_orcamento: horas, valor_orcamento: valor, extra });
+    const zona  = document.getElementById("novoServZona")?.value.trim() || null;
+    const novo = { obra_id: obraId, nome, horas_orcamento: horas, valor_orcamento: valor, extra };
+    if (zona) novo.zona = zona;
+    const { error } = await SB.from("obra_servicos").insert(novo);
     if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
     document.getElementById("novoServNome").value  = "";
     document.getElementById("novoServHoras").value = "";
@@ -2461,37 +2624,179 @@ async function adicionarServico() {
     await servicosMudaram();
 }
 
-// Editar nome, valor e "extra" de um serviço, ali mesmo na lista
+// Zonas já usadas na obra, para sugerir ao escrever
+function datalistZonas() {
+    const zs = [...new Set(Object.values(_servicosModal).map(s => (s.zona || "").trim()).filter(Boolean))];
+    return `<datalist id="zonasObra">${zs.map(z => `<option value="${esc(z)}">`).join("")}</datalist>`;
+}
+
+// Editar o pacote, ali mesmo na lista
 let _servicosModal = {};
 function editarServico(id) {
     const s = _servicosModal[id], row = document.getElementById("servRow-" + id);
     if (!s || !row) return;
-    row.innerHTML = `<div style="flex:1;display:grid;grid-template-columns:1fr 120px;gap:8px;align-items:end">
-            <label style="font-size:11px;opacity:.7">Serviço<input id="servEdNome-${id}" value="${esc(s.nome)}"></label>
+    const funcs = _funcsPacote || [];
+    const respVal = s.responsavel_funcionario_id ? "f:" + s.responsavel_funcionario_id : s.responsavel_externo ? "x" : "";
+    row.innerHTML = `<div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end">
+            <label style="font-size:11px;opacity:.7">Zona<input id="servEdZona-${id}" list="zonasObra" value="${esc(s.zona || "")}" placeholder="Ex.: Cozinha, WC, Fachada"></label>
+            <label style="font-size:11px;opacity:.7">Pacote<input id="servEdNome-${id}" value="${esc(s.nome)}"></label>
             <label style="font-size:11px;opacity:.7">Valor sem IVA (€)<input id="servEdValor-${id}" type="number" step="0.01" min="0" value="${s.valor_orcamento ?? ""}"></label>
+            <label style="font-size:11px;opacity:.7">% feito<input id="servEdPct-${id}" type="number" step="1" min="0" max="100" value="${pctPacote(s)}"></label>
+            <label style="font-size:11px;opacity:.7">Quem responde
+                <select id="servEdResp-${id}" onchange="document.getElementById('servEdExt-${id}').style.display=this.value==='x'?'':'none'">
+                    <option value="">—</option>
+                    ${funcs.map(f => `<option value="f:${esc(f.id)}"${respVal === "f:" + f.id ? " selected" : ""}>${esc(f.nome)}</option>`).join("")}
+                    <option value="x"${respVal === "x" ? " selected" : ""}>Subempreiteiro / outro…</option>
+                </select>
+                <input id="servEdExt-${id}" value="${esc(s.responsavel_externo || "")}" placeholder="Nome do subempreiteiro" style="margin-top:4px;${respVal === "x" ? "" : "display:none"}">
+            </label>
+            <label style="font-size:11px;opacity:.7">Terminar até<input id="servEdData-${id}" type="date" value="${esc(s.data_fim_prevista || "")}"></label>
+            <label style="font-size:11px;opacity:.7;grid-column:1/-1">Terminado quando…<input id="servEdCrit-${id}" value="${esc(s.criterio_fim || "")}" placeholder="Ex.: tomadas e interruptores ligados e testados"></label>
             <label style="font-size:12px;display:flex;gap:6px;align-items:center"><input id="servEdExtra-${id}" type="checkbox" style="width:auto"${s.extra ? " checked" : ""}> Extra</label>
             <div style="display:flex;gap:6px;justify-content:flex-end">
-                <button class="btn-primary" style="padding:5px 12px;font-size:12px" onclick="gravarServico('${id}')">Gravar</button>
+                <button class="btn-primary" style="padding:5px 12px;font-size:12px" onclick="gravarServico('${esc(id)}')">Gravar</button>
                 <button class="btn-secondary" style="padding:5px 12px;font-size:12px" onclick="carregarServicosModal()">Cancelar</button>
             </div>
         </div>`;
-    document.getElementById("servEdValor-" + id).focus();
+    document.getElementById("servEdZona-" + id).focus();
 }
 
 async function gravarServico(id) {
-    const nome = document.getElementById("servEdNome-" + id).value.trim();
-    if (!nome) { alert("Nome do serviço obrigatório."); return; }
-    const v = document.getElementById("servEdValor-" + id).value;
+    const $ = k => document.getElementById(k + id);
+    const nome = $("servEdNome-").value.trim();
+    if (!nome) { alert("Nome do pacote obrigatório."); return; }
+    const v = $("servEdValor-").value;
     const valor = v === "" ? null : Math.round(parseFloat(v) * 100) / 100;
     if (valor !== null && !(valor >= 0)) { alert("Valor inválido."); return; }
-    const extra = document.getElementById("servEdExtra-" + id).checked;
-    const { error } = await SB.from("obra_servicos").update({ nome, valor_orcamento: valor, extra }).eq("id", id);
-    if (error) { console.error(error); alert("Não foi possível gravar o serviço: " + error.message); return; }
+    const pct = Math.round(Number($("servEdPct-").value || 0));
+    if (!(pct >= 0 && pct <= 100)) { alert("A % feita tem de estar entre 0 e 100."); return; }
+    const resp = $("servEdResp-").value;
+    const antes = _servicosModal[id] || {};
+    const concluido = pct >= 100;
+    const upd = {
+        nome, valor_orcamento: valor, extra: $("servEdExtra-").checked,
+        zona: $("servEdZona-").value.trim() || null,
+        responsavel_funcionario_id: resp.startsWith("f:") ? resp.slice(2) : null,
+        responsavel_externo: resp === "x" ? ($("servEdExt-").value.trim() || null) : null,
+        criterio_fim: $("servEdCrit-").value.trim() || null,
+        data_fim_prevista: $("servEdData-").value || null,
+        percentagem: pct, concluido,
+        concluido_em: concluido ? (antes.concluido_em || hojeISO()) : null,
+    };
+    const { error } = await SB.from("obra_servicos").update(upd).eq("id", id);
+    if (error) { console.error(error); alert("Não foi possível gravar o pacote: " + error.message
+        + (/column/.test(error.message) ? "\n\nFalta correr o ficheiro novidades_novembro.sql no Supabase." : "")); return; }
+    await servicosMudaram();
+}
+
+// ✂️ Partir: um serviço passa a vários pacotes por zona. O primeiro pacote é
+// o próprio serviço (mantém as horas, faturas e autos já ligados); os outros
+// são novos. A soma dos valores tem de dar o valor do serviço.
+function partirServico(id) {
+    const s = _servicosModal[id], row = document.getElementById("servRow-" + id);
+    if (!s || !row) return;
+    const v = Number(s.valor_orcamento || 0);
+    row.innerHTML = `<div style="flex:1">
+        <div style="font-size:12px;margin-bottom:6px"><b>Partir "${esc(s.nome)}"</b> em pacotes que se consigam medir numa semana.
+            ${v ? `A soma tem de dar <b>${v.toFixed(2)} €</b>.` : ""}</div>
+        <div id="partirLinhas-${esc(id)}" style="display:flex;flex-direction:column;gap:6px"></div>
+        <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap">
+            <span style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="btn-secondary" style="padding:4px 10px;font-size:12px" onclick="partirLinha('${esc(id)}')">+ Pacote</button>
+                <select style="width:auto;font-size:12px;padding:4px 8px" onchange="if(this.value)partirComModelo('${esc(id)}', this.value)">
+                    <option value="">Usar o modelo de…</option>
+                    ${Object.entries(PACOTES_TIPO).map(([k, t]) => `<option value="${k}">${esc(t.nome)}</option>`).join("")}
+                </select>
+            </span>
+            <span id="partirSoma-${esc(id)}" style="font-size:12px;opacity:.75"></span>
+            <span style="display:flex;gap:6px">
+                <button class="btn-primary" style="padding:5px 12px;font-size:12px" onclick="gravarPartir('${esc(id)}')">Partir</button>
+                <button class="btn-secondary" style="padding:5px 12px;font-size:12px" onclick="carregarServicosModal()">Cancelar</button>
+            </span>
+        </div>
+    </div>`;
+    partirLinha(id, s.zona || "", s.nome, v || "");
+    partirLinha(id);
+}
+
+function partirLinha(id, zona = "", nome = "", valor = "") {
+    const cont = document.getElementById("partirLinhas-" + id);
+    if (!cont) return;
+    const d = document.createElement("div");
+    d.className = "partir-linha";
+    d.style.cssText = "display:grid;grid-template-columns:1fr 1.4fr 100px;gap:6px";
+    d.innerHTML = `<input class="p-zona" list="zonasObra" placeholder="Zona" value="${esc(zona)}">
+        <input class="p-nome" placeholder="Pacote (ex.: Tomadas e luz)" value="${esc(nome)}">
+        <input class="p-valor" type="number" step="0.01" min="0" placeholder="€" value="${esc(valor)}">`;
+    d.querySelector(".p-valor").addEventListener("input", () => partirSoma(id));
+    cont.appendChild(d);
+    partirSoma(id);
+}
+
+function partirSoma(id) {
+    const s = _servicosModal[id], el = document.getElementById("partirSoma-" + id);
+    if (!s || !el) return;
+    const soma = [...document.querySelectorAll(`#partirLinhas-${CSS.escape(id)} .p-valor`)].reduce((t, i) => t + (Number(i.value) || 0), 0);
+    const v = Number(s.valor_orcamento || 0);
+    const dif = Math.round((v - soma) * 100) / 100;
+    el.textContent = v ? (dif === 0 ? "✓ Soma certa" : dif > 0 ? `Faltam ${dif.toFixed(2)} €` : `Sobram ${(-dif).toFixed(2)} €`) : `Soma: ${soma.toFixed(2)} €`;
+    el.style.color = v && dif !== 0 ? "#fb923c" : "";
+}
+
+// Evita que um duplo clique em "Partir" crie os pacotes novos duas vezes
+const _partirEmCurso = new Set();
+async function gravarPartir(id) {
+    if (_partirEmCurso.has(id)) return;
+    _partirEmCurso.add(id);
+    try { await _gravarPartir(id); } finally { _partirEmCurso.delete(id); }
+}
+
+async function _gravarPartir(id) {
+    const s = _servicosModal[id];
+    if (!s) return;
+    const linhas = [...document.querySelectorAll(`#partirLinhas-${CSS.escape(id)} .partir-linha`)].map(d => ({
+        zona: d.querySelector(".p-zona").value.trim() || null,
+        nome: d.querySelector(".p-nome").value.trim(),
+        valor: d.querySelector(".p-valor").value === "" ? null : Math.round(Number(d.querySelector(".p-valor").value) * 100) / 100,
+    })).filter(l => l.nome || l.valor);
+    if (linhas.length < 2) { alert("Escreve pelo menos dois pacotes."); return; }
+    if (linhas.some(l => !l.nome)) { alert("Cada pacote precisa de um nome."); return; }
+    if (linhas.some(l => l.valor !== null && !(l.valor >= 0))) { alert("Há um valor inválido."); return; }
+    const v = Number(s.valor_orcamento || 0);
+    const soma = linhas.reduce((t, l) => t + (l.valor || 0), 0);
+    if (v && Math.abs(soma - v) > 0.009) {
+        alert(`A soma dos pacotes (${soma.toFixed(2)} €) tem de dar o valor do serviço (${v.toFixed(2)} €).`);
+        return;
+    }
+    const [primeiro, ...resto] = linhas;
+    const { error: e1 } = await SB.from("obra_servicos")
+        .update({ nome: primeiro.nome, zona: primeiro.zona, valor_orcamento: primeiro.valor }).eq("id", s.id);
+    if (e1) { console.error(e1); alert("Não foi possível partir o serviço: " + e1.message); return; }
+    const ordemBase = Math.max(0, ...Object.values(_servicosModal).map(x => x.ordem || 0));
+    const { error: e2 } = await SB.from("obra_servicos").insert(resto.map((l, i) => ({
+        obra_id: s.obra_id, orcamento_id: s.orcamento_id, extra: s.extra,
+        nome: l.nome, zona: l.zona, valor_orcamento: l.valor,
+        percentagem: s.percentagem || 0, ordem: ordemBase + i + 1,
+    })));
+    if (e2) {
+        console.error(e2);
+        // Repõe o serviço como estava, para o valor da obra não ficar a menos
+        await SB.from("obra_servicos").update({ nome: s.nome, zona: s.zona, valor_orcamento: s.valor_orcamento }).eq("id", s.id);
+        alert("Não foi possível criar os pacotes novos; o serviço ficou como estava.\n" + e2.message);
+        return;
+    }
     await servicosMudaram();
 }
 
 async function toggleServicoConcluido(id, concluido) {
-    await SB.from("obra_servicos").update({ concluido: !concluido }).eq("id", id);
+    const s = _servicosModal[id] || {};
+    const upd = concluido
+        ? { concluido: false, concluido_em: null, percentagem: Math.min(Number(s.percentagem || 0), 99) }
+        : { concluido: true, concluido_em: hojeISO(), percentagem: 100 };
+    let { error } = await SB.from("obra_servicos").update(upd).eq("id", id);
+    // Sem o SQL novo as colunas ainda não existem: grava só o concluído
+    if (error) ({ error } = await SB.from("obra_servicos").update({ concluido: !concluido }).eq("id", id));
+    if (error) { console.error(error); alert("Não foi possível gravar."); return; }
     await servicosMudaram();
 }
 
@@ -2499,6 +2804,51 @@ async function eliminarServico(id, nome) {
     if (!confirm(`Eliminar serviço "${nome}"?\nAs imputações associadas também serão removidas.`)) return;
     await SB.from("obra_servicos").delete().eq("id", id);
     await servicosMudaram();
+}
+
+// =======================================================
+// CORTE SEMANAL
+// No telemóvel, quem está na obra marca a % de cada pacote (app.html). O
+// corte fica pendente até ser aprovado aqui; só então as % mudam e o
+// cliente as vê.
+// =======================================================
+function htmlCortePendente(c, servicos) {
+    const semana = c.semana ? c.semana.split("-").reverse().join("/") : "";
+    const linhas = (c.corte_linhas || []).map(l => {
+        const s = servicos[l.obra_servico_id];
+        const sobe = Number(l.percentagem) - Number(l.percentagem_antes);
+        return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:2px 0">
+            <span>${esc([s?.zona, s?.nome || "pacote apagado"].filter(Boolean).join(" · "))}</span>
+            <span style="white-space:nowrap">${Number(l.percentagem_antes).toFixed(0)}% → <b>${Number(l.percentagem).toFixed(0)}%</b>${sobe < 0 ? ' <span style="color:#e09486">(desce)</span>' : ""}</span>
+        </div>`;
+    }).join("");
+    return `<div style="background:rgba(181,136,99,.12);border:1px solid rgba(181,136,99,.35);border-radius:8px;padding:12px 14px;margin-bottom:6px">
+        <div style="font-weight:600;font-size:13px;margin-bottom:4px">📏 Corte da semana de ${esc(semana)} por aprovar</div>
+        <div style="font-size:11px;opacity:.7;margin-bottom:6px">Medido por ${esc(c.funcionarios?.nome || "—")}. Só depois de aprovares é que as % mudam e o cliente as vê.</div>
+        ${linhas}
+        ${c.notas ? `<div style="font-size:12px;opacity:.8;margin-top:6px;white-space:pre-wrap">"${esc(c.notas)}"</div>` : ""}
+        <div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end">
+            <button class="btn-secondary" style="padding:4px 12px;font-size:12px" onclick="rejeitarCorte('${esc(c.id)}')">Rejeitar</button>
+            <button class="btn-primary" style="padding:4px 12px;font-size:12px" onclick="aprovarCorte('${esc(c.id)}')">Aprovar</button>
+        </div>
+    </div>`;
+}
+
+async function aprovarCorte(id, depois = servicosMudaram) {
+    const { error } = await SB.rpc("corte_aprovar", { p_corte_id: id });
+    if (error) { console.error(error); alert("Não foi possível aprovar o corte: " + error.message); return false; }
+    await depois();
+    if (typeof listaMudou === "function") listaMudou();
+    return true;
+}
+
+async function rejeitarCorte(id, depois = servicosMudaram) {
+    if (!confirm("Rejeitar este corte? As % ficam como estavam e quem mediu pode voltar a enviar esta semana.")) return false;
+    const { error } = await SB.from("cortes_semanais").update({ estado: "rejeitado", tratado_em: new Date().toISOString() }).eq("id", id);
+    if (error) { console.error(error); alert("Não foi possível rejeitar o corte."); return false; }
+    await depois();
+    if (typeof listaMudou === "function") listaMudou();
+    return true;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2644,13 +2994,15 @@ async function abrirPainelObra(obra, tabInicial = "resumo") {
             ], "É o que sobra do valor dos serviços depois de tirar o custo real, sem IVA. Não é o dinheiro em caixa: para isso vê o Resumo (recebido menos gasto)."),
         },
         {
-            label: "Serviços",
-            val: `${concluidosCount}/${(servicos||[]).length}`,
-            sub: "concluídos",
+            label: "Avanço",
+            val: `${avancoDosPacotes(servicos)}%`,
+            sub: `${concluidosCount}/${(servicos||[]).length} pacotes feitos`,
             cor: concluidosCount === (servicos||[]).length ? "#8fbfa0" : "rgba(255,255,255,.7)",
             accent: "#8fbfa0",
-            contas: botaoContas("Serviços concluídos", (servicos || []).map(x => ({ t: x.nome, v: x.concluido ? "✓ Feito" : "Em curso" })),
-                "Marcas um serviço como feito no separador Serviços, com o botão ✓."),
+            contas: botaoContas("Avanço da obra", [
+                ...(servicos || []).map(x => ({ t: [x.zona, x.nome].filter(Boolean).join(" · ") + ` (${Number(x.valor_orcamento || 0).toFixed(0)} €)`, v: pctPacote(x).toFixed(0) + " %" })),
+                { t: "Avanço da obra", v: avancoDosPacotes(servicos) + " %", total: true },
+            ], "A % de cada pacote pesada pelo seu valor: um pacote de 10 000 € a 50 % conta mais do que um de 1 000 € a 50 %. A % muda quando aprovas o corte semanal, quando a escreves no pacote ou quando o marcas como feito (✓). É esta a % que o cliente vê."),
         },
     ];
 
@@ -2697,12 +3049,21 @@ async function abrirPainelObra(obra, tabInicial = "resumo") {
     };
 
     const tbody = document.getElementById("painelServicosTbody");
-    tbody.innerHTML = (servicos||[]).map(s => {
+    // Agrupados por zona: um título por zona quando há mais do que uma
+    const ordenados = [...(servicos || [])].sort((a, b) =>
+        ((a.zona || "") === "") - ((b.zona || "") === "") || String(a.zona || "").localeCompare(String(b.zona || ""), "pt"));
+    const variasZonas = new Set(ordenados.map(x => (x.zona || "").trim())).size > 1;
+    let zonaAnt = null;
+    tbody.innerHTML = ordenados.map(s => {
+        const z = (s.zona || "").trim();
+        const titulo = variasZonas && z !== zonaAnt
+            ? `<div style="padding:8px 14px 4px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.45);background:rgba(255,255,255,.02)">${esc(z || "Sem zona")} · ${avancoDosPacotes(ordenados.filter(x => (x.zona || "").trim() === z))}%</div>` : "";
+        zonaAnt = z;
         const valor = Number(s.valor_orcamento || 0);
         const mo = moP[s.id]||0, mat = matP[s.id]||0;
         const estadoBadge = s.concluido
             ? `<span style="background:rgba(143,191,160,.15);color:#8fbfa0;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap">✓ Feito</span>`
-            : `<span style="background:rgba(255,255,255,.07);color:rgba(255,255,255,.4);padding:2px 9px;border-radius:10px;font-size:10px;white-space:nowrap">Em curso</span>`;
+            : `<span style="background:rgba(255,255,255,.07);color:rgba(255,255,255,.55);padding:2px 9px;border-radius:10px;font-size:10px;white-space:nowrap">${pctPacote(s).toFixed(0)}% feito</span>`;
         const extraBadge = s.extra
             ? `<span style="background:rgba(251,146,60,.15);color:#fb923c;padding:1px 6px;border-radius:6px;font-size:9px;font-weight:600;margin-left:4px">Extra</span>`
             : "";
@@ -2714,7 +3075,7 @@ async function abrirPainelObra(obra, tabInicial = "resumo") {
             { t: "Margem do serviço", v: valor - mo - mat, total: true },
             ...(d.rec.length ? [{ t: `Recebido do cliente para este serviço (${d.rec.length})`, v: recP[s.id] || 0, itens: d.rec, info: true }] : []),
         ], "Só conta o que ligaste a este serviço (no movimento, no Registo diário ou em \"Custos sem serviço\"). Sem IVA. O recebido é informação e não entra na margem.");
-        return linhaServ(esc(s.nome), extraBadge, valor, mo, mat, estadoBadge,
+        return titulo + linhaServ(esc(s.nome), extraBadge, valor, mo, mat, estadoBadge,
             valor > 0 && (mo + mat) > 0 ? Math.round((mo + mat) / valor * 100) : null, " " + contas);
     }).join("") + (matSemServ + moSemServ >= 1 ? linhaServ(
         `<span style="opacity:.6;font-style:italic">Custos sem serviço</span>`,
@@ -3957,7 +4318,7 @@ async function carregarVisaoGeral() {
     const btn = document.getElementById("vgActualizar");
     if (btn) { btn.disabled = true; btn.textContent = "A ler…"; }
 
-    await Promise.all([vgCarregarAlertas(), vgCarregarNumeros(), vgCarregarObras(), vgCarregarAtalhos()]);
+    await Promise.all([vgCarregarAlertas(), vgCarregarPontoHoje(), vgCarregarNumeros(), vgCarregarObras(), vgCarregarAtalhos()]);
 
     if (btn) {
         btn.disabled = false;
@@ -3968,6 +4329,111 @@ async function carregarVisaoGeral() {
 
 const vgEuros = (n) =>
     new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(Number(n) || 0);
+
+// ---------- Hoje no ponto ----------
+// Quem estava planeado para hoje e onde marcou (ou não). As saídas por
+// marcar (de dias anteriores, ou de hoje depois das 18h30) têm o botão
+// "Lembrar", que abre o WhatsApp com a mensagem pronta para o trabalhador.
+const diaLisboa = d => new Date(d).toLocaleDateString("sv-SE", { timeZone: "Europe/Lisbon" });
+const horaLisboa = d => new Date(d).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Lisbon" });
+
+// WhatsApp com uma mensagem pronta para um número (ver linkWhatsApp, que é
+// a do link da Área do cliente)
+function linkWhatsAppTexto(telefone, texto) {
+    const tel = telefoneWhatsApp(telefone);
+    if (!tel) return null;
+    const msg = encodeURIComponent(texto);
+    return eTelemovel() ? `whatsapp://send?phone=${tel}&text=${msg}` : `https://wa.me/${tel}?text=${msg}`;
+}
+
+// E-mail da Área do cliente: abre o Gmail já na conta geralmaiasolutions,
+// com o destinatário, o assunto e o texto preenchidos. Não envia sozinho:
+// o Alcindo vê e carrega em Enviar. (Sem palavras-passe nem chaves na app.)
+const EMAIL_AREA_CLIENTE = "geralmaiasolutions@gmail.com";
+function linkEmailCliente(email, assunto, corpo) {
+    if (!email || !/@/.test(email)) return null;
+    const q = new URLSearchParams({ authuser: EMAIL_AREA_CLIENTE, view: "cm", fs: "1", to: email, su: assunto, body: corpo });
+    return "https://mail.google.com/mail/?" + q.toString();
+}
+
+async function vgCarregarPontoHoje() {
+    const cont = document.getElementById("vgPontoHoje");
+    if (!cont) return;
+    const hoje = diaLisboa(Date.now());
+    const desde = new Date(Date.now() - 6 * 86400000).toISOString();
+    const [fRes, pRes, tRes] = await Promise.all([
+        SB.from("funcionarios").select("id, nome, telemovel").eq("ativo", true).order("nome"),
+        SB.from("ponto").select("funcionario_id, obra_id, datahora, tipo, a_rever, obras(nome)")
+            .gte("datahora", desde).order("datahora"),
+        SB.from("tarefas").select("obra_id, estado, obras(nome), tarefa_funcionarios(funcionario_id)")
+            .eq("data_prevista", hoje).neq("estado", "cancelada"),
+    ]);
+    if (fRes.error || pRes.error) {
+        console.error(fRes.error || pRes.error);
+        cont.innerHTML = '<div style="padding:14px 0;font-size:13px;opacity:.7">Não foi possível ler o ponto de hoje.</div>';
+        return;
+    }
+    const plan = {};   // funcionário → obras planeadas hoje
+    (tRes.data || []).forEach(t => (t.tarefa_funcionarios || []).forEach(tf => {
+        (plan[tf.funcionario_id] ||= new Map()).set(t.obra_id, t.obras?.nome || "obra");
+    }));
+    const porFunc = {};
+    (pRes.data || []).forEach(p => (porFunc[p.funcionario_id] ||= []).push(p));
+    const tardeHoje = Number(new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Lisbon" }).replace(":", "")) >= 1830;
+
+    const linhas = (fRes.data || []).map(f => {
+        const marcas = porFunc[f.id] || [];
+        const deHoje = marcas.filter(m => diaLisboa(m.datahora) === hoje);
+        const ultima = marcas[marcas.length - 1];
+        const planeadas = plan[f.id] ? [...plan[f.id].entries()] : [];
+        // Saída por marcar: a última marcação é uma entrada de outro dia, ou
+        // de hoje já ao fim da tarde
+        const aberta = ultima?.tipo === "entrada" && (diaLisboa(ultima.datahora) !== hoje || tardeHoje) ? ultima : null;
+        let estado, cor = "rgba(255,255,255,.55)";
+        if (deHoje.length) {
+            const ent = deHoje.find(m => m.tipo === "entrada");
+            const sai = [...deHoje].reverse().find(m => m.tipo === "saida");
+            const obraNome = (ent || deHoje[0]).obras?.nome || "obra";
+            const foraDoPlano = planeadas.length && !planeadas.some(([id]) => id === (ent || deHoje[0]).obra_id);
+            estado = `${ent ? "Entrou " + horaLisboa(ent.datahora) : ""}${sai && (!ent || sai.datahora > ent.datahora) ? " · saiu " + horaLisboa(sai.datahora) : ""} em ${esc(obraNome)}`
+                + (foraDoPlano ? ` <span style="color:#fb923c">(planeado: ${esc(planeadas.map(x => x[1]).join(", "))})</span>` : "");
+            cor = foraDoPlano ? "#fb923c" : "#8fbfa0";
+        } else if (planeadas.length) {
+            estado = `Sem marcação · planeado em ${esc(planeadas.map(x => x[1]).join(", "))}`;
+            cor = "#e09486";
+        } else {
+            return aberta ? { f, estado: "Sem marcação hoje", cor, aberta, ordem: 2 } : null;
+        }
+        return { f, estado, cor, aberta, ordem: cor === "#e09486" ? 0 : cor === "#fb923c" ? 1 : 3 };
+    }).filter(Boolean).sort((a, b) => a.ordem - b.ordem);
+
+    if (!linhas.length) {
+        cont.innerHTML = '<div style="padding:14px 0;font-size:13.5px;opacity:.7">Ninguém planeado nem a marcar hoje.</div>';
+        return;
+    }
+    cont.innerHTML = linhas.map((l, i) => {
+        let aviso = "", botao = "";
+        if (l.aberta) {
+            const diaAb = diaLisboa(l.aberta.datahora), hAb = horaLisboa(l.aberta.datahora);
+            const quando = diaAb === hoje ? "hoje" : "no dia " + dataCurta(diaAb).slice(0, 5);
+            const texto = `Olá ${l.f.nome.split(" ")[0]}, ${quando} marcaste a entrada às ${hAb} e ainda não marcaste a saída. Abre a app do ponto e diz a que horas saíste. Obrigado!`;
+            const url = linkWhatsAppTexto(l.f.telemovel, texto);
+            aviso = `<div style="font-size:12px;color:#fb923c;margin-top:2px">Saída por marcar: entrada ${esc(quando)} às ${hAb}</div>`;
+            botao = url
+                ? `<a class="btn-secondary" style="font-size:12px;padding:4px 12px;flex-shrink:0;text-decoration:none" href="${esc(url)}" target="_blank" rel="noopener noreferrer">📲 Lembrar</a>`
+                : `<span style="font-size:11px;opacity:.6;flex-shrink:0">sem telemóvel na ficha</span>`;
+        }
+        return `<div style="display:flex;align-items:center;gap:12px;padding:11px 0;${i ? "border-top:1px solid rgba(0,0,0,.07)" : ""}">
+            <span style="width:9px;height:9px;border-radius:50%;background:${l.cor};flex-shrink:0"></span>
+            <div style="flex:1;min-width:0">
+                <div style="font-weight:600;font-size:14px">${esc(l.f.nome)}</div>
+                <div style="font-size:12.5px;opacity:.75">${l.estado}</div>
+                ${aviso}
+            </div>
+            ${botao}
+        </div>`;
+    }).join("");
+}
 
 // ---------- O que precisa de decisão ----------
 async function vgCarregarAlertas() {
@@ -3980,7 +4446,9 @@ async function vgCarregarAlertas() {
     const alertas = [];
     try { alertas.push(...await vgRespostasClientes()); }
     catch (e) { console.warn("vgRespostasClientes", e); }
-    for (const procurar of [vgPedidosPorValidar, vgPrecosSubiram, vgDespesasSemObra,
+    try { const a = await vgPedidosClientes(); if (a) alertas.push(a); }
+    catch (e) { console.warn("vgPedidosClientes", e); }
+    for (const procurar of [vgCortesPorAprovar, vgPedidosPorValidar, vgPrecosSubiram, vgDespesasSemObra,
                             vgFaturasPorPagar, vgStockAbaixoMinimo, vgTarefasAtrasadas, vgPontoParaCorrigir]) {
         try { const a = await procurar(); if (a) alertas.push(a); }
         catch (e) { console.warn(procurar.name, e); }
@@ -4001,11 +4469,19 @@ async function vgCarregarAlertas() {
             </div>
             ${a.lista || a.fluxo || a.tab || a.ir || a.orc || a.accao ? `<button class="btn-secondary" style="font-size:12px;padding:4px 12px;flex-shrink:0"
                         onclick="${a.lista ? `abrirListaRapida('${a.lista}')`
-                                 : a.accao ? a.accao
+                                 : a.accao ? vgAccaoOnclick(a.accao)
                                  : a.fluxo ? `abrirFluxoFiltrado(${esc(JSON.stringify(a.fluxo))})`
                                  : a.orc ? `abrirOrcamentoPeloNumero(${esc(JSON.stringify(a.orc))})`
                                  : a.tab ? `abrirTab('${a.tab}')` : `location.href='${a.ir}'`}">Ver</button>` : ""}
         </div>`).join("");
+}
+
+// A acção do botão "Ver" vem como { fn, arg }: só correm funções desta lista
+// e o argumento entra como texto JSON escapado, nunca colado no código.
+const VG_ACCOES = new Set(["abrirPontoParaCorrigir"]);
+function vgAccaoOnclick(a) {
+    if (!a || !VG_ACCOES.has(a.fn)) return "";
+    return `${a.fn}(${esc(JSON.stringify(a.arg ?? null))})`;
 }
 
 async function vgRespostasClientes() {
@@ -4017,10 +4493,10 @@ async function vgRespostasClientes() {
         const quando = new Date(r.created_at).toLocaleString("pt-PT",
             { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
         const quem = o.cliente_nome || o.obras?.nome || "Cliente";
-        const aceite = r.resposta === "aceite";
-        return { icone: aceite ? "✅" : "💬", cor: "rgba(181,136,99,.22)",
-                 titulo: `${quem} ${aceite ? "aceitou" : "comentou"} o orçamento ${o.numero || ""}`.trim(),
-                 sub: (r.comentario ? `"${r.comentario}"` : aceite ? "Falta confirmares o aceite" : "Sem comentário")
+        const aceite = r.resposta === "aceite", recusa = r.resposta === "recusa";
+        return { icone: aceite ? "✅" : recusa ? "❌" : "💬", cor: "rgba(181,136,99,.22)",
+                 titulo: `${quem} ${aceite ? "aceitou" : recusa ? "recusou" : "comentou"} o orçamento ${o.numero || ""}`.trim(),
+                 sub: (r.comentario ? `"${r.comentario}"` : aceite ? "Falta confirmares o aceite" : recusa ? "Sem motivo" : "Sem comentário")
                       + ` · ${quando}`,
                  orc: o.numero || "" };
     });
@@ -4033,6 +4509,29 @@ function abrirOrcamentoPeloNumero(numero) {
     if (pesq) pesq.value = numero || "";
     abrirTab("orcamentos");
     if (typeof switchOrcSub === "function") switchOrcSub("clientes");
+}
+
+// Pedidos que os clientes escreveram na Área do cliente, por responder
+async function vgPedidosClientes() {
+    const { data, error } = await SB.from("cliente_pedidos").select("id, tipo, clientes(nome)").eq("estado", "novo");
+    if (error || !data?.length) return null;   // sem o SQL novo a tabela não existe
+    const recl = data.filter(p => p.tipo === "reclamacao").length;
+    const quem = [...new Set(data.map(p => p.clientes?.nome || "Cliente"))];
+    return { icone: recl ? "⚠️" : "✉️", cor: "rgba(181,136,99,.22)",
+             titulo: (data.length === 1 ? "1 pedido de cliente" : `${data.length} pedidos de clientes`) + (recl ? ` (${recl} reclamaç${recl === 1 ? "ão" : "ões"})` : ""),
+             sub: quem.slice(0, 3).join(", ") + (quem.length > 3 ? "…" : "") + " · a resposta aparece na Área do cliente",
+             lista: "pedidosCliente" };
+}
+
+// Cortes semanais das obras à espera de aprovação
+async function vgCortesPorAprovar() {
+    const { data, error } = await SB.from("cortes_semanais").select("id, obras(nome)").eq("estado", "pendente");
+    if (error || !data?.length) return null;   // sem o SQL novo a tabela não existe
+    const obras = [...new Set(data.map(c => c.obras?.nome || "obra"))];
+    return { icone: "📏", cor: "rgba(181,136,99,.22)",
+             titulo: data.length === 1 ? "1 corte semanal por aprovar" : `${data.length} cortes semanais por aprovar`,
+             sub: obras.slice(0, 3).join(", ") + (obras.length > 3 ? "…" : "") + " · o cliente só vê a % depois de aprovares",
+             lista: "cortes" };
 }
 
 async function vgPedidosPorValidar() {
@@ -4149,7 +4648,7 @@ async function vgPontoParaCorrigir() {
     return { icone: "🕐", cor: "rgba(181,136,99,.22)",
              titulo: itens.length === 1 ? "1 dia de ponto para corrigir" : `${itens.length} dias de ponto para corrigir`,
              sub: nomes.slice(0, 3).join(", ") + (nomes.length > 3 ? "…" : "") + porMes,
-             accao: `abrirPontoParaCorrigir('${maisRecente.dia}')` };
+             accao: { fn: "abrirPontoParaCorrigir", arg: maisRecente.dia } };
 }
 
 // Abre os Registos de ponto no mês do dia pedido, já na caixa "Para corrigir"
@@ -4223,7 +4722,48 @@ function listaMudou() {
     if (typeof carregarNotificacoes === "function") carregarNotificacoes();
 }
 
+const TIPO_PEDIDO_CLIENTE = { informacao: "Informação", extra: "Trabalho extra", reclamacao: "Reclamação", sugestao: "Sugestão" };
 const LISTAS_RAPIDAS = {
+    // ---- Pedidos dos clientes ----
+    async pedidosCliente() {
+        const { data, error } = await SB.from("cliente_pedidos")
+            .select("id, tipo, mensagem, created_at, obras(nome), clientes(nome, email, telefone)")
+            .eq("estado", "novo").order("created_at");
+        if (error) throw error;
+        const lista = data || [];
+        _vgListas.pedidosCliente = lista;
+        listaPreencher(lista.length === 1 ? "1 pedido de cliente" : `${lista.length} pedidos de clientes`,
+            "O que escreveres aparece ao cliente na Área do cliente. Depois podes avisá-lo por WhatsApp ou e-mail.",
+            lista.map((p, i) => `<div class="lista-linha" style="display:block">
+                <div style="font-weight:600">${esc(p.clientes?.nome || "Cliente")} · ${esc(TIPO_PEDIDO_CLIENTE[p.tipo] || p.tipo)}${p.obras?.nome ? ` · ${esc(p.obras.nome)}` : ""}</div>
+                <div class="lista-det">${esc(new Date(p.created_at).toLocaleString("pt-PT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }))}</div>
+                <div style="white-space:pre-wrap;margin:6px 0;font-size:13.5px">${esc(p.mensagem)}</div>
+                <textarea id="pedResp-${i}" rows="3" maxlength="4000" placeholder="A tua resposta ao cliente" style="width:100%"></textarea>
+                <div class="lista-accoes" style="justify-content:flex-end;margin-top:6px;flex-wrap:wrap;gap:6px">
+                    <button type="button" class="btn-secondary" onclick="listaPedidoFechar(${i}, this)">Fechar sem resposta</button>
+                    <button type="button" class="btn-primary" onclick="listaPedidoResponder(${i}, this)">Responder</button>
+                </div>
+            </div>`).join(""));
+    },
+
+    // ---- Cortes semanais por aprovar ----
+    async cortes() {
+        const { data, error } = await SB.from("cortes_semanais")
+            .select("id, semana, notas, obra_id, obras(nome), funcionarios(nome), corte_linhas(obra_servico_id, percentagem_antes, percentagem, obra_servicos(nome, zona))")
+            .eq("estado", "pendente").order("semana");
+        if (error) throw error;
+        const lista = data || [];
+        listaPreencher(lista.length === 1 ? "1 corte por aprovar" : `${lista.length} cortes por aprovar`,
+            "A % que quem está na obra mediu esta semana. Só depois de aprovares é que o cliente a vê.",
+            lista.map(c => {
+                const servs = Object.fromEntries((c.corte_linhas || []).map(l => [l.obra_servico_id, l.obra_servicos || {}]));
+                return `<div class="lista-linha" style="display:block">
+                    <div style="font-weight:600;margin-bottom:4px">${esc(c.obras?.nome || "Obra")}</div>
+                    ${htmlCortePendente(c, servs).replace(/onclick="(aprovar|rejeitar)Corte\('([^']+)'\)"/g, (m, f, id) => `onclick="listaCorte('${f}', '${id}')"`)}
+                </div>`;
+            }).join(""));
+    },
+
     // ---- Faturas por pagar (e pagamentos em atraso do sino) ----
     async porPagar() {
         const { data, error } = await SB.from("movimentos_financeiros")
@@ -4257,13 +4797,21 @@ const LISTAS_RAPIDAS = {
 
     // ---- Despesas sem obra: escolhe-se a obra ali mesmo ----
     async semObra() {
-        const [{ data, error }, { data: obras }] = await Promise.all([
+        const [{ data, error }, { data: obras, error: errObras }] = await Promise.all([
             SB.from("movimentos_financeiros")
                 .select("id, referencia, data_documento, valor_total, fornecedores(nome)")
                 .is("obra_id", null).eq("tipo", "saida").eq("ativo", true).order("data_documento", { ascending: false }),
             SB.from("obras").select("id, nome, estado").order("nome"),
         ]);
         if (error) throw error;
+        // Sem a lista de obras não há como escolher: diz-se, em vez de mostrar
+        // um seletor vazio que parece não haver obras
+        if (errObras) {
+            console.error(errObras);
+            listaPreencher("Despesas sem obra", "",
+                '<div style="opacity:.75;font-size:13px;padding:10px 0">Não foi possível ler as obras. Fecha e volta a abrir a lista.</div>');
+            return;
+        }
         const lista = data || [];
         // As activas primeiro; as outras ficam para despesas de obras já acabadas
         const ord = [...(obras || [])].sort((a, b) => (a.estado === "ativa" ? 0 : 1) - (b.estado === "ativa" ? 0 : 1));
@@ -4367,8 +4915,15 @@ async function listaMarcarPaga(i, btn) {
         `<span class="lista-feito">Paga ✓</span><button type="button" class="btn-secondary lista-desfazer">Desfazer</button>`;
     linha.querySelector(".lista-desfazer").onclick = async (e) => {
         e.target.disabled = true;
+        // Desfaz só o que este botão fez: volta a "por pagar" e tira a nota.
+        // Se as observações mudaram entretanto, mantém-se o que lá está agora.
+        const { data: atual } = await SB.from("movimentos_financeiros").select("observacoes").eq("id", m.id).maybeSingle();
+        const agora = atual?.observacoes ?? "";
+        const semNota = agora === obs ? (m.observacoes ?? null)
+            : agora.includes(nota) ? (agora.replace(" · " + nota, "").replace(nota, "").trim() || null)
+            : (agora || null);
         const { error: err } = await SB.from("movimentos_financeiros")
-            .update({ estado_pagamento: "por_pagar", observacoes: m.observacoes ?? null }).eq("id", m.id);
+            .update({ estado_pagamento: "por_pagar", observacoes: semNota }).eq("id", m.id).eq("estado_pagamento", "pago");
         if (err) { console.error(err); alert("Não foi possível desfazer."); e.target.disabled = false; return; }
         await LISTAS_RAPIDAS.porPagar();
         listaMudou();
@@ -4403,6 +4958,45 @@ async function listaPorObra(movId, sel) {
     linha.classList.add("feita");
     linha.querySelector(".lista-accoes").innerHTML = `<span class="lista-feito">${esc(nome)} ✓</span>`;
     listaMudou();
+}
+
+async function listaPedidoResponder(i, btn) {
+    const p = _vgListas.pedidosCliente?.[i];
+    const txt = document.getElementById("pedResp-" + i)?.value.trim();
+    if (!p) return;
+    if (!txt) { alert("Escreve a resposta."); return; }
+    btn.disabled = true;
+    const { error } = await SB.from("cliente_pedidos")
+        .update({ resposta: txt, estado: "respondido", respondido_em: new Date().toISOString() }).eq("id", p.id);
+    if (error) { console.error(error); alert("Não foi possível gravar a resposta."); btn.disabled = false; return; }
+    const c = p.clientes || {}, primeiro = (c.nome || "").trim().split(/\s+/)[0];
+    const aviso = `Olá ${primeiro}, respondemos ao seu pedido na Área do cliente da Maia Solutions.`;
+    const wa = linkWhatsAppTexto(c.telefone, aviso);
+    const mail = linkEmailCliente(c.email, "Resposta ao seu pedido", `${aviso}\n\n${txt}\n\nMaia Solutions`);
+    const linha = btn.closest(".lista-linha");
+    linha.classList.add("feita");
+    linha.querySelector(".lista-accoes").innerHTML = `<span class="lista-feito">Respondido ✓</span>`
+        + (wa ? `<a class="btn-secondary" href="${esc(wa)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none">📲 Avisar</a>` : "")
+        + (mail ? `<a class="btn-secondary" href="${esc(mail)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none">✉️ E-mail</a>` : "");
+    listaMudou();
+}
+
+async function listaPedidoFechar(i, btn) {
+    const p = _vgListas.pedidosCliente?.[i];
+    if (!p) return;
+    btn.disabled = true;
+    const { error } = await SB.from("cliente_pedidos").update({ estado: "fechado" }).eq("id", p.id);
+    if (error) { console.error(error); alert("Não foi possível fechar o pedido."); btn.disabled = false; return; }
+    const linha = btn.closest(".lista-linha");
+    linha.classList.add("feita");
+    linha.querySelector(".lista-accoes").innerHTML = `<span class="lista-feito">Fechado ✓</span>`;
+    listaMudou();
+}
+
+async function listaCorte(accao, id) {
+    const depois = () => LISTAS_RAPIDAS.cortes();
+    if (accao === "aprovar") await aprovarCorte(id, depois);
+    else await rejeitarCorte(id, depois);
 }
 
 async function listaTarefaFeita(id, btn) {
@@ -6142,6 +6736,7 @@ function mostrarAcessoCliente(c) {
             ${tel
                 ? `<a class="btn-primary" href="${esc(linkWhatsApp(c))}" ${eTelemovel() ? "" : 'target="_blank" rel="noopener"'} style="text-decoration:none">📲 Enviar por WhatsApp</a>`
                 : `<button class="btn-primary" disabled title="Falta o telefone do cliente">📲 Enviar por WhatsApp</button>`}
+            ${c.email ? `<a class="btn-secondary" href="${esc(linkEmailCliente(c.email, "A sua Área do cliente Maia Solutions", textoLinkCliente(c)))}" target="_blank" rel="noopener" style="text-decoration:none">✉️ Enviar por e-mail</a>` : ""}
             <button class="btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById('fcLink').value).then(() => this.textContent = '✓ Copiado')">Copiar</button>
             <a class="btn-secondary" href="${esc(link)}" target="_blank" rel="noopener" style="text-decoration:none">Ver como o cliente</a>
             <button class="btn-secondary" onclick="desligarAcessoCliente('${c.id}')">Desligar</button>
@@ -6189,11 +6784,15 @@ const eTelemovel = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 // bloqueia janelas abertas fora do toque do utilizador. No telemóvel usa-se
 // whatsapp://, que abre logo a app; o wa.me ficava na página do WhatsApp com
 // um botão "Abrir app". No computador fica o wa.me (WhatsApp Web).
-function linkWhatsApp(c) {
+function textoLinkCliente(c) {
     const primeiro = (c.nome || "").trim().split(/\s+/)[0];
-    const texto = `Olá ${primeiro}, a Maia Solutions criou a sua Área do cliente. ` +
+    return `Olá ${primeiro}, a Maia Solutions criou a sua Área do cliente. ` +
         `Pode acompanhar a sua obra e consultar orçamentos, faturas, recibos e fotografias neste link:\n` +
         `${linkAreaCliente(c.token_acesso)}\n\nGuarde esta mensagem: o link é pessoal, por favor não o partilhe.`;
+}
+
+function linkWhatsApp(c) {
+    const texto = textoLinkCliente(c);
     const tel = telefoneWhatsApp(c.telefone), msg = encodeURIComponent(texto);
     return eTelemovel()
         ? `whatsapp://send?phone=${tel}&text=${msg}`
@@ -7589,6 +8188,14 @@ async function confirmarRespostaCliente(o) {
     if (r.resposta === 'aceite') {
         if (o.estado !== 'aceite') return mudarEstadoOrcamento(o, 'aceite');   // também trata a resposta
         await tratarRespostaCliente(r, 'confirmada');
+    } else if (r.resposta === 'recusa') {
+        // Confirmar a recusa: o orçamento passa a recusado
+        if (o.estado !== 'recusado') {
+            if (o.estado === 'aceite') return mudarEstadoOrcamento(o, 'recusado');
+            const { error } = await SB.from('orcamentos').update({ estado: 'recusado' }).eq('id', o.id);
+            if (error) { alert('Não foi possível marcar o orçamento como recusado: ' + error.message); return; }
+        }
+        await tratarRespostaCliente(r, 'confirmada');
     } else {
         await tratarRespostaCliente(r, 'vista');
     }
@@ -7606,13 +8213,13 @@ async function ignorarRespostaCliente(o) {
 
 function htmlRespostaCliente(r) {
     const quando = new Date(r.created_at).toLocaleString('pt-PT', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
-    const aceite = r.resposta === 'aceite';
+    const aceite = r.resposta === 'aceite', recusa = r.resposta === 'recusa';
     return `<div class="resp-cliente" style="margin-top:6px;padding:6px 8px;border-radius:8px;background:rgba(181,136,99,.12);font-size:11px;line-height:1.4">
-        <div style="font-weight:600">${aceite ? '👤 Cliente aceitou' : '✏️ Cliente pede alterações'} · ${esc(quando)}</div>
+        <div style="font-weight:600">${aceite ? '👤 Cliente aceitou' : recusa ? '❌ Cliente recusou' : '✏️ Cliente pede alterações'} · ${esc(quando)}</div>
         ${r.comentario ? `<div style="opacity:.8;white-space:pre-wrap;margin-top:2px">${esc(r.comentario)}</div>` : ''}
         <div style="display:flex;gap:6px;margin-top:5px">
-            <button class="btn-resp-ok btn-primary" style="padding:3px 10px;font-size:11px">${aceite ? 'Confirmar aceite' : 'Visto'}</button>
-            ${aceite ? '<button class="btn-resp-nao btn-secondary" style="padding:3px 10px;font-size:11px">Ignorar</button>' : ''}
+            <button class="btn-resp-ok btn-primary" style="padding:3px 10px;font-size:11px">${aceite ? 'Confirmar aceite' : recusa ? 'Confirmar recusa' : 'Visto'}</button>
+            ${aceite || recusa ? '<button class="btn-resp-nao btn-secondary" style="padding:3px 10px;font-size:11px">Ignorar</button>' : ''}
         </div>
     </div>`;
 }
@@ -8724,7 +9331,7 @@ async function carregarNotificacoes() {
         respostas.forEach(r => {
             html += `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer" onclick="abrirOrcamentoPeloNumero(${esc(JSON.stringify(r.orcamentos?.numero || ""))})">
                 <div style="font-size:13px;font-weight:500;color:var(--text-dark)">${esc(r.orcamentos?.cliente_nome || "Cliente")} · ${esc(r.orcamentos?.numero || "")}</div>
-                <div style="font-size:11px;color:var(--primary);margin-top:2px">${r.resposta === "aceite" ? "Aceitou o orçamento: falta confirmares" : "Pediu alterações"}</div>
+                <div style="font-size:11px;color:var(--primary);margin-top:2px">${r.resposta === "aceite" ? "Aceitou o orçamento: falta confirmares" : r.resposta === "recusa" ? "Recusou o orçamento" : "Pediu alterações"}</div>
             </div>`;
         });
     }
