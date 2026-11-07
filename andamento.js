@@ -770,7 +770,7 @@ async function pedirSugestaoFases(obra, orcId) {
         desenharSugestaoFases();
     } catch (e) {
         console.error("sugerirFasesDoOrcamento:", e);
-        abrirModalSugestaoFases(`<div style="padding:20px 6px;color:#e09486">Não foi possível fazer a sugestão: ${esc(e.message)}</div>
+        abrirModalSugestaoFases(`<div style="padding:20px 6px;color:#e09486">${esc(/^Não foi possível/.test(e.message) ? e.message : "Não foi possível fazer a sugestão: " + e.message)}</div>
             <div style="display:flex;justify-content:flex-end"><button class="btn-secondary" onclick="fecharSugestaoFases()">Fechar</button></div>`);
     }
 }

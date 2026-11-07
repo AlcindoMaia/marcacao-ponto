@@ -29,6 +29,7 @@ const MAX_BYTES = 8 * 1024 * 1024;
 const MAX_FASES   = 15;
 const MAX_PACOTES = 60;
 const MAX_LINHAS  = 300;
+const MAX_SAIDA   = 12000;   // tokens de resposta; no plano grátis a função tem 150 s, por isso as linhas vêm em formato curto
 
 const CORS = {
     "Access-Control-Allow-Origin": "*",
@@ -60,7 +61,9 @@ ${linhasTexto}
 As linhas já estão lidas: NÃO devolvas "linhas".`
         : `O orçamento vem em PDF, em anexo. Primeiro lê TODAS as linhas de
 artigos, pela ordem do documento, numeradas a partir de 1, e devolve-as em
-"linhas". O valor de cada linha é o da coluna "Valor sem IVA" (ou o total da
+"linhas", cada uma como [n, "descrição curta", valor] (descrição com 50
+caracteres no máximo: um orçamento grande tem centenas de linhas e a
+resposta não pode ficar cortada). O valor de cada linha é o da coluna "Valor sem IVA" (ou o total da
 linha sem IVA). Não contes linhas de "Transporte" / "Total a transportar"
 entre páginas, nem subtotais, nem totais: só artigos. Se o PDF repetir o
 documento (Original, Duplicado), lê-o uma vez. Números em formato
@@ -93,7 +96,7 @@ O que é cada coisa:
 
 Devolves SEMPRE este JSON, sem texto à volta:
 {
-  ${linhasTexto ? "" : `"linhas": [ { "n": number, "descricao": string, "valor": number|null } ],
+  ${linhasTexto ? "" : `"linhas": [ [n, "descrição curta", valor|null] ],
   `}"fases": [
     { "nome": string,
       "pacotes": [ { "nome": string, "criterio_fim": string, "linhas": [number] } ] }
@@ -108,7 +111,9 @@ Regras, e são para cumprir:
   para a fase em que o trabalho fica terminado.
 - Não inventes trabalho que não está no orçamento.
 - No máximo ${MAX_FASES} fases e ${MAX_PACOTES} pacotes.
-- Descrições de linhas curtas: até 90 caracteres.
+- Sê breve: nomes de pacotes até 50 caracteres, "criterio_fim" até 60.
+- Num orçamento grande junta várias linhas do mesmo trabalho num pacote
+  (ex.: um pacote por capítulo e zona), em vez de um pacote por linha.
 - "notas": até 3 frases curtas com o que assumiste ou o que convém o
   Alcindo confirmar (ex.: a ordem de dois trabalhos).`;
 }
@@ -216,7 +221,7 @@ Deno.serve(async (req) => {
             },
             body: JSON.stringify({
                 model: MODELO,
-                max_tokens: 8000,
+                max_tokens: MAX_SAIDA,
                 system: instrucoes(orc, fasesExistentes, linhasTexto),
                 messages: [{ role: "user", content: conteudo }],
             }),
@@ -225,7 +230,7 @@ Deno.serve(async (req) => {
         if (!r.ok) throw new Error(j?.error?.message || `HTTP ${r.status}`);
         tokIn  = j?.usage?.input_tokens  ?? 0;
         tokOut = j?.usage?.output_tokens ?? 0;
-        if (j?.stop_reason === "max_tokens") throw new Error("a resposta ficou cortada (orçamento muito grande)");
+        if (j?.stop_reason === "max_tokens") throw new Error("a resposta ficou cortada: o orçamento é grande demais para uma sugestão de uma vez");
 
         const bruto = (j.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
         const limpo = bruto.trim().replace(/^```(?:json)?/, "").replace(/```$/, "").trim();
@@ -252,7 +257,9 @@ Deno.serve(async (req) => {
     const avisos: string[] = [];
 
     if (origem === "pdf") {
-        linhas = (Array.isArray(d?.linhas) ? d.linhas : []).slice(0, MAX_LINHAS).map((l: any, i: number) => {
+        linhas = (Array.isArray(d?.linhas) ? d.linhas : []).slice(0, MAX_LINHAS).map((x: any, i: number) => {
+            // Vem como [n, descrição, valor]; aceita também { n, descricao, valor }
+            const l = Array.isArray(x) ? { n: x[0], descricao: x[1], valor: x[2] } : x;
             const v = l?.valor == null || l.valor === "" ? null : Number(l.valor);
             return {
                 n: Number.isInteger(Number(l?.n)) ? Number(l.n) : i + 1,
