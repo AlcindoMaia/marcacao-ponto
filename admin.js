@@ -2743,7 +2743,15 @@ function partirSoma(id) {
     el.style.color = v && dif !== 0 ? "#fb923c" : "";
 }
 
+// Evita que um duplo clique em "Partir" crie os pacotes novos duas vezes
+const _partirEmCurso = new Set();
 async function gravarPartir(id) {
+    if (_partirEmCurso.has(id)) return;
+    _partirEmCurso.add(id);
+    try { await _gravarPartir(id); } finally { _partirEmCurso.delete(id); }
+}
+
+async function _gravarPartir(id) {
     const s = _servicosModal[id];
     if (!s) return;
     const linhas = [...document.querySelectorAll(`#partirLinhas-${CSS.escape(id)} .partir-linha`)].map(d => ({
