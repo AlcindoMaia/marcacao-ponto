@@ -2387,6 +2387,72 @@ const pctPacote = s => s?.concluido ? 100 : Math.max(0, Math.min(100, Number(s?.
 // numa semana: o botão "Partir" divide-o por zona.
 const PACOTE_GRANDE = 0.25;
 
+// Modelos de pacotes por tipo de obra (as fases-tipo estão em andamento.js).
+// Só um ponto de partida: [zona, pacote, terminado quando…]. Os valores
+// escrevem-se depois, ou vêm do serviço que se parte.
+const PACOTES_TIPO = {
+    remodelacao: { nome: "Remodelação", pacotes: [
+        ["Geral", "Demolições e remoções", "entulho retirado e espaço limpo"],
+        ["Geral", "Eletricidade (quadro e circuitos)", "quadro montado e circuitos testados"],
+        ["Geral", "Canalização e esgotos", "redes testadas sem fugas"],
+        ["Geral", "Paredes e tetos (pladur/estuque)", "superfícies prontas para pintar"],
+        ["Cozinha", "Revestimentos", "azulejo e pavimento assentes e betumados"],
+        ["Cozinha", "Móveis e equipamentos", "móveis montados e equipamentos a funcionar"],
+        ["Casa de banho", "Revestimentos", "azulejo e pavimento assentes e betumados"],
+        ["Casa de banho", "Loiças e torneiras", "loiças e torneiras montadas, sem fugas"],
+        ["Geral", "Pavimentos", "pavimento assente com rodapés"],
+        ["Geral", "Carpintarias e portas", "portas a abrir e fechar, ferragens montadas"],
+        ["Geral", "Pinturas", "duas demãos, sem manchas"],
+        ["Geral", "Limpeza e entrega", "obra limpa e visita final com o cliente"]] },
+    alvenaria: { nome: "Construção nova (alvenaria)", pacotes: [
+        ["Exterior", "Estaleiro e implantação", "estaleiro montado e obra implantada"],
+        ["Estrutura", "Fundações", "sapatas e lintéis betonados"],
+        ["Estrutura", "Pilares, vigas e lajes", "lajes betonadas e descofradas"],
+        ["Estrutura", "Alvenarias", "paredes levantadas até à cobertura"],
+        ["Cobertura", "Cobertura e impermeabilização", "telhado fechado e sem infiltrações"],
+        ["Interior", "Redes (águas, esgotos, eletricidade)", "redes embutidas e testadas"],
+        ["Exterior", "Caixilharia", "janelas e portas exteriores montadas"],
+        ["Exterior", "Isolamento e capoto", "capoto com acabamento final"],
+        ["Interior", "Rebocos e estuques", "paredes prontas para pintar"],
+        ["Interior", "Revestimentos e pavimentos", "pavimentos e azulejos assentes"],
+        ["Interior", "Carpintarias e loiças", "portas, cozinha e loiças montadas"],
+        ["Interior", "Pinturas", "duas demãos interior e exterior"],
+        ["Exterior", "Arranjos exteriores e limpeza final", "exterior arrumado e obra limpa"]] },
+    steelframe: { nome: "Steel frame", pacotes: [
+        ["Estrutura", "Fundações / laje", "laje betonada e nivelada"],
+        ["Estrutura", "Estrutura LSF", "estrutura montada e aparafusada"],
+        ["Cobertura", "Cobertura", "cobertura fechada e sem infiltrações"],
+        ["Exterior", "Fechamento exterior (OSB e membrana)", "OSB e membrana aplicados em todas as faces"],
+        ["Exterior", "Caixilharia", "janelas e portas exteriores montadas"],
+        ["Interior", "Redes (águas, esgotos, eletricidade)", "redes passadas e testadas"],
+        ["Interior", "Isolamento e placas interiores", "lã e gesso cartonado fechados"],
+        ["Exterior", "Capoto / revestimento exterior", "acabamento final aplicado"],
+        ["Interior", "Acabamentos interiores", "pavimentos, azulejos e carpintarias montados"],
+        ["Interior", "Pinturas", "duas demãos, sem manchas"],
+        ["Geral", "Limpeza e entrega", "obra limpa e visita final com o cliente"]] },
+};
+
+// Obra sem pacotes: criar os do modelo de uma vez (sem valores)
+async function criarPacotesTipo(tipo) {
+    const obraId = document.getElementById("editObraId").value;
+    const t = PACOTES_TIPO[tipo];
+    if (!obraId || !t) return;
+    if (!confirm(`Criar ${t.pacotes.length} pacotes de "${t.nome}"? Depois apagas os que não se aplicam e pões os valores.`)) return;
+    const { error } = await SB.from("obra_servicos").insert(t.pacotes.map(([zona, nome, criterio_fim], i) =>
+        ({ obra_id: obraId, zona, nome, criterio_fim, ordem: i + 1 })));
+    if (error) { console.error(error); alert("Não foi possível criar os pacotes: " + error.message
+        + (/column/.test(error.message) ? "\n\nFalta correr o ficheiro novidades_novembro.sql no Supabase." : "")); return; }
+    await servicosMudaram();
+}
+
+// No ✂️ Partir: enche as linhas com os pacotes do modelo (valores em branco)
+function partirComModelo(id, tipo) {
+    const t = PACOTES_TIPO[tipo], cont = document.getElementById("partirLinhas-" + id);
+    if (!t || !cont) return;
+    cont.innerHTML = "";
+    t.pacotes.forEach(([zona, nome]) => partirLinha(id, zona, nome, ""));
+}
+
 // Avanço da obra: a % de cada pacote pesada pelo seu valor. Sem valores,
 // conta cada pacote por igual.
 function avancoDosPacotes(servicos) {
@@ -2463,7 +2529,10 @@ async function carregarServicosModal() {
 
     const lista = document.getElementById("listaServicos");
     if (!data?.length) {
-        lista.innerHTML = `<div style="opacity:.4;font-size:13px;text-align:center;padding:16px">Sem serviços. Adicione o primeiro aqui em baixo.</div>`;
+        lista.innerHTML = `<div style="opacity:.6;font-size:13px;text-align:center;padding:12px 8px">Sem pacotes. Começa pelo modelo do tipo de obra, ou adiciona um a um aqui em baixo.</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:6px">
+                ${Object.entries(PACOTES_TIPO).map(([k, t]) => `<button class="btn-secondary" style="font-size:12px" onclick="criarPacotesTipo('${k}')">${esc(t.nome)}</button>`).join("")}
+            </div>`;
         return;
     }
     _servicosModal = Object.fromEntries(data.map(s => [s.id, s]));
@@ -2616,7 +2685,7 @@ async function gravarServico(id) {
     };
     const { error } = await SB.from("obra_servicos").update(upd).eq("id", id);
     if (error) { console.error(error); alert("Não foi possível gravar o pacote: " + error.message
-        + (/column/.test(error.message) ? "\n\nFalta correr o ficheiro pacotes_obra.sql no Supabase." : "")); return; }
+        + (/column/.test(error.message) ? "\n\nFalta correr o ficheiro novidades_novembro.sql no Supabase." : "")); return; }
     await servicosMudaram();
 }
 
@@ -2632,7 +2701,13 @@ function partirServico(id) {
             ${v ? `A soma tem de dar <b>${v.toFixed(2)} €</b>.` : ""}</div>
         <div id="partirLinhas-${esc(id)}" style="display:flex;flex-direction:column;gap:6px"></div>
         <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap">
-            <button class="btn-secondary" style="padding:4px 10px;font-size:12px" onclick="partirLinha('${esc(id)}')">+ Pacote</button>
+            <span style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="btn-secondary" style="padding:4px 10px;font-size:12px" onclick="partirLinha('${esc(id)}')">+ Pacote</button>
+                <select style="width:auto;font-size:12px;padding:4px 8px" onchange="if(this.value)partirComModelo('${esc(id)}', this.value)">
+                    <option value="">Usar o modelo de…</option>
+                    ${Object.entries(PACOTES_TIPO).map(([k, t]) => `<option value="${k}">${esc(t.nome)}</option>`).join("")}
+                </select>
+            </span>
             <span id="partirSoma-${esc(id)}" style="font-size:12px;opacity:.75"></span>
             <span style="display:flex;gap:6px">
                 <button class="btn-primary" style="padding:5px 12px;font-size:12px" onclick="gravarPartir('${esc(id)}')">Partir</button>
@@ -4235,7 +4310,7 @@ async function carregarVisaoGeral() {
     const btn = document.getElementById("vgActualizar");
     if (btn) { btn.disabled = true; btn.textContent = "A ler…"; }
 
-    await Promise.all([vgCarregarAlertas(), vgCarregarNumeros(), vgCarregarObras(), vgCarregarAtalhos()]);
+    await Promise.all([vgCarregarAlertas(), vgCarregarPontoHoje(), vgCarregarNumeros(), vgCarregarObras(), vgCarregarAtalhos()]);
 
     if (btn) {
         btn.disabled = false;
@@ -4246,6 +4321,111 @@ async function carregarVisaoGeral() {
 
 const vgEuros = (n) =>
     new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(Number(n) || 0);
+
+// ---------- Hoje no ponto ----------
+// Quem estava planeado para hoje e onde marcou (ou não). As saídas por
+// marcar (de dias anteriores, ou de hoje depois das 18h30) têm o botão
+// "Lembrar", que abre o WhatsApp com a mensagem pronta para o trabalhador.
+const diaLisboa = d => new Date(d).toLocaleDateString("sv-SE", { timeZone: "Europe/Lisbon" });
+const horaLisboa = d => new Date(d).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Lisbon" });
+
+// WhatsApp com uma mensagem pronta para um número (ver linkWhatsApp, que é
+// a do link da Área do cliente)
+function linkWhatsAppTexto(telefone, texto) {
+    const tel = telefoneWhatsApp(telefone);
+    if (!tel) return null;
+    const msg = encodeURIComponent(texto);
+    return eTelemovel() ? `whatsapp://send?phone=${tel}&text=${msg}` : `https://wa.me/${tel}?text=${msg}`;
+}
+
+// E-mail da Área do cliente: abre o Gmail já na conta geralmaiasolutions,
+// com o destinatário, o assunto e o texto preenchidos. Não envia sozinho:
+// o Alcindo vê e carrega em Enviar. (Sem palavras-passe nem chaves na app.)
+const EMAIL_AREA_CLIENTE = "geralmaiasolutions@gmail.com";
+function linkEmailCliente(email, assunto, corpo) {
+    if (!email || !/@/.test(email)) return null;
+    const q = new URLSearchParams({ authuser: EMAIL_AREA_CLIENTE, view: "cm", fs: "1", to: email, su: assunto, body: corpo });
+    return "https://mail.google.com/mail/?" + q.toString();
+}
+
+async function vgCarregarPontoHoje() {
+    const cont = document.getElementById("vgPontoHoje");
+    if (!cont) return;
+    const hoje = diaLisboa(Date.now());
+    const desde = new Date(Date.now() - 6 * 86400000).toISOString();
+    const [fRes, pRes, tRes] = await Promise.all([
+        SB.from("funcionarios").select("id, nome, telemovel").eq("ativo", true).order("nome"),
+        SB.from("ponto").select("funcionario_id, obra_id, datahora, tipo, a_rever, obras(nome)")
+            .gte("datahora", desde).order("datahora"),
+        SB.from("tarefas").select("obra_id, estado, obras(nome), tarefa_funcionarios(funcionario_id)")
+            .eq("data_prevista", hoje).neq("estado", "cancelada"),
+    ]);
+    if (fRes.error || pRes.error) {
+        console.error(fRes.error || pRes.error);
+        cont.innerHTML = '<div style="padding:14px 0;font-size:13px;opacity:.7">Não foi possível ler o ponto de hoje.</div>';
+        return;
+    }
+    const plan = {};   // funcionário → obras planeadas hoje
+    (tRes.data || []).forEach(t => (t.tarefa_funcionarios || []).forEach(tf => {
+        (plan[tf.funcionario_id] ||= new Map()).set(t.obra_id, t.obras?.nome || "obra");
+    }));
+    const porFunc = {};
+    (pRes.data || []).forEach(p => (porFunc[p.funcionario_id] ||= []).push(p));
+    const tardeHoje = Number(new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Lisbon" }).replace(":", "")) >= 1830;
+
+    const linhas = (fRes.data || []).map(f => {
+        const marcas = porFunc[f.id] || [];
+        const deHoje = marcas.filter(m => diaLisboa(m.datahora) === hoje);
+        const ultima = marcas[marcas.length - 1];
+        const planeadas = plan[f.id] ? [...plan[f.id].entries()] : [];
+        // Saída por marcar: a última marcação é uma entrada de outro dia, ou
+        // de hoje já ao fim da tarde
+        const aberta = ultima?.tipo === "entrada" && (diaLisboa(ultima.datahora) !== hoje || tardeHoje) ? ultima : null;
+        let estado, cor = "rgba(255,255,255,.55)";
+        if (deHoje.length) {
+            const ent = deHoje.find(m => m.tipo === "entrada");
+            const sai = [...deHoje].reverse().find(m => m.tipo === "saida");
+            const obraNome = (ent || deHoje[0]).obras?.nome || "obra";
+            const foraDoPlano = planeadas.length && !planeadas.some(([id]) => id === (ent || deHoje[0]).obra_id);
+            estado = `${ent ? "Entrou " + horaLisboa(ent.datahora) : ""}${sai && (!ent || sai.datahora > ent.datahora) ? " · saiu " + horaLisboa(sai.datahora) : ""} em ${esc(obraNome)}`
+                + (foraDoPlano ? ` <span style="color:#fb923c">(planeado: ${esc(planeadas.map(x => x[1]).join(", "))})</span>` : "");
+            cor = foraDoPlano ? "#fb923c" : "#8fbfa0";
+        } else if (planeadas.length) {
+            estado = `Sem marcação · planeado em ${esc(planeadas.map(x => x[1]).join(", "))}`;
+            cor = "#e09486";
+        } else {
+            return aberta ? { f, estado: "Sem marcação hoje", cor, aberta, ordem: 2 } : null;
+        }
+        return { f, estado, cor, aberta, ordem: cor === "#e09486" ? 0 : cor === "#fb923c" ? 1 : 3 };
+    }).filter(Boolean).sort((a, b) => a.ordem - b.ordem);
+
+    if (!linhas.length) {
+        cont.innerHTML = '<div style="padding:14px 0;font-size:13.5px;opacity:.7">Ninguém planeado nem a marcar hoje.</div>';
+        return;
+    }
+    cont.innerHTML = linhas.map((l, i) => {
+        let aviso = "", botao = "";
+        if (l.aberta) {
+            const diaAb = diaLisboa(l.aberta.datahora), hAb = horaLisboa(l.aberta.datahora);
+            const quando = diaAb === hoje ? "hoje" : "no dia " + dataCurta(diaAb).slice(0, 5);
+            const texto = `Olá ${l.f.nome.split(" ")[0]}, ${quando} marcaste a entrada às ${hAb} e ainda não marcaste a saída. Abre a app do ponto e diz a que horas saíste. Obrigado!`;
+            const url = linkWhatsAppTexto(l.f.telemovel, texto);
+            aviso = `<div style="font-size:12px;color:#fb923c;margin-top:2px">Saída por marcar: entrada ${esc(quando)} às ${hAb}</div>`;
+            botao = url
+                ? `<a class="btn-secondary" style="font-size:12px;padding:4px 12px;flex-shrink:0;text-decoration:none" href="${esc(url)}" target="_blank" rel="noopener noreferrer">📲 Lembrar</a>`
+                : `<span style="font-size:11px;opacity:.6;flex-shrink:0">sem telemóvel na ficha</span>`;
+        }
+        return `<div style="display:flex;align-items:center;gap:12px;padding:11px 0;${i ? "border-top:1px solid rgba(0,0,0,.07)" : ""}">
+            <span style="width:9px;height:9px;border-radius:50%;background:${l.cor};flex-shrink:0"></span>
+            <div style="flex:1;min-width:0">
+                <div style="font-weight:600;font-size:14px">${esc(l.f.nome)}</div>
+                <div style="font-size:12.5px;opacity:.75">${l.estado}</div>
+                ${aviso}
+            </div>
+            ${botao}
+        </div>`;
+    }).join("");
+}
 
 // ---------- O que precisa de decisão ----------
 async function vgCarregarAlertas() {
@@ -4258,6 +4438,8 @@ async function vgCarregarAlertas() {
     const alertas = [];
     try { alertas.push(...await vgRespostasClientes()); }
     catch (e) { console.warn("vgRespostasClientes", e); }
+    try { const a = await vgPedidosClientes(); if (a) alertas.push(a); }
+    catch (e) { console.warn("vgPedidosClientes", e); }
     for (const procurar of [vgCortesPorAprovar, vgPedidosPorValidar, vgPrecosSubiram, vgDespesasSemObra,
                             vgFaturasPorPagar, vgStockAbaixoMinimo, vgTarefasAtrasadas, vgPontoParaCorrigir]) {
         try { const a = await procurar(); if (a) alertas.push(a); }
@@ -4319,6 +4501,18 @@ function abrirOrcamentoPeloNumero(numero) {
     if (pesq) pesq.value = numero || "";
     abrirTab("orcamentos");
     if (typeof switchOrcSub === "function") switchOrcSub("clientes");
+}
+
+// Pedidos que os clientes escreveram na Área do cliente, por responder
+async function vgPedidosClientes() {
+    const { data, error } = await SB.from("cliente_pedidos").select("id, tipo, clientes(nome)").eq("estado", "novo");
+    if (error || !data?.length) return null;   // sem o SQL novo a tabela não existe
+    const recl = data.filter(p => p.tipo === "reclamacao").length;
+    const quem = [...new Set(data.map(p => p.clientes?.nome || "Cliente"))];
+    return { icone: recl ? "⚠️" : "✉️", cor: "rgba(181,136,99,.22)",
+             titulo: (data.length === 1 ? "1 pedido de cliente" : `${data.length} pedidos de clientes`) + (recl ? ` (${recl} reclamaç${recl === 1 ? "ão" : "ões"})` : ""),
+             sub: quem.slice(0, 3).join(", ") + (quem.length > 3 ? "…" : "") + " · a resposta aparece na Área do cliente",
+             lista: "pedidosCliente" };
 }
 
 // Cortes semanais das obras à espera de aprovação
@@ -4520,7 +4714,30 @@ function listaMudou() {
     if (typeof carregarNotificacoes === "function") carregarNotificacoes();
 }
 
+const TIPO_PEDIDO_CLIENTE = { informacao: "Informação", extra: "Trabalho extra", reclamacao: "Reclamação", sugestao: "Sugestão" };
 const LISTAS_RAPIDAS = {
+    // ---- Pedidos dos clientes ----
+    async pedidosCliente() {
+        const { data, error } = await SB.from("cliente_pedidos")
+            .select("id, tipo, mensagem, created_at, obras(nome), clientes(nome, email, telefone)")
+            .eq("estado", "novo").order("created_at");
+        if (error) throw error;
+        const lista = data || [];
+        _vgListas.pedidosCliente = lista;
+        listaPreencher(lista.length === 1 ? "1 pedido de cliente" : `${lista.length} pedidos de clientes`,
+            "O que escreveres aparece ao cliente na Área do cliente. Depois podes avisá-lo por WhatsApp ou e-mail.",
+            lista.map((p, i) => `<div class="lista-linha" style="display:block">
+                <div style="font-weight:600">${esc(p.clientes?.nome || "Cliente")} · ${esc(TIPO_PEDIDO_CLIENTE[p.tipo] || p.tipo)}${p.obras?.nome ? ` · ${esc(p.obras.nome)}` : ""}</div>
+                <div class="lista-det">${esc(new Date(p.created_at).toLocaleString("pt-PT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }))}</div>
+                <div style="white-space:pre-wrap;margin:6px 0;font-size:13.5px">${esc(p.mensagem)}</div>
+                <textarea id="pedResp-${i}" rows="3" maxlength="4000" placeholder="A tua resposta ao cliente" style="width:100%"></textarea>
+                <div class="lista-accoes" style="justify-content:flex-end;margin-top:6px;flex-wrap:wrap;gap:6px">
+                    <button type="button" class="btn-secondary" onclick="listaPedidoFechar(${i}, this)">Fechar sem resposta</button>
+                    <button type="button" class="btn-primary" onclick="listaPedidoResponder(${i}, this)">Responder</button>
+                </div>
+            </div>`).join(""));
+    },
+
     // ---- Cortes semanais por aprovar ----
     async cortes() {
         const { data, error } = await SB.from("cortes_semanais")
@@ -4732,6 +4949,39 @@ async function listaPorObra(movId, sel) {
     const linha = sel.closest(".lista-linha");
     linha.classList.add("feita");
     linha.querySelector(".lista-accoes").innerHTML = `<span class="lista-feito">${esc(nome)} ✓</span>`;
+    listaMudou();
+}
+
+async function listaPedidoResponder(i, btn) {
+    const p = _vgListas.pedidosCliente?.[i];
+    const txt = document.getElementById("pedResp-" + i)?.value.trim();
+    if (!p) return;
+    if (!txt) { alert("Escreve a resposta."); return; }
+    btn.disabled = true;
+    const { error } = await SB.from("cliente_pedidos")
+        .update({ resposta: txt, estado: "respondido", respondido_em: new Date().toISOString() }).eq("id", p.id);
+    if (error) { console.error(error); alert("Não foi possível gravar a resposta."); btn.disabled = false; return; }
+    const c = p.clientes || {}, primeiro = (c.nome || "").trim().split(/\s+/)[0];
+    const aviso = `Olá ${primeiro}, respondemos ao seu pedido na Área do cliente da Maia Solutions.`;
+    const wa = linkWhatsAppTexto(c.telefone, aviso);
+    const mail = linkEmailCliente(c.email, "Resposta ao seu pedido", `${aviso}\n\n${txt}\n\nMaia Solutions`);
+    const linha = btn.closest(".lista-linha");
+    linha.classList.add("feita");
+    linha.querySelector(".lista-accoes").innerHTML = `<span class="lista-feito">Respondido ✓</span>`
+        + (wa ? `<a class="btn-secondary" href="${esc(wa)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none">📲 Avisar</a>` : "")
+        + (mail ? `<a class="btn-secondary" href="${esc(mail)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none">✉️ E-mail</a>` : "");
+    listaMudou();
+}
+
+async function listaPedidoFechar(i, btn) {
+    const p = _vgListas.pedidosCliente?.[i];
+    if (!p) return;
+    btn.disabled = true;
+    const { error } = await SB.from("cliente_pedidos").update({ estado: "fechado" }).eq("id", p.id);
+    if (error) { console.error(error); alert("Não foi possível fechar o pedido."); btn.disabled = false; return; }
+    const linha = btn.closest(".lista-linha");
+    linha.classList.add("feita");
+    linha.querySelector(".lista-accoes").innerHTML = `<span class="lista-feito">Fechado ✓</span>`;
     listaMudou();
 }
 
@@ -6478,6 +6728,7 @@ function mostrarAcessoCliente(c) {
             ${tel
                 ? `<a class="btn-primary" href="${esc(linkWhatsApp(c))}" ${eTelemovel() ? "" : 'target="_blank" rel="noopener"'} style="text-decoration:none">📲 Enviar por WhatsApp</a>`
                 : `<button class="btn-primary" disabled title="Falta o telefone do cliente">📲 Enviar por WhatsApp</button>`}
+            ${c.email ? `<a class="btn-secondary" href="${esc(linkEmailCliente(c.email, "A sua Área do cliente Maia Solutions", textoLinkCliente(c)))}" target="_blank" rel="noopener" style="text-decoration:none">✉️ Enviar por e-mail</a>` : ""}
             <button class="btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById('fcLink').value).then(() => this.textContent = '✓ Copiado')">Copiar</button>
             <a class="btn-secondary" href="${esc(link)}" target="_blank" rel="noopener" style="text-decoration:none">Ver como o cliente</a>
             <button class="btn-secondary" onclick="desligarAcessoCliente('${c.id}')">Desligar</button>
@@ -6525,11 +6776,15 @@ const eTelemovel = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 // bloqueia janelas abertas fora do toque do utilizador. No telemóvel usa-se
 // whatsapp://, que abre logo a app; o wa.me ficava na página do WhatsApp com
 // um botão "Abrir app". No computador fica o wa.me (WhatsApp Web).
-function linkWhatsApp(c) {
+function textoLinkCliente(c) {
     const primeiro = (c.nome || "").trim().split(/\s+/)[0];
-    const texto = `Olá ${primeiro}, a Maia Solutions criou a sua Área do cliente. ` +
+    return `Olá ${primeiro}, a Maia Solutions criou a sua Área do cliente. ` +
         `Pode acompanhar a sua obra e consultar orçamentos, faturas, recibos e fotografias neste link:\n` +
         `${linkAreaCliente(c.token_acesso)}\n\nGuarde esta mensagem: o link é pessoal, por favor não o partilhe.`;
+}
+
+function linkWhatsApp(c) {
+    const texto = textoLinkCliente(c);
     const tel = telefoneWhatsApp(c.telefone), msg = encodeURIComponent(texto);
     return eTelemovel()
         ? `whatsapp://send?phone=${tel}&text=${msg}`

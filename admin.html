@@ -704,6 +704,11 @@ document.getElementById("btnLogin").addEventListener("click", function () {
         </div>
         <div id="vgAlertas" class="card" style="padding:4px 18px"></div>
 
+        <!-- Ponto de hoje face ao planeamento -->
+        <h2 style="font-family:var(--font-title);font-size:18px;font-weight:400;letter-spacing:1px;text-transform:uppercase;margin:24px 0 10px">
+            Hoje no ponto</h2>
+        <div id="vgPontoHoje" class="card" style="padding:4px 18px"></div>
+
         <!-- Números do mês -->
         <h2 style="font-family:var(--font-title);font-size:18px;font-weight:400;letter-spacing:1px;text-transform:uppercase;margin:24px 0 10px">
             Como vai o mês</h2>
@@ -1526,11 +1531,11 @@ document.getElementById("btnLogin").addEventListener("click", function () {
                 </button>
                 <button class="painel-tab" data-tab="andamento" onclick="abrirPainelTab('andamento')"
                     style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title,sans-serif);letter-spacing:.5px;white-space:nowrap">
-                    <span class="pt-ic">🗓️</span><span class="pt-txt">Andamento</span>
+                    <span class="pt-ic">🗓️</span><span class="pt-txt" data-curto="Plano">Andamento</span>
                 </button>
                 <button class="painel-tab" data-tab="financeiro" onclick="abrirPainelTab('financeiro')"
                     style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title,sans-serif);letter-spacing:.5px;white-space:nowrap">
-                    <span class="pt-ic">💰</span><span class="pt-txt">Financeiro</span>
+                    <span class="pt-ic">💰</span><span class="pt-txt" data-curto="Contas">Financeiro</span>
                 </button>
                 <button class="painel-tab" data-tab="ponto" onclick="abrirPainelTab('ponto')"
                     style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font-title,sans-serif);letter-spacing:.5px;white-space:nowrap">

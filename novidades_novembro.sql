@@ -1,5 +1,5 @@
 -- =======================================================
--- PACOTES POR ZONA E CORTE SEMANAL DA OBRA
+-- NOVIDADES DE NOVEMBRO: PACOTES, CORTE SEMANAL, PEDIDOS DO CLIENTE…
 --
 -- 1. Os serviços da obra passam a ser "pacotes" de trabalho entregável:
 --    cada um tem a zona onde fica (Cozinha, WC, Fachada…), quem responde
@@ -16,6 +16,9 @@
 --
 -- 3. Área do cliente: o cliente pode também recusar um orçamento
 --    (resposta "recusa"), além de aceitar ou pedir alterações.
+--
+-- 4. Pedidos do cliente (informação, extras, reclamações, sugestões), que
+--    chegam ao "Precisa de ti" e recebem resposta na Área do cliente.
 --
 -- Correr no SQL Editor do Supabase. Pode correr-se mais de uma vez.
 -- =======================================================
@@ -224,3 +227,29 @@ $$;
 alter table orcamento_respostas drop constraint if exists orcamento_respostas_resposta_check;
 alter table orcamento_respostas add constraint orcamento_respostas_resposta_check
     check (resposta in ('aceite', 'alteracoes', 'recusa'));
+
+-- ---------- 4. Pedidos do cliente (Área do cliente) ----------
+-- O cliente escreve um pedido (informação, extra, reclamação ou sugestão)
+-- sobre uma obra dele. Chega ao Alcindo no "Precisa de ti"; a resposta que
+-- ele escrever aparece ao cliente na Área do cliente. Só a função
+-- area-cliente (chave de serviço) escreve pedidos.
+create table if not exists cliente_pedidos (
+    id             uuid primary key default gen_random_uuid(),
+    cliente_id     uuid not null references clientes(id) on delete cascade,
+    obra_id        uuid references obras(id) on delete set null,
+    tipo           text not null check (tipo in ('informacao', 'extra', 'reclamacao', 'sugestao')),
+    mensagem       text not null check (char_length(mensagem) between 1 and 2000),
+    estado         text not null default 'novo' check (estado in ('novo', 'respondido', 'fechado')),
+    resposta       text check (char_length(resposta) <= 4000),
+    respondido_em  timestamptz,
+    ip             text,
+    created_at     timestamptz not null default now()
+);
+create index if not exists idx_cliente_pedidos_estado on cliente_pedidos (estado, created_at);
+
+alter table cliente_pedidos enable row level security;
+drop policy if exists "cliente_pedidos: admin gere tudo" on cliente_pedidos;
+create policy "cliente_pedidos: admin gere tudo" on cliente_pedidos
+    for all to authenticated using (is_admin()) with check (is_admin());
+revoke all on cliente_pedidos from anon;
+grant select, insert, update, delete on cliente_pedidos to authenticated;

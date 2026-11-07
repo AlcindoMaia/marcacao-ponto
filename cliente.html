@@ -120,6 +120,18 @@
     .semana { background: rgba(255,255,255,.04); border: 1px solid var(--linha); border-radius: 12px; padding: 12px 14px; }
     .semana ul { margin: 6px 0 0; padding-left: 18px; font-size: 14px; }
     .semana .fotos { margin-top: 10px; }
+    .pedidos .ped { border-top: 1px solid var(--linha); padding: 10px 0; font-size: 14px; }
+    .pedidos .ped:first-child { border-top: none; }
+    .pedidos .ped .cab { font-size: 12px; color: var(--suave); }
+    .pedidos .ped .msg { white-space: pre-wrap; }
+    .pedidos .ped .rsp { margin-top: 6px; padding: 8px 10px; border-left: 3px solid var(--caramelo); background: rgba(255,255,255,.03); white-space: pre-wrap; }
+    .novo-pedido { margin-top: 10px; }
+    .novo-pedido select, .novo-pedido textarea { width: 100%; font: inherit; font-size: 14px; color: var(--texto); background: var(--bg); border: 1px solid var(--linha); border-radius: 10px; padding: 10px; margin-bottom: 8px; }
+    .novo-pedido textarea { min-height: 80px; resize: vertical; }
+    .novo-pedido button { font: inherit; font-size: 14px; font-weight: 600; border-radius: 10px; padding: 9px 14px; cursor: pointer; border: none; background: var(--caramelo); color: #131c25; }
+    .novo-pedido button:disabled { opacity: .5; }
+    .novo-pedido .erro { color: #e59a8f; font-size: 13px; }
+    .novo-pedido .ok { color: var(--ok); font-size: 13px; }
     .resp button.recusar { border-color: rgba(229,154,143,.6); color: #e59a8f; }
 </style>
 <link rel="stylesheet" href="carregar.css?v=1">
@@ -140,6 +152,7 @@
     </div>
 </main>
 
+<script src="curva.js?v=2"></script>
 <script>
 const FUNCAO = "https://npyosbigynxmxdakcymg.supabase.co/functions/v1/area-cliente";
 const TOKEN  = new URLSearchParams(location.search).get("t") || "";
@@ -301,7 +314,7 @@ function htmlPacotes(pacotes) {
 }
 
 // O último corte semanal aprovado: o que avançou e as fotografias dessa semana
-function htmlSemana(corte, fotos) {
+function htmlSemana(corte, fotos, obraId) {
     if (!corte) return "";
     const ini = corte.semana, fim = new Date(new Date(ini + "T12:00:00").getTime() + 6 * 86400000).toISOString().slice(0, 10);
     const daSemana = fotos.filter(d => d.data >= ini && d.data <= fim).slice(0, 8);
@@ -310,6 +323,7 @@ function htmlSemana(corte, fotos) {
             ? `<div>O que avançou:</div><ul>${corte.avancou.map(l => `<li>${esc([l.zona, l.nome].filter(Boolean).join(" · "))}: ${esc(l.antes)}% → <b>${esc(l.depois)}%</b></li>`).join("")}</ul>`
             : `<div>Sem avanço registado nesta semana.</div>`}
         ${daSemana.length ? `<div class="fotos">${daSemana.map(htmlFoto).join("")}</div>` : ""}
+        <p style="margin:10px 0 0"><a href="relatorio.html?t=${encodeURIComponent(TOKEN)}&obra=${encodeURIComponent(obraId)}" target="_blank" rel="noopener">📄 Relatório da semana (PDF)</a></p>
     </div>`;
 }
 
@@ -318,6 +332,48 @@ function htmlFoto(d) {
         <img src="${esc(urlSegura(d.url))}" alt="Fotografia da obra" loading="lazy" onerror="this.parentNode.classList.add('falhou')">
         <span class="sem-pre"><b>📷</b>Abrir fotografia</span></a>`;
 }
+
+// Pedidos ao Alcindo: os já feitos, com a resposta, e o formulário para um novo
+const TIPO_PEDIDO = { informacao: "Pedido de informação", extra: "Trabalho extra", reclamacao: "Reclamação", sugestao: "Sugestão" };
+function htmlPedidos(obraId, pedidos) {
+    const quando = d => new Date(d).toLocaleDateString("pt-PT");
+    return `<h2>Pedidos e mensagens</h2><div class="pedidos">${pedidos.map(p => `<div class="ped">
+        <div class="cab">${esc(TIPO_PEDIDO[p.tipo] || "Pedido")} · ${esc(quando(p.created_at))} · ${p.resposta ? "Respondido" : p.estado === "fechado" ? "Tratado" : "Aguarda resposta"}</div>
+        <div class="msg">${esc(p.mensagem)}</div>
+        ${p.resposta ? `<div class="rsp">${esc(p.resposta)}</div>` : ""}
+    </div>`).join("")}</div>
+    <form class="novo-pedido" data-obra="${esc(obraId)}">
+        <select name="tipo" aria-label="Tipo de pedido">
+            <option value="">Que tipo de pedido?</option>
+            ${Object.entries(TIPO_PEDIDO).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}
+        </select>
+        <textarea name="mensagem" maxlength="2000" placeholder="Escreva aqui a sua mensagem para a Maia Solutions."></textarea>
+        <button type="submit">Enviar pedido</button>
+        <div class="estado-envio"></div>
+    </form>`;
+}
+
+document.addEventListener("submit", async e => {
+    const f = e.target.closest(".novo-pedido");
+    if (!f) return;
+    e.preventDefault();
+    const est = f.querySelector(".estado-envio"), btn = f.querySelector("button");
+    const tipo = f.tipo.value, mensagem = f.mensagem.value.trim();
+    const aviso = (t, cls = "erro") => { est.className = "estado-envio " + cls; est.textContent = t; };
+    if (!tipo) return aviso("Escolha o tipo de pedido.");
+    if (!mensagem) return aviso("Escreva o seu pedido.");
+    btn.disabled = true;
+    try {
+        const r = await fetch(FUNCAO, { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: TOKEN, acao: "pedido", obra_id: f.dataset.obra, tipo, mensagem }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.erro || "Erro " + r.status);
+        await iniciar();
+    } catch (err) {
+        btn.disabled = false;
+        aviso(err.message);
+    }
+});
 
 function htmlDiario(notas) {
     if (!notas.length) return "";
@@ -339,7 +395,7 @@ function seccao(titulo, itens, vazio) {
     return `<h2>${titulo}</h2>${itens.length ? itens.join("") : `<div class="vazio">${vazio}</div>`}`;
 }
 
-function htmlObra(o, docs, fases, autos, diario, pacotes, corte) {
+function htmlObra(o, docs, fases, autos, diario, pacotes, corte, pedidos) {
     // % pelos pacotes de trabalho (cada um pesado pelo valor, calculada no
     // servidor); sem pacotes, a % escrita na obra; sem ela, as fases
     // (concluídas contam inteiras, as a decorrer metade). Sem nada, não há barra.
@@ -376,7 +432,8 @@ function htmlObra(o, docs, fases, autos, diario, pacotes, corte) {
             ${o.data_conclusao_prevista && !feita ? `<span>Conclusão prevista: ${esc(dataPT(o.data_conclusao_prevista))}</span>` : ""}
         </div>
         ${htmlContas(o.contas)}
-        ${htmlSemana(corte, de("foto"))}
+        ${o.curva ? `<h2>Feito vs previsto</h2>${htmlCurva(o.curva)}` : ""}
+        ${htmlSemana(corte, de("foto"), o.id)}
         ${htmlPacotes(pacotes)}
         ${htmlFases(fases)}
         ${htmlDiario(diario)}
@@ -385,6 +442,7 @@ function htmlObra(o, docs, fases, autos, diario, pacotes, corte) {
         ${seccao("Faturas e recibos", fats, "Ainda não há faturas.")}
         ${fotos.length ? `<h2>Fotografias</h2><div class="fotos">${fotos.join("")}</div>` : ""}
         ${outros.length ? seccao("Outros documentos", outros, "") : ""}
+        ${pedidos ? htmlPedidos(o.id, pedidos) : ""}
     </section>`;
 }
 
@@ -413,7 +471,8 @@ async function iniciar() {
                 ? obras.map(o => htmlObra(o, docs.filter(d => d.obra_id === o.id),
                     (j.fases || []).filter(f => f.obra_id === o.id), (j.autos || []).filter(a => a.obra_id === o.id),
                     (j.diario || []).filter(n => n.obra_id === o.id), (j.pacotes || []).filter(p => p.obra_id === o.id),
-                    (j.cortes || []).find(c => c.obra_id === o.id))).join("")
+                    (j.cortes || []).find(c => c.obra_id === o.id),
+                    j.pedidos ? j.pedidos.filter(p => p.obra_id === o.id) : null)).join("")
                 : `<div class="centro">Ainda não há obras associadas.</div>`}
             <div class="rodape">Os links dos documentos valem 1 hora. Se algum não abrir, atualize a página.<br>Maia Solutions</div>`;
     } catch (e) {
