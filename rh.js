@@ -570,12 +570,6 @@ function custoDiaFunc(f) {
     if (sal > 0) return sal * 14 * (1 + TSU_EMPRESA) / DIAS_UTEIS_ANO;
     return Number(f?.valor_dia || 0);
 }
-function textoCustoDia(f) {
-    const sal = Number(f?.salario_mensal || 0);
-    return sal > 0
-        ? `${custoDiaFunc(f).toFixed(2)} €/dia (salário ${sal.toFixed(0)} € × 14 + TSU ÷ ${DIAS_UTEIS_ANO} dias)`
-        : `${Number(f?.valor_dia || 0)} €/dia`;
-}
 
 function rhValorOrdenado(f, dias, faltas = {}) {
     if (!f.salario_mensal) {

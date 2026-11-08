@@ -18,14 +18,6 @@
 // O código é de uso único, expira em 48 horas, e é consumido no servidor.
 // =======================================================
 
-function getDeviceId() {
-    let id = localStorage.getItem("deviceId");
-    if (!id) {
-        id = crypto.randomUUID();
-        localStorage.setItem("deviceId", id);
-    }
-    return id;
-}
 
 document.addEventListener("DOMContentLoaded", async () => {
     const form = document.getElementById("frmCadastro");

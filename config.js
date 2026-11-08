@@ -68,3 +68,11 @@ function esc(s) {
         "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
     }[c]));
 }
+
+// Identificador deste aparelho, guardado no próprio telemóvel. É por ele que
+// o ponto, o stock e a carga sabem de quem é o telemóvel que está a marcar.
+function getDeviceId() {
+    let id = localStorage.getItem("deviceId");
+    if (!id) { id = crypto.randomUUID(); localStorage.setItem("deviceId", id); }
+    return id;
+}

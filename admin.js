@@ -743,12 +743,16 @@ async function carregarRegistosAdmin() {
     const raConteudo = document.getElementById("raConteudo");
     raConteudo.innerHTML = `<div style="padding:24px;text-align:center;opacity:.4">A carregar…</div>`;
 
-    const { data, error } = await SB.from("registos_admin")
+    const { data, error } = await lerTudo(() => SB.from("registos_admin")
         .select("id, data, tipo, horas, funcionario_id, obra_id, observacoes, funcionarios(id, nome, valor_dia), obras(id, nome)")
         .gte("data", inicio).lte("data", fim)
-        .order("data").order("funcionarios(nome)");
+        .order("data").order("funcionarios(nome)"));
 
-    if (error) { raConteudo.innerHTML = `<div style="padding:24px;color:#e09486">Erro: ${error.message}</div>`; return; }
+    if (error) {
+        console.error(error);
+        raConteudo.innerHTML = `<div style="padding:24px;color:#e09486">Não foi possível carregar os registos.</div>`;
+        return;
+    }
     _raCache = data || [];
     await carregarFeriados(ano);
 
@@ -2341,38 +2345,6 @@ function lerGpsDaObra() {
         return false;
     }
     return { lat, lon };
-}
-
-async function guardarEditObra() {
-    const id   = document.getElementById("editObraId").value;
-    const nome = document.getElementById("editObraNome").value.trim();
-    if (!nome) { alert("Nome obrigatório"); return; }
-    const payload = {
-        nome,
-        morada:                  document.getElementById("editObraMorada").value.trim() || null,
-        raio:                    parseInt(document.getElementById("editObraRaio").value) || 120,
-        percentagem_conclusao:   parseInt(document.getElementById("editObraPercent").value) || null,
-        data_conclusao_prevista: document.getElementById("editObraData").value || null,
-    };
-    // Pasta do Google Drive: guarda-se o ID da pasta. As subpastas (fotos,
-    // orçamentos...) só se mantêm se a pasta principal não mudou.
-    const linkDrive = document.getElementById("editObraDrive")?.value.trim() || "";
-    const pastaId = idPastaDrive(linkDrive);
-    if (linkDrive && !pastaId) { alert("O link da pasta do Google Drive não parece válido."); return; }
-    const obraAntes = id ? (await SB.from("obras").select("drive_pastas").eq("id", id).maybeSingle()).data : null;
-    const pastasAntes = obraAntes?.drive_pastas || null;
-    payload.drive_pastas = !pastaId ? null
-        : pastasAntes?.pasta === pastaId ? pastasAntes
-        : { pasta: pastaId };
-    if (id) {
-        const { error } = await SB.from("obras").update(payload).eq("id", id);
-        if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
-    } else {
-        const { error } = await SB.from("obras").insert(payload);
-        if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
-    }
-    document.getElementById("modalEditarObra").style.display = "none";
-    await carregarObras();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -7380,11 +7352,6 @@ function renderMovimentos() {
         tbody.appendChild(tr);
     }
 }
-
-function renderTotais() {
-    actualizarKpisFluxo(movimentos);
-}
-
 
 // movId opcional: em edição, repõe as imputações já gravadas. Sem isto,
 // guardar um movimento editado apagava as imputações existentes, porque o
