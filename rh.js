@@ -587,6 +587,26 @@ function rhValorOrdenado(f, dias, faltas = {}) {
     return { valor, nota: notas.join(" · ") };
 }
 
+// Parte do valor de um dia que cabe a um registo (lista e Excel dos
+// Registos). À jornada, o dia paga-se inteiro, como nos Ordenados, e
+// reparte-se pelas obras desse dia na proporção das horas: as linhas de um
+// dia somam sempre o valor/dia. Com salário mensal não há valor por
+// registo (devolve null): a conta é a do mês, no rhValorOrdenado.
+function valorDoRegisto(f, horas, horasDoDia) {
+    if (!f || Number(f.salario_mensal) > 0) return null;
+    const vd = Number(f.valor_dia || 0), h = Number(horas || 0);
+    const tot = Number(horasDoDia ?? h);
+    if (!(vd > 0) || !(h > 0) || !(tot > 0)) return null;
+    return vd * h / tot;
+}
+
+// Como se paga cada pessoa, para mostrar ao lado do valor
+function basePagamento(f) {
+    if (!f) return "";
+    if (Number(f.salario_mensal) > 0) return "salário mensal";
+    return Number(f.valor_dia) > 0 ? "à jornada" : "sem valor por dia";
+}
+
 // ---------- sino ----------
 async function rhAlertas() {
     const hoje = new Date();

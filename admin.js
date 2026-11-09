@@ -744,7 +744,7 @@ async function carregarRegistosAdmin() {
     raConteudo.innerHTML = `<div style="padding:24px;text-align:center;opacity:.4">A carregar…</div>`;
 
     const { data, error } = await lerTudo(() => SB.from("registos_admin")
-        .select("id, data, tipo, horas, funcionario_id, obra_id, observacoes, funcionarios(id, nome, valor_dia), obras(id, nome)")
+        .select("id, data, tipo, motivo, horas, funcionario_id, obra_id, observacoes, funcionarios(id, nome, valor_dia, salario_mensal), obras(id, nome)")
         .gte("data", inicio).lte("data", fim)
         .order("data").order("funcionarios(nome)"));
 
@@ -802,14 +802,20 @@ function renderRaMapaFuncionario(ano, mes) {
     const dias = diasDoMes(ano, mes);
 
     // Agrupar por funcionário
+    // O valor do mês é o mesmo do ecrã Ordenados (rhValorOrdenado): com
+    // salário mensal, o salário menos as faltas descontáveis; à jornada, os
+    // dias trabalhados × valor/dia. Um dia em duas obras conta uma vez.
     const porFunc = {};
     _raCache.forEach(r => {
         const nome = r.funcionarios?.nome || (r.funcionario_id ? "—" : nomeTempRA(r.observacoes));
-        if (!porFunc[nome]) porFunc[nome] = { vd: r.funcionarios?.valor_dia, dias: {}, totalH: 0, totalDias: 0 };
+        if (!porFunc[nome]) porFunc[nome] = { f: r.funcionarios || null, dias: {}, totalH: 0, diasTrab: new Set(), faltas: {} };
         porFunc[nome].dias[r.data] = { tipo: r.tipo, horas: Number(r.horas||0), obra: r.obras?.nome||"" };
         if (r.tipo === "presenca") {
             porFunc[nome].totalH += Number(r.horas||0);
-            porFunc[nome].totalDias++;
+            porFunc[nome].diasTrab.add(r.data);
+        } else if (r.tipo === "falta") {
+            const m = r.motivo || "sem_motivo";
+            porFunc[nome].faltas[m] = (porFunc[nome].faltas[m] || 0) + 1;
         }
     });
 
@@ -831,8 +837,10 @@ function renderRaMapaFuncionario(ano, mes) {
     funcs.forEach((func, fi) => {
         const fd  = porFunc[func];
         const bg  = fi%2===1 ? "rgba(0,0,0,.03)" : "transparent";
-        const vd  = fd.vd ? Number(fd.vd) : null;
-        const val = vd ? (fd.totalDias * vd).toFixed(2)+"€" : "—";
+        fd.totalDias = fd.diasTrab.size;
+        const calc = fd.f && (Number(fd.f.salario_mensal) > 0 || Number(fd.f.valor_dia) > 0)
+            ? rhValorOrdenado(fd.f, fd.totalDias, fd.faltas) : null;
+        const val = calc ? `<span title="${esc(calc.nota || basePagamento(fd.f))}">${calc.valor.toFixed(2)}€</span>` : "—";
 
         html += `<tr style="background:${bg};border-bottom:1px solid rgba(0,0,0,.07)">
             <td style="padding:7px 12px;position:sticky;left:0;background:var(--panel-solid);z-index:1;font-weight:500;white-space:nowrap;border-right:1px solid rgba(0,0,0,.1)">${func}</td>
@@ -924,6 +932,27 @@ function renderRaMapaObra(ano, mes) {
     raConteudo.innerHTML = html;
 }
 
+// Horas de cada pessoa em cada dia, para repartir o valor do dia pelas
+// obras desse dia (ver valorDoRegisto, no rh.js)
+function chaveDiaRA(r) {
+    return (r.funcionario_id || nomeTempRA(r.observacoes)) + "|" + r.data;
+}
+function horasPorPessoaEDia(registos) {
+    const h = {};
+    registos.filter(r => r.tipo === "presenca").forEach(r => {
+        const k = chaveDiaRA(r);
+        h[k] = (h[k] || 0) + Number(r.horas || 0);
+    });
+    return h;
+}
+function textoValorRegisto(r, horasDia) {
+    if (r.tipo !== "presenca") return "—";
+    if (Number(r.funcionarios?.salario_mensal) > 0)
+        return `<span style="font-size:11px;opacity:.6" title="O valor é o do mês, no ecrã Ordenados">salário mensal</span>`;
+    const v = valorDoRegisto(r.funcionarios, r.horas, horasDia[chaveDiaRA(r)]);
+    return v == null ? "—" : v.toFixed(2) + "€";
+}
+
 function renderRaDetalhe() {
     const raConteudo = document.getElementById("raConteudo");
     const presencas = _raCache.filter(r => r.tipo === "presenca");
@@ -941,9 +970,9 @@ function renderRaDetalhe() {
         </tr>
     </thead><tbody>`;
 
+    const horasDia = horasPorPessoaEDia(_raCache);
     _raCache.forEach((r, i) => {
-        const vd  = r.funcionarios?.valor_dia ? Number(r.funcionarios.valor_dia) : null;
-        const val = (r.tipo==="presenca" && vd && r.horas) ? (Number(r.horas)/8*vd).toFixed(2)+"€" : "—";
+        const val = textoValorRegisto(r, horasDia);
         const bg  = i%2===1 ? "rgba(0,0,0,.03)" : "transparent";
         const dataFmt = r.data ? r.data.split("-").reverse().join("/") : "—";
 
@@ -969,11 +998,15 @@ async function exportarRegistosAdminExcel() {
     if (!_raCache.length) { alert("Sem dados para exportar. Carrega primeiro."); return; }
     const mesEl = document.getElementById("raFiltroMes");
     const [ano, mes] = (mesEl?.value || "").split("-");
-    const linhas = ["Data,Funcionário,Obra,Tipo,Horas,Valor/dia,Valor estimado"];
+    // A base de pagamento vai numa coluna própria: quem tem salário mensal
+    // não tem valor por registo, e somar as duas coisas não dá nada certo.
+    const linhas = ["Data,Funcionário,Obra,Tipo,Horas,Base de pagamento,Valor/dia,Valor estimado"];
+    const horasDia = horasPorPessoaEDia(_raCache);
     _raCache.forEach(r => {
-        const vd  = r.funcionarios?.valor_dia ? Number(r.funcionarios.valor_dia) : "";
-        const val = (r.tipo==="presenca" && vd && r.horas) ? (Number(r.horas)/8*vd).toFixed(2) : "";
-        linhas.push(`"${r.data}","${r.funcionarios?.nome||""}","${r.obras?.nome||""}","${r.tipo}","${r.horas||0}","${vd}","${val}"`);
+        const f   = r.funcionarios;
+        const vd  = f?.valor_dia && !(Number(f.salario_mensal) > 0) ? Number(f.valor_dia) : "";
+        const v   = r.tipo === "presenca" ? valorDoRegisto(f, r.horas, horasDia[chaveDiaRA(r)]) : null;
+        linhas.push(`"${r.data}","${f?.nome||""}","${r.obras?.nome||""}","${r.tipo}","${r.horas||0}","${basePagamento(f)}","${vd}","${v == null ? "" : v.toFixed(2)}"`);
     });
     const blob = new Blob(["\ufeff"+linhas.join("\n")], {type:"text/csv;charset=utf-8;"});
     const a = document.createElement("a");
