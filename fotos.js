@@ -77,3 +77,146 @@ async function prepararFoto(ficheiro) {
     const nome = (ficheiro.name || "foto").replace(/\.[^.]+$/, "") + ".jpg";
     return new File([blob], nome, { type: "image/jpeg", lastModified: ficheiro.lastModified });
 }
+
+// =======================================================
+// VÍDEOS — comprimir antes de carregar
+// Um vídeo do telemóvel tem 50–150 MB por minuto. Antes de gravar, passa a
+// 720p a cerca de 1,5 Mbit/s (≈ 11 MB por minuto): o vídeo toca no próprio
+// telemóvel e é regravado ao mesmo tempo, por isso demora o que o vídeo
+// dura. Não é preciso descarregar nenhum programa.
+// =======================================================
+const VIDEO_LADO_MAX  = 1280;        // 720p
+const VIDEO_SEG_MAX   = 60;
+const VIDEO_BITS_SEG  = 1_500_000;
+const VIDEO_AUDIO_BITS = 96_000;
+
+const ehVideo = f => /^video\//i.test(f.type || "") || /\.(mp4|mov|m4v|webm|3gp)$/i.test(f.name || "");
+
+// O primeiro formato que este telemóvel consegue gravar. MP4 primeiro:
+// abre em qualquer telemóvel; WebM só se não houver alternativa.
+function formatoGravacaoVideo() {
+    if (typeof MediaRecorder === "undefined" || !HTMLCanvasElement.prototype.captureStream) return null;
+    return ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4",
+            "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"]
+        .find(t => MediaRecorder.isTypeSupported(t)) || null;
+}
+
+// O som cria-se dentro do clique (o iPhone só deixa ligar o som aí).
+// Quem chama prepararVideo deve criar isto logo no início do clique.
+function criarSomParaVideo() {
+    const C = window.AudioContext || window.webkitAudioContext;
+    try { return C ? new C() : null; } catch { return null; }
+}
+
+function abrirVideo(url) {
+    return new Promise((resolve, reject) => {
+        const v = document.createElement("video");
+        v.muted = true;              // o som vai à parte (ver abaixo)
+        v.playsInline = true;
+        v.preload = "auto";
+        v.onloadedmetadata = () => resolve(v);
+        v.onerror = () => reject(new Error("este telemóvel não consegue abrir o vídeo"));
+        v.src = url;
+    });
+}
+
+// Devolve um File comprimido. Se não for vídeo, devolve o próprio ficheiro.
+// Se o telemóvel não souber comprimir, ou o resultado não ficar mais
+// pequeno, devolve o original. Lança erro se o vídeo for longo de mais.
+// aoAvancar(0..1) mostra o progresso; som = criarSomParaVideo().
+async function prepararVideo(ficheiro, aoAvancar, som) {
+    if (!ehVideo(ficheiro)) return ficheiro;
+    const formato = formatoGravacaoVideo();
+    if (!formato) return ficheiro;
+
+    const url = URL.createObjectURL(ficheiro);
+    let v = null, rec = null, fonte = null, desenhar = true, vigia = null;
+    try {
+        v = await abrirVideo(url);
+        const dur = v.duration;
+        if (Number.isFinite(dur) && dur > VIDEO_SEG_MAX + 0.5)
+            throw Object.assign(new Error(`o vídeo tem ${Math.round(dur)} s; o máximo são ${VIDEO_SEG_MAX} s. Corta-o no telemóvel e volta a carregar.`), { longo: true });
+        if (!v.videoWidth || !v.videoHeight) throw new Error("este telemóvel não consegue ler a imagem do vídeo");
+
+        const escala = Math.min(1, VIDEO_LADO_MAX / Math.max(v.videoWidth, v.videoHeight));
+        const canvas = document.createElement("canvas");
+        canvas.width  = Math.round(v.videoWidth  * escala / 2) * 2;   // números pares: os codificadores pedem
+        canvas.height = Math.round(v.videoHeight * escala / 2) * 2;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+
+        const faixas = [...canvas.captureStream(30).getVideoTracks()];
+
+        // Som: lê-se a faixa de áudio do ficheiro e toca-se só para a
+        // gravação (não sai pelo altifalante). Sem som, o vídeo fica mudo.
+        if (som) {
+            try {
+                if (som.state === "suspended") await som.resume();
+                const audio = await som.decodeAudioData(await ficheiro.arrayBuffer());
+                const destino = som.createMediaStreamDestination();
+                fonte = som.createBufferSource();
+                fonte.buffer = audio;
+                fonte.connect(destino);
+                faixas.push(...destino.stream.getAudioTracks());
+            } catch (e) {
+                console.warn("prepararVideo: sem som", e);
+                fonte = null;
+            }
+        }
+
+        const partes = [];
+        rec = new MediaRecorder(new MediaStream(faixas), {
+            mimeType: formato, videoBitsPerSecond: VIDEO_BITS_SEG, audioBitsPerSecond: VIDEO_AUDIO_BITS,
+        });
+        rec.ondataavailable = e => { if (e.data?.size) partes.push(e.data); };
+        const parado = new Promise(r => { rec.onstop = r; });
+
+        const proximo = cb => v.requestVideoFrameCallback ? v.requestVideoFrameCallback(cb) : requestAnimationFrame(cb);
+        const passo = () => {
+            if (!desenhar) return;
+            ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+            if (aoAvancar && Number.isFinite(dur) && dur > 0) aoAvancar(Math.min(1, v.currentTime / dur));
+            proximo(passo);
+        };
+
+        // Se o vídeo encravar (ecrã bloqueado, separador escondido), desiste.
+        let ultimoTempo = -1, encravado = 0;
+        vigia = setInterval(() => {
+            if (v.currentTime === ultimoTempo) encravado++; else encravado = 0;
+            ultimoTempo = v.currentTime;
+            if (encravado >= 10) v.dispatchEvent(new Event("error"));
+        }, 1000);
+
+        const acabou = new Promise((resolve, reject) => {
+            v.onended = resolve;
+            v.onerror = () => reject(new Error("a compressão parou. Mantém o ecrã ligado e esta página aberta enquanto o vídeo é preparado."));
+        });
+        acabou.catch(() => {});   // se o play() falhar, ninguém espera por isto
+
+        rec.start(1000);
+        await v.play();
+        fonte?.start();
+        proximo(passo);
+        await acabou;
+        clearInterval(vigia);
+        desenhar = false;
+
+        rec.stop();
+        await parado;
+        faixas.forEach(t => t.stop());
+        aoAvancar?.(1);
+
+        const tipo = formato.split(";")[0];
+        const blob = new Blob(partes, { type: tipo });
+        if (!blob.size || blob.size >= ficheiro.size) return ficheiro;
+        const nome = (ficheiro.name || "video").replace(/\.[^.]+$/, "") + (tipo === "video/mp4" ? ".mp4" : ".webm");
+        return new File([blob], nome, { type: tipo, lastModified: ficheiro.lastModified });
+    } finally {
+        desenhar = false;
+        clearInterval(vigia);
+        try { fonte?.stop(); } catch { /* já tinha parado */ }
+        if (rec && rec.state !== "inactive") { try { rec.stop(); } catch { /* nada */ } }
+        if (v) { v.onerror = v.onended = null; v.pause(); v.removeAttribute("src"); v.load(); }
+        URL.revokeObjectURL(url);
+    }
+}

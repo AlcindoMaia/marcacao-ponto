@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://npyosbigynxmxdakcymg.supabase.co; connect-src https://npyosbigynxmxdakcymg.supabase.co; object-src 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://npyosbigynxmxdakcymg.supabase.co; media-src https://npyosbigynxmxdakcymg.supabase.co; connect-src https://npyosbigynxmxdakcymg.supabase.co; object-src 'none'; base-uri 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
@@ -67,6 +67,8 @@
     .fotos .sem-pre b { font-size: 26px; font-weight: 400; }
     .fotos a.falhou img { display: none; }
     .fotos a.falhou .sem-pre { display: flex; }
+    .fotos .vid { aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: #25363f; }
+    .fotos video { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
     .vazio { color: var(--suave); font-size: 14px; padding: 6px 0; }
     .centro { text-align: center; padding: 60px 16px; color: var(--suave); }
     .fases { list-style: none; margin: 0; padding: 0; }
@@ -327,7 +329,11 @@ function htmlSemana(corte, fotos, obraId) {
     </div>`;
 }
 
+const ehVideoDoc = d => /^video\//i.test(d.mime || "");
+
 function htmlFoto(d) {
+    if (ehVideoDoc(d)) return `<div class="vid" title="${esc(d.nome)}">
+        <video src="${esc(urlSegura(d.url))}" controls playsinline preload="metadata" aria-label="Vídeo da obra"></video></div>`;
     return `<a href="${esc(urlSegura(d.url))}" target="_blank" rel="noopener noreferrer" title="${esc(d.nome)}">
         <img src="${esc(urlSegura(d.url))}" alt="Fotografia da obra" loading="lazy" onerror="this.parentNode.classList.add('falhou')">
         <span class="sem-pre"><b>📷</b>Abrir fotografia</span></a>`;
@@ -440,7 +446,7 @@ function htmlObra(o, docs, fases, autos, diario, pacotes, corte, pedidos) {
         ${seccao("Orçamentos", orcs, "Ainda não há orçamentos.")}
         ${htmlAutos(autos)}
         ${seccao("Faturas e recibos", fats, "Ainda não há faturas.")}
-        ${fotos.length ? `<h2>Fotografias</h2><div class="fotos">${fotos.join("")}</div>` : ""}
+        ${fotos.length ? `<h2>${de("foto").some(ehVideoDoc) ? "Fotografias e vídeos" : "Fotografias"}</h2><div class="fotos">${fotos.join("")}</div>` : ""}
         ${outros.length ? seccao("Outros documentos", outros, "") : ""}
         ${pedidos ? htmlPedidos(o.id, pedidos) : ""}
     </section>`;

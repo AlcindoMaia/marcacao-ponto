@@ -5973,7 +5973,7 @@ const TIPOS_DOC_OBRA = {
     orcamento: { icone: "🧾", nome: "Orçamento",       ler: true,  visivel: true  },
     fatura:    { icone: "💶", nome: "Fatura de venda", ler: true,  visivel: true  },
     recibo:    { icone: "✅", nome: "Recibo",          ler: true,  visivel: true  },
-    foto:      { icone: "📷", nome: "Foto",            ler: false, visivel: false },
+    foto:      { icone: "📷", nome: "Foto ou vídeo",   ler: false, visivel: false },
     outro:     { icone: "📄", nome: "Outro documento", ler: false, visivel: false },
 };
 
@@ -6013,6 +6013,7 @@ async function carregarPainelDocumentos() {
 
     const linha = d => {
         const t = TIPOS_DOC_OBRA[d.tipo] || TIPOS_DOC_OBRA.outro;
+        const icone = /^video\//i.test(d.mime || "") ? "🎬" : t.icone;
         const estado = d.estado === "registado"
             ? `<span style="color:#8fbfa0;font-size:11px">✓ Registado</span>`
             : d.estado === "por_tratar"
@@ -6021,7 +6022,7 @@ async function carregarPainelDocumentos() {
         const info = [d.numero_documento, d.data_documento].filter(Boolean).map(esc).join(" · ");
         return `
         <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap">
-            <span style="font-size:20px">${t.icone}</span>
+            <span style="font-size:20px">${icone}</span>
             <span style="flex:1;min-width:160px">
                 <a href="#" onclick="abrirDocumentoObra('${d.id}');return false" style="color:inherit;font-weight:600;font-size:13px;word-break:break-all">${esc(d.nome_ficheiro)}</a>
                 <span style="display:block;font-size:11px;opacity:.5">${t.nome}${info ? " · " + info : ""} · carregado ${new Date(d.created_at).toLocaleDateString("pt-PT")}</span>
@@ -6061,14 +6062,14 @@ async function carregarPainelDocumentos() {
             <div class="doc-carregar-titulo">⬆ Carregar documento</div>
             <div class="barra-filtros" style="margin:0">
                 <select id="docObraTipo" onchange="document.getElementById('docObraVisivel').checked = TIPOS_DOC_OBRA[this.value].visivel">${opcoesTipo}</select>
-                <input type="file" id="docObraFicheiro" multiple accept="application/pdf,image/*,.heic,.heif" hidden onchange="mostrarFicheirosDocObra(this)">
+                <input type="file" id="docObraFicheiro" multiple accept="application/pdf,image/*,video/*,.heic,.heif" hidden onchange="mostrarFicheirosDocObra(this)">
                 <label for="docObraFicheiro" class="btn-pequeno doc-escolher" id="docObraEscolhidos">📎 Escolher ficheiro</label>
                 <label class="doc-visivel">
                     <input type="checkbox" id="docObraVisivel" checked> Visível ao cliente
                 </label>
                 <button class="btn-icone" id="btnCarregarDocObra" onclick="carregarDocumentoObra()" title="Carregar">⬆</button>
             </div>
-            <div style="font-size:11px;opacity:.5;margin-top:6px">O assistente lê orçamentos, faturas e recibos antes de gravar. Fotos passam a JPG. Máx. 20 MB.</div>
+            <div style="font-size:11px;opacity:.5;margin-top:6px">O assistente lê orçamentos, faturas e recibos antes de gravar. Fotos passam a JPG. Vídeos até ${VIDEO_SEG_MAX} s são comprimidos (mantém o ecrã ligado). Máx. 20 MB.</div>
             <div id="docObraMsg" style="display:none;font-size:12px;margin-top:6px"></div>
         </div>
         ${fotosHeic.length ? `
@@ -6108,15 +6109,34 @@ async function carregarDocumentoObra() {
     const visivel = document.getElementById("docObraVisivel").checked;
     let ficheiros = [...(inp.files || [])];
     if (!ficheiros.length) { msgDocObra("Escolhe primeiro o ficheiro.", "warn"); return; }
+    const temVideo = ficheiros.some(ehVideo);
+    if (temVideo && tipo !== "foto") {
+        msgDocObra('Os vídeos carregam-se com o tipo "📷 Foto ou vídeo".', "warn"); return;
+    }
+    // O som do vídeo só se pode ligar aqui, ainda dentro do clique
+    const som = temVideo ? criarSomParaVideo() : null;
 
     const btn = document.getElementById("btnCarregarDocObra");
     btn.disabled = true; btn.textContent = "⏳";
 
-    // Fotos (e qualquer HEIC) passam a JPEG reduzido antes de gravar
+    // Fotos (e qualquer HEIC) passam a JPEG reduzido e os vídeos a 720p
+    // antes de gravar
     try {
         const novos = [];
         for (const f of ficheiros) {
-            if (tipo === "foto" || ehHeic(f)) {
+            if (ehVideo(f)) {
+                msgDocObra(`A comprimir "${f.name}"… mantém o ecrã ligado.`, "warn");
+                try {
+                    novos.push(await prepararVideo(f,
+                        p => msgDocObra(`A comprimir "${f.name}"… ${Math.round(p * 100)}%. Mantém o ecrã ligado.`, "warn"), som));
+                } catch (e) {
+                    // Longo de mais: pára. Outra falha: segue o original,
+                    // se couber no limite (a verificação dos 20 MB vem abaixo).
+                    if (e.longo) throw e;
+                    console.warn("prepararVideo:", e);
+                    novos.push(f);
+                }
+            } else if (tipo === "foto" || ehHeic(f)) {
                 msgDocObra(`A preparar "${f.name}"…`, "warn");
                 novos.push(await prepararFoto(f));
             } else novos.push(f);
@@ -6125,14 +6145,17 @@ async function carregarDocumentoObra() {
     } catch (e) {
         console.error("prepararFoto:", e);
         btn.disabled = false; btn.textContent = "⬆";
-        msgDocObra("Não foi possível converter a foto: " + e.message, "err");
+        som?.close?.();
+        msgDocObra(e.longo ? "Não carreguei: " + e.message : "Não foi possível converter a foto: " + e.message, "err");
         return;
     }
+    som?.close?.();
 
     const grandes = ficheiros.filter(f => f.size > MAX_DOC_OBRA);
     if (grandes.length) {
         btn.disabled = false; btn.textContent = "⬆";
-        msgDocObra(`"${grandes[0].name}" tem mais de 20 MB.`, "err"); return;
+        msgDocObra(`"${grandes[0].name}" tem mais de 20 MB.` + (ehVideo(grandes[0])
+            ? " Este telemóvel não conseguiu comprimir o vídeo: tenta noutro telemóvel ou com um vídeo mais curto." : ""), "err"); return;
     }
 
     const { data: { session } } = await SB.auth.getSession();
