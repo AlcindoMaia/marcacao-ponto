@@ -88,7 +88,7 @@ async function carregarPainelAndamento() {
             .eq("obra_id", obraId).eq("tipo", "presenca").gte("data", desde).lte("data", hoje),
         SB.from("tarefas").select("data_prevista, descricao, estado")
             .eq("obra_id", obraId).gte("data_prevista", desde).lte("data_prevista", hoje).neq("estado", "cancelada"),
-        SB.from("obra_documentos").select("id, nome_ficheiro, created_at")
+        SB.from("obra_documentos").select("id, nome_ficheiro, mime, created_at")
             .eq("obra_id", obraId).eq("tipo", "foto").gte("created_at", desde),
         SB.from("obras").select("mostrar_contas_cliente").eq("id", obraId).maybeSingle(),
         SB.from("orcamentos").select("id, numero").eq("obra_id", obraId).eq("estado", "aceite").order("data"),
@@ -599,7 +599,7 @@ function htmlDiario() {
     return titulo + dias.map((d, i) => {
         const equipa = Object.entries(d.equipa).map(([n, h]) => `${esc(n)} ${Number(h.toFixed(1))}h`).join(", ");
         const tar = d.tarefas.map(t => `${t.estado === "concluida" ? "✓" : "•"} ${esc(t.descricao)}`).join("<br>");
-        const fotos = d.fotos.map(f => `<a href="#" onclick="abrirDocumentoObra('${f.id}');return false" title="${esc(f.nome_ficheiro)}">📷</a>`).join(" ");
+        const fotos = d.fotos.map(f => `<a href="#" onclick="abrirDocumentoObra('${f.id}');return false" title="${esc(f.nome_ficheiro)}">${/^video\//i.test(f.mime || "") ? "🎬" : "📷"}</a>`).join(" ");
         const nota = d.nota;
         return `<div style="padding:9px 0;border-top:${i ? "1px solid rgba(255,255,255,.06)" : "none"};font-size:12px">
             <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">

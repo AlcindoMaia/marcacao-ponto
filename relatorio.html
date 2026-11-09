@@ -70,7 +70,7 @@ function relatorio(j) {
     const pacotes = (j.pacotes || []).filter(p => p.obra_id === o.id);
     const ini = corte?.semana;
     const fim = ini ? new Date(new Date(ini + "T12:00:00").getTime() + 6 * 86400000).toISOString().slice(0, 10) : null;
-    const fotos = (j.documentos || []).filter(d => d.obra_id === o.id && d.tipo === "foto" && urlSegura(d.url)
+    const fotos = (j.documentos || []).filter(d => d.obra_id === o.id && d.tipo === "foto" && !/^video\//i.test(d.mime || "") && urlSegura(d.url)
         && (!ini || (d.data >= ini && d.data <= fim))).slice(0, 9);
     const atrasados = pacotes.filter(p => p.atrasado).length;
     const ultimoPrev = (o.curva || []).filter(p => p.real != null).slice(-1)[0];
