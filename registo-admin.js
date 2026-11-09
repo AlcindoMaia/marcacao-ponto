@@ -585,33 +585,18 @@ async function guardarTudo() {
         return;
     }
 
-    // Buscar IDs existentes para esta data — excluir faltas (já guardadas pelo toggleFalta)
-    const { data: existentes } = await SB.from("registos_admin")
-        .select("id, tipo, funcionario_id")
-        .eq("data", data);
-
-    // Só apagar os registos de presença (não as faltas)
-    if (existentes && existentes.length > 0) {
-        const ids = existentes
-            .filter(r => r.tipo !== 'falta')
-            .map(r => r.id);
-        if (ids.length > 0) {
-            const { error: errDel } = await SB.from("registos_admin")
-                .delete()
-                .in("id", ids);
-            if (errDel) { feedback("Erro ao atualizar: " + errDel.message, "erro"); return; }
-        }
-    }
-
-    // As ligações antigas a serviços saíram com os registos apagados (cascade)
-    const { data: inseridos, error } = await SB.from("registos_admin").insert(registos).select("id");
-    if (error) { feedback("Erro ao guardar: " + error.message, "erro"); return; }
-
-    const ligacoes = (inseridos || []).map((r, i) => servicosDasLinhas[i]
-        ? { registo_id: r.id, obra_servico_id: servicosDasLinhas[i], horas: registos[i].horas } : null).filter(Boolean);
-    if (ligacoes.length) {
-        const { error: errServ } = await SB.from("registo_servicos").insert(ligacoes);
-        if (errServ) { feedback("Horas guardadas, mas não foi possível ligá-las aos serviços: " + errServ.message, "erro"); return; }
+    // Tudo numa só transacção no Supabase: apaga as presenças do dia (as
+    // faltas ficam) e grava as novas com a ligação ao serviço na mesma
+    // linha. Se a rede falhar a meio, o dia fica como estava, em vez de
+    // vazio.
+    const { error } = await SB.rpc("guardar_registos_do_dia", {
+        p_data: data,
+        p_registos: registos.map((r, i) => ({ ...r, obra_servico_id: servicosDasLinhas[i] }))
+    });
+    if (error) {
+        console.error("guardar_registos_do_dia:", error);
+        feedback("Não foi possível guardar. O dia ficou como estava: tenta outra vez.", "erro");
+        return;
     }
 
     feedback(`✓ ${registos.length} linha(s) guardada(s) com sucesso!`, "ok");

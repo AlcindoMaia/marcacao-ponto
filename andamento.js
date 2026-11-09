@@ -537,20 +537,21 @@ async function gravarAuto() {
         return msgAndamento(`Auto nº ${a.numero} gravado.`);
     }
 
-    let id = a.id;
-    if (id) {
-        const { error } = await SB.from("autos_medicao").update(dados).eq("id", id);
-        if (error) return msgAndamento("Não foi possível gravar: " + error.message, "err");
-        const { error: errDel } = await SB.from("auto_linhas").delete().eq("auto_id", id);
-        if (errDel) return msgAndamento("Não foi possível gravar as linhas: " + errDel.message, "err");
-    } else {
-        const { data, error } = await SB.from("autos_medicao")
-            .insert({ ...dados, obra_id: _painelObraActual.id, numero: a.numero }).select("id").single();
-        if (error) return msgAndamento("Não foi possível criar o auto: " + error.message, "err");
-        id = data.id;
+    // O auto e as linhas gravam-se juntos, numa só transacção. Antes as
+    // linhas eram apagadas e inseridas em pedidos separados: se o segundo
+    // falhasse, o auto ficava sem linhas e o seguinte voltava a cobrar o
+    // que este já tinha cobrado.
+    const { error } = await SB.rpc("gravar_auto_medicao", {
+        p_auto_id: a.id || null,
+        p_obra_id: _painelObraActual.id,
+        p_numero:  a.numero,
+        p_dados:   dados,
+        p_linhas:  linhas,
+    });
+    if (error) {
+        console.error("gravar_auto_medicao:", error);
+        return msgAndamento("Não foi possível gravar o auto. Ficou como estava: tenta outra vez.", "err");
     }
-    const { error: errLin } = await SB.from("auto_linhas").insert(linhas.map(l => ({ ...l, auto_id: id })));
-    if (errLin) return msgAndamento("O auto ficou sem linhas: " + errLin.message, "err");
 
     _autoEmEdicao = null;
     await carregarPainelAndamento();
