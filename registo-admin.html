@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com https://cdn.datatables.net; style-src 'self' 'unsafe-inline' https://cdn.datatables.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https://npyosbigynxmxdakcymg.supabase.co wss://npyosbigynxmxdakcymg.supabase.co; object-src 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com https://cdn.datatables.net; style-src 'self' 'unsafe-inline' https://cdn.datatables.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://npyosbigynxmxdakcymg.supabase.co wss://npyosbigynxmxdakcymg.supabase.co; object-src 'none'; base-uri 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0e151d">
@@ -300,6 +300,18 @@ button { font: inherit; color: inherit; }
 .sel-motivo { width:auto; font-size:12px; padding:4px 6px; border-radius:8px; margin-right:6px; }
 .sel-motivo.sem-motivo { border:1px solid var(--red); color: var(--red); }
 
+/* Fotos e vídeos da obra */
+.media-obra { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin: 14px 0 4px; }
+.media-titulo { font-family: var(--fh); font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
+.media-linha { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.media-linha select { flex: 1; min-width: 0; padding: 10px; border-radius: var(--radsm); border: 1px solid var(--border); background: var(--bg3); color: var(--text); font-family: var(--fb); font-size: 14px; }
+.media-linha .btn-acao { white-space: nowrap; max-width: 55%; overflow: hidden; text-overflow: ellipsis; }
+.media-visivel { flex: 1; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); cursor: pointer; }
+.media-visivel input { width: auto; margin: 0; }
+.media-nota { font-size: 11px; color: var(--muted); }
+.media-msg { font-size: 12px; margin-top: 6px; min-height: 0; }
+.media-msg.ok { color: var(--green); } .media-msg.warn { color: var(--orange); } .media-msg.err { color: var(--red); }
+
 /* Guardar: fica sempre à mão no fundo do ecrã */
 .rodape {
   position: sticky; bottom: 0; z-index: 40;
@@ -458,6 +470,22 @@ button { font: inherit; color: inherit; }
     <!-- Lista de funcionários -->
     <div class="func-lista" id="funcLista"></div>
 
+    <!-- Fotos e vídeos da obra (vão para Documentos da obra) -->
+    <div class="media-obra">
+      <div class="media-titulo">📷 Fotos e vídeos da obra</div>
+      <div class="media-linha">
+        <select id="mediaObra" aria-label="Obra"></select>
+        <input type="file" id="mediaFicheiros" accept="image/*,video/*,.heic,.heif" multiple hidden onchange="mostrarMediaEscolhida(this)">
+        <label for="mediaFicheiros" class="btn-acao" id="mediaEscolhidos">📎 Escolher</label>
+      </div>
+      <div class="media-linha">
+        <label class="media-visivel"><input type="checkbox" id="mediaVisivel"> Visível ao cliente</label>
+        <button class="btn-acao destaque" id="btnCarregarMedia" onclick="carregarMediaObra()">⬆ Carregar</button>
+      </div>
+      <div class="media-nota">Vídeos até 60 s, comprimidos no telemóvel: mantém o ecrã ligado até acabar.</div>
+      <div class="media-msg" id="mediaMsg"></div>
+    </div>
+
     <!-- Botão guardar -->
     <div class="rodape">
       <button class="btn-guardar-tudo" onclick="guardarTudo()">✓ Guardar registo</button>
@@ -484,6 +512,7 @@ button { font: inherit; color: inherit; }
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="config.js?v=4"></script>
-<script src="registo-admin.js?v=6"></script>
+<script src="fotos.js?v=2"></script>
+<script src="registo-admin.js?v=7"></script>
 </body>
 </html>
