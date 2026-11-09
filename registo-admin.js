@@ -85,7 +85,7 @@ async function iniciarApp() {
 
     // Carregar dados base
     const [obrasRes, funcsRes, servRes] = await Promise.all([
-        SB.from("obras").select("id, nome").order("nome"),
+        SB.from("obras").select("id, nome, estado").order("nome"),
         SB.from("funcionarios").select("id, nome, valor_dia, tipo_contrato").eq("ativo", true).order("nome"),
         SB.from("obra_servicos").select("id, obra_id, nome, extra, concluido").order("ordem").order("created_at")
     ]);
@@ -107,6 +107,7 @@ async function iniciarApp() {
         await carregarParaData();
     });
 
+    preencherObrasMedia();
     mostrarEcrã("ecrãPrincipal");
     await carregarParaData();
 
@@ -817,3 +818,97 @@ document.addEventListener('click', e => {
         painel.classList.add('hidden-painel');
     }
 });
+
+// =======================================================
+// FOTOS E VÍDEOS DA OBRA
+// O encarregado carrega daqui o que fez na obra. Vai para os Documentos
+// da obra (tipo "foto"), como no painel: fotos a JPEG, vídeos a 720p.
+// "Visível ao cliente" desligado por defeito: só o Alcindo decide mostrar.
+// =======================================================
+const BUCKET_MEDIA = "obra-documentos";
+const MAX_MEDIA    = 20 * 1024 * 1024;   // limite do bucket
+
+function preencherObrasMedia() {
+    const sel = document.getElementById("mediaObra");
+    if (!sel) return;
+    const ativas = _obras.filter(o => o.estado !== "concluida");
+    sel.innerHTML = `<option value="">Escolhe a obra…</option>` +
+        ativas.map(o => `<option value="${o.id}">${esc(o.nome || "")}</option>`).join("");
+}
+
+function msgMedia(texto, tipo = "ok") {
+    const el = document.getElementById("mediaMsg");
+    if (!el) return;
+    el.className = "media-msg " + tipo;
+    el.textContent = texto || "";
+}
+
+function mostrarMediaEscolhida(inp) {
+    const n = inp.files?.length || 0;
+    const el = document.getElementById("mediaEscolhidos");
+    el.textContent = n === 0 ? "📎 Escolher" : n === 1 ? "📎 " + inp.files[0].name : `📎 ${n} ficheiros`;
+}
+
+async function carregarMediaObra() {
+    const obraId  = document.getElementById("mediaObra").value;
+    const inp     = document.getElementById("mediaFicheiros");
+    const visivel = document.getElementById("mediaVisivel").checked;
+    const ficheiros = [...(inp.files || [])];
+    if (!obraId) return msgMedia("Escolhe a obra.", "warn");
+    if (!ficheiros.length) return msgMedia("Escolhe as fotos ou vídeos.", "warn");
+
+    // O som do vídeo só se pode ligar aqui, ainda dentro do clique
+    const som = ficheiros.some(ehVideo) ? criarSomParaVideo() : null;
+    const btn = document.getElementById("btnCarregarMedia");
+    btn.disabled = true;
+    let feitos = 0;
+    try {
+        const { data: { session } } = await SB.auth.getSession();
+        if (!session) throw new Error("sessão expirada. Volta a entrar.");
+        for (const original of ficheiros) {
+            const nomeCurto = original.name || "ficheiro";
+            if (!ehVideo(original) && !ehImagem(original)) throw new Error(`"${nomeCurto}" não é foto nem vídeo.`);
+            let f;
+            if (ehVideo(original)) {
+                msgMedia(`A comprimir "${nomeCurto}"… mantém o ecrã ligado.`, "warn");
+                try {
+                    f = await prepararVideo(original,
+                        p => msgMedia(`A comprimir "${nomeCurto}"… ${Math.round(p * 100)}%. Mantém o ecrã ligado.`, "warn"), som);
+                } catch (e) {
+                    if (e.longo) throw e;
+                    console.warn("prepararVideo:", e);
+                    f = original;   // segue o original, se couber no limite
+                }
+            } else {
+                msgMedia(`A preparar "${nomeCurto}"…`, "warn");
+                f = await prepararFoto(original);
+            }
+            if (f.size > MAX_MEDIA) throw new Error(`"${nomeCurto}" tem mais de 20 MB` +
+                (ehVideo(f) ? ". Este telemóvel não conseguiu comprimir o vídeo: tenta um vídeo mais curto." : "."));
+
+            msgMedia(`A enviar "${nomeCurto}"…`, "warn");
+            const caminho = `${obraId}/${Date.now()}-${nomeSeguroFicheiro(f.name)}`;
+            const up = await SB.storage.from(BUCKET_MEDIA).upload(caminho, f, { contentType: f.type || undefined });
+            if (up.error) throw new Error(up.error.message);
+            const { error } = await SB.from("obra_documentos").insert({
+                obra_id: obraId, tipo: "foto", nome_ficheiro: f.name, caminho,
+                mime: f.type || null, tamanho: f.size, visivel_cliente: visivel,
+                estado: "arquivado", criado_por: session.user?.email || null,
+            });
+            if (error) {
+                await SB.storage.from(BUCKET_MEDIA).remove([caminho]);
+                throw new Error(error.message);
+            }
+            feitos++;
+        }
+        inp.value = "";
+        mostrarMediaEscolhida(inp);
+        msgMedia(feitos === 1 ? "✓ Carregado. Fica nos Documentos da obra." : `✓ ${feitos} carregados. Ficam nos Documentos da obra.`, "ok");
+    } catch (e) {
+        console.error("carregarMediaObra:", e);
+        msgMedia((feitos ? `Carreguei ${feitos} de ${ficheiros.length}. ` : "") + "Não foi possível: " + e.message, "err");
+    } finally {
+        btn.disabled = false;
+        som?.close?.();
+    }
+}

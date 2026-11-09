@@ -10,6 +10,13 @@ const FOTO_QUALIDADE = 0.85;
 const LIBHEIF_URL = "https://cdn.jsdelivr.net/npm/libheif-js@1.19.8/libheif-wasm/libheif-bundle.js";
 const LIBHEIF_SRI = "sha384-HXIRij9wEcFbMeYe8lcO83/544aNPhd8574RnlD/cQVbNPdq5iBkjgGPpxtsycNv";
 
+// Nome de ficheiro sem acentos nem espaços, para o caminho no armazenamento.
+function nomeSeguroFicheiro(nome) {
+    return (nome || "ficheiro")
+        .normalize("NFD").replace(/\p{Diacritic}/gu, "")
+        .replace(/[^\w.\-]+/g, "_").replace(/_+/g, "_").slice(-80);
+}
+
 const ehHeic = f => /image\/hei[cf]/i.test(f.type || "") || /\.hei[cf]$/i.test(f.name || "");
 const ehImagem = f => /^image\//i.test(f.type || "") || /\.(jpe?g|png|webp|hei[cf])$/i.test(f.name || "");
 

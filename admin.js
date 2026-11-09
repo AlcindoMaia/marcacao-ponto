@@ -6088,11 +6088,7 @@ async function carregarPainelDocumentos() {
         ${htmlPastasDrive()}`;
 }
 
-function nomeSeguroFicheiro(nome) {
-    return (nome || "ficheiro")
-        .normalize("NFD").replace(/\p{Diacritic}/gu, "")
-        .replace(/[^\w.\-]+/g, "_").replace(/_+/g, "_").slice(-80);
-}
+// nomeSeguroFicheiro está no fotos.js (também o usa o Registo diário)
 
 function mostrarFicheirosDocObra(inp) {
     const n = inp.files?.length || 0;
