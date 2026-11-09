@@ -109,9 +109,6 @@ async function iniciarApp() {
 
     mostrarEcrã("ecrãPrincipal");
     await carregarParaData();
-
-    // Pedir permissão de notificações
-    pedirPermissaoNotificacoes();
 }
 
 // =======================================================
@@ -733,57 +730,8 @@ function voltarPrincipal() {
     mostrarEcrã("ecrãPrincipal");
 }
 
-// =======================================================
-// NOTIFICAÇÕES PUSH — lembrete às 19h (seg-sab)
-// =======================================================
-async function pedirPermissaoNotificacoes() {
-    if (!("Notification" in window)) return;
-    if (Notification.permission === "granted") {
-        agendarLembrete();
-        return;
-    }
-    if (Notification.permission !== "denied") {
-        const perm = await Notification.requestPermission();
-        if (perm === "granted") agendarLembrete();
-    }
-}
-
-function agendarLembrete() {
-    // Calcular quantos ms faltam para as 19h de hoje (ou amanhã se já passou)
-    const agora   = new Date();
-    const diaSem  = agora.getDay(); // 0=Dom, 6=Sab
-
-    // Não agendar ao domingo
-    if (diaSem === 0) return;
-
-    let alvo = new Date();
-    alvo.setHours(19, 0, 0, 0);
-
-    // Se já são mais de 19h, agendar para o próximo dia útil
-    if (agora >= alvo) {
-        alvo.setDate(alvo.getDate() + 1);
-        // Saltar domingo
-        if (alvo.getDay() === 0) alvo.setDate(alvo.getDate() + 1);
-    }
-
-    const msAte19h = alvo.getTime() - agora.getTime();
-
-    setTimeout(() => {
-        const n = new Notification("Maia Solutions — Registo Diário", {
-            body: "Está na hora de registar quem trabalhou hoje. Toca para abrir.",
-            icon: "Logo.png",
-            badge: "Logo.png",
-            tag: "registo-diario",
-            requireInteraction: true
-        });
-        n.onclick = () => { window.focus(); mostrarEcrã("ecrãPrincipal"); };
-
-        // Re-agendar para o dia seguinte
-        setTimeout(agendarLembrete, 60 * 1000); // 1 min depois, re-calcular
-    }, msAte19h);
-
-    console.log(`Lembrete agendado para ${alvo.toLocaleString("pt-PT")}`);
-}
+// O lembrete das 19h passou para os avisos no telemóvel (push.js e a
+// função "avisos" do Supabase): o antigo só tocava com esta página aberta.
 
 // =======================================================
 // ARRANQUE

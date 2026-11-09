@@ -9271,7 +9271,7 @@ async function carregarNotificacoes() {
 
     if (total === 0) {
         badge.style.display = "none";
-        painel.innerHTML = `<div style="padding:20px;text-align:center;opacity:.5;font-size:13px">Sem alertas 👍</div>`;
+        painel.innerHTML = linhaAvisosSino() + `<div style="padding:20px;text-align:center;opacity:.5;font-size:13px">Sem alertas 👍</div>`;
         return;
     }
 
@@ -9339,7 +9339,14 @@ async function carregarNotificacoes() {
         badge.textContent = Math.min(parseInt(badge.textContent||0) + semRegisto.length, 99);
     }
 
-    painel.innerHTML = html;
+    painel.innerHTML = linhaAvisosSino() + html;
+}
+
+// Atalho no topo do sino para ativar/gerir os avisos no telemóvel (push.js)
+function linhaAvisosSino() {
+    if (typeof abrirAvisosTelemovel !== "function") return "";
+    return `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:13px;font-weight:600;color:var(--text-dark);cursor:pointer"
+                onclick="abrirAvisosTelemovel()">📲 Avisos no telemóvel ›</div>`;
 }
 
 function toggleNotificacoes() {
