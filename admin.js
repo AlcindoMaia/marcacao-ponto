@@ -563,7 +563,7 @@ async function carregarFinanceiro() {
     const porFunc = {};
     registos.forEach(r => {
         const fid = r.funcionario_id;
-        if (!porFunc[fid]) porFunc[fid] = { horas: 0, dias: new Set(), faltas: {} };
+        if (!porFunc[fid]) porFunc[fid] = { horas: 0, dias: new Set(), faltas: {}, presencas: [] };
         if (r.tipo === "falta") {
             const m = r.motivo || "sem_motivo";
             porFunc[fid].faltas[m] = (porFunc[fid].faltas[m] || 0) + 1;
@@ -571,6 +571,7 @@ async function carregarFinanceiro() {
         }
         porFunc[fid].horas += Number(r.horas) || 0;
         porFunc[fid].dias.add(r.data);
+        porFunc[fid].presencas.push(r);
     });
 
     let totalHoras = 0, totalDias = 0, totalPagar = 0;
@@ -581,10 +582,10 @@ async function carregarFinanceiro() {
         const dados = porFunc[f.id];
         // Quem recebe ao mês aparece sempre, mesmo sem registos
         if (!dados && !f.salario_mensal) return;
-        const d = dados || { horas: 0, dias: new Set(), faltas: {} };
+        const d = dados || { horas: 0, dias: new Set(), faltas: {}, presencas: [] };
         const horas = d.horas;
         const dias  = d.dias.size;
-        const calc  = rhValorOrdenado(f, dias, d.faltas);
+        const calc  = rhValorOrdenado(f, dias, d.faltas, rhDiasPagos(d.presencas));
         totalHoras += horas;
         totalDias  += dias;
         totalPagar += calc.valor;
@@ -608,7 +609,7 @@ async function carregarFinanceiro() {
     if (kpiTEl) kpiTEl.textContent = totalPagar.toFixed(2) + " €";
     _ordenadosMes = { anoMes, linhas: linhasF, totalPagar };
 
-    const NOTA_ORD = "Sai do Registo diário do mês. Quem tem salário recebe o salário mensal menos as faltas injustificadas e os dias de baixa; os temporários recebem os dias trabalhados × valor/dia combinado. É o valor bruto, antes de descontos e sem a TSU da empresa.";
+    const NOTA_ORD = "Sai do Registo diário do mês. Quem tem salário recebe o salário mensal menos as faltas injustificadas e os dias de baixa; os temporários recebem o valor/dia combinado por cada dia de 8 h, e metade por meio dia (horas do dia ÷ 8, no máximo um dia). É o valor bruto, antes de descontos e sem a TSU da empresa.";
     porContas("kpiFuncionariosContas", "Funcionários", linhasF.map(l => ({ t: l.f.nome + (l.f.ativo ? "" : " (já saiu)"), v: l.f.salario_mensal ? "salário" : "à jornada" })),
         "Quem tem salário aparece sempre; os outros aparecem quando têm registos no mês.");
     porContas("kpiHorasContas", "Horas do mês", [...linhasF.map(l => ({ t: l.f.nome, v: l.horas.toFixed(2) + " h" })), { t: "Total", v: totalHoras.toFixed(2) + " h", total: true }],
@@ -744,9 +745,9 @@ async function carregarRegistosAdmin() {
     raConteudo.innerHTML = `<div style="padding:24px;text-align:center;opacity:.4">A carregar…</div>`;
 
     const { data, error } = await lerTudo(() => SB.from("registos_admin")
-        .select("id, data, tipo, horas, funcionario_id, obra_id, observacoes, funcionarios(id, nome, valor_dia), obras(id, nome)")
+        .select("id, data, tipo, motivo, horas, funcionario_id, obra_id, observacoes, funcionarios(id, nome, valor_dia, salario_mensal), obras(id, nome)")
         .gte("data", inicio).lte("data", fim)
-        .order("data").order("funcionarios(nome)"));
+        .order("data").order("funcionarios(nome)").order("id"));
 
     if (error) {
         console.error(error);
@@ -802,14 +803,26 @@ function renderRaMapaFuncionario(ano, mes) {
     const dias = diasDoMes(ano, mes);
 
     // Agrupar por funcionário
+    // O valor do mês é o mesmo do ecrã Ordenados (rhValorOrdenado): com
+    // salário mensal, o salário menos as faltas descontáveis; à jornada, os
+    // dias pagos × valor/dia (meio dia paga metade). Um dia em duas obras
+    // conta uma vez.
     const porFunc = {};
     _raCache.forEach(r => {
         const nome = r.funcionarios?.nome || (r.funcionario_id ? "—" : nomeTempRA(r.observacoes));
-        if (!porFunc[nome]) porFunc[nome] = { vd: r.funcionarios?.valor_dia, dias: {}, totalH: 0, totalDias: 0 };
-        porFunc[nome].dias[r.data] = { tipo: r.tipo, horas: Number(r.horas||0), obra: r.obras?.nome||"" };
+        if (!porFunc[nome]) porFunc[nome] = { f: r.funcionarios || null, dias: {}, totalH: 0, diasTrab: new Set(), faltas: {}, presencas: [] };
+        // Um dia em duas obras soma as horas, para o ½ só aparecer em meio dia
+        const ant = porFunc[nome].dias[r.data];
+        porFunc[nome].dias[r.data] = ant && ant.tipo === "presenca" && r.tipo === "presenca"
+            ? { tipo: "presenca", horas: ant.horas + Number(r.horas||0), obra: [ant.obra, r.obras?.nome].filter(Boolean).join(" + ") }
+            : { tipo: r.tipo, horas: Number(r.horas||0), obra: r.obras?.nome||"" };
         if (r.tipo === "presenca") {
             porFunc[nome].totalH += Number(r.horas||0);
-            porFunc[nome].totalDias++;
+            porFunc[nome].diasTrab.add(r.data);
+            porFunc[nome].presencas.push(r);
+        } else if (r.tipo === "falta") {
+            const m = r.motivo || "sem_motivo";
+            porFunc[nome].faltas[m] = (porFunc[nome].faltas[m] || 0) + 1;
         }
     });
 
@@ -831,11 +844,13 @@ function renderRaMapaFuncionario(ano, mes) {
     funcs.forEach((func, fi) => {
         const fd  = porFunc[func];
         const bg  = fi%2===1 ? "rgba(0,0,0,.03)" : "transparent";
-        const vd  = fd.vd ? Number(fd.vd) : null;
-        const val = vd ? (fd.totalDias * vd).toFixed(2)+"€" : "—";
+        fd.totalDias = fd.diasTrab.size;
+        const calc = fd.f && (Number(fd.f.salario_mensal) > 0 || Number(fd.f.valor_dia) > 0)
+            ? rhValorOrdenado(fd.f, fd.totalDias, fd.faltas, rhDiasPagos(fd.presencas)) : null;
+        const val = calc ? `<span title="${esc(calc.nota || basePagamento(fd.f))}">${calc.valor.toFixed(2)}€</span>` : "—";
 
         html += `<tr style="background:${bg};border-bottom:1px solid rgba(0,0,0,.07)">
-            <td style="padding:7px 12px;position:sticky;left:0;background:var(--panel-solid);z-index:1;font-weight:500;white-space:nowrap;border-right:1px solid rgba(0,0,0,.1)">${func}</td>
+            <td style="padding:7px 12px;position:sticky;left:0;background:var(--panel-solid);z-index:1;font-weight:500;white-space:nowrap;border-right:1px solid rgba(0,0,0,.1)">${esc(func)}</td>
             ${dias.map(d => {
                 const dObj = new Date(d+"T12:00:00");
                 const dow  = dObj.getDay();
@@ -924,6 +939,27 @@ function renderRaMapaObra(ano, mes) {
     raConteudo.innerHTML = html;
 }
 
+// Horas de cada pessoa em cada dia, para repartir o valor do dia pelas
+// obras desse dia (ver valorDoRegisto, no rh.js)
+function chaveDiaRA(r) {
+    return (r.funcionario_id || nomeTempRA(r.observacoes)) + "|" + r.data;
+}
+function horasPorPessoaEDia(registos) {
+    const h = {};
+    registos.filter(r => r.tipo === "presenca").forEach(r => {
+        const k = chaveDiaRA(r);
+        h[k] = (h[k] || 0) + Number(r.horas || 0);
+    });
+    return h;
+}
+function textoValorRegisto(r, horasDia) {
+    if (r.tipo !== "presenca") return "—";
+    if (Number(r.funcionarios?.salario_mensal) > 0)
+        return `<span style="font-size:11px;opacity:.6" title="O valor é o do mês, no ecrã Ordenados">salário mensal</span>`;
+    const v = valorDoRegisto(r.funcionarios, r.horas, horasDia[chaveDiaRA(r)]);
+    return v == null ? "—" : v.toFixed(2) + "€";
+}
+
 function renderRaDetalhe() {
     const raConteudo = document.getElementById("raConteudo");
     const presencas = _raCache.filter(r => r.tipo === "presenca");
@@ -941,9 +977,9 @@ function renderRaDetalhe() {
         </tr>
     </thead><tbody>`;
 
+    const horasDia = horasPorPessoaEDia(_raCache);
     _raCache.forEach((r, i) => {
-        const vd  = r.funcionarios?.valor_dia ? Number(r.funcionarios.valor_dia) : null;
-        const val = (r.tipo==="presenca" && vd && r.horas) ? (Number(r.horas)/8*vd).toFixed(2)+"€" : "—";
+        const val = textoValorRegisto(r, horasDia);
         const bg  = i%2===1 ? "rgba(0,0,0,.03)" : "transparent";
         const dataFmt = r.data ? r.data.split("-").reverse().join("/") : "—";
 
@@ -969,11 +1005,18 @@ async function exportarRegistosAdminExcel() {
     if (!_raCache.length) { alert("Sem dados para exportar. Carrega primeiro."); return; }
     const mesEl = document.getElementById("raFiltroMes");
     const [ano, mes] = (mesEl?.value || "").split("-");
-    const linhas = ["Data,Funcionário,Obra,Tipo,Horas,Valor/dia,Valor estimado"];
+    // A base de pagamento vai numa coluna própria: quem tem salário mensal
+    // não tem valor por registo, e somar as duas coisas não dá nada certo.
+    const linhas = ["Data,Funcionário,Obra,Tipo,Horas,Base de pagamento,Valor/dia,Valor estimado"];
+    const horasDia = horasPorPessoaEDia(_raCache);
     _raCache.forEach(r => {
-        const vd  = r.funcionarios?.valor_dia ? Number(r.funcionarios.valor_dia) : "";
-        const val = (r.tipo==="presenca" && vd && r.horas) ? (Number(r.horas)/8*vd).toFixed(2) : "";
-        linhas.push(`"${r.data}","${r.funcionarios?.nome||""}","${r.obras?.nome||""}","${r.tipo}","${r.horas||0}","${vd}","${val}"`);
+        const f   = r.funcionarios;
+        const vd  = f?.valor_dia && !(Number(f.salario_mensal) > 0) ? Number(f.valor_dia) : "";
+        const v   = r.tipo === "presenca" ? valorDoRegisto(f, r.horas, horasDia[chaveDiaRA(r)]) : null;
+        // Nomes escritos à mão: aspas escapadas e nada que o Excel leia como fórmula
+        const q = x => { let s = String(x ?? ""); if (/^[=+\-@]/.test(s)) s = "'" + s; return `"${s.replace(/"/g, '""')}"`; };
+        const nome = f?.nome || (r.funcionario_id ? "" : nomeTempRA(r.observacoes));
+        linhas.push([r.data, nome, r.obras?.nome, r.tipo, r.horas || 0, basePagamento(f), vd, v == null ? "" : v.toFixed(2)].map(q).join(","));
     });
     const blob = new Blob(["\ufeff"+linhas.join("\n")], {type:"text/csv;charset=utf-8;"});
     const a = document.createElement("a");
@@ -1770,7 +1813,7 @@ async function carregarFichaMes(anoMes) {
     const horas = presencas.reduce((s, r) => s + r.horas, 0);
     const faltasPorMotivo = {};
     faltas.forEach(f => { faltasPorMotivo[f.motivo] = (faltasPorMotivo[f.motivo] || 0) + 1; });
-    const calc = rhValorOrdenado(func, dias, faltasPorMotivo);
+    const calc = rhValorOrdenado(func, dias, faltasPorMotivo, rhDiasPagos(presencas));
     _histDados = { presencas, faltas, dias, horas, faltasPorMotivo, calc };
 
     // Por obra: um dia conta uma vez por obra, mesmo com várias linhas
@@ -6539,9 +6582,13 @@ async function gravarPropostaDocumento() {
             // (ao registar o documento), reaproveita-se, como nas faturas.
             // Antes, tentar outra vez dava "já existe um orçamento com o
             // número" e o documento ficava por registar para sempre.
-            const { data: jaOrc } = await SB.from("orcamentos").select("id")
+            // Só se reaproveita se for o mesmo documento (mesmo total): um PDF
+            // diferente com o mesmo número continua a ser recusado, em vez de
+            // ficar ligado em silêncio ao orçamento antigo.
+            const { data: jaOrc } = await SB.from("orcamentos").select("id, total_com_iva")
                 .eq("numero", numero).eq("obra_id", obra.id).like("notas", "Importado do PDF%").limit(1);
-            const { data: o, error } = jaOrc?.[0] ? { data: jaOrc[0], error: null } : await SB.from("orcamentos").insert({
+            const reaproveitar = jaOrc?.[0] && Math.abs(Number(jaOrc[0].total_com_iva) - Number(comIva)) < 0.01 ? jaOrc[0] : null;
+            const { data: o, error } = reaproveitar ? { data: reaproveitar, error: null } : await SB.from("orcamentos").insert({
                 numero, data: data || undefined, validade: val("propValidade") || null,
                 estado: val("propEstadoOrc"),
                 cliente_nome: cli.nome, cliente_nif: cli.nif || null, cliente_morada: cli.morada || null,
