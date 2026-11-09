@@ -4172,10 +4172,9 @@ function limparLinhasFatura() {
     if (wrap) wrap.style.display = "none";
 }
 
-// Depois de as linhas estarem gravadas: aprender os sinónimos e registar
-// os preços. Corre sempre a seguir ao movimento, nunca antes — precisa
-// dos ids das linhas e do fornecedor.
-async function gravarSinonimosEPrecos(linhas, fornecedor_id, dataDoc) {
+// Depois de as linhas estarem gravadas (com os preços e o stock, pela
+// gravar_linhas_fatura): aprender os sinónimos das descrições.
+async function aprenderDaFatura(linhas) {
     const comArtigo = (linhas || []).filter(l => l.artigo_id);
     if (!comArtigo.length) return;
 
@@ -4196,66 +4195,16 @@ async function gravarSinonimosEPrecos(linhas, fornecedor_id, dataDoc) {
         else sinonimos.forEach(s => { _sinonimosFatura[s.texto] = s.artigo_id; });
     }
 
-    // 2) Histórico de preços
-    const precos = comArtigo
-        .filter(l => Number(l.preco_unitario) > 0)
-        .map(l => ({
-            artigo_id:       l.artigo_id,
-            fornecedor_id:   fornecedor_id || null,
-            preco:           Number(l.preco_unitario),
-            unidade:         l.unidade || null,
-            data:            dataDoc,
-            origem:          "fatura",
-            fatura_linha_id: l.id,
-        }));
-    if (!precos.length) return;
-
-    const { error: errP } = await SB.from("precos").insert(precos);
-    if (errP) { console.error("preços:", errP); return; }
-
-    // 3) O preço actual do artigo passa a ser o mais recente que conhecemos.
-    //    Pergunta-se à base de dados em vez de assumir que esta fatura é a
-    //    mais recente — pode estar a lançar-se uma fatura atrasada.
-    for (const artigoId of [...new Set(precos.map(p => p.artigo_id))]) {
-        delete _ultimosPrecos[artigoId];
-        const { data: recente } = await SB.from("precos")
-            .select("preco, data").eq("artigo_id", artigoId)
-            .order("data", { ascending: false })
-            .order("criado_em", { ascending: false })
-            .limit(1).maybeSingle();
-        if (!(Number(recente?.preco) > 0)) continue;
-        await SB.from("artigos").update({ preco_atual: recente.preco }).eq("id", artigoId);
-        const a = _artigosFatura.find(x => x.id === artigoId);
-        if (a) a.preco_atual = recente.preco;
-    }
-}
-
-// Entrada em inventário das linhas marcadas. Fica ligada à fatura e à
-// linha, para se poder desfazer quando a fatura for corrigida e para se
-// saber sempre de onde veio este material.
-async function gravarEntradasStock(movId, gravadas, linhasEcra, dataDoc, referencia) {
-    const porOrdem = {};
-    (gravadas || []).forEach(g => { porOrdem[g.ordem] = g.id; });
-
-    const entradas = (linhasEcra || [])
-        .filter(l => l.stock && l.artigo_id && Number(l.quantidade) > 0)
-        .map(l => ({
-            artigo_id:       l.artigo_id,
-            tipo_movimento:  "entrada",
-            quantidade:      Number(l.quantidade),
-            preco_unitario:  l.preco_unitario ?? null,
-            data_movimento:  dataDoc,
-            observacoes:     referencia ? `Fatura ${referencia}` : "Entrada por fatura",
-            movimento_id:    movId,
-            fatura_linha_id: porOrdem[l.ordem] || null,
-        }));
-    if (!entradas.length) return;
-
-    const { error } = await SB.from("movimentos_stock").insert(entradas);
-    if (error) {
-        console.error("entradas de stock:", error);
-        { console.error(error); alert("O movimento ficou gravado, mas a entrada em inventário não."); };
-    }
+    // 2) Os preços e o preço actual de cada artigo já foram gravados pela
+    //    gravar_linhas_fatura. Aqui só se refresca o que o ecrã guardou em
+    //    memória, numa só consulta para todos os artigos.
+    const ids = [...new Set(comArtigo.map(l => l.artigo_id))];
+    ids.forEach(id => { delete _ultimosPrecos[id]; });
+    const { data: arts } = await SB.from("artigos").select("id, preco_atual").in("id", ids);
+    (arts || []).forEach(x => {
+        const a = _artigosFatura.find(y => y.id === x.id);
+        if (a) a.preco_atual = x.preco_atual;
+    });
 }
 
 function mostrarFeedbackQR(msg, tipo) {
@@ -6567,7 +6516,13 @@ async function gravarPropostaDocumento() {
         if (tipo === "orcamento") {
             const taxa = semIva && iva != null ? Math.round(iva / semIva * 100) : 23;
             const notas = "Importado do PDF do TOCONLINE" + (document.getElementById("propRevisao").checked ? " · revisão ou extra" : "");
-            const { data: o, error } = await SB.from("orcamentos").insert({
+            // Se uma tentativa anterior já lançou o orçamento e falhou depois
+            // (ao registar o documento), reaproveita-se, como nas faturas.
+            // Antes, tentar outra vez dava "já existe um orçamento com o
+            // número" e o documento ficava por registar para sempre.
+            const { data: jaOrc } = await SB.from("orcamentos").select("id")
+                .eq("numero", numero).eq("obra_id", obra.id).like("notas", "Importado do PDF%").limit(1);
+            const { data: o, error } = jaOrc?.[0] ? { data: jaOrc[0], error: null } : await SB.from("orcamentos").insert({
                 numero, data: data || undefined, validade: val("propValidade") || null,
                 estado: val("propEstadoOrc"),
                 cliente_nome: cli.nome, cliente_nif: cli.nif || null, cliente_morada: cli.morada || null,
@@ -7741,32 +7696,30 @@ async function guardarMovimento() {
     const movIdLinhas = movSalvo?.id || movEditId;
     const linhasFatura = linhasFaturaDoEcra();
     if (movIdLinhas && linhasFatura.length) {
-        // Em edição, substitui as linhas lidas antes (as manuais ficam).
-        // Os preços saem primeiro: se saíssem depois das linhas, ficavam
-        // órfãos, sem se saber de que fatura vieram.
-        if (movEditId) {
-            const { data: antigas } = await SB.from("fatura_linhas")
-                .select("id").eq("movimento_id", movEditId).eq("origem", "ia");
-            const ids = (antigas || []).map(l => l.id);
-            if (ids.length) {
-                await SB.from("precos").delete().in("fatura_linha_id", ids);
-                await SB.from("fatura_linhas").delete().in("id", ids);
-            }
-            // As entradas em stock desta fatura também saem: senão, editar
-            // a fatura duplicava o material no inventário.
-            await SB.from("movimentos_stock").delete().eq("movimento_id", movEditId);
-        }
-        const { data: gravadas, error: errLinhas } = await SB.from("fatura_linhas").insert(
-            linhasFatura.map(({ stock, ...l }) => ({ ...l, movimento_id: movIdLinhas, origem: "ia" }))
-        ).select("id, artigo_id, descricao_original, preco_unitario, unidade, ordem");
+        // Linhas, preços e entradas em stock gravam-se numa só transacção.
+        // Em edição, as linhas lidas antes (as manuais ficam), os preços
+        // delas e as entradas em stock desta fatura saem na mesma
+        // transacção: se falhar, a fatura fica como estava, em vez de sem
+        // linhas e com o inventário em baixo. O que vendemos não é preço de
+        // compra nem entra no inventário (p_compra).
+        const compra = !_movEmitidaPorNos;
+        const { data: gravadas, error: errLinhas } = await SB.rpc("gravar_linhas_fatura", {
+            p_movimento:  movIdLinhas,
+            p_substituir: !!movEditId,
+            p_linhas:     linhasFatura,
+            p_compra:     compra,
+            p_fornecedor: fornecedor_id || null,
+            p_data:       dataDoc,
+            p_referencia: payload.referencia || null,
+        });
 
         if (errLinhas) {
-            console.error(errLinhas);
-            alert("O movimento foi guardado, mas as linhas da fatura não: " + errLinhas.message);
-        } else if (!_movEmitidaPorNos) {
-            // O que vendemos não é preço de compra nem entra no inventário
-            await gravarSinonimosEPrecos(gravadas, fornecedor_id, dataDoc);
-            await gravarEntradasStock(movIdLinhas, gravadas, linhasFatura, dataDoc, payload.referencia);
+            console.error("gravar_linhas_fatura:", errLinhas);
+            alert(movEditId
+                ? "O movimento foi guardado, mas as linhas da fatura não: ficaram as que já lá estavam."
+                : "O movimento foi guardado, mas as linhas da fatura não. Abre-o e grava outra vez.");
+        } else if (compra) {
+            await aprenderDaFatura(gravadas);
         }
     }
 
@@ -7774,8 +7727,6 @@ async function guardarMovimento() {
     const movId = movSalvo?.id || movEditId;
     const linhasImput = document.querySelectorAll(".linha-imput-serv");
     if (movId && linhasImput.length) {
-        // Remover imputações anteriores se for edição
-        if (movEditId) await SB.from("movimento_servicos").delete().eq("movimento_id", movEditId);
         const imputacoes = [];
         const comServico = [...linhasImput].filter(l => l.querySelector(".imput-serv-sel")?.value);
         linhasImput.forEach(linha => {
@@ -7786,7 +7737,15 @@ async function guardarMovimento() {
             if (sid && !(val > 0) && comServico.length === 1) val = payload.valor_base;
             if (sid && val > 0) imputacoes.push({ movimento_id: movId, obra_servico_id: sid, valor: val });
         });
-        if (imputacoes.length) await SB.from("movimento_servicos").insert(imputacoes);
+        // As anteriores saem e as novas entram na mesma transacção
+        const { error: errImp } = await SB.rpc("substituir_imputacoes", {
+            p_movimento:  movId,
+            p_imputacoes: imputacoes.map(({ obra_servico_id, valor }) => ({ obra_servico_id, valor })),
+        });
+        if (errImp) {
+            console.error("substituir_imputacoes:", errImp);
+            alert("O movimento foi guardado, mas a divisão pelos serviços da obra não: ficou a que já lá estava.");
+        }
     }
 
     // Lote em curso: guardar esta não fecha, abre a seguinte já preenchida
