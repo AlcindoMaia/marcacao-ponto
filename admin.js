@@ -609,7 +609,7 @@ async function carregarFinanceiro() {
     if (kpiTEl) kpiTEl.textContent = totalPagar.toFixed(2) + " €";
     _ordenadosMes = { anoMes, linhas: linhasF, totalPagar };
 
-    const NOTA_ORD = "Sai do Registo diário do mês. Quem tem salário recebe o salário mensal menos as faltas injustificadas e os dias de baixa; os temporários recebem os dias trabalhados × valor/dia combinado. É o valor bruto, antes de descontos e sem a TSU da empresa.";
+    const NOTA_ORD = "Sai do Registo diário do mês. Quem tem salário recebe o salário mensal menos as faltas injustificadas e os dias de baixa; os temporários recebem o valor/dia combinado por cada dia de 8 h, e metade por meio dia (horas do dia ÷ 8, no máximo um dia). É o valor bruto, antes de descontos e sem a TSU da empresa.";
     porContas("kpiFuncionariosContas", "Funcionários", linhasF.map(l => ({ t: l.f.nome + (l.f.ativo ? "" : " (já saiu)"), v: l.f.salario_mensal ? "salário" : "à jornada" })),
         "Quem tem salário aparece sempre; os outros aparecem quando têm registos no mês.");
     porContas("kpiHorasContas", "Horas do mês", [...linhasF.map(l => ({ t: l.f.nome, v: l.horas.toFixed(2) + " h" })), { t: "Total", v: totalHoras.toFixed(2) + " h", total: true }],
@@ -747,7 +747,7 @@ async function carregarRegistosAdmin() {
     const { data, error } = await lerTudo(() => SB.from("registos_admin")
         .select("id, data, tipo, motivo, horas, funcionario_id, obra_id, observacoes, funcionarios(id, nome, valor_dia, salario_mensal), obras(id, nome)")
         .gte("data", inicio).lte("data", fim)
-        .order("data").order("funcionarios(nome)"));
+        .order("data").order("funcionarios(nome)").order("id"));
 
     if (error) {
         console.error(error);
@@ -811,7 +811,11 @@ function renderRaMapaFuncionario(ano, mes) {
     _raCache.forEach(r => {
         const nome = r.funcionarios?.nome || (r.funcionario_id ? "—" : nomeTempRA(r.observacoes));
         if (!porFunc[nome]) porFunc[nome] = { f: r.funcionarios || null, dias: {}, totalH: 0, diasTrab: new Set(), faltas: {}, presencas: [] };
-        porFunc[nome].dias[r.data] = { tipo: r.tipo, horas: Number(r.horas||0), obra: r.obras?.nome||"" };
+        // Um dia em duas obras soma as horas, para o ½ só aparecer em meio dia
+        const ant = porFunc[nome].dias[r.data];
+        porFunc[nome].dias[r.data] = ant && ant.tipo === "presenca" && r.tipo === "presenca"
+            ? { tipo: "presenca", horas: ant.horas + Number(r.horas||0), obra: [ant.obra, r.obras?.nome].filter(Boolean).join(" + ") }
+            : { tipo: r.tipo, horas: Number(r.horas||0), obra: r.obras?.nome||"" };
         if (r.tipo === "presenca") {
             porFunc[nome].totalH += Number(r.horas||0);
             porFunc[nome].diasTrab.add(r.data);
@@ -846,7 +850,7 @@ function renderRaMapaFuncionario(ano, mes) {
         const val = calc ? `<span title="${esc(calc.nota || basePagamento(fd.f))}">${calc.valor.toFixed(2)}€</span>` : "—";
 
         html += `<tr style="background:${bg};border-bottom:1px solid rgba(0,0,0,.07)">
-            <td style="padding:7px 12px;position:sticky;left:0;background:var(--panel-solid);z-index:1;font-weight:500;white-space:nowrap;border-right:1px solid rgba(0,0,0,.1)">${func}</td>
+            <td style="padding:7px 12px;position:sticky;left:0;background:var(--panel-solid);z-index:1;font-weight:500;white-space:nowrap;border-right:1px solid rgba(0,0,0,.1)">${esc(func)}</td>
             ${dias.map(d => {
                 const dObj = new Date(d+"T12:00:00");
                 const dow  = dObj.getDay();
@@ -1009,7 +1013,10 @@ async function exportarRegistosAdminExcel() {
         const f   = r.funcionarios;
         const vd  = f?.valor_dia && !(Number(f.salario_mensal) > 0) ? Number(f.valor_dia) : "";
         const v   = r.tipo === "presenca" ? valorDoRegisto(f, r.horas, horasDia[chaveDiaRA(r)]) : null;
-        linhas.push(`"${r.data}","${f?.nome||""}","${r.obras?.nome||""}","${r.tipo}","${r.horas||0}","${basePagamento(f)}","${vd}","${v == null ? "" : v.toFixed(2)}"`);
+        // Nomes escritos à mão: aspas escapadas e nada que o Excel leia como fórmula
+        const q = x => { let s = String(x ?? ""); if (/^[=+\-@]/.test(s)) s = "'" + s; return `"${s.replace(/"/g, '""')}"`; };
+        const nome = f?.nome || (r.funcionario_id ? "" : nomeTempRA(r.observacoes));
+        linhas.push([r.data, nome, r.obras?.nome, r.tipo, r.horas || 0, basePagamento(f), vd, v == null ? "" : v.toFixed(2)].map(q).join(","));
     });
     const blob = new Blob(["\ufeff"+linhas.join("\n")], {type:"text/csv;charset=utf-8;"});
     const a = document.createElement("a");
@@ -6556,9 +6563,13 @@ async function gravarPropostaDocumento() {
             // (ao registar o documento), reaproveita-se, como nas faturas.
             // Antes, tentar outra vez dava "já existe um orçamento com o
             // número" e o documento ficava por registar para sempre.
-            const { data: jaOrc } = await SB.from("orcamentos").select("id")
+            // Só se reaproveita se for o mesmo documento (mesmo total): um PDF
+            // diferente com o mesmo número continua a ser recusado, em vez de
+            // ficar ligado em silêncio ao orçamento antigo.
+            const { data: jaOrc } = await SB.from("orcamentos").select("id, total_com_iva")
                 .eq("numero", numero).eq("obra_id", obra.id).like("notas", "Importado do PDF%").limit(1);
-            const { data: o, error } = jaOrc?.[0] ? { data: jaOrc[0], error: null } : await SB.from("orcamentos").insert({
+            const reaproveitar = jaOrc?.[0] && Math.abs(Number(jaOrc[0].total_com_iva) - Number(comIva)) < 0.01 ? jaOrc[0] : null;
+            const { data: o, error } = reaproveitar ? { data: reaproveitar, error: null } : await SB.from("orcamentos").insert({
                 numero, data: data || undefined, validade: val("propValidade") || null,
                 estado: val("propEstadoOrc"),
                 cliente_nome: cli.nome, cliente_nif: cli.nif || null, cliente_morada: cli.morada || null,
