@@ -571,9 +571,26 @@ function custoDiaFunc(f) {
     return Number(f?.valor_dia || 0);
 }
 
-function rhValorOrdenado(f, dias, faltas = {}) {
+// Dias que se pagam a quem trabalha à jornada: um dia de 8 h ou mais vale
+// um dia, meio dia vale metade (decisão do Alcindo, 09/11). Recebe as
+// presenças como [{ data, horas }] e soma as horas de cada dia primeiro,
+// para um dia repartido por duas obras contar uma vez.
+function rhDiasPagos(presencas) {
+    const porDia = {};
+    (presencas || []).forEach(r => {
+        const d = r.data ?? r.dia;
+        porDia[d] = (porDia[d] || 0) + (Number(r.horas) || 0);
+    });
+    return Object.values(porDia).reduce((s, h) => s + Math.min(h, 8) / 8, 0);
+}
+
+function rhValorOrdenado(f, dias, faltas = {}, diasPagos = dias) {
     if (!f.salario_mensal) {
-        return { valor: f.valor_dia ? dias * f.valor_dia : 0, nota: f.valor_dia ? "" : "sem valor por dia" };
+        if (!f.valor_dia) return { valor: 0, nota: "sem valor por dia" };
+        const pagos = Math.round(diasPagos * 1000) / 1000;
+        const nota = pagos !== dias
+            ? `${String(pagos).replace(".", ",")} dia(s) pago(s): meio dia paga metade` : "";
+        return { valor: pagos * f.valor_dia, nota };
     }
     const sal = Number(f.salario_mensal);
     const dia = sal * 12 / (52 * 5);
@@ -588,16 +605,16 @@ function rhValorOrdenado(f, dias, faltas = {}) {
 }
 
 // Parte do valor de um dia que cabe a um registo (lista e Excel dos
-// Registos). À jornada, o dia paga-se inteiro, como nos Ordenados, e
-// reparte-se pelas obras desse dia na proporção das horas: as linhas de um
-// dia somam sempre o valor/dia. Com salário mensal não há valor por
-// registo (devolve null): a conta é a do mês, no rhValorOrdenado.
+// Registos). À jornada, como nos Ordenados (rhDiasPagos): o dia vale
+// horas/8 do valor/dia, no máximo um dia, e reparte-se pelas obras desse
+// dia na proporção das horas. Com salário mensal não há valor por registo
+// (devolve null): a conta é a do mês, no rhValorOrdenado.
 function valorDoRegisto(f, horas, horasDoDia) {
     if (!f || Number(f.salario_mensal) > 0) return null;
     const vd = Number(f.valor_dia || 0), h = Number(horas || 0);
     const tot = Number(horasDoDia ?? h);
     if (!(vd > 0) || !(h > 0) || !(tot > 0)) return null;
-    return vd * h / tot;
+    return vd * h / Math.max(tot, 8);
 }
 
 // Como se paga cada pessoa, para mostrar ao lado do valor

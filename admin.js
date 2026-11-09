@@ -563,7 +563,7 @@ async function carregarFinanceiro() {
     const porFunc = {};
     registos.forEach(r => {
         const fid = r.funcionario_id;
-        if (!porFunc[fid]) porFunc[fid] = { horas: 0, dias: new Set(), faltas: {} };
+        if (!porFunc[fid]) porFunc[fid] = { horas: 0, dias: new Set(), faltas: {}, presencas: [] };
         if (r.tipo === "falta") {
             const m = r.motivo || "sem_motivo";
             porFunc[fid].faltas[m] = (porFunc[fid].faltas[m] || 0) + 1;
@@ -571,6 +571,7 @@ async function carregarFinanceiro() {
         }
         porFunc[fid].horas += Number(r.horas) || 0;
         porFunc[fid].dias.add(r.data);
+        porFunc[fid].presencas.push(r);
     });
 
     let totalHoras = 0, totalDias = 0, totalPagar = 0;
@@ -581,10 +582,10 @@ async function carregarFinanceiro() {
         const dados = porFunc[f.id];
         // Quem recebe ao mês aparece sempre, mesmo sem registos
         if (!dados && !f.salario_mensal) return;
-        const d = dados || { horas: 0, dias: new Set(), faltas: {} };
+        const d = dados || { horas: 0, dias: new Set(), faltas: {}, presencas: [] };
         const horas = d.horas;
         const dias  = d.dias.size;
-        const calc  = rhValorOrdenado(f, dias, d.faltas);
+        const calc  = rhValorOrdenado(f, dias, d.faltas, rhDiasPagos(d.presencas));
         totalHoras += horas;
         totalDias  += dias;
         totalPagar += calc.valor;
@@ -804,15 +805,17 @@ function renderRaMapaFuncionario(ano, mes) {
     // Agrupar por funcionário
     // O valor do mês é o mesmo do ecrã Ordenados (rhValorOrdenado): com
     // salário mensal, o salário menos as faltas descontáveis; à jornada, os
-    // dias trabalhados × valor/dia. Um dia em duas obras conta uma vez.
+    // dias pagos × valor/dia (meio dia paga metade). Um dia em duas obras
+    // conta uma vez.
     const porFunc = {};
     _raCache.forEach(r => {
         const nome = r.funcionarios?.nome || (r.funcionario_id ? "—" : nomeTempRA(r.observacoes));
-        if (!porFunc[nome]) porFunc[nome] = { f: r.funcionarios || null, dias: {}, totalH: 0, diasTrab: new Set(), faltas: {} };
+        if (!porFunc[nome]) porFunc[nome] = { f: r.funcionarios || null, dias: {}, totalH: 0, diasTrab: new Set(), faltas: {}, presencas: [] };
         porFunc[nome].dias[r.data] = { tipo: r.tipo, horas: Number(r.horas||0), obra: r.obras?.nome||"" };
         if (r.tipo === "presenca") {
             porFunc[nome].totalH += Number(r.horas||0);
             porFunc[nome].diasTrab.add(r.data);
+            porFunc[nome].presencas.push(r);
         } else if (r.tipo === "falta") {
             const m = r.motivo || "sem_motivo";
             porFunc[nome].faltas[m] = (porFunc[nome].faltas[m] || 0) + 1;
@@ -839,7 +842,7 @@ function renderRaMapaFuncionario(ano, mes) {
         const bg  = fi%2===1 ? "rgba(0,0,0,.03)" : "transparent";
         fd.totalDias = fd.diasTrab.size;
         const calc = fd.f && (Number(fd.f.salario_mensal) > 0 || Number(fd.f.valor_dia) > 0)
-            ? rhValorOrdenado(fd.f, fd.totalDias, fd.faltas) : null;
+            ? rhValorOrdenado(fd.f, fd.totalDias, fd.faltas, rhDiasPagos(fd.presencas)) : null;
         const val = calc ? `<span title="${esc(calc.nota || basePagamento(fd.f))}">${calc.valor.toFixed(2)}€</span>` : "—";
 
         html += `<tr style="background:${bg};border-bottom:1px solid rgba(0,0,0,.07)">
@@ -1803,7 +1806,7 @@ async function carregarFichaMes(anoMes) {
     const horas = presencas.reduce((s, r) => s + r.horas, 0);
     const faltasPorMotivo = {};
     faltas.forEach(f => { faltasPorMotivo[f.motivo] = (faltasPorMotivo[f.motivo] || 0) + 1; });
-    const calc = rhValorOrdenado(func, dias, faltasPorMotivo);
+    const calc = rhValorOrdenado(func, dias, faltasPorMotivo, rhDiasPagos(presencas));
     _histDados = { presencas, faltas, dias, horas, faltasPorMotivo, calc };
 
     // Por obra: um dia conta uma vez por obra, mesmo com várias linhas

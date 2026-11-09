@@ -12,8 +12,8 @@ const ler = f => fs.readFileSync(path.join(raiz, f), "utf8");
 
 // rh.js não toca na página ao carregar: corre inteiro num contexto isolado
 const rh = vm.createContext({});
-vm.runInContext(ler("rh.js") + "\n;globalThis.__rh = { valorDoRegisto, basePagamento, rhValorOrdenado, custoDiaFunc };", rh);
-const { valorDoRegisto, basePagamento, rhValorOrdenado, custoDiaFunc } = rh.__rh;
+vm.runInContext(ler("rh.js") + "\n;globalThis.__rh = { valorDoRegisto, basePagamento, rhValorOrdenado, rhDiasPagos, custoDiaFunc };", rh);
+const { valorDoRegisto, basePagamento, rhValorOrdenado, rhDiasPagos, custoDiaFunc } = rh.__rh;
 
 // admin.js mexe na página ao carregar: tiram-se só as funções que se testam
 function funcaoDe(ficheiro, nome) {
@@ -39,8 +39,12 @@ test("temporário: um dia inteiro numa obra vale o valor/dia", () => {
     assert.equal(valorDoRegisto(temporario, 8, 8), 50);
 });
 
-test("temporário: meio dia sozinho paga o dia inteiro, como nos Ordenados", () => {
-    assert.equal(valorDoRegisto(temporario, 4, 4), 50);
+test("temporário: meio dia paga metade (decisão do Alcindo, 09/11)", () => {
+    assert.equal(valorDoRegisto(temporario, 4, 4), 25);
+});
+
+test("temporário: mais de 8 h num dia paga um dia, não mais", () => {
+    assert.equal(valorDoRegisto(temporario, 10, 10), 50);
 });
 
 test("temporário: um dia em duas obras reparte-se pelas horas e soma o valor/dia", () => {
@@ -62,8 +66,14 @@ test("sem valor/dia nem horas não se inventa um valor", () => {
     assert.equal(valorDoRegisto(null, 8, 8), null);
 });
 
-test("Ordenados: temporário recebe dias × valor/dia", () => {
+test("Ordenados: temporário recebe dias pagos × valor/dia", () => {
     assert.equal(rhValorOrdenado(temporario, 20).valor, 1000);
+    // 3 dias: um inteiro, um meio dia, um dia repartido por duas obras
+    const pres = [{ data: "2026-11-02", horas: 8 }, { data: "2026-11-03", horas: 4 },
+                  { data: "2026-11-04", horas: 6 }, { data: "2026-11-04", horas: 2 }];
+    assert.equal(rhDiasPagos(pres), 2.5);
+    assert.equal(rhValorOrdenado(temporario, 3, {}, rhDiasPagos(pres)).valor, 125);
+    assert.match(rhValorOrdenado(temporario, 3, {}, 2.5).nota, /meio dia paga metade/);
 });
 
 test("Ordenados: assalariado recebe o salário, menos as injustificadas", () => {
