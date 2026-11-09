@@ -11,11 +11,6 @@ let artigo      = null;
 let obras       = [];
 
 // --- Device ID (igual ao app.html) ---
-function getDeviceId() {
-  let id = localStorage.getItem("deviceId");
-  if (!id) { id = crypto.randomUUID(); localStorage.setItem("deviceId", id); }
-  return id;
-}
 
 // --- UI helpers ---
 function mostrarEcrã(id) {

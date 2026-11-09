@@ -2,11 +2,6 @@
 // SUPABASE — vem de config.js (SB já está disponível)
 // =======================================================
 
-function getDeviceId() {
-  let id = localStorage.getItem("deviceId");
-  if (!id) { id = crypto.randomUUID(); localStorage.setItem("deviceId", id); }
-  return id;
-}
 
 // A tabela obras não é legível sem login: tinha morada, coordenadas GPS e
 // raio de todas as obras — inteligência comercial, e as coordenadas exactas
