@@ -114,11 +114,23 @@ function rhEstadoContrato(f) {
     return null;
 }
 
+// Quem não tem contrato de trabalho (sócio-gerente, familiar, independente)
+// só tem de ter a identificação; o resto passa a "se aplicável".
+// com_contrato vazio (SQL ainda não corrido) conta como "tem contrato".
+const RH_SO_COM_CONTRATO = ["contrato", "admissao_ss", "medicina", "formacao_sst", "epi"];
+function rhTiposFunc(f) {
+    if (f?.com_contrato !== false) return TIPOS_DOC_RH;
+    const t = {};
+    for (const [k, v] of Object.entries(TIPOS_DOC_RH))
+        t[k] = RH_SO_COM_CONTRATO.includes(k) ? { ...v, obrigatorio: false } : v;
+    return t;
+}
+
 // Problemas de um trabalhador (para semáforo e sino)
 function rhProblemasFunc(f, docs) {
     const meus = docs.filter(d => d.funcionario_id === f.id);
     const prob = [];
-    Object.entries(TIPOS_DOC_RH).forEach(([k, t]) => {
+    Object.entries(rhTiposFunc(f)).forEach(([k, t]) => {
         const e = rhEstadoTipo(meus, k, t);
         if (e.cor === "vermelho" || e.cor === "amarelo") prob.push({ cor: e.cor, texto: `${t.nome}: ${e.texto.toLowerCase()}` });
     });
@@ -149,8 +161,16 @@ async function rhSemaforos(funcs) {
 }
 
 // ---------- ficha: separadores ----------
+let _rhTemComContrato = false;
 function rhPrepararFicha(func) {
     _rhFunc = func?.id ? func : null;
+    // Só mostra e grava "Contrato de trabalho" depois de corrido o com_contrato.sql
+    _rhTemComContrato = !!func && "com_contrato" in func || _rhTemComContrato;
+    const cc = document.getElementById("funcComContrato");
+    if (cc) {
+        cc.value = func?.com_contrato === false ? "false" : "true";
+        cc.closest(".form-group").style.display = _rhTemComContrato ? "" : "none";
+    }
     document.querySelectorAll("#fichaTabs .ficha-tab").forEach(b => {
         b.disabled = b.dataset.ficha !== "dados" && !_rhFunc;
         b.title = b.disabled ? "Grava primeiro o funcionário" : "";
@@ -183,6 +203,7 @@ function rhCamposFicha() {
         salario_mensal:      n("funcSalarioMensal"),
         emergencia_nome:     v("funcEmergenciaNome"),
         emergencia_telefone: v("funcEmergenciaTel"),
+        ...(_rhTemComContrato ? { com_contrato: document.getElementById("funcComContrato")?.value !== "false" } : {}),
     };
 }
 
@@ -207,7 +228,7 @@ async function rhCarregarDocsFunc() {
             <span style="opacity:.7">Se ainda não correste o SQL rh.sql no Supabase, é isso que falta.</span></div>`;
         return;
     }
-    el.innerHTML = rhHtmlPasta("func", TIPOS_DOC_RH, docs || [], rhEstadoContrato(_rhFunc));
+    el.innerHTML = rhHtmlPasta("func", rhTiposFunc(_rhFunc), docs || [], rhEstadoContrato(_rhFunc));
 }
 
 async function carregarDocsEmpresa() {
@@ -633,7 +654,7 @@ async function rhAlertas() {
     const ha30 = new Date(hoje); ha30.setDate(hoje.getDate() - 30);
 
     const [funcsRes, docsRes, regsRes] = await Promise.all([
-        SB.from("funcionarios").select("id, nome, ativo, tipo_contrato, data_fim_contrato, data_saida").eq("ativo", true),
+        SB.from("funcionarios").select("*").eq("ativo", true),
         SB.from("rh_documentos").select("funcionario_id, tipo, descricao, validade"),
         SB.from("registos_admin").select("data, funcionario_id, tipo, motivo")
             .gte("data", rhIso(segAnt < ha30 ? segAnt : ha30)).lte("data", rhIso(domAtual)),
@@ -711,7 +732,7 @@ async function rhAlertas() {
 async function rhAvisosTarefa(ids, dataIso) {
     if (!ids?.length) return [];
     const [funcsRes, docsRes, faltasRes] = await Promise.all([
-        SB.from("funcionarios").select("id, nome, data_fim_contrato, data_saida").in("id", ids),
+        SB.from("funcionarios").select("*").in("id", ids),
         SB.from("rh_documentos").select("funcionario_id, tipo, validade").in("funcionario_id", ids).eq("tipo", "medicina"),
         dataIso ? SB.from("registos_admin").select("funcionario_id, motivo").in("funcionario_id", ids).eq("tipo", "falta").eq("data", dataIso)
                 : Promise.resolve({ data: [] }),
@@ -722,7 +743,7 @@ async function rhAvisosTarefa(ids, dataIso) {
         const falta = (faltasRes.data || []).find(r => r.funcionario_id === f.id);
         if (falta) avisos.push(`${f.nome} está ausente nesse dia (${(MOTIVOS_FALTA_RH[falta.motivo || "sem_motivo"] || "").replace(/^\S+\s/, "").toLowerCase()}).`);
         const med = rhEstadoTipo((docsRes.data || []).filter(d => d.funcionario_id === f.id), "medicina", TIPOS_DOC_RH.medicina);
-        if (med.cor === "vermelho") avisos.push(`${f.nome}: ficha da medicina do trabalho ${med.texto.toLowerCase()}.`);
+        if (med.cor === "vermelho" && f.com_contrato !== false) avisos.push(`${f.nome}: ficha da medicina do trabalho ${med.texto.toLowerCase()}.`);
         if (f.data_saida && dataIso && dataIso > f.data_saida) avisos.push(`${f.nome} saiu da empresa a ${rhData(f.data_saida)}.`);
         else if (f.data_fim_contrato && dataIso && dataIso > f.data_fim_contrato) avisos.push(`${f.nome}: o contrato termina a ${rhData(f.data_fim_contrato)}.`);
     });

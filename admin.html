@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Maia">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-<link rel="stylesheet" href="style.css?v=20">
+<link rel="stylesheet" href="style.css?v=21">
 <link rel="stylesheet" href="telemovel.css?v=7">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
@@ -1727,6 +1727,13 @@ document.getElementById("btnLogin").addEventListener("click", function () {
 
         <div class="rh-secao">Contrato</div>
         <div class="form-row">
+            <div class="form-group input-sm" style="display:none">
+                <label>Contrato de trabalho</label>
+                <select id="funcComContrato">
+                    <option value="true">Sim</option>
+                    <option value="false">Não (sócio, família, independente)</option>
+                </select>
+            </div>
             <div class="form-group input-sm">
                 <label>Data de admissão</label>
                 <input id="funcDataAdmissao" type="date">
@@ -1923,8 +1930,8 @@ document.getElementById("btnLogin").addEventListener("click", function () {
 <script src="planeamento.js?v=4"></script>
 <script src="cotacoes.js?v=2"></script>
 <script src="andamento.js?v=8"></script>
-<script src="rh.js?v=6"></script>
-<script src="admin.js?v=43"></script>
+<script src="rh.js?v=7"></script>
+<script src="admin.js?v=44"></script>
 <script src="push.js?v=1"></script>
 <script src="telemovel.js?v=5"></script>
 
