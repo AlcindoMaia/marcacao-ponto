@@ -1552,6 +1552,7 @@ async function carregarFuncionarios() {
     }
 
     // Semáforo dos documentos de cada um (rh.js)
+    if (typeof _rhTemComContrato !== "undefined") _rhTemComContrato = "com_contrato" in data[0];
     const semaforos = await rhSemaforos(data).catch(() => ({}));
 
     data.forEach(f => {
