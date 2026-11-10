@@ -433,7 +433,7 @@ function linhaPedidoHTML(l, i) {
         <div class="hoje-linha-topo">
             <input type="number" step="0.01" min="0" class="qtd" value="${l.quantidade ?? ""}" placeholder="qtd">
             <input class="un" value="${esc(l.unidade || "")}" placeholder="un">
-            <select class="art" style="flex:1;min-width:0;padding:6px 8px;font:inherit;font-size:13px;border:1px solid rgba(0,0,0,.15);border-radius:8px;background:#fff;color:var(--text-dark)">${opcoes}</select>
+            <select class="art" style="flex:1;min-width:0;padding:6px 8px;font:inherit;font-size:13px;border:1px solid rgba(0,0,0,.15);border-radius:8px">${opcoes}</select>
             <button class="hoje-acao" onclick="this.closest('.hoje-linha-pedido').remove()" title="Tirar">✕</button>
         </div>
     </div>`;
