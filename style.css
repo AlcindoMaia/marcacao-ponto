@@ -1551,3 +1551,9 @@ body:has(#modalPainelObra[style*="display: flex"], #modalPainelObra[style*="disp
 @media (max-width: 600px) {
     .novo-serv-grelha { grid-template-columns: 1fr 1fr !important; }
 }
+
+/* Sino no tema escuro: o painel tinha fundo claro fixo e o texto claro do
+   tema escuro ficava invisível (nomes e títulos das secções) */
+body.dark #notifPainel { background: #1d2a37 !important; color: #ece5de; border-color: rgba(255,255,255,.12) !important; }
+body.dark #notifPainel > div { border-bottom-color: rgba(255,255,255,.08) !important; }
+body.dark #notifPainel > div[style*="text-transform:uppercase"] { opacity: .75 !important; color: #d0a47f; }
