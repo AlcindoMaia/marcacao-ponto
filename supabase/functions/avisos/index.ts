@@ -195,13 +195,18 @@ async function avisoRegisto(hoje: string): Promise<Aviso | null> {
 // ---------- 19h: saída do ponto esquecida ----------
 async function avisoPonto(hoje: string): Promise<Aviso | null> {
     const desde = new Date(Date.now() - 26 * 3600_000).toISOString();
-    const { data } = await SB.from("ponto").select("funcionario_id, tipo, datahora, funcionarios(nome)")
-        .gte("datahora", desde).order("datahora");
+    // ponto não tem chave estrangeira para funcionarios: os nomes leem-se à parte
+    const [{ data, error }, { data: funcs }] = await Promise.all([
+        SB.from("ponto").select("funcionario_id, tipo, datahora").gte("datahora", desde).order("datahora"),
+        SB.from("funcionarios").select("id, nome"),
+    ]);
+    if (error) throw error;
+    const nomeDe = new Map((funcs || []).map(f => [f.id, f.nome]));
     const ultimo = new Map<string, { tipo: string; nome: string }>();
     // deno-lint-ignore no-explicit-any
     for (const p of (data || []) as any[]) {
         if (lisboa(new Date(p.datahora)).dia !== hoje) continue;
-        ultimo.set(p.funcionario_id, { tipo: p.tipo, nome: p.funcionarios?.nome || "?" });
+        ultimo.set(p.funcionario_id, { tipo: p.tipo, nome: nomeDe.get(p.funcionario_id) || "?" });
     }
     const nomes = [...ultimo.values()].filter(u => u.tipo === "entrada").map(u => u.nome);
     if (!nomes.length) return null;
