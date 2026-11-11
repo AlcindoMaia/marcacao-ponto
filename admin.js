@@ -4344,13 +4344,18 @@ async function vgCarregarPontoHoje() {
     if (!cont) return;
     const hoje = diaLisboa(Date.now());
     const desde = new Date(Date.now() - 6 * 86400000).toISOString();
-    const [fRes, pRes, tRes] = await Promise.all([
+    // A tabela ponto não tem chave estrangeira para obras, por isso o nome
+    // da obra não vem junto ("obras(nome)" fazia falhar a leitura toda)
+    const [fRes, pRes, tRes, oRes] = await Promise.all([
         SB.from("funcionarios").select("id, nome, telemovel").eq("ativo", true).order("nome"),
-        SB.from("ponto").select("funcionario_id, obra_id, datahora, tipo, a_rever, obras(nome)")
+        SB.from("ponto").select("funcionario_id, obra_id, datahora, tipo, a_rever")
             .gte("datahora", desde).order("datahora"),
         SB.from("tarefas").select("obra_id, estado, obras(nome), tarefa_funcionarios(funcionario_id)")
             .eq("data_prevista", hoje).neq("estado", "cancelada"),
+        SB.from("obras").select("id, nome"),
     ]);
+    const nomeObra = new Map((oRes.data || []).map(o => [o.id, o.nome]));
+    (pRes.data || []).forEach(p => { p.obras = { nome: nomeObra.get(p.obra_id) }; });
     if (fRes.error || pRes.error) {
         console.error(fRes.error || pRes.error);
         cont.innerHTML = '<div style="padding:14px 0;font-size:13px;opacity:.7">Não foi possível ler o ponto de hoje.</div>';
