@@ -361,6 +361,15 @@ document.getElementById("btnLogin").addEventListener("click", function () {
                 </div>
             </div>
 
+            <!-- Faturas que o assistente leu do e-mail e esperam validação -->
+            <div class="card" id="cartaoPorValidar" style="display:none">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                    <h3 style="margin:0;font-size:15px">📥 Por validar <span id="porValidarConta" style="opacity:.7"></span></h3>
+                    <span style="font-size:12px;opacity:.7;flex:1">Faturas que chegaram ao e-mail. Abre, confere e grava.</span>
+                </div>
+                <div id="listaPorValidar"></div>
+            </div>
+
             <!-- Tabela movimentos -->
             <div class="card" style="overflow-x:auto">
                 <table id="tabelaMovimentos">
@@ -1931,7 +1940,7 @@ document.getElementById("btnLogin").addEventListener("click", function () {
 <script src="cotacoes.js?v=2"></script>
 <script src="andamento.js?v=8"></script>
 <script src="rh.js?v=7"></script>
-<script src="admin.js?v=45"></script>
+<script src="admin.js?v=46"></script>
 <script src="push.js?v=1"></script>
 <script src="telemovel.js?v=5"></script>
 
