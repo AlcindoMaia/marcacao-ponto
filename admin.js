@@ -3833,6 +3833,82 @@ async function proximaFaturaDaFila() {
     );
 }
 
+// -------------------------------------------------------
+// POR VALIDAR
+// O assistente lê as faturas do e-mail da empresa e deixa-as na tabela
+// faturas_por_validar. Aqui aparecem em lista no Fluxo: "Abrir" enche o
+// formulário do movimento com tudo o que ele propôs (obra, categoria,
+// pago ou não, linhas e ferramentas); ao gravar, a linha passa a validada.
+// -------------------------------------------------------
+let _porValidar      = [];     // linhas pendentes carregadas
+let _validacaoActual = null;   // a que está aberta no formulário
+
+async function carregarPorValidar() {
+    const cartao = document.getElementById("cartaoPorValidar");
+    if (!cartao) return;
+    const { data, error } = await SB.from("faturas_por_validar")
+        .select("id, created_at, documento, resumo")
+        .eq("estado", "pendente")
+        .order("created_at");
+    // Sem a tabela (SQL ainda por correr) ou sem nada: o cartão fica escondido
+    if (error || !data?.length) { _porValidar = []; cartao.style.display = "none"; return; }
+    _porValidar = data;
+
+    document.getElementById("porValidarConta").textContent = `(${data.length})`;
+    const eur = v => Number(v || 0).toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+    const dataPt = d => d ? d.split("-").reverse().join("/") : "";
+    document.getElementById("listaPorValidar").innerHTML = data.map(r => {
+        const d = r.documento || {};
+        const pago = d.estado_pagamento === "pago" ? "pago" : "por pagar";
+        return `
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:8px 0;border-top:1px solid rgba(128,128,128,.18)">
+            <div style="flex:1;min-width:200px">
+                <div style="font-weight:600">${esc(d.fornecedor_nome || "Fornecedor?")} · ${esc(d.numero_documento || "")}</div>
+                <div style="font-size:12px;opacity:.75">${dataPt(d.data)} · ${esc(d.obra_nome || "obra por escolher")} · ${pago}` +
+                `${(d.linhas || []).length ? ` · ${(d.linhas || []).length} linhas` : ""}</div>
+                ${r.resumo ? `<div style="font-size:12px;opacity:.75;margin-top:2px">${esc(r.resumo)}</div>` : ""}
+            </div>
+            <b style="white-space:nowrap">${eur(d.total_com_iva)}</b>
+            <button type="button" class="btn-primary" style="font-size:12px;padding:4px 12px"
+                onclick="abrirPorValidar('${r.id}')">Abrir</button>
+            <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px"
+                onclick="rejeitarPorValidar('${r.id}')">Rejeitar</button>
+        </div>`;
+    }).join("");
+    cartao.style.display = "";
+}
+
+async function abrirPorValidar(id) {
+    const r = _porValidar.find(x => x.id === id);
+    if (!r) return;
+    const d = r.documento || {};
+    await abrirModalMovimento();
+    _validacaoActual = r;          // depois de abrir: o reset não a apaga
+    _filaFaturas = [d];
+    _filaTotal   = 1;
+    await proximaFaturaDaFila();
+    limparFilaFaturas();           // uma só: sem barra "1 de 1"
+
+    // O que o assistente propôs e o ler-fatura não traz
+    const set = (campo, v) => { const el = document.getElementById(campo); if (el && v != null && v !== "") el.value = v; };
+    set("movObra", d.obra_id);
+    set("movCategoria", d.categoria_id);
+    set("movEstado", d.estado_pagamento);
+    if (d.observacoes) set("movObs", d.observacoes);
+    actualizarResumoLinhas();
+}
+
+async function rejeitarPorValidar(id) {
+    const r = _porValidar.find(x => x.id === id);
+    const nome = r ? `${r.documento?.fornecedor_nome || ""} ${r.documento?.numero_documento || ""}`.trim() : "esta fatura";
+    if (!confirm(`Rejeitar ${nome}? Não entra no Financeiro e sai da lista.`)) return;
+    const { error } = await SB.from("faturas_por_validar")
+        .update({ estado: "rejeitada", decidido_em: new Date().toISOString() })
+        .eq("id", id);
+    if (error) { console.error(error); alert("Não foi possível rejeitar."); return; }
+    await carregarPorValidar();
+}
+
 // Vários ficheiros de uma vez: lê-se um a um e junta-se tudo à mesma fila.
 async function lerFicheirosFatura(ficheiros) {
     const lista = [...(ficheiros || [])];
@@ -7257,6 +7333,7 @@ function actualizarKpisFluxo(lista) {
 
 let _pedidoFluxo = 0;
 async function carregarMovimentos() {
+    carregarPorValidar();   // a lista de cima, em paralelo
     const obra       = document.getElementById("filtroObra")?.value || "";
     const categoria  = document.getElementById("filtroCategoria")?.value || "";
     const tipo       = document.getElementById("filtroTipo")?.value || "";
@@ -7453,6 +7530,7 @@ function fecharModalMovimento() {
     }
     limparLinhasFatura();   // não deixar linhas de uma fatura anterior
     limparFilaFaturas();    // fechar à mão desiste do lote que estava a meio
+    _validacaoActual = null;
     movEditId = null;
     // Remover listener de barcode
     if (window._barcodeListener) {
@@ -7482,6 +7560,7 @@ async function abrirModalMovimento(mov = null) {
     }
 
     movEditId = mov?.id || null;
+    _validacaoActual = null;   // abrirPorValidar volta a pô-la depois de abrir
     modoFaturaNossa(!!(mov && mov.tipo === "entrada" && !mov.fornecedor_id && mov.cliente_nome));
 
     // Título
@@ -7749,6 +7828,12 @@ async function guardarMovimento() {
         }
         if (!movEditId) payload.fonte = "fatura_emitida";
     }
+    // Veio da lista "Por validar": fica a saber-se de onde veio
+    const validacao = movEditId ? null : _validacaoActual;
+    if (validacao) {
+        payload.fonte    = validacao.documento?.fonte || "email_faturas";
+        payload.fonte_id = payload.referencia;
+    }
 
     const { data: movSalvo, error } = movEditId
         ? await SB.from("movimentos_financeiros").update(payload).eq("id", movEditId).select("id").single()
@@ -7762,6 +7847,13 @@ async function guardarMovimento() {
             ? `Já existe um movimento com a referência ${payload.referencia} deste fornecedor. Não foi gravado outra vez.`
             : "Não foi possível gravar o movimento.";
         return;
+    }
+
+    if (validacao && movSalvo?.id) {
+        const { error: errVal } = await SB.from("faturas_por_validar")
+            .update({ estado: "validada", movimento_id: movSalvo.id, decidido_em: new Date().toISOString() })
+            .eq("id", validacao.id);
+        if (errVal) console.error("faturas_por_validar:", errVal);
     }
 
     // Linhas da fatura lidas pelo assistente
