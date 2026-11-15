@@ -113,6 +113,9 @@
     /* Avanço por pacotes e corte da semana */
     .pacotes .zona { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--suave); margin: 12px 0 4px; }
     .pacotes .zona:first-child { margin-top: 0; }
+    .fases .fase-corpo { flex: 1; min-width: 0; }
+    .fases .pacotes { margin-top: 4px; }
+    .fases .pac { font-size: 13px; padding: 3px 0; grid-template-columns: 1fr 70px 40px; }
     .pac { display: grid; grid-template-columns: 1fr 90px 44px; gap: 10px; align-items: center; padding: 6px 0; font-size: 14px; }
     .pac .mini { height: 6px; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; }
     .pac .mini > div { height: 100%; background: var(--caramelo); }
@@ -272,7 +275,8 @@ document.addEventListener("click", e => {
     else caixaResposta(el, passo);
 });
 
-function htmlFases(fases) {
+// Fases da obra, cada uma com a sua % e os seus pacotes por baixo
+function htmlFases(fases, pacotes = []) {
     if (!fases.length) return "";
     const icone = { concluida: "✓", a_decorrer: "", por_fazer: "" };
     const quando = f => f.estado === "concluida"
@@ -281,7 +285,9 @@ function htmlFases(fases) {
            f.data_fim ? "Fim previsto: " + dataPT(f.data_fim) : ""].filter(Boolean).join(" · ");
     return `<h2>Andamento</h2><ul class="fases">${fases.map(f => `<li class="${esc(f.estado)}">
         <span class="ponto">${icone[f.estado] || ""}</span>
-        <span><span class="nm">${esc(f.nome)}</span>${quando(f) ? `<br><span class="dt">${esc(quando(f))}</span>` : ""}</span>
+        <span class="fase-corpo"><span class="nm">${esc(f.nome)}</span>${f.percentagem != null && f.estado !== "concluida"
+            ? ` <span class="dt">· ${esc(f.percentagem)}%</span>` : ""}${quando(f) ? `<br><span class="dt">${esc(quando(f))}</span>` : ""}
+            ${htmlListaPacotes(pacotes.filter(p => p.fase_id && p.fase_id === f.id), false)}</span>
     </li>`).join("")}</ul>`;
 }
 
@@ -299,12 +305,21 @@ function htmlAutos(autos) {
     </details>`).join("")}`;
 }
 
-// Avanço por pacotes: a % de cada parte da obra, agrupada por zona
-function htmlPacotes(pacotes) {
+// Avanço por pacotes: a % de cada parte da obra, agrupada por zona. Os
+// pacotes que pertencem a uma fase aparecem dentro dela (htmlFases); aqui
+// ficam só os outros.
+function htmlPacotes(pacotes, fases) {
+    const idsFases = new Set(fases.map(f => f.id).filter(Boolean));
+    const soltos = pacotes.filter(p => !p.fase_id || !idsFases.has(p.fase_id));
+    if (!soltos.length) return "";
+    return `<h2>${soltos.length < pacotes.length ? "Outros trabalhos" : "Avanço por zona"}</h2>${htmlListaPacotes(soltos, true)}`;
+}
+
+function htmlListaPacotes(pacotes, comZonas) {
     if (!pacotes.length) return "";
     let zonaAnt = null;
-    const variasZonas = new Set(pacotes.map(p => p.zona)).size > 1 || pacotes[0].zona;
-    return `<h2>Avanço por zona</h2><div class="pacotes">${pacotes.map(p => {
+    const variasZonas = comZonas && (new Set(pacotes.map(p => p.zona)).size > 1 || pacotes[0].zona);
+    return `<div class="pacotes">${pacotes.map(p => {
         const tit = variasZonas && p.zona !== zonaAnt ? `<div class="zona">${esc(p.zona || "Geral")}</div>` : "";
         zonaAnt = p.zona;
         return `${tit}<div class="pac${p.percentagem >= 100 ? " feito" : ""}">
@@ -440,8 +455,8 @@ function htmlObra(o, docs, fases, autos, diario, pacotes, corte, pedidos) {
         ${htmlContas(o.contas)}
         ${o.curva ? `<h2>Feito vs previsto</h2>${htmlCurva(o.curva)}` : ""}
         ${htmlSemana(corte, de("foto"), o.id)}
-        ${htmlPacotes(pacotes)}
-        ${htmlFases(fases)}
+        ${htmlFases(fases, pacotes)}
+        ${htmlPacotes(pacotes, fases)}
         ${htmlDiario(diario)}
         ${seccao("Orçamentos", orcs, "Ainda não há orçamentos.")}
         ${htmlAutos(autos)}

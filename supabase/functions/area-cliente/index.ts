@@ -6,7 +6,8 @@
 // função é a ÚNICA porta e só devolve o que o cliente pode ver:
 //   - o nome do cliente;
 //   - as obras ligadas a ele (nome, local, estado, percentagem, data prevista);
-//   - as fases visíveis de cada obra (nome, datas, estado) e os autos de
+//   - as fases visíveis de cada obra (nome, datas, estado, % feita pelos
+//     pacotes dessa fase) e os autos de
 //     medição já enviados (serviço, % acumulada, valor, totais);
 //   - as notas do diário de obra marcadas como visíveis (as últimas 20);
 //   - os documentos dessas obras marcados "Visível ao cliente", com um link
@@ -83,7 +84,7 @@ Deno.serve(async (req) => {
 
     if (idsObras.length) {
         const [f, a, n] = await Promise.all([
-            db.from("obra_fases").select("obra_id, nome, ordem, data_inicio, data_fim, estado")
+            db.from("obra_fases").select("id, obra_id, nome, ordem, data_inicio, data_fim, estado")
                 .in("obra_id", idsObras).eq("visivel_cliente", true).order("ordem"),
             db.from("autos_medicao")
                 .select("id, obra_id, numero, data, estado, taxa_iva, notas, auto_linhas(percentagem, valor, obra_servicos(nome, ordem))")
@@ -91,9 +92,11 @@ Deno.serve(async (req) => {
             db.from("obra_diario").select("obra_id, data, notas")
                 .in("obra_id", idsObras).eq("visivel_cliente", true).order("data", { ascending: false }).limit(20),
         ]);
-        fases = f.data || [];
         diario = n.data || [];
-        ({ pacotes, cortes, avanco, curva } = await pacotesECortes(db, idsObras));
+        let pctFase: Record<string, number> = {};
+        ({ pacotes, cortes, avanco, curva, pctFase } = await pacotesECortes(db, idsObras));
+        // % de cada fase pelos seus pacotes (pesada pelo valor, que não sai daqui)
+        fases = (f.data || []).map((x: any) => ({ ...x, percentagem: pctFase[x.id] ?? null }));
         autos = (a.data || []).map((x: any) => {
             const linhas = (x.auto_linhas || [])
                 .sort((p: any, q: any) => (p.obra_servicos?.ordem || 0) - (q.obra_servicos?.ordem || 0))
@@ -239,20 +242,20 @@ async function pacotesECortes(db: any, idsObras: string[]) {
     const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Lisbon" });
     const [p, c] = await Promise.all([
         db.from("obra_servicos")
-            .select("id, obra_id, zona, nome, ordem, valor_orcamento, percentagem, concluido, data_fim_prevista")
+            .select("id, obra_id, fase_id, zona, nome, ordem, valor_orcamento, percentagem, concluido, data_fim_prevista")
             .in("obra_id", idsObras),
         db.from("cortes_semanais")
             .select("obra_id, semana, tratado_em, corte_linhas(obra_servico_id, percentagem_antes, percentagem, obra_servicos(zona, nome))")
             .in("obra_id", idsObras).eq("estado", "aprovado").order("semana", { ascending: false }),
     ]);
-    if (p.error) { console.error("pacotes", p.error); return { pacotes: [], cortes: [], avanco: {}, curva: {} }; }
+    if (p.error) { console.error("pacotes", p.error); return { pacotes: [], cortes: [], avanco: {}, curva: {}, pctFase: {} }; }
     // O peso de cada pacote (o valor) fica no servidor: o cliente só recebe a
     // % já calculada da obra e a % de cada pacote
     const pacotes = (p.data || [])
         .sort((a: any, b: any) => String(a.zona || "\uffff").localeCompare(String(b.zona || "\uffff"), "pt") || (a.ordem || 0) - (b.ordem || 0))
         .map((x: any) => {
             const pct = x.concluido ? 100 : Math.max(0, Math.min(100, Number(x.percentagem || 0)));
-            return { obra_id: x.obra_id, zona: x.zona || "", nome: x.nome, percentagem: Math.round(pct),
+            return { obra_id: x.obra_id, fase_id: x.fase_id || null, zona: x.zona || "", nome: x.nome, percentagem: Math.round(pct),
                      atrasado: pct < 100 && !!x.data_fim_prevista && x.data_fim_prevista < hoje,
                      peso: Number(x.valor_orcamento || 0), id: x.id, fim: x.data_fim_prevista };
         });
@@ -262,6 +265,14 @@ async function pacotesECortes(db: any, idsObras: string[]) {
         if (!l.length) continue;
         const tot = l.reduce((t: number, x: any) => t + x.peso, 0);
         avanco[id] = Math.round(tot > 0
+            ? l.reduce((t: number, x: any) => t + x.peso * x.percentagem, 0) / tot
+            : l.reduce((t: number, x: any) => t + x.percentagem, 0) / l.length);
+    }
+    const pctFase: Record<string, number> = {};
+    for (const fid of new Set(pacotes.map((x: any) => x.fase_id).filter(Boolean))) {
+        const l = pacotes.filter((x: any) => x.fase_id === fid);
+        const tot = l.reduce((t: number, x: any) => t + x.peso, 0);
+        pctFase[fid as string] = Math.round(tot > 0
             ? l.reduce((t: number, x: any) => t + x.peso * x.percentagem, 0) / tot
             : l.reduce((t: number, x: any) => t + x.percentagem, 0) / l.length);
     }
@@ -293,6 +304,7 @@ async function pacotesECortes(db: any, idsObras: string[]) {
         cortes,
         avanco,
         curva,
+        pctFase,
     };
 }
 

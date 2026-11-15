@@ -292,10 +292,30 @@ async function gravarFase(id) {
     await carregarPainelAndamento();
 }
 
+// O estado da fase e a % dos pacotes andam juntos: "Concluída" põe os
+// pacotes da fase a 100%; tirar de "Concluída" pergunta se baixa a % (sem
+// confirmar, os pacotes ficam como estão). No sentido contrário (a % dos
+// pacotes muda o estado da fase) trata a base de dados (fases_sincronizar.sql).
 async function mudarEstadoFase(id, estado) {
+    const f = _andamento.fases.find(x => x.id === id);
+    const pacotes = pacotesDaFase(id);
+    const ids = pacotes.map(s => s.id);
+    let updPac = null;
+    if (estado === "concluida" && pacotes.some(s => pctPacoteAnd(s) < 100)) {
+        updPac = { percentagem: 100, concluido: true, concluido_em: hojeISO() };
+    } else if (f?.estado === "concluida" && estado !== "concluida" && pacotes.some(s => pctPacoteAnd(s) >= 100)
+        && confirm(`Os pacotes de "${f.nome}" estão a 100%. Pô-los a 0%?\n\nOK: ficam a 0% (o cliente vê 0% nesta fase).\nCancelar: a % fica como está; acertas no separador Serviços.`)) {
+        updPac = { percentagem: 0, concluido: false, concluido_em: null };
+    }
+    if (updPac && ids.length) {
+        const { error } = await SB.from("obra_servicos").update(updPac).in("id", ids);
+        if (error) return msgAndamento("Não foi possível mudar a % dos pacotes: " + error.message, "err");
+    }
+    // Depois dos pacotes: a base de dados pode ter mexido no estado ao
+    // gravá-los, e o que o Alcindo escolheu aqui é o que fica
     const { error } = await SB.from("obra_fases").update({ estado }).eq("id", id);
     if (error) return msgAndamento("Não foi possível mudar o estado: " + error.message, "err");
-    const f = _andamento.fases.find(x => x.id === id);
+    if (updPac) return carregarPainelAndamento();
     if (f) f.estado = estado;
     desenharAndamento();
 }
