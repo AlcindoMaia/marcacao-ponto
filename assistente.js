@@ -135,7 +135,8 @@ async function escolherObra() {
 // horas, o que vem a seguir, e o que lhe foste contando. É daqui que se
 // lhe acrescenta contexto ou se lhe pede um plano.
 // =======================================================
-async function abrirObra(obraId) {
+// aviso: frase curta a verde no topo (ex.: "Nota guardada" depois de contar como está)
+async function abrirObra(obraId, aviso = "") {
     abrirPainel("…", '<div class="hoje-vazio">A ler.</div>', "");
 
     const hoje = new Date().toISOString().slice(0, 10);
@@ -171,6 +172,7 @@ async function abrirObra(obraId) {
     const rotulosNota = { ponto_situacao: "ponto de situação", contexto: "contexto", projeto: "projeto", decisao: "decisão" };
 
     const corpo = `
+        ${aviso ? `<div style="background:rgba(143,191,160,.15);border:1px solid rgba(143,191,160,.5);color:#5e9a74;border-radius:10px;padding:9px 12px;margin-bottom:10px;font-size:13px;font-weight:600">✓ ${esc(aviso)}</div>` : ""}
         ${obra.local ? `<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px">${esc(obra.local)}</div>` : ""}
 
         <div class="hoje-campo">
@@ -543,7 +545,9 @@ async function guardarNotaDeObra() {
             autor:   user?.email || null,
         });
         if (error) throw error;
-        fecharPainel();
+        // Volta à ficha da obra, com a nota já na lista e o "Pedir plano" à mão
+        await abrirObra(obra, "Nota guardada. Se quiseres, pede já o plano.");
+        return;
     } catch (e) {
         console.error("guardarNotaDeObra:", e);
         alert("Não foi possível guardar: " + (e.message || e));

@@ -196,6 +196,13 @@ begin
              order by p.artigo_id, p.data desc, p.criado_em desc) r
      where a.id = r.artigo_id and r.preco > 0;
 
+    -- Artigo que ficou sem nenhum preço (a edição tirou o único que tinha):
+    -- o preço actual deixa de valer, em vez de ficar o da linha apagada
+    update artigos a
+       set preco_atual = null
+     where a.id = any(tocados)
+       and not exists (select 1 from precos p where p.artigo_id = a.id);
+
     return query
     select fl.id, fl.artigo_id, fl.descricao_original, fl.preco_unitario, fl.unidade, fl.ordem
       from fatura_linhas fl
