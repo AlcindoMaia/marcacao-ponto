@@ -295,6 +295,61 @@ function taxaIvaMov(m) {
     const base = Number(m.valor_base || 0);
     return base > 0 ? Math.round(ivaMov(m) / base * 100) : 0;
 }
+
+// =======================================================
+// PAGAMENTOS PARCIAIS (tabela pagamentos_fatura, recebimentos_parciais.sql)
+// Uma fatura "por pagar" pode já ter parte paga ou recebida por recibos.
+// Lê-se à parte e sem falhar: se a tabela ainda não existir, tudo fica como
+// antes (só "pago" ou "por pagar").
+// =======================================================
+async function lerPagamentosParciais(ids) {
+    const r = {};
+    if (!ids?.length) return r;
+    const { data, error } = await SB.from("pagamentos_fatura")
+        .select("movimento_id, data, valor, recibo").in("movimento_id", ids).order("data");
+    if (error) { console.warn("pagamentos_fatura:", error.message); return r; }
+    (data || []).forEach(p => (r[p.movimento_id] ||= []).push(p));
+    return r;
+}
+// Com IVA: quanto deste movimento já foi pago ou recebido
+function valorPagoMov(m, parciais) {
+    const total = Number(m.valor_total || 0);
+    if (m.estado_pagamento === "pago") return total;
+    const soma = (parciais?.[m.id] || []).reduce((s, p) => s + Number(p.valor || 0), 0);
+    return Math.min(total, soma);
+}
+// Sem IVA, na mesma proporção do que foi pago
+function semIvaPago(m, parciais) {
+    const total = Number(m.valor_total || 0);
+    if (m.estado_pagamento === "pago" || !total) return m.estado_pagamento === "pago" ? semIva(m) : 0;
+    return semIva(m) * valorPagoMov(m, parciais) / total;
+}
+// Etiqueta pequena com o estado: nada quando está pago, "por receber" ou
+// "recebido X de Y" quando há parte paga
+function estadoPagamentoCurto(m, parciais) {
+    if (m.estado_pagamento === "pago") return "";
+    const ent = m.tipo === "entrada", pago = valorPagoMov(m, parciais);
+    const txt = pago > 0.004
+        ? `${ent ? "recebido" : "pago"} ${pago.toFixed(2)} € · falta ${(Number(m.valor_total) - pago).toFixed(2)} €`
+        : (ent ? "por receber" : "por pagar");
+    return `<div style="font-size:10px;color:#fb923c">${txt}</div>`;
+}
+// Grava um pagamento (parcial ou total) de uma fatura. A base de dados põe a
+// fatura como "pago" quando a soma dos pagamentos chega ao total.
+async function registarPagamentoFatura(mov, { data, valor, recibo, obraDocumentoId = null }) {
+    const { error } = await SB.from("pagamentos_fatura").upsert({
+        movimento_id: mov.id, data, valor: Math.round(Number(valor) * 100) / 100,
+        recibo: recibo || null, obra_documento_id: obraDocumentoId,
+    }, { onConflict: "movimento_id,recibo", ignoreDuplicates: true });
+    if (error) throw new Error(/pagamentos_fatura/.test(error.message)
+        ? "falta correr o ficheiro recebimentos_parciais.sql no Supabase (SQL Editor)." : error.message);
+    const dPt = data ? ` de ${data.split("-").reverse().join("/")}` : "";
+    const nota = `${mov.tipo === "entrada" ? "Recebido" : "Pago"} ${Number(valor).toFixed(2).replace(".", ",")} € pelo recibo ${recibo || "?"}${dPt}`;
+    if (!(mov.observacoes || "").includes(recibo || nota)) {
+        await SB.from("movimentos_financeiros")
+            .update({ observacoes: [mov.observacoes, nota].filter(Boolean).join(" · ") }).eq("id", mov.id);
+    }
+}
 // =======================================================
 // "DE ONDE VEM ESTE VALOR?" — botão ⓘ discreto ao lado de um número
 // botaoContas(titulo, linhas, nota) devolve o HTML do botão; ao carregar,
@@ -4052,7 +4107,9 @@ function abrirReciboPagamento(doc) {
                 <span>Fatura <b>${esc(f.numero)}</b> · ${eur(f.valor_pago)} · <i>não está na app</i></span>
             </div>`;
         const jaPaga = f.estado_pagamento === "pago";
-        const marcar = !jaPaga && !f.parcial;
+        // Um pagamento parcial já não dá a fatura como paga por inteiro:
+        // regista-se só a parte paga, por isso também vem marcado.
+        const marcar = !jaPaga;
         return `
             <label style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;font-size:13px;cursor:pointer">
                 <input type="checkbox" class="reciboFatura" data-i="${i}" ${marcar ? "checked" : ""} ${jaPaga ? "disabled" : ""}
@@ -4061,7 +4118,7 @@ function abrirReciboPagamento(doc) {
                     ${f.obra ? `· obra ${esc(f.obra)}` : ""}
                     <span style="opacity:.7">· pago no recibo ${eur(f.valor_pago)}</span>
                     ${jaPaga ? ` <span style="color:#8fbfa0">(já está paga)</span>` : ""}
-                    ${f.parcial ? ` <span style="color:#fb923c">(pagamento parcial)</span>` : ""}
+                    ${f.parcial ? ` <span style="color:#fb923c">(pagamento parcial: regista ${eur(f.valor_pago)} e ficam ${eur(Number(f.valor_total) - Number(f.valor_pago))} por pagar)</span>` : ""}
                 </span>
             </label>`;
     }).join("") || `<div style="font-size:12px;opacity:.6">Não consegui ver que faturas este recibo paga.</div>`;
@@ -4078,7 +4135,7 @@ function abrirReciboPagamento(doc) {
             Um recibo não é despesa nova nem material: só dá como pagas as faturas que já estão na app.
         </div>
         ${avisos ? `<ul style="background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.3);color:#fb923c;border-radius:8px;padding:10px 10px 10px 28px;font-size:12px;margin:0 0 12px">${avisos}</ul>` : ""}
-        <div style="font-size:12px;font-weight:600;margin-bottom:4px">Dar como pagas:</div>
+        <div style="font-size:12px;font-weight:600;margin-bottom:4px">Faturas que este recibo paga:</div>
         ${linhas}
         <div id="reciboMsg" style="display:none;color:#e09486;font-size:12px;margin-top:10px"></div>
         <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
@@ -4120,14 +4177,26 @@ async function gravarReciboPagamento() {
     const nota = `Paga pelo recibo ${doc.numero_documento || "?"}` +
         (doc.data ? ` de ${doc.data.split("-").reverse().join("/")}` : "");
     try {
+        let parciais = 0;
         for (const f of escolhidas) {
+            if (f.parcial && f.valor_pago != null) {
+                // Só a parte paga; a fatura continua por pagar até ao total
+                await registarPagamentoFatura({ ...f, tipo: doc.emitida_por_nos ? "entrada" : "saida" },
+                    { data: doc.data || new Date().toISOString().slice(0, 10), valor: f.valor_pago, recibo: doc.numero_documento });
+                parciais++;
+                continue;
+            }
             const obs = f.observacoes && f.observacoes.includes(nota) ? f.observacoes
                       : [f.observacoes, nota].filter(Boolean).join(" · ");
             const { error } = await SB.from("movimentos_financeiros")
                 .update({ estado_pagamento: "pago", observacoes: obs }).eq("id", f.id);
             if (error) throw new Error(error.message);
         }
-        mostrarFeedbackQR(`Recibo ${doc.numero_documento || ""}: ${escolhidas.length} fatura${escolhidas.length === 1 ? "" : "s"} dada${escolhidas.length === 1 ? "" : "s"} como paga${escolhidas.length === 1 ? "" : "s"}.`, "ok");
+        const inteiras = escolhidas.length - parciais;
+        mostrarFeedbackQR(`Recibo ${doc.numero_documento || ""}: ` + [
+            inteiras ? `${inteiras} fatura${inteiras === 1 ? "" : "s"} dada${inteiras === 1 ? "" : "s"} como paga${inteiras === 1 ? "" : "s"}` : "",
+            parciais ? `${parciais} com pagamento parcial (o resto fica por pagar)` : "",
+        ].filter(Boolean).join(", ") + ".", "ok");
         await fecharReciboPagamento(true);
     } catch (e) {
         console.error("gravarReciboPagamento:", e);
@@ -6103,6 +6172,31 @@ const TIPOS_DOC_OBRA = {
 };
 
 const fmtEurDoc = v => v == null || v === "" ? "—" : Number(v).toFixed(2).replace(".", ",") + " €";
+// Quanto um recibo lido paga por uma fatura: o valor dessa fatura no recibo
+// ou, quando o recibo só paga uma, o total recebido. null se não se sabe.
+function mesmaRef(a, b) { return String(a || "").replace(/\s+/g, "").toUpperCase() === String(b || "").replace(/\s+/g, "").toUpperCase(); }
+function valorDoReciboParaFatura(lido, referencia) {
+    const liq = Array.isArray(lido?.faturas_liquidadas) ? lido.faturas_liquidadas : [];
+    const f = liq.find(x => mesmaRef(x?.numero, referencia));
+    if (f && f.valor != null && Number.isFinite(Number(f.valor))) return Number(f.valor);
+    if (liq.length <= 1 && lido?.valor_recebido != null) return Number(lido.valor_recebido);
+    return null;
+}
+// Dá uma fatura como paga por um recibo: por inteiro quando o recibo cobre o
+// total, ou regista só a parte recebida (fica "por receber" o resto).
+async function aplicarReciboAFatura(mov, { valor, data, recibo, obraDocumentoId }) {
+    const total = Number(mov.valor_total || 0);
+    if (valor != null && valor < total - 0.05) {
+        await registarPagamentoFatura(mov, { data, valor, recibo, obraDocumentoId });
+        return "parcial";
+    }
+    const dPt = data ? ` de ${data.split("-").reverse().join("/")}` : "";
+    const nota = `Paga pelo recibo ${recibo || "?"}${dPt}`;
+    const obs = (mov.observacoes || "").includes(nota) ? mov.observacoes : [mov.observacoes, nota].filter(Boolean).join(" · ");
+    const { error } = await SB.from("movimentos_financeiros").update({ estado_pagamento: "pago", observacoes: obs }).eq("id", mov.id);
+    if (error) throw new Error(error.message);
+    return "pago";
+}
 
 function msgDocObra(texto, tipo = "ok") {
     const el = document.getElementById("docObraMsg");
@@ -6507,11 +6601,15 @@ async function abrirPropostaDocumento(doc, lido) {
     const encontradas = lido.faturas_encontradas || [];
     const blocoRec = `
         <div data-tipo="recibo" class="prop-bloco">
-            <div style="font-size:12px;margin-bottom:6px">Valor recebido: <b>${fmtEurDoc(lido.valor_recebido)}</b>. Marcar como pagas:</div>
+            <div style="font-size:12px;margin-bottom:6px">Valor recebido: <b>${fmtEurDoc(lido.valor_recebido)}</b>. Faturas que este recibo paga:</div>
             ${encontradas.length ? encontradas.map(f => `
                 <label style="display:flex;align-items:center;gap:6px;font-size:13px;padding:4px 0">
                     <input type="checkbox" style="width:auto;margin:0" class="propFaturaPaga" value="${f.id}" ${f.estado_pagamento === "pago" ? "" : "checked"}>
-                    Fatura ${esc(f.referencia)} de ${esc(f.data_documento)}, ${fmtEurDoc(f.valor_total)}${f.estado_pagamento === "pago" ? " (já paga)" : ""}
+                    Fatura ${esc(f.referencia)} de ${esc(f.data_documento)}, ${fmtEurDoc(f.valor_total)}${f.estado_pagamento === "pago" ? " (já paga)" : ""}${(() => {
+                        const v = valorDoReciboParaFatura(lido, f.referencia);
+                        return v != null && v < Number(f.valor_total) - 0.05
+                            ? ` <span style="color:#fb923c">· recebido ${fmtEurDoc(v)}, parcial: fica ${fmtEurDoc(Number(f.valor_total) - v)} por receber</span>` : "";
+                    })()}
                 </label>`).join("")
                 : `<div style="font-size:12px;opacity:.6">Nenhuma das faturas deste recibo está na app. O recibo fica guardado na obra sem marcar nada.</div>`}
         </div>`;
@@ -6616,6 +6714,26 @@ async function guardarClienteDaProposta(v) {
     return data.id;
 }
 
+// Um recibo carregado antes da sua fatura ficava registado sem pagar nada.
+// Quando a fatura chega, procura-se o recibo à espera na obra e aplica-se.
+async function aplicarRecibosAEspera(obraId, mov) {
+    const { data: recs } = await SB.from("obra_documentos")
+        .select("id, numero_documento, data_documento, dados_lidos")
+        .eq("obra_id", obraId).eq("tipo", "recibo").eq("estado", "registado").is("movimento_id", null);
+    const espera = (recs || []).filter(r => (r.dados_lidos?.faturas_liquidadas || []).some(f => mesmaRef(f?.numero, mov.referencia)));
+    if (!espera.length) return "";
+    const partes = [];
+    for (const r of espera) {
+        const valor = valorDoReciboParaFatura(r.dados_lidos, mov.referencia);
+        const res = await aplicarReciboAFatura(mov, { valor, data: r.data_documento, recibo: r.numero_documento, obraDocumentoId: r.id });
+        await SB.from("obra_documentos").update({ movimento_id: mov.id }).eq("id", r.id);
+        partes.push(`${r.numero_documento || "recibo"} (${res === "parcial" ? "recebido " + fmtEurDoc(valor) + ", resto por receber" : "paga"})`);
+        const { data: atual } = await SB.from("movimentos_financeiros").select("observacoes").eq("id", mov.id).single();
+        mov.observacoes = atual?.observacoes || mov.observacoes;
+    }
+    return " Recibo já carregado aplicado: " + partes.join(", ") + ".";
+}
+
 async function gravarPropostaDocumento() {
     if (!_propostaDoc) return;
     const { doc, lido } = _propostaDoc;
@@ -6655,6 +6773,7 @@ async function gravarPropostaDocumento() {
         }
 
         const ligacao = { orcamento_id: null, movimento_id: null };
+        let resultadoFatura = "";
         let sugerirFasesDe = null;   // orçamento aceite com pacotes novos: o assistente propõe as fases
 
         if (tipo === "orcamento") {
@@ -6704,14 +6823,31 @@ async function gravarPropostaDocumento() {
             }).select("id").single();
             if (error) throw new Error(error.message);
             ligacao.movimento_id = mv.id;
+            try {
+                resultadoFatura = await aplicarRecibosAEspera(obra.id, { id: mv.id, tipo: "entrada", referencia: numero, valor_total: comIva, observacoes: null });
+            } catch (e) {
+                console.error("aplicarRecibosAEspera:", e);
+                resultadoFatura = " Há um recibo desta fatura já carregado mas não consegui aplicá-lo: " + e.message;
+            }
         }
 
+        let resultadoRecibo = "";
         if (tipo === "recibo") {
+            // Antes dava como pagas por inteiro todas as faturas escolhidas,
+            // mesmo com um recibo de metade do valor. Agora cada uma recebe o
+            // valor que o recibo diz; se não chega ao total, fica a parte.
             const ids = [...document.querySelectorAll("#modalPropostaDoc .propFaturaPaga:checked")].map(x => x.value);
             if (ids.length) {
-                const { error } = await SB.from("movimentos_financeiros").update({ estado_pagamento: "pago" }).in("id", ids);
+                const { data: movs, error } = await SB.from("movimentos_financeiros")
+                    .select("id, tipo, referencia, valor_total, observacoes").in("id", ids);
                 if (error) throw new Error(error.message);
+                const r = [];
+                for (const mv of movs || []) {
+                    const valor = valorDoReciboParaFatura(lido, mv.referencia);
+                    r.push(await aplicarReciboAFatura(mv, { valor, data, recibo: numero, obraDocumentoId: doc.id }));
+                }
                 ligacao.movimento_id = ids[0];
+                resultadoRecibo = r.includes("parcial") ? " Pagamento parcial: o resto fica por receber." : " Fatura marcada como paga.";
             }
         }
 
@@ -6727,8 +6863,8 @@ async function gravarPropostaDocumento() {
         await carregarPainelDocumentos();
         msgDocObra({
             orcamento: `Orçamento ${numero} registado na obra` + (val("propEstadoOrc") === "aceite" ? " e serviços criados." : "."),
-            fatura:    `Fatura ${numero} lançada no Financeiro.`,
-            recibo:    "Recibo registado" + (ligacao.movimento_id ? " e fatura marcada como paga." : "."),
+            fatura:    `Fatura ${numero} lançada no Financeiro.` + resultadoFatura,
+            recibo:    "Recibo registado." + resultadoRecibo,
         }[tipo]);
         if (sugerirFasesDe) {
             abrirPainelTab("andamento");
@@ -6934,7 +7070,7 @@ async function carregarPainelResumo() {
 
     let movsRes, orcRes, pontoRes, servRes, custos;
     try { [movsRes, orcRes, pontoRes, servRes, custos] = await Promise.all([
-        SB.from("movimentos_financeiros").select("tipo, valor_base, valor_total, referencia, data_documento, fornecedores(nome), categorias_financeiras(nome)").eq("obra_id", obraId).eq("tipo", "entrada").eq("ativo", true).order("data_documento"),
+        SB.from("movimentos_financeiros").select("id, tipo, valor_base, valor_total, estado_pagamento, referencia, data_documento, fornecedores(nome), categorias_financeiras(nome)").eq("obra_id", obraId).eq("tipo", "entrada").eq("ativo", true).order("data_documento"),
         SB.from("orcamentos").select("id, numero, estado, taxa_iva, total_com_iva, total_sem_iva, subtotal_mao_obra, subtotal_materiais").eq("obra_id", obraId),
         SB.from("vw_registos_ponto").select("funcionario, horas, dia").eq("obra", _painelObraActual.nome),
         SB.from("obra_servicos").select("orcamento_id, valor_orcamento").eq("obra_id", obraId),
@@ -6957,8 +7093,12 @@ async function carregarPainelResumo() {
     (servRes.data || []).forEach(s => { if (s.orcamento_id) servPorOrc[s.orcamento_id] = (servPorOrc[s.orcamento_id] || 0) + Number(s.valor_orcamento || 0); });
     const valorOrc = o => servPorOrc[o.id] > 0 ? servPorOrc[o.id] : orcSemIva(o);
 
-    // Tudo sem IVA (ver semIva): recebido, faturas de compra e orçamento
-    const totalEntradas = movs.filter(m => m.tipo === "entrada").reduce((s,m) => s + semIva(m), 0);
+    // Tudo sem IVA (ver semIva): recebido, faturas de compra e orçamento.
+    // Só conta como recebido o que entrou mesmo: uma fatura emitida "por
+    // receber" não conta, e uma com recibo parcial conta só a parte recebida.
+    const parciais = await lerPagamentosParciais(movs.filter(m => m.estado_pagamento !== "pago").map(m => m.id));
+    const totalEntradas = movs.reduce((s,m) => s + semIvaPago(m, parciais), 0);
+    const porReceber    = movs.reduce((s,m) => s + semIva(m) - semIvaPago(m, parciais), 0);
     const totalFaturas  = custo.mat;
     const horasRegistos = custo.horas;
     const custoMaoObra  = custo.mo;
@@ -6979,11 +7119,18 @@ async function carregarPainelResumo() {
 
     // As contas de cada número (botão ⓘ)
     const dataPt = d => d ? d.split("-").reverse().join("/") : "";
-    const itMov = lista => lista.map(m => ({ t: `${dataPt(m.data_documento)} ${m.referencia || m.fornecedores?.nome || m.categorias_financeiras?.nome || ""}`, v: semIva(m) }));
-    const entradasL = movs;
+    const eurPt = v => Number(v).toFixed(2).replace(".", ",") + " €";
+    const itRec = movs.filter(m => semIvaPago(m, parciais) > 0.004).map(m => {
+        const parcial = m.estado_pagamento !== "pago";
+        const recibos = (parciais[m.id] || []).map(p => `${p.recibo || "sem recibo"} ${eurPt(p.valor)}`).join(", ");
+        return { t: `${dataPt(m.data_documento)} ${m.referencia || m.categorias_financeiras?.nome || ""}${parcial ? ` (parte recebida: ${recibos} com IVA)` : ""}`, v: semIvaPago(m, parciais) };
+    });
+    const itPorRec = movs.filter(m => semIva(m) - semIvaPago(m, parciais) > 0.004)
+        .map(m => ({ t: `${dataPt(m.data_documento)} ${m.referencia || ""}`, v: semIva(m) - semIvaPago(m, parciais) }));
     const cRecebido = botaoContas("Recebido sem IVA", [
-        ...itMov(entradasL), { t: `Total (${entradasL.length} entradas)`, v: totalEntradas, total: true }],
-        "Soma das entradas desta obra no Financeiro, sem IVA (valor base). Quando a entrada não tem IVA separado, conta o valor total.");
+        ...itRec, { t: `Total recebido (${itRec.length})`, v: totalEntradas, total: true },
+        ...(itPorRec.length ? [{ t: `Faturado e ainda por receber (${itPorRec.length}), não somado`, v: porReceber, itens: itPorRec, info: true }] : [])],
+        "Soma do que o cliente já pagou nesta obra, sem IVA (valor base). Uma fatura por receber não conta; com um recibo parcial conta só a parte recebida.");
     const cGasto = botaoContas("Gasto sem IVA", linhasContasCusto(custo),
         NOTA_CUSTO_REAL + " É o mesmo Custo real do separador Serviços.");
     const cMargem = botaoContas("Margem bruta", [
@@ -7002,6 +7149,7 @@ async function carregarPainelResumo() {
             <div class="card card-kpi-contas" style="padding:16px;text-align:center">${cRecebido}
                 <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">RECEBIDO S/ IVA</div>
                 <div style="font-size:20px;font-weight:800;color:#8fbfa0">${fmt(totalEntradas)}</div>
+                ${porReceber > 0.004 ? `<div style="font-size:11px;color:#fb923c;margin-top:4px">+ ${fmt(porReceber)} por receber</div>` : ""}
             </div>
             <div class="card card-kpi-contas" style="padding:16px;text-align:center">${cGasto}
                 <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">GASTO S/ IVA</div>
@@ -7060,9 +7208,10 @@ async function carregarPainelFinanceiro() {
     const el = document.getElementById("painelTab-financeiro");
     el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">A carregar...</div>`;
     const { data } = await SB.from("movimentos_financeiros")
-        .select("id, data_documento, tipo, referencia, valor_total, observacoes, fornecedores(nome), categorias_financeiras(nome)")
+        .select("id, data_documento, tipo, referencia, valor_total, estado_pagamento, observacoes, fornecedores(nome), categorias_financeiras(nome)")
         .eq("obra_id", _painelObraActual.id).eq("ativo", true)
         .order("data_documento", { ascending: false });
+    const parciais = await lerPagamentosParciais((data || []).filter(m => m.estado_pagamento !== "pago").map(m => m.id));
     // Registar um pagamento sem ir ao Fluxo de caixa: o movimento abre já com esta obra
     const barra = `<div class="painel-fin-barra"><button class="btn-icone painel-fin-novo" onclick="novoMovimentoDaObra()"
         title="Registar um pagamento ou recebimento desta obra">＋ Registar pagamento</button>
@@ -7075,8 +7224,10 @@ async function carregarPainelFinanceiro() {
     data.forEach(m => {
         const cat = m.tipo === "entrada" ? ENTRADAS : (m.categorias_financeiras?.nome || "Sem categoria");
         if (!porCat[cat]) porCat[cat] = { entradas:0, saidas:0, items:[] };
-        if (m.tipo === "entrada") porCat[cat].entradas += Number(m.valor_total);
-        else porCat[cat].saidas += Number(m.valor_total);
+        // O total do grupo é o que entrou ou saiu mesmo; o pendente fica à parte
+        if (m.tipo === "entrada") porCat[cat].entradas += valorPagoMov(m, parciais);
+        else porCat[cat].saidas += valorPagoMov(m, parciais);
+        porCat[cat].pendente = (porCat[cat].pendente || 0) + Number(m.valor_total) - valorPagoMov(m, parciais);
         porCat[cat].items.push(m);
     });
     if (!porCat[ENTRADAS].items.length) delete porCat[ENTRADAS];
@@ -7086,6 +7237,7 @@ async function carregarPainelFinanceiro() {
                 <span style="font-family:var(--font-title);font-size:11px;letter-spacing:.5px;text-transform:uppercase">${cat}</span>
                 <span style="font-size:13px;font-weight:700;color:${d.saidas > 0 ? "#e09486" : "#8fbfa0"}">
                     ${d.entradas > 0 ? "+" + d.entradas.toFixed(2) + " € " : ""}${d.saidas > 0 ? "−" + d.saidas.toFixed(2) + " €" : ""}
+                    ${d.pendente > 0.004 ? `<span style="font-size:11px;font-weight:500;color:#fb923c;margin-left:6px">${d.pendente.toFixed(2)} € ${cat === ENTRADAS ? "por receber" : "por pagar"}</span>` : ""}
                 </span>
             </div>
             ${d.items.map(m => `<div style="padding:8px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12px">
@@ -7095,7 +7247,8 @@ async function carregarPainelFinanceiro() {
                         ? (m.referencia || m.observacoes || "—")
                         : (m.fornecedores?.nome || m.observacoes || m.referencia || "—"))}</div></div>
                 <div style="display:flex;align-items:center;gap:8px">
-                    <div style="font-weight:700;color:${m.tipo === "entrada" ? "#8fbfa0" : "#e09486"}">${m.tipo === "entrada" ? "+" : "−"}${Number(m.valor_total).toFixed(2)} €</div>
+                    <div style="text-align:right"><div style="font-weight:700;color:${m.tipo === "entrada" ? "#8fbfa0" : "#e09486"}">${m.tipo === "entrada" ? "+" : "−"}${Number(m.valor_total).toFixed(2)} €</div>
+                        ${estadoPagamentoCurto(m, parciais)}</div>
                     ${m.tipo === "entrada" ? `<button class="btn-icone" title="Gerar declaração de valores" onclick="abrirDeclaracaoValores('${m.id}')">📄</button>` : ""}
                 </div>
             </div>`).join("")}
@@ -7253,6 +7406,7 @@ async function carregarObrasFluxo() {
 }
 
 let _todosMovimentos = []; // cache dos movimentos já filtrados (por ano/datas/obra/etc)
+let _parciaisFluxo = {};   // pagamentos parciais das faturas por pagar da lista
 
 function filtrarPorEstado(estado) {
     const hoje  = new Date().toISOString().split("T")[0];
@@ -7280,11 +7434,15 @@ function actualizarKpisFluxo(lista) {
     lista = lista || movimentos || [];
     // O saldo é o dinheiro que passou mesmo pelo banco: só o pago e o
     // recebido. O que está por pagar ou por receber aparece por baixo.
-    const pago = m => m.estado_pagamento === "pago";
-    const soma = l => l.reduce((s,m) => s + Number(m.valor_total || 0), 0);
+    // Uma fatura com recibo parcial conta a parte paga aqui e o resto como pendente.
+    const jaPago = m => valorPagoMov(m, _parciaisFluxo);
+    const falta  = m => Number(m.valor_total || 0) - jaPago(m);
+    const pago = m => jaPago(m) > 0.004, pendente = m => falta(m) > 0.004;
+    const somaPago = l => l.reduce((s,m) => s + jaPago(m), 0);
+    const somaFalta = l => l.reduce((s,m) => s + falta(m), 0);
     const entL = lista.filter(m => m.tipo === "entrada"), saiL = lista.filter(m => m.tipo === "saida");
-    const entradas = soma(entL.filter(pago)), porReceber = soma(entL.filter(m => !pago(m)));
-    const saidas   = soma(saiL.filter(pago)), porPagar   = soma(saiL.filter(m => !pago(m)));
+    const entradas = somaPago(entL), porReceber = somaFalta(entL);
+    const saidas   = somaPago(saiL), porPagar   = somaFalta(saiL);
     const saldo    = entradas - saidas;
     const f2 = v => v.toFixed(2) + " €";
     const sub = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt; };
@@ -7292,15 +7450,17 @@ function actualizarKpisFluxo(lista) {
     sub("totalSaidasSub",   porPagar   ? `+ ${f2(porPagar)} por pagar` : "");
     sub("saldoFluxoSub",    porReceber || porPagar ? `Contando o pendente: ${f2(entradas + porReceber - saidas - porPagar)}` : "");
     const dPt = d => d ? d.split("-").reverse().join("/") : "";
-    const it = l => l.map(m => ({ t: `${dPt(m.data_documento)} ${m.fornecedores?.nome || m.cliente_nome || m.referencia || "—"}`, v: Number(m.valor_total || 0) }));
+    const nomeIt = m => `${dPt(m.data_documento)} ${m.fornecedores?.nome || m.cliente_nome || m.referencia || "—"}`;
+    const it   = l => l.map(m => ({ t: nomeIt(m) + (pendente(m) ? " (parte)" : ""), v: jaPago(m) }));
+    const itF  = l => l.map(m => ({ t: nomeIt(m) + (pago(m) ? " (o que falta)" : ""), v: falta(m) }));
     const NOTA_FILTROS = "Conta os movimentos da lista, com os filtros escolhidos. Valores com IVA, como no banco.";
     porContas("totalEntradasContas", "Recebido", [
         { t: `Recebido (${entL.filter(pago).length})`, v: entradas, itens: it(entL.filter(pago)) },
-        { t: `Por receber (${entL.filter(m => !pago(m)).length}), não somado`, v: porReceber, itens: it(entL.filter(m => !pago(m))), info: true },
+        { t: `Por receber (${entL.filter(pendente).length}), não somado`, v: porReceber, itens: itF(entL.filter(pendente)), info: true },
         { t: "Recebido", v: entradas, total: true }], NOTA_FILTROS);
     porContas("totalSaidasContas", "Pago", [
         { t: `Pago (${saiL.filter(pago).length})`, v: saidas, itens: it(saiL.filter(pago)) },
-        { t: `Por pagar (${saiL.filter(m => !pago(m)).length}), não somado`, v: porPagar, itens: it(saiL.filter(m => !pago(m))), info: true },
+        { t: `Por pagar (${saiL.filter(pendente).length}), não somado`, v: porPagar, itens: itF(saiL.filter(pendente)), info: true },
         { t: "Pago", v: saidas, total: true }], NOTA_FILTROS);
     porContas("saldoFluxoContas", "Saldo", [
         { t: "Recebido", v: entradas }, { t: "− Pago", v: -saidas }, { t: "Saldo", v: saldo, total: true },
@@ -7373,6 +7533,8 @@ async function carregarMovimentos() {
     const { data, error } = await lerTudo(() => montarPedido().order("id"));
     if (pedido !== _pedidoFluxo) return;
     if (error) { console.error(error); return; }
+    _parciaisFluxo = await lerPagamentosParciais((data || []).filter(m => m.estado_pagamento !== "pago").map(m => m.id));
+    if (pedido !== _pedidoFluxo) return;
     movimentos = data || [];
     _todosMovimentos = data || [];
     actualizarKpisFluxo(movimentos);
@@ -7416,7 +7578,7 @@ function renderMovimentos() {
         const tr  = document.createElement("tr");
         // O recibo não é movimento (contava o dinheiro duas vezes): identifica-se
         // na fatura que pagou, pela nota que gravarReciboPagamento lhe deixou.
-        const recibo = (m.observacoes || "").match(/Paga pelo recibo (.+?)(?: de \d{2}\/\d{2}\/\d{4})?(?: · |$)/);
+        const recibo = (m.observacoes || "").match(/(?:Paga|(?:Recebido|Pago) [\d.,]+ €) pelo recibo (.+?)(?: de \d{2}\/\d{2}\/\d{4})?(?: · |$)/);
         tr.innerHTML = `
             <td>${esc(m.data_documento || "")}</td>
             <td>${esc(m.referencia || "—")}${recibo ? `<div style="font-size:11px;color:#8fbfa0">🧾 Recibo ${esc(recibo[1])}</div>` : ""}</td>
@@ -7425,7 +7587,7 @@ function renderMovimentos() {
             <td>${esc(m.categorias_financeiras?.nome || "—")}</td>
             <td>${esc(m.obras?.nome || "—")}</td>
             <td style="text-align:right;font-weight:500;color:${ent ? "#8fbfa0" : "#e09486"}">${ent ? "+" : "–"}${Number(m.valor_total).toFixed(2)} €</td>
-            <td><span class="badge-estado ${m.estado_pagamento}">${m.estado_pagamento === "pago" ? (ent ? "Recebido" : "Pago") : (ent ? "Por receber" : "Por pagar")}</span></td>
+            <td><span class="badge-estado ${m.estado_pagamento}">${m.estado_pagamento === "pago" ? (ent ? "Recebido" : "Pago") : (ent ? "Por receber" : "Por pagar")}</span>${m.estado_pagamento !== "pago" && valorPagoMov(m, _parciaisFluxo) > 0.004 ? estadoPagamentoCurto(m, _parciaisFluxo) : ""}</td>
             <td class="acoes-td">
                 <button class="btn-acao" title="Editar">✏️</button>
                 <button class="btn-acao" title="Apagar">🗑️</button>
