@@ -6250,6 +6250,7 @@ async function carregarPainelDocumentos() {
             <label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer;opacity:.85;color:inherit;text-transform:none;letter-spacing:0;white-space:nowrap;width:auto;margin:0" title="A futura Área do cliente mostra este documento">
                 <input type="checkbox" style="width:auto;margin:0" ${d.visivel_cliente ? "checked" : ""} onchange="alternarVisivelDocObra('${d.id}', this.checked)"> Visível ao cliente
             </label>
+            ${vistoPeloCliente(d)}
             <button onclick="apagarDocumentoObra('${d.id}')" title="Apagar" style="background:none;border:none;cursor:pointer;font-size:14px;opacity:.6">🗑</button>
         </div>`;
     };
@@ -6477,6 +6478,16 @@ async function abrirDocumentoObra(id) {
     const { data, error } = await SB.storage.from(BUCKET_DOCS_OBRA).createSignedUrl(doc.caminho, 600);
     if (error) { win?.close(); msgDocObra("Não foi possível abrir: " + error.message, "err"); return; }
     irParaNaJanela(win, data.signedUrl);
+}
+
+// Se o cliente já carregou em "Tomei conhecimento" (cliente_viu_em) ou se o
+// documento ainda está no topo da Área do cliente, em "Novo esta semana"
+function vistoPeloCliente(d) {
+    if (!d.visivel_cliente) return "";
+    if (d.cliente_viu_em) return `<span style="font-size:11px;color:#8fbfa0;white-space:nowrap" title="O cliente carregou em Tomei conhecimento">👁 Cliente viu a ${new Date(d.cliente_viu_em).toLocaleDateString("pt-PT")}</span>`;
+    if (d.visivel_desde && Date.now() - new Date(d.visivel_desde).getTime() < 7 * 86400000)
+        return `<span style="font-size:11px;color:#e0b07a;white-space:nowrap" title="Está no topo da Área do cliente até ele carregar em Tomei conhecimento ou passar uma semana">🆕 Novo para o cliente</span>`;
+    return "";   // passou a semana sem confirmar (ou é de antes deste botão)
 }
 
 async function alternarVisivelDocObra(id, visivel) {

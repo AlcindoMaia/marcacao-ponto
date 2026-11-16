@@ -110,7 +110,7 @@
     .doc.sem-link { cursor: default; } .doc.sem-link .abrir { color: var(--suave); }
     .aviso-links { background: rgba(224,176,122,.12); border: 1px solid rgba(224,176,122,.35); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; margin-bottom: 14px; }
     .aviso-links button { font: inherit; font-size: 13px; margin-left: 6px; background: none; border: none; color: var(--primary); text-decoration: underline; cursor: pointer; padding: 0; }
-    /* Avanço por pacotes e corte da semana */
+    /* Avanço por pacotes */
     .pacotes .zona { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--suave); margin: 12px 0 4px; }
     .pacotes .zona:first-child { margin-top: 0; }
     .fases .fase-corpo { flex: 1; min-width: 0; }
@@ -122,9 +122,16 @@
     .pac.feito .mini > div { background: var(--ok); }
     .pac .pc { text-align: right; font-variant-numeric: tabular-nums; color: var(--suave); font-size: 13px; }
     .pac .atr { color: var(--aviso); font-size: 12px; }
-    .semana { background: rgba(255,255,255,.04); border: 1px solid var(--linha); border-radius: 12px; padding: 12px 14px; }
-    .semana ul { margin: 6px 0 0; padding-left: 18px; font-size: 14px; }
-    .semana .fotos { margin-top: 10px; }
+    /* Novo esta semana: no topo até "Tomei conhecimento" ou 7 dias */
+    .novos { background: rgba(181,136,99,.10); border: 1px solid rgba(208,164,127,.45); border-radius: 14px; padding: 14px 16px; margin: 18px 0 8px; }
+    .novos h2 { margin-top: 0; }
+    .novos .de-obra { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--suave); margin: 12px 0 4px; }
+    .novos .fotos { margin-top: 8px; }
+    .novos .acoes { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .novos .acoes button { font: inherit; font-size: 14px; font-weight: 600; border-radius: 10px; padding: 9px 16px; cursor: pointer; border: none; background: var(--caramelo); color: #131c25; }
+    .novos .acoes button:disabled { opacity: .5; cursor: default; }
+    .novos .acoes span { font-size: 12px; color: var(--suave); }
+    .novos .erro { color: #e59a8f; font-size: 13px; }
     .pedidos .ped { border-top: 1px solid var(--linha); padding: 10px 0; font-size: 14px; }
     .pedidos .ped:first-child { border-top: none; }
     .pedidos .ped .cab { font-size: 12px; color: var(--suave); }
@@ -330,20 +337,6 @@ function htmlListaPacotes(pacotes, comZonas) {
     }).join("")}</div>`;
 }
 
-// O último corte semanal aprovado: o que avançou e as fotografias dessa semana
-function htmlSemana(corte, fotos, obraId) {
-    if (!corte) return "";
-    const ini = corte.semana, fim = new Date(new Date(ini + "T12:00:00").getTime() + 6 * 86400000).toISOString().slice(0, 10);
-    const daSemana = fotos.filter(d => d.data >= ini && d.data <= fim).slice(0, 8);
-    return `<h2>Semana de ${esc(dataPT(ini))}</h2><div class="semana">
-        ${corte.avancou.length
-            ? `<div>O que avançou:</div><ul>${corte.avancou.map(l => `<li>${esc([l.zona, l.nome].filter(Boolean).join(" · "))}: ${esc(l.antes)}% → <b>${esc(l.depois)}%</b></li>`).join("")}</ul>`
-            : `<div>Sem avanço registado nesta semana.</div>`}
-        ${daSemana.length ? `<div class="fotos">${daSemana.map(htmlFoto).join("")}</div>` : ""}
-        <p style="margin:10px 0 0"><a href="relatorio.html?t=${encodeURIComponent(TOKEN)}&obra=${encodeURIComponent(obraId)}" target="_blank" rel="noopener">📄 Relatório da semana (PDF)</a></p>
-    </div>`;
-}
-
 const ehVideoDoc = d => /^video\//i.test(d.mime || "");
 
 function htmlFoto(d) {
@@ -416,7 +409,64 @@ function seccao(titulo, itens, vazio) {
     return `<h2>${titulo}</h2>${itens.length ? itens.join("") : `<div class="vazio">${vazio}</div>`}`;
 }
 
-function htmlObra(o, docs, fases, autos, diario, pacotes, corte, pedidos) {
+// Uma linha de documento tal como aparece na sua secção (orçamento com os
+// botões de resposta, fatura com o estado do pagamento…)
+function linhaDocumento(d) {
+    if (d.tipo === "orcamento") return linhaDoc(d, "🧾", estadoOrcamento(d)) + respostaOrcamento(d);
+    if (d.tipo === "recibo") return linhaDoc(d, "✅", "Recibo");
+    if (d.tipo === "fatura") return linhaDoc(d, "💶", [euros(d.total),
+        d.paga == null ? "" : d.paga ? `<span class="estado ok">Paga</span>`
+            : d.recebido ? `<span class="estado pend">Paga em parte: falta ${euros(Number(d.total) - Number(d.recebido))}</span>`
+            : `<span class="estado pend">Por pagar</span>`]
+        .filter(Boolean).join(" · "));
+    return linhaDoc(d, "📄");
+}
+
+// No topo da página: os documentos, fotos e vídeos que ficaram visíveis há
+// menos de 7 dias e que o cliente ainda não deu como vistos. Ao carregar em
+// "Tomei conhecimento" (ou passada a semana) voltam para a sua secção.
+function htmlNovos(obras, docs) {
+    const novos = docs.filter(d => d.novo);
+    if (!novos.length) return "";
+    const nomeObra = new Map(obras.map(o => [o.id, o.nome]));
+    const porObra = obras.map(o => novos.filter(d => d.obra_id === o.id)).filter(l => l.length);
+    const temVideo = novos.some(d => d.tipo === "foto" && ehVideoDoc(d));
+    const temFoto  = novos.some(d => d.tipo === "foto");
+    const temDoc   = novos.some(d => d.tipo !== "foto");
+    const titulo = [temDoc ? "documentos" : "", temFoto ? (temVideo ? "fotos e vídeos" : "fotos") : ""].filter(Boolean).join(", ");
+    return `<div class="novos">
+        <h2>Novo esta semana: ${esc(titulo)}</h2>
+        ${porObra.map(l => {
+            const fotos = l.filter(d => d.tipo === "foto"), outros = l.filter(d => d.tipo !== "foto");
+            return `${porObra.length > 1 || obras.length > 1 ? `<div class="de-obra">${esc(nomeObra.get(l[0].obra_id))}</div>` : ""}
+                ${outros.map(linhaDocumento).join("")}
+                ${fotos.length ? `<div class="fotos">${fotos.map(htmlFoto).join("")}</div>` : ""}`;
+        }).join("")}
+        <div class="acoes">
+            <button type="button" id="btnTomeiConhecimento" data-ids="${esc(novos.map(d => d.id).join(","))}">Tomei conhecimento</button>
+            <span>Passam para as secções habituais, mais abaixo.</span>
+        </div>
+    </div>`;
+}
+
+document.addEventListener("click", async e => {
+    const b = e.target.closest("#btnTomeiConhecimento");
+    if (!b) return;
+    b.disabled = true;
+    b.parentNode.querySelector(".erro")?.remove();
+    try {
+        const r = await fetch(FUNCAO, { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: TOKEN, acao: "tomei_conhecimento", documentos: b.dataset.ids.split(",") }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.erro || "Erro " + r.status);
+        await iniciar();
+    } catch (err) {
+        b.disabled = false;
+        b.insertAdjacentHTML("afterend", `<span class="erro">${esc(err.message)}</span>`);
+    }
+});
+
+function htmlObra(o, docs, fases, autos, diario, pacotes, pedidos, novosPorTipo = {}) {
     // % pelos pacotes de trabalho (cada um pesado pelo valor, calculada no
     // servidor); sem pacotes, a % escrita na obra; sem ela, as fases
     // (concluídas contam inteiras, as a decorrer metade). Sem nada, não há barra.
@@ -428,18 +478,14 @@ function htmlObra(o, docs, fases, autos, diario, pacotes, corte, pedidos) {
     if (feita) pct = 100;
     const de = t => docs.filter(d => d.tipo === t);
 
-    const orcs = de("orcamento").map(d => linhaDoc(d, "🧾", estadoOrcamento(d)) + respostaOrcamento(d));
+    const orcs = de("orcamento").map(linhaDocumento);
     const fats = [...de("fatura"), ...de("recibo")]
         .sort((a, b) => String(b.data).localeCompare(String(a.data)))
-        .map(d => d.tipo === "recibo"
-            ? linhaDoc(d, "✅", "Recibo")
-            : linhaDoc(d, "💶", [euros(d.total),
-                d.paga == null ? "" : d.paga ? `<span class="estado ok">Paga</span>`
-                    : d.recebido ? `<span class="estado pend">Paga em parte: falta ${euros(Number(d.total) - Number(d.recebido))}</span>`
-                    : `<span class="estado pend">Por pagar</span>`]
-                .filter(Boolean).join(" · ")));
+        .map(linhaDocumento);
     const fotos = de("foto").map(htmlFoto);
-    const outros = de("outro").map(d => linhaDoc(d, "📄"));
+    const outros = de("outro").map(linhaDocumento);
+    // Se os únicos desta secção estão em "Novo esta semana", não se diz "ainda não há"
+    const vazioSe = (tipos, txt) => tipos.some(t => novosPorTipo[t]) ? "Está em «Novo esta semana», no topo." : txt;
 
     return `<section class="obra">
         <div class="obra-cab">
@@ -456,13 +502,12 @@ function htmlObra(o, docs, fases, autos, diario, pacotes, corte, pedidos) {
         </div>
         ${htmlContas(o.contas)}
         ${o.curva ? `<h2>Feito vs previsto</h2>${htmlCurva(o.curva)}` : ""}
-        ${htmlSemana(corte, de("foto"), o.id)}
         ${htmlFases(fases, pacotes)}
         ${htmlPacotes(pacotes, fases)}
         ${htmlDiario(diario)}
-        ${seccao("Orçamentos", orcs, "Ainda não há orçamentos.")}
+        ${seccao("Orçamentos", orcs, vazioSe(["orcamento"], "Ainda não há orçamentos."))}
         ${htmlAutos(autos)}
-        ${seccao("Faturas e recibos", fats, "Ainda não há faturas.")}
+        ${seccao("Faturas e recibos", fats, vazioSe(["fatura", "recibo"], "Ainda não há faturas."))}
         ${fotos.length ? `<h2>${de("foto").some(ehVideoDoc) ? "Fotografias e vídeos" : "Fotografias"}</h2><div class="fotos">${fotos.join("")}</div>` : ""}
         ${outros.length ? seccao("Outros documentos", outros, "") : ""}
         ${pedidos ? htmlPedidos(o.id, pedidos) : ""}
@@ -490,12 +535,13 @@ async function iniciar() {
             <h1>Olá${primeiro ? ", " + esc(primeiro) : ""}</h1>
             <p class="sub">Aqui pode acompanhar ${obras.length === 1 ? "a sua obra" : "as suas obras"} e consultar os documentos.</p>
             ${j.links_falharam ? `<div class="aviso-links">Alguns documentos não abriram desta vez.<button type="button" onclick="location.reload()">Atualizar a página</button></div>` : ""}
+            ${htmlNovos(obras, docs)}
             ${obras.length
-                ? obras.map(o => htmlObra(o, docs.filter(d => d.obra_id === o.id),
+                ? obras.map(o => htmlObra(o, docs.filter(d => d.obra_id === o.id && !d.novo),
                     (j.fases || []).filter(f => f.obra_id === o.id), (j.autos || []).filter(a => a.obra_id === o.id),
                     (j.diario || []).filter(n => n.obra_id === o.id), (j.pacotes || []).filter(p => p.obra_id === o.id),
-                    (j.cortes || []).find(c => c.obra_id === o.id),
-                    j.pedidos ? j.pedidos.filter(p => p.obra_id === o.id) : null)).join("")
+                    j.pedidos ? j.pedidos.filter(p => p.obra_id === o.id) : null,
+                    Object.fromEntries(docs.filter(d => d.obra_id === o.id && d.novo).map(d => [d.tipo, true])))).join("")
                 : `<div class="centro">Ainda não há obras associadas.</div>`}
             <div class="rodape">Os links dos documentos valem 1 hora. Se algum não abrir, atualize a página.<br>Maia Solutions</div>`;
     } catch (e) {

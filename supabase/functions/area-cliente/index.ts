@@ -15,15 +15,20 @@
 //   - nas faturas, o total e se está paga; nos orçamentos, o estado, o total
 //     e a resposta do cliente que ainda está por tratar;
 //   - o avanço da obra pelos pacotes de trabalho (zona, nome, % feita, se
-//     está atrasado) e o último corte semanal aprovado (o que avançou). Sem
-//     valores dos pacotes nem notas de quem mediu.
+//     está atrasado) e a curva feito vs previsto. Sem valores dos pacotes
+//     nem notas de quem mediu. O relatório do corte semanal já não vai ao
+//     cliente (decisão do Alcindo, 2026-11-16: as barras chegam);
+//   - em cada documento, se é novo: ficou visível há menos de 7 dias e o
+//     cliente ainda não carregou em "Tomei conhecimento".
 // Nunca devolve custos, margens, fornecedores, horas ou outras obras.
 //
 // A única coisa que o cliente pode escrever é a resposta a um orçamento
 // enviado (acao "responder_orcamento"): "aceite", "alteracoes" com um
 // comentário ou "recusa" com um motivo opcional; e um pedido sobre uma obra
 // dele (acao "pedido": informação, extra, reclamação ou sugestão), que o
-// Alcindo responde na app. Os pedidos e as respostas voltam na leitura. Fica em orcamento_respostas e não muda o orçamento; quem o
+// Alcindo responde na app. Os pedidos e as respostas voltam na leitura.
+// E pode carregar em "Tomei conhecimento" nos documentos novos (acao
+// "tomei_conhecimento"), o que guarda a data em obra_documentos.cliente_viu_em. Fica em orcamento_respostas e não muda o orçamento; quem o
 // passa a aceite é o Alcindo, na app.
 //
 // O código está em clientes.token_acesso e só vale com acesso_ativo = true.
@@ -51,7 +56,7 @@ Deno.serve(async (req) => {
     if (req.method !== "POST")    return resposta({ erro: "Método não permitido" }, 405);
 
     let corpo: { token?: string; acao?: string; documento_id?: string; resposta?: string; comentario?: string;
-                 obra_id?: string; tipo?: string; mensagem?: string };
+                 obra_id?: string; tipo?: string; mensagem?: string; documentos?: unknown };
     try { corpo = await req.json(); } catch { return resposta({ erro: "Pedido inválido" }, 400); }
 
     // Os códigos gerados pela app têm 32 caracteres base64url. Tudo o que não
@@ -68,6 +73,7 @@ Deno.serve(async (req) => {
 
     if (corpo.acao === "responder_orcamento") return responderOrcamento(db, req, cliente.id, corpo);
     if (corpo.acao === "pedido") return criarPedido(db, req, cliente.id, corpo);
+    if (corpo.acao === "tomei_conhecimento") return tomeiConhecimento(db, cliente.id, corpo.documentos);
 
     const { data: obras } = await db.from("obras")
         .select("id, codigo, nome, local, estado, percentagem_conclusao, data_conclusao_prevista, mostrar_contas_cliente")
@@ -77,7 +83,7 @@ Deno.serve(async (req) => {
     const idsObras = (obras || []).map(o => o.id);
     let documentos: any[] = [];
     let fases: any[] = [], autos: any[] = [], diario: any[] = [];
-    let pacotes: any[] = [], cortes: any[] = [];
+    let pacotes: any[] = [];
     let avanco: Record<string, number> = {};
     let curva: Record<string, any[]> = {};
     let linksFalharam = false;
@@ -94,7 +100,7 @@ Deno.serve(async (req) => {
         ]);
         diario = n.data || [];
         let pctFase: Record<string, number> = {};
-        ({ pacotes, cortes, avanco, curva, pctFase } = await pacotesECortes(db, idsObras));
+        ({ pacotes, avanco, curva, pctFase } = await pacotesECurva(db, idsObras));
         // % de cada fase pelos seus pacotes (pesada pelo valor, que não sai daqui)
         fases = (f.data || []).map((x: any) => ({ ...x, percentagem: pctFase[x.id] ?? null }));
         autos = (a.data || []).map((x: any) => {
@@ -144,6 +150,7 @@ Deno.serve(async (req) => {
             linksFalharam = !!r.error || assinados.some((x: any) => !x.signedUrl || x.error);
         }
         const urlDe = new Map(assinados.map((s: any) => [s.path, s.signedUrl]));
+        const novos = await documentosNovos(db, lista.map(d => d.id));
 
         documentos = lista.map(d => {
             const mov = d.movimento_id ? dadosMov.get(d.movimento_id) : null;
@@ -158,6 +165,7 @@ Deno.serve(async (req) => {
                 numero: d.numero_documento,
                 data: d.data_documento || d.created_at?.slice(0, 10),
                 url: urlDe.get(d.caminho) || null,
+                novo: novos.has(d.id),
                 estado_orcamento: orc ? orc.estado : null,
                 resposta_pendente: pr ? { resposta: pr.resposta, data: pr.created_at } : null,
                 total: mov ? mov.valor_total : orc ? orc.total_com_iva : null,
@@ -216,7 +224,7 @@ Deno.serve(async (req) => {
     await db.from("clientes").update({ ultimo_acesso: new Date().toISOString() }).eq("id", cliente.id);
 
     return resposta({ cliente: { nome: cliente.nome }, obras: obrasCliente, documentos, fases, autos, diario,
-                      pacotes, cortes, pedidos, links_falharam: linksFalharam });
+                      pacotes, pedidos, links_falharam: linksFalharam });
 });
 
 // Pedido do cliente sobre uma das obras dele. No máximo 10 por dia, para um
@@ -247,20 +255,21 @@ async function criarPedido(db: any, req: Request, clienteId: string,
     return resposta({ ok: true });
 }
 
-// Pacotes da obra e último corte semanal aprovado. Se o SQL dos pacotes
-// ainda não foi corrido, as colunas não existem: devolve listas vazias e a
-// página continua a usar a % da obra ou as fases.
-async function pacotesECortes(db: any, idsObras: string[]) {
+// Pacotes da obra e curva feito vs previsto (que usa os cortes semanais
+// aprovados). Se o SQL dos pacotes ainda não foi corrido, as colunas não
+// existem: devolve listas vazias e a página continua a usar a % da obra ou
+// as fases.
+async function pacotesECurva(db: any, idsObras: string[]) {
     const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Lisbon" });
     const [p, c] = await Promise.all([
         db.from("obra_servicos")
             .select("id, obra_id, fase_id, zona, nome, ordem, valor_orcamento, percentagem, concluido, data_fim_prevista")
             .in("obra_id", idsObras),
         db.from("cortes_semanais")
-            .select("obra_id, semana, tratado_em, corte_linhas(obra_servico_id, percentagem_antes, percentagem, obra_servicos(zona, nome))")
+            .select("obra_id, semana, corte_linhas(obra_servico_id, percentagem)")
             .in("obra_id", idsObras).eq("estado", "aprovado").order("semana", { ascending: false }),
     ]);
-    if (p.error) { console.error("pacotes", p.error); return { pacotes: [], cortes: [], avanco: {}, curva: {}, pctFase: {} }; }
+    if (p.error) { console.error("pacotes", p.error); return { pacotes: [], avanco: {}, curva: {}, pctFase: {} }; }
     // O peso de cada pacote (o valor) fica no servidor: o cliente só recebe a
     // % já calculada da obra e a % de cada pacote
     const pacotes = (p.data || [])
@@ -288,21 +297,6 @@ async function pacotesECortes(db: any, idsObras: string[]) {
             ? l.reduce((t: number, x: any) => t + x.peso * x.percentagem, 0) / tot
             : l.reduce((t: number, x: any) => t + x.percentagem, 0) / l.length);
     }
-    const cortes: any[] = [];
-    if (!c.error) {
-        const vistos = new Set();
-        for (const x of c.data || []) {
-            if (vistos.has(x.obra_id)) continue;   // só o mais recente de cada obra
-            vistos.add(x.obra_id);
-            cortes.push({
-                obra_id: x.obra_id, semana: x.semana,
-                avancou: (x.corte_linhas || [])
-                    .filter((l: any) => Number(l.percentagem) > Number(l.percentagem_antes))
-                    .map((l: any) => ({ zona: l.obra_servicos?.zona || "", nome: l.obra_servicos?.nome || "",
-                                        antes: Math.round(Number(l.percentagem_antes)), depois: Math.round(Number(l.percentagem)) })),
-            });
-        }
-    }
     // Curva real vs planeado de cada obra, semana a semana
     const curva: Record<string, any[]> = {};
     for (const id of idsObras) {
@@ -313,7 +307,6 @@ async function pacotesECortes(db: any, idsObras: string[]) {
     }
     return {
         pacotes: pacotes.map(({ peso, id, fim, ...x }: any) => x),
-        cortes,
         avanco,
         curva,
         pctFase,
@@ -398,4 +391,34 @@ async function somaPagamentos(db: any, ids: string[]): Promise<Map<string, numbe
     if (error) { console.error("pagamentos_fatura", error.message); return r; }
     for (const p of data || []) r.set(p.movimento_id, (r.get(p.movimento_id) || 0) + Number(p.valor || 0));
     return r;
+}
+
+// Documentos novos para o cliente: visíveis há menos de 7 dias e sem
+// "Tomei conhecimento". Sem as colunas (SQL documentos_novos_cliente.sql por
+// correr), nada é novo e a página fica como antes.
+const DIAS_NOVO = 7;
+async function documentosNovos(db: any, ids: string[]): Promise<Set<string>> {
+    const r = new Set<string>();
+    if (!ids.length) return r;
+    const desde = new Date(Date.now() - DIAS_NOVO * 86400000).toISOString();
+    const { data, error } = await db.from("obra_documentos").select("id")
+        .in("id", ids).is("cliente_viu_em", null).gte("visivel_desde", desde);
+    if (error) { console.error("documentos novos", error.message); return r; }
+    for (const d of data || []) r.add(d.id);
+    return r;
+}
+
+// "Tomei conhecimento": guarda a data só nos documentos visíveis das obras
+// deste cliente que ainda não tinham sido vistos.
+async function tomeiConhecimento(db: any, clienteId: string, documentos: unknown) {
+    const ids = (Array.isArray(documentos) ? documentos : [])
+        .map(String).filter(x => /^[0-9a-f-]{36}$/i.test(x)).slice(0, 200);
+    if (!ids.length) return resposta({ erro: "Sem documentos" }, 400);
+    const { data: obras } = await db.from("obras").select("id").eq("cliente_id", clienteId);
+    const idsObras = (obras || []).map((o: any) => o.id);
+    if (!idsObras.length) return resposta({ ok: true });
+    const { error } = await db.from("obra_documentos").update({ cliente_viu_em: new Date().toISOString() })
+        .in("id", ids).in("obra_id", idsObras).eq("visivel_cliente", true).is("cliente_viu_em", null);
+    if (error) { console.error(error); return resposta({ erro: "Não foi possível guardar." }, 500); }
+    return resposta({ ok: true });
 }
