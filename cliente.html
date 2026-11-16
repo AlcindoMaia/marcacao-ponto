@@ -434,7 +434,9 @@ function htmlObra(o, docs, fases, autos, diario, pacotes, corte, pedidos) {
         .map(d => d.tipo === "recibo"
             ? linhaDoc(d, "✅", "Recibo")
             : linhaDoc(d, "💶", [euros(d.total),
-                d.paga == null ? "" : d.paga ? `<span class="estado ok">Paga</span>` : `<span class="estado pend">Por pagar</span>`]
+                d.paga == null ? "" : d.paga ? `<span class="estado ok">Paga</span>`
+                    : d.recebido ? `<span class="estado pend">Paga em parte: falta ${euros(Number(d.total) - Number(d.recebido))}</span>`
+                    : `<span class="estado pend">Por pagar</span>`]
                 .filter(Boolean).join(" · ")));
     const fotos = de("foto").map(htmlFoto);
     const outros = de("outro").map(d => linhaDoc(d, "📄"));

@@ -98,3 +98,34 @@ test("orcSemIva: orçamento de PDF só com o total com IVA tira o IVA da taxa", 
     assert.equal(orcSemIva({ total_sem_iva: 500, total_com_iva: 615 }), 500);
     assert.ok(Math.abs(orcSemIva({ total_com_iva: 1060, taxa_iva: 6 }) - 1000) < 1e-9);
 });
+
+// Pagamentos parciais: um recibo de metade não dá a fatura como paga
+const parc = vm.createContext({});
+vm.runInContext(["semIva", "valorPagoMov", "semIvaPago", "mesmaRef", "valorDoReciboParaFatura"].map(n => funcaoDe("admin.js", n)).join("\n")
+    + "\n;globalThis.__p = { valorPagoMov, semIvaPago, valorDoReciboParaFatura };", parc);
+const { valorPagoMov, semIvaPago, valorDoReciboParaFatura } = parc.__p;
+const ft12 = { id: "ft12", valor_base: 3135, valor_total: 3856.05, estado_pagamento: "por_pagar" };
+
+test("fatura por receber sem recibos: recebido 0", () => {
+    assert.equal(valorPagoMov(ft12, {}), 0);
+    assert.equal(semIvaPago(ft12, {}), 0);
+});
+test("recibo parcial de 1930 €: conta só a parte recebida, sem IVA na mesma proporção", () => {
+    const p = { ft12: [{ valor: 1930 }] };
+    assert.equal(valorPagoMov(ft12, p), 1930);
+    assert.ok(Math.abs(semIvaPago(ft12, p) - 3135 * 1930 / 3856.05) < 0.001);
+});
+test("fatura paga conta por inteiro, mesmo sem recibos registados", () => {
+    const paga = { ...ft12, estado_pagamento: "pago" };
+    assert.equal(valorPagoMov(paga, {}), 3856.05);
+    assert.equal(semIvaPago(paga, {}), 3135);
+});
+test("recibos a mais nunca passam o total da fatura", () => {
+    assert.equal(valorPagoMov(ft12, { ft12: [{ valor: 3000 }, { valor: 3000 }] }), 3856.05);
+});
+test("valor do recibo por fatura: o da linha da fatura, senão o total quando só paga uma", () => {
+    const rc9 = { valor_recebido: 1930, faturas_liquidadas: [{ numero: "FT 2026/12", valor: 1930 }] };
+    assert.equal(valorDoReciboParaFatura(rc9, "FT2026/12"), 1930);
+    assert.equal(valorDoReciboParaFatura({ valor_recebido: 500, faturas_liquidadas: [{ numero: "FT 1", valor: null }] }, "FT 1"), 500);
+    assert.equal(valorDoReciboParaFatura({ valor_recebido: 900, faturas_liquidadas: [{ numero: "FT 1" }, { numero: "FT 2" }] }, "FT 1"), null);
+});

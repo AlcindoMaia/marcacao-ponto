@@ -126,6 +126,8 @@ Deno.serve(async (req) => {
         ]);
         const dadosOrc  = new Map((orcs.data || []).map((o: any) => [o.id, o]));
         const dadosMov  = new Map((movs.data || []).map((m: any) => [m.id, m]));
+        // Recibos parciais: quanto de cada fatura por pagar já foi recebido
+        const parcialDoc = await somaPagamentos(db, (movs.data || []).filter((m: any) => m.estado_pagamento !== "pago").map((m: any) => m.id));
         const { data: pend } = idsOrc.length
             ? await db.from("orcamento_respostas").select("orcamento_id, resposta, created_at")
                 .in("orcamento_id", idsOrc).is("tratada_em", null)
@@ -160,6 +162,8 @@ Deno.serve(async (req) => {
                 resposta_pendente: pr ? { resposta: pr.resposta, data: pr.created_at } : null,
                 total: mov ? mov.valor_total : orc ? orc.total_com_iva : null,
                 paga: mov ? mov.estado_pagamento === "pago" : null,
+                recebido: mov && mov.estado_pagamento !== "pago" && parcialDoc.get(mov.id)
+                    ? Math.min(Number(mov.valor_total), parcialDoc.get(mov.id)!) : null,
             };
         });
     }
@@ -173,9 +177,11 @@ Deno.serve(async (req) => {
         const [serv, orcs, ent] = await Promise.all([
             db.from("obra_servicos").select("obra_id, orcamento_id, valor_orcamento").in("obra_id", comContas),
             db.from("orcamentos").select("id, obra_id, total_sem_iva, total_com_iva, taxa_iva").in("obra_id", comContas).eq("estado", "aceite"),
-            db.from("movimentos_financeiros").select("obra_id, valor_base").in("obra_id", comContas)
-                .eq("tipo", "entrada").eq("ativo", true).eq("estado_pagamento", "pago"),
+            db.from("movimentos_financeiros").select("id, obra_id, valor_base, valor_total, estado_pagamento").in("obra_id", comContas)
+                .eq("tipo", "entrada").eq("ativo", true),
         ]);
+        // Uma fatura por pagar conta só a parte já recebida por recibos parciais
+        const parcialObra = await somaPagamentos(db, (ent.data || []).filter((m: any) => m.estado_pagamento !== "pago").map((m: any) => m.id));
         if (!serv.error && !orcs.error && !ent.error) {
             const r2 = (n: number) => Math.round(n * 100) / 100;
             for (const id of comContas) {
@@ -188,7 +194,13 @@ Deno.serve(async (req) => {
                 }, 0) + (serv.data || []).filter((x: any) => x.obra_id === id && !x.orcamento_id)
                     .reduce((t: number, x: any) => t + Number(x.valor_orcamento || 0), 0);
                 const pago = (ent.data || []).filter((m: any) => m.obra_id === id)
-                    .reduce((t: number, m: any) => t + Number(m.valor_base || 0), 0);
+                    .reduce((t: number, m: any) => {
+                        const base = Number(m.valor_base ?? m.valor_total ?? 0);
+                        if (m.estado_pagamento === "pago") return t + base;
+                        const total = Number(m.valor_total || 0);
+                        const rec = Math.min(total, parcialObra.get(m.id) || 0);
+                        return t + (total > 0 ? base * rec / total : 0);
+                    }, 0);
                 contas[id] = { valor: r2(valor), pago: r2(pago), falta: r2(Math.max(0, valor - pago)) };
             }
         }
@@ -375,4 +387,15 @@ async function responderOrcamento(db: any, req: Request, clienteId: string,
     if (error?.code === "23505") return resposta({ erro: "Já recebemos a sua resposta a este orçamento." }, 409);
     if (error) { console.error(error); return resposta({ erro: "Não foi possível guardar a resposta." }, 500); }
     return resposta({ ok: true });
+}
+
+// Soma dos pagamentos parciais (tabela pagamentos_fatura) por movimento.
+// Sem a tabela (SQL por correr) devolve vazio e tudo fica como antes.
+async function somaPagamentos(db: any, ids: string[]): Promise<Map<string, number>> {
+    const r = new Map<string, number>();
+    if (!ids.length) return r;
+    const { data, error } = await db.from("pagamentos_fatura").select("movimento_id, valor").in("movimento_id", ids);
+    if (error) { console.error("pagamentos_fatura", error.message); return r; }
+    for (const p of data || []) r.set(p.movimento_id, (r.get(p.movimento_id) || 0) + Number(p.valor || 0));
+    return r;
 }
