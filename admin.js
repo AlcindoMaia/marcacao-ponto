@@ -2042,15 +2042,29 @@ async function gerarCodigoInscricao() {
     msgEl.textContent = "";
 }
 
-async function revogarDispositivoFuncionario() {
+// Telemóvel novo, perdido ou com os dados do site apagados: revoga e gera o
+// código num só passo, para dar logo à pessoa.
+async function trocarTelemovelFuncionario() {
     if (!funcEditId) return;
-    if (!confirm("Revogar o dispositivo deste funcionário?\nEle terá de fazer novo cadastro.")) return;
+    if (!confirm("Trocar o telemóvel desta pessoa?\nO antigo deixa de marcar e aparece um código para registar o novo.")) return;
+    if (!(await revogarDispositivoFuncionario(true))) return;
+    await gerarCodigoInscricao();
+    const msgEl = document.getElementById("modalFuncMsg");
+    if (document.getElementById("funcCodigoGerado").style.display !== "none") {
+        msgEl.textContent = "Telemóvel antigo revogado. No novo: abrir o link da obra › Tenho um código.";
+        msgEl.style.color = "#8fbfa0";
+    }
+}
+
+async function revogarDispositivoFuncionario(semPerguntar) {
+    if (!funcEditId) return false;
+    if (semPerguntar !== true && !confirm("Revogar o dispositivo deste funcionário?\nEle terá de fazer novo cadastro.")) return false;
 
     const { error } = await SB.from("funcionarios")
         .update({ device_id: null })
         .eq("id", funcEditId);
 
-    if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
+    if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return false; }
 
     document.getElementById("funcDeviceInfo").style.display = "none";
     // Aparece a caixa do código, para se poder gerar um logo a seguir.
@@ -2061,6 +2075,7 @@ async function revogarDispositivoFuncionario() {
     document.getElementById("modalFuncMsg").textContent = "Dispositivo revogado. Gere um código de inscrição para esta pessoa se registar de novo.";
     document.getElementById("modalFuncMsg").style.color = "#8fbfa0";
     await carregarFuncionarios();
+    return true;
 }
 
 // =======================================================
@@ -6251,7 +6266,7 @@ async function carregarPainelDocumentos() {
                 <input type="checkbox" style="width:auto;margin:0" ${d.visivel_cliente ? "checked" : ""} onchange="alternarVisivelDocObra('${d.id}', this.checked)"> Visível ao cliente
             </label>
             ${vistoPeloCliente(d)}
-            <button onclick="apagarDocumentoObra('${d.id}')" title="Apagar" style="background:none;border:none;cursor:pointer;font-size:14px;opacity:.6">🗑</button>
+            <button onclick="apagarDocumentoObra('${d.id}')" title="Apagar" style="background:none;border:none;cursor:pointer;font-size:14px;opacity:.6;margin-left:auto">🗑</button>
         </div>`;
     };
 
@@ -8125,7 +8140,8 @@ function ligarEventosGlobais() {
     // Funcionários — modal
     document.getElementById("btnNovoFuncionario")?.addEventListener("click", () => abrirModalFuncionario());
     document.getElementById("guardarFuncionarioBtn")?.addEventListener("click", guardarFuncionario);
-    document.getElementById("btnRevogarDispositivo")?.addEventListener("click", revogarDispositivoFuncionario);
+    document.getElementById("btnRevogarDispositivo")?.addEventListener("click", () => revogarDispositivoFuncionario());
+    document.getElementById("btnTrocarTelemovel")?.addEventListener("click", trocarTelemovelFuncionario);
     document.getElementById("btnGerarCodigo")?.addEventListener("click", gerarCodigoInscricao);
     document.getElementById("modalFuncionario")?.addEventListener("click", e => {
         if (e.target.id === "modalFuncionario") fecharModalFuncionario();

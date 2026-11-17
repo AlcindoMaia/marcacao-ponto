@@ -1183,6 +1183,11 @@ label.cot-ed-chk input { width: auto !important; min-width: 0 !important; }
     img, video, iframe { max-width: 100%; }
     [style*="min-width:1"], [style*="min-width:2"], [style*="min-width:3"],
     [style*="min-width: 1"], [style*="min-width: 2"], [style*="min-width: 3"] { min-width: 0 !important; }
+    /* Linhas "ícone + texto (flex:1) + selos/botões": sem o min-width, o texto
+       encolhia até partir letra a letra (Documentos da obra). O texto fica com
+       a linha toda ao lado do ícone e os selos/botões passam para baixo. */
+    [style*="flex-wrap:wrap"] > [style*="flex:1;min-width:1"],
+    [style*="flex-wrap:wrap"] > [style*="flex:1;min-width:2"] { flex: 1 1 calc(100% - 44px) !important; }
 }
 
 /* A cor do texto da ficha de cliente (fundo escuro) — também no computador */
