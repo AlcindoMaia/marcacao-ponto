@@ -105,6 +105,11 @@ async function carregarPainelAndamento() {
         // null = a coluna ainda não existe (SQL por correr): não se mostra a opção
         contasCliente: contasRes.error ? null : !!contasRes.data?.mostrar_contas_cliente,
         orcsAceites: orcsRes.data || [], comFaseId: !servRes0.error };
+    // Trabalhos a mais e remates (obra-entrega.js)
+    if (typeof carregarEntrega === "function") {
+        try { await carregarEntrega(obraId); } catch (e) { console.warn("carregarEntrega", e); }
+    }
+    if (_painelObraActual?.id !== obraId) return;   // mudou de obra entretanto
     desenharAndamento();
 }
 
@@ -115,7 +120,8 @@ function desenharAndamento() {
         <div id="andamentoMsg" style="font-size:12px;min-height:16px;margin:4px 0"></div>
         <div class="card" style="margin:0 0 14px">${htmlFases()}</div>
         <div class="card" style="margin:0 0 14px">${_autoEmEdicao ? htmlEditorAuto() : htmlAutos()}</div>
-        <div class="card" style="margin:0">${htmlDiario()}</div>`;
+        <div class="card" style="margin:0">${htmlDiario()}</div>
+        ${typeof htmlCartoesEntrega === "function" ? htmlCartoesEntrega() : ""}`;
     if (_autoEmEdicao) recalcularAuto();
 }
 
@@ -644,11 +650,26 @@ function editarNotaDia(data) {
     box.innerHTML = `<div style="padding:8px;margin-top:6px;border-radius:8px;background:rgba(255,255,255,.04)">
         <textarea id="diarioTxt" rows="3" maxlength="4000" placeholder="Ocorrências, atrasos, visitas, o que ficou feito…">${esc(n?.notas || "")}</textarea>
         <label style="font-size:12px;display:flex;gap:6px;align-items:center;margin:6px 0"><input type="checkbox" id="diarioVis" style="width:auto"${n?.visivel_cliente ? " checked" : ""}> O cliente vê esta nota</label>
-        <div style="display:flex;gap:6px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn-primary" style="padding:5px 14px;font-size:12px" onclick="gravarNotaDia('${data}')">Gravar</button>
             <button class="btn-secondary" style="padding:5px 14px;font-size:12px" onclick="desenharAndamento()">Cancelar</button>
+            <button type="button" class="btn-secondary" id="diarioMic" style="padding:5px 14px;font-size:12px;display:none">🎤 Ditar</button>
+            <button type="button" class="btn-secondary" style="padding:5px 14px;font-size:12px" onclick="arrumarNotaDia(this)">✨ Arrumar</button>
         </div></div>`;
+    if (typeof ligarDitado === "function") ligarDitado(document.getElementById("diarioMic"), document.getElementById("diarioTxt"));
     document.getElementById("diarioTxt").focus();
+}
+
+// Arruma o texto ditado em trabalho feito / problemas / material (voz.js)
+async function arrumarNotaDia(btn) {
+    const caixa = document.getElementById("diarioTxt");
+    if (!caixa?.value.trim()) return msgAndamento("Dita ou escreve primeiro a nota.", "err");
+    btn.disabled = true;
+    try {
+        caixa.value = await arrumarRelatorioDia(caixa.value.trim(), _painelObraActual?.nome);
+        msgAndamento("Arrumado. Confere antes de gravar.");
+    } catch (e) { msgAndamento("Não deu para arrumar: " + e.message, "err"); }
+    finally { btn.disabled = false; }
 }
 
 async function gravarNotaDia(data) {

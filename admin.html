@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Maia">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-<link rel="stylesheet" href="style.css?v=22">
+<link rel="stylesheet" href="style.css?v=23">
 <link rel="stylesheet" href="telemovel.css?v=7">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
@@ -1244,9 +1244,12 @@ document.getElementById("btnLogin").addEventListener("click", function () {
             <button id="planSemanaHoje"     class="btn-primary">Hoje</button>
             <button id="planSemanaSeguinte" class="btn-primary">›</button>
             <span id="planLabelSemana" class="plan-label"></span>
+            <button id="btnTresSemanas" class="btn-secondary" onclick="alternarTresSemanas()" title="As tarefas das próximas 3 semanas: está tudo pronto?">🔭 3 semanas</button>
         </div>
         <button id="btnNovaTarefa" class="btn-primary btn-circular">+</button>
     </div>
+
+    <div class="card" id="planTresSemanas" style="display:none;margin-bottom:14px"></div>
 
     <div class="card plan-quadro" id="planQuadro" style="overflow-x:auto">
         <table id="planGrelha" class="plan-grelha sem-cartoes"></table>
@@ -1941,11 +1944,14 @@ document.getElementById("btnLogin").addEventListener("click", function () {
 <script src="leitor-qr.js"></script>
 <script src="dados-publicos.js"></script>
 <script src="fotos.js?v=2"></script>
-<script src="planeamento.js?v=4"></script>
+<script src="planeamento.js?v=5"></script>
+<script src="tres-semanas.js?v=1"></script>
 <script src="cotacoes.js?v=2"></script>
-<script src="andamento.js?v=9"></script>
+<script src="voz.js?v=1"></script>
+<script src="andamento.js?v=10"></script>
+<script src="obra-entrega.js?v=1"></script>
 <script src="rh.js?v=8"></script>
-<script src="admin.js?v=49"></script>
+<script src="admin.js?v=51"></script>
 <script src="push.js?v=1"></script>
 <script src="telemovel.js?v=5"></script>
 
@@ -1977,20 +1983,34 @@ document.getElementById("btnLogin").addEventListener("click", function () {
                         <option value="m³">m³</option><option value="vg">vg</option><option value="kg">kg</option>
                     </select>
                 </div>
-                <div style="grid-column:1/-1">
+                <div>
                     <label style="font-size:11px;opacity:.6;display:block;margin-bottom:4px">Rendimento MO (un/dia)</label>
-                    <input id="bibServRendimento" type="number" step="0.5" min="0" placeholder="Ex: 8" style="width:100%;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
+                    <input id="bibServRendimento" type="number" step="0.5" min="0" placeholder="Ex: 8" oninput="atualizarResumoCustoBib()" style="width:100%;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
+                </div>
+                <div>
+                    <label style="font-size:11px;opacity:.6;display:block;margin-bottom:4px">Custo da equipa por dia (€)</label>
+                    <input id="bibServCustoDia" type="number" step="1" min="0" placeholder="Ex: 240 (2 pessoas)" oninput="atualizarResumoCustoBib()" style="width:100%;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
+                </div>
+                <div>
+                    <label style="font-size:11px;opacity:.6;display:block;margin-bottom:4px">Equipamento (€ por unidade)</label>
+                    <input id="bibServEquip" type="number" step="0.01" min="0" placeholder="Ex: 1,50" oninput="atualizarResumoCustoBib()" style="width:100%;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
+                </div>
+                <div>
+                    <label style="font-size:11px;opacity:.6;display:block;margin-bottom:4px">Margem (×)</label>
+                    <input id="bibServMargem" type="number" step="0.05" min="1" placeholder="1.3" oninput="atualizarResumoCustoBib()" style="width:100%;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#fff;font-size:13px">
                 </div>
             </div>
             <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin-bottom:8px">Materiais (por unidade do serviço)</div>
             <div style="display:grid;grid-template-columns:1fr 80px 70px 28px;gap:6px;padding:0 4px;margin-bottom:4px">
-                <span style="font-size:10px;opacity:.4">Material</span>
+                <span style="font-size:10px;opacity:.4">Material · artigo do Stock / €/un / % perdas</span>
                 <span style="font-size:10px;opacity:.4;text-align:right">Qtd/un</span>
                 <span style="font-size:10px;opacity:.4;text-align:center">Un</span>
                 <span></span>
             </div>
             <div id="bibMatLinhas" style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px"></div>
             <button onclick="adicionarLinhaBibMat()" style="background:rgba(181,136,99,.1);border:1px solid rgba(181,136,99,.2);color:var(--primary,#b58863);border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px">+ Adicionar material</button>
+            <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin:16px 0 6px">Composição de custo (por unidade)</div>
+            <div id="bibResumoCusto" style="font-size:12px;color:#fff;background:rgba(255,255,255,.05);border-radius:8px;padding:10px"></div>
         </div>
         <div style="padding:16px 24px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:flex-end;gap:10px">
             <button onclick="fecharModalBibServico()" class="btn-secondary">Cancelar</button>

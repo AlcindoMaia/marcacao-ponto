@@ -305,6 +305,65 @@ async function gastosPeriodo(admin: any, p: any) {
 }
 
 // =======================================================
+// RELATÓRIO DO DIA (Registo diário › 🎤 Relatório do dia)
+// O encarregado dita o dia; a IA só separa as frases em quatro listas, com
+// as palavras de quem falou. Não inventa, não resume, não põe números que
+// não foram ditos. Quem guarda é a pessoa, depois de conferir.
+// =======================================================
+async function relatorioDia(admin: any, chave: string, email: string, texto: string, obra: string | null) {
+    if (texto.length > 4000) return resposta({ erro: "Relatório demasiado longo (máximo 4000 letras)." }, 413);
+    const sistema = `Recebes o relatório do dia de uma obra de construção civil em Portugal,
+ditado ao telemóvel pelo encarregado${obra ? ` (obra: ${obra})` : ""}. O texto vem do
+reconhecimento de voz: pode ter palavras trocadas, sem pontuação e repetições.
+
+Separa o que foi dito em quatro listas:
+- "feito": trabalho feito hoje (o quê e onde, se foi dito).
+- "problemas": o que correu mal, atrasos, avarias, faltas de pessoal, chuva,
+  decisões que faltam do cliente.
+- "material": material que falta ou que é preciso encomendar.
+- "outras": o resto que valha a pena guardar (visitas, combinações).
+
+Regras:
+- Usa as palavras de quem falou. Corrige só erros óbvios do reconhecimento
+  de voz e tira hesitações ("é pá", "pronto", "tipo"). Não resumas, não
+  acrescentes, não interpretes.
+- Nunca inventes quantidades, medidas, nomes ou datas que não foram ditos.
+- Cada item é uma frase curta, sem ponto final, começada por maiúscula.
+- Português de Portugal.
+- Lista vazia quando não foi dito nada desse tipo.
+
+Devolve SÓ este JSON, sem texto à volta:
+{"feito": [string], "problemas": [string], "material": [string], "outras": [string]}`;
+
+    let dados: any = null, erro: string | null = null, tokIn = 0, tokOut = 0;
+    try {
+        const r = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-api-key": chave, "anthropic-version": "2023-06-01" },
+            body: JSON.stringify({ model: MODELO, max_tokens: 1500, system: sistema, messages: [{ role: "user", content: texto }] }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j?.error?.message || `HTTP ${r.status}`);
+        tokIn = j?.usage?.input_tokens ?? 0;
+        tokOut = j?.usage?.output_tokens ?? 0;
+        const bruto = (j.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
+        const p = JSON.parse(bruto.trim().replace(/^```(?:json)?/, "").replace(/```$/, "").trim());
+        const lista = (x: unknown) => (Array.isArray(x) ? x : []).map(v => String(v ?? "").trim()).filter(Boolean).slice(0, 40)
+            .map(v => v.slice(0, 500));
+        dados = { feito: lista(p.feito), problemas: lista(p.problemas), material: lista(p.material), outras: lista(p.outras) };
+    } catch (e: any) {
+        erro = String(e?.message || e);
+    }
+    await admin.from("assistente_registo").insert({
+        accao: "relatorio_dia", utilizador: email, entrada: { texto, obra }, saida: erro ? null : dados,
+        modelo: MODELO, tokens_entrada: tokIn, tokens_saida: tokOut,
+        custo_estimado: tokIn * CUSTO_ENTRADA + tokOut * CUSTO_SAIDA, erro,
+    });
+    if (erro) return resposta({ erro: "Não foi possível arrumar o relatório. Tenta outra vez." }, 502);
+    return resposta({ relatorio: dados });
+}
+
+// =======================================================
 Deno.serve(async (req) => {
     if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
     if (req.method !== "POST")    return resposta({ erro: "Método não permitido" }, 405);
@@ -330,17 +389,18 @@ Deno.serve(async (req) => {
     const hoje = new Date().toISOString().slice(0, 10);
     const { count } = await admin
         .from("assistente_registo").select("id", { count: "exact", head: true })
-        .eq("accao", "assistente").gte("criado_em", hoje);
+        .in("accao", ["assistente", "relatorio_dia"]).gte("criado_em", hoje);
     if ((count ?? 0) >= teto) {
         return resposta({ erro: `Limite diário atingido (${teto} pedidos).` }, 429);
     }
 
     // ---- Entrada ----
-    let corpo: { texto?: string };
+    let corpo: { texto?: string; modo?: string; obra?: string | null };
     try { corpo = await req.json(); } catch { return resposta({ erro: "JSON inválido" }, 400); }
 
     const texto = (corpo.texto || "").trim();
     if (!texto)              return resposta({ erro: "Falta o texto" }, 400);
+    if (corpo.modo === "relatorio_dia") return relatorioDia(admin, chave, user.email, texto, corpo.obra || null);
     if (texto.length > 2000) return resposta({ erro: "Pedido demasiado longo." }, 413);
 
     // ---- Contexto: o que existe mesmo ----
