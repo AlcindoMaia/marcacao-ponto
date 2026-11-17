@@ -254,7 +254,7 @@ function htmlRemates() {
                 ${r.foto_antes ? `<button class="btn-acao" title="Foto antes" onclick="abrirFotoRemate('${r.id}','antes')">📷 Antes</button>` : ""}
                 ${r.foto_depois ? `<button class="btn-acao" title="Foto depois" onclick="abrirFotoRemate('${r.id}','depois')">📷 Depois</button>` : ""}
                 ${r.estado === "aberto"
-                    ? `<label class="btn-primary" style="padding:4px 10px;font-size:12px;cursor:pointer">✓ Resolvido (com foto)<input type="file" accept="image/*,.heic,.heif" capture="environment" hidden onchange="resolverRemate('${r.id}', this)"></label>
+                    ? `<label class="btn-primary" style="padding:4px 10px;font-size:12px;cursor:pointer">✓ Resolvido (com foto)<input type="file" accept="image/*,.heic,.heif" hidden onchange="resolverRemate('${r.id}', this)"></label>
                        <button class="btn-secondary" style="padding:4px 10px;font-size:12px" onclick="resolverRemate('${r.id}', null)">✓ Sem foto</button>`
                     : `<button class="btn-secondary" style="padding:4px 10px;font-size:12px" onclick="reabrirRemate('${r.id}')">Reabrir</button>`}
                 <button class="btn-acao" title="Editar" onclick="editarRemate('${r.id}')">✏️</button>
@@ -288,7 +288,7 @@ function htmlFormRemate(r) {
             <label style="flex:1;min-width:140px;font-size:12px">Se for outro, quem<input id="remExt" maxlength="120" value="${esc(r.responsavel_externo || "")}"></label>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;align-items:center">
-            <label class="btn-secondary" style="padding:4px 10px;font-size:12px;cursor:pointer" id="remFotoLbl">📷 ${r.foto_antes ? "Trocar foto (antes)" : "Foto (antes)"}<input id="remFoto" type="file" accept="image/*,.heic,.heif" capture="environment" hidden onchange="document.getElementById('remFotoLbl').firstChild.textContent='📷 ' + (this.files[0]?.name || 'Foto (antes)')"></label>
+            <label class="btn-secondary" style="padding:4px 10px;font-size:12px;cursor:pointer" id="remFotoLbl">📷 ${r.foto_antes ? "Trocar foto (antes)" : "Foto (antes)"}<input id="remFoto" type="file" accept="image/*,.heic,.heif" hidden onchange="document.getElementById('remFotoLbl').firstChild.textContent='📷 ' + (this.files[0]?.name || 'Foto (antes)')"></label>
             <label style="font-size:12px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="remVis" style="width:auto"${r.visivel_cliente === false ? "" : " checked"}> O cliente vê</label>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
