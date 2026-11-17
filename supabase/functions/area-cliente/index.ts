@@ -31,6 +31,13 @@
 // "tomei_conhecimento"), o que guarda a data em obra_documentos.cliente_viu_em. Fica em orcamento_respostas e não muda o orçamento; quem o
 // passa a aceite é o Alcindo, na app.
 //
+// Trabalhos a mais (2026-11-17): o cliente vê os extras enviados, aceites e
+// recusados, e responde aos enviados (acao "responder_extra": "aceite" com o
+// nome de quem aceita, ou "recusa" com motivo opcional). Ao aceitar, a base de
+// dados cria o serviço extra da obra (trigger em obra_em_curso.sql).
+// Remates: vê os remates visíveis da obra (divisão, o quê, prazo, estado,
+// fotos antes/depois) e confirma os resolvidos (acao "confirmar_remate").
+//
 // O código está em clientes.token_acesso e só vale com acesso_ativo = true.
 // =======================================================
 
@@ -56,7 +63,8 @@ Deno.serve(async (req) => {
     if (req.method !== "POST")    return resposta({ erro: "Método não permitido" }, 405);
 
     let corpo: { token?: string; acao?: string; documento_id?: string; resposta?: string; comentario?: string;
-                 obra_id?: string; tipo?: string; mensagem?: string; documentos?: unknown };
+                 obra_id?: string; tipo?: string; mensagem?: string; documentos?: unknown;
+                 extra_id?: string; nome?: string; remate_id?: string };
     try { corpo = await req.json(); } catch { return resposta({ erro: "Pedido inválido" }, 400); }
 
     // Os códigos gerados pela app têm 32 caracteres base64url. Tudo o que não
@@ -74,6 +82,8 @@ Deno.serve(async (req) => {
     if (corpo.acao === "responder_orcamento") return responderOrcamento(db, req, cliente.id, corpo);
     if (corpo.acao === "pedido") return criarPedido(db, req, cliente.id, corpo);
     if (corpo.acao === "tomei_conhecimento") return tomeiConhecimento(db, cliente.id, corpo.documentos);
+    if (corpo.acao === "responder_extra") return responderExtra(db, req, cliente.id, corpo);
+    if (corpo.acao === "confirmar_remate") return confirmarRemate(db, cliente.id, corpo.remate_id);
 
     const { data: obras } = await db.from("obras")
         .select("id, codigo, nome, local, estado, percentagem_conclusao, data_conclusao_prevista, mostrar_contas_cliente")
@@ -221,11 +231,100 @@ Deno.serve(async (req) => {
         .eq("cliente_id", cliente.id).order("created_at", { ascending: false }).limit(30);
     const pedidos = ped.error ? [] : ped.data || [];
 
+    // Trabalhos a mais e remates (sem as tabelas, por correr o SQL, ficam vazios)
+    const { extras, remates } = await extrasERemates(db, idsObras);
+
     await db.from("clientes").update({ ultimo_acesso: new Date().toISOString() }).eq("id", cliente.id);
 
     return resposta({ cliente: { nome: cliente.nome }, obras: obrasCliente, documentos, fases, autos, diario,
-                      pacotes, pedidos, links_falharam: linksFalharam });
+                      pacotes, pedidos, extras, remates, links_falharam: linksFalharam });
 });
+
+// Trabalhos a mais (sem rascunhos nem cancelados) e remates visíveis, com
+// links temporários para as fotos. Valores sem IVA e com IVA: o cliente
+// aceita um preço, tem de o ver por inteiro.
+async function extrasERemates(db: any, idsObras: string[]) {
+    if (!idsObras.length) return { extras: [], remates: [] };
+    const [e, r] = await Promise.all([
+        db.from("trabalhos_mais")
+            .select("id, obra_id, descricao, valor_sem_iva, taxa_iva, dias_prazo, estado, enviado_em, resposta_em, resposta_nome, motivo_recusa")
+            .in("obra_id", idsObras).in("estado", ["enviado", "aceite", "recusado"]).order("created_at"),
+        db.from("obra_remates")
+            .select("id, obra_id, divisao, descricao, foto_antes, foto_depois, prazo, estado, resolvido_em, cliente_confirmou_em")
+            .in("obra_id", idsObras).eq("visivel_cliente", true).order("created_at"),
+    ]);
+    if (e.error) console.error("trabalhos_mais", e.error.message);
+    if (r.error) console.error("obra_remates", r.error.message);
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const extras = (e.data || []).map((x: any) => {
+        const base = Number(x.valor_sem_iva || 0), iva = r2(base * Number(x.taxa_iva ?? 23) / 100);
+        return { ...x, valor_sem_iva: base, iva, total: r2(base + iva) };
+    });
+    const lista = r.data || [];
+    const caminhos = lista.flatMap((x: any) => [x.foto_antes, x.foto_depois]).filter(Boolean);
+    let urlDe = new Map<string, string>();
+    if (caminhos.length) {
+        const s = await db.storage.from(BUCKET).createSignedUrls(caminhos, VALIDADE_LINK);
+        if (s.error) console.error("remates fotos", s.error);
+        urlDe = new Map((s.data || []).filter((x: any) => x.signedUrl).map((x: any) => [x.path, x.signedUrl]));
+    }
+    const remates = lista.map(({ foto_antes, foto_depois, ...x }: any) => ({
+        ...x,
+        foto_antes: foto_antes ? urlDe.get(foto_antes) || null : null,
+        foto_depois: foto_depois ? urlDe.get(foto_depois) || null : null,
+    }));
+    return { extras, remates };
+}
+
+// Resposta do cliente a um trabalho a mais enviado. "aceite" pede o nome de
+// quem aceita (fica registado com a data, o IP e o navegador); "recusa" aceita
+// um motivo. Só vale para extras "enviado" de obras deste cliente.
+async function responderExtra(db: any, req: Request, clienteId: string,
+                              corpo: { extra_id?: string; resposta?: string; nome?: string; comentario?: string }) {
+    const id = String(corpo.extra_id || "");
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return resposta({ erro: "Trabalho inválido" }, 400);
+    const tipo = corpo.resposta;
+    if (tipo !== "aceite" && tipo !== "recusa") return resposta({ erro: "Resposta inválida" }, 400);
+    const nome = String(corpo.nome || "").trim().slice(0, 120);
+    if (tipo === "aceite" && nome.length < 2) return resposta({ erro: "Escreva o seu nome para aceitar." }, 400);
+    const motivo = String(corpo.comentario || "").trim().slice(0, 2000);
+
+    const { data: ex } = await db.from("trabalhos_mais")
+        .select("id, estado, obras!inner(cliente_id)")
+        .eq("id", id).eq("obras.cliente_id", clienteId).maybeSingle();
+    if (!ex) return resposta({ erro: "Trabalho não encontrado" }, 404);
+    if (ex.estado !== "enviado") return resposta({ erro: "Este trabalho já não está à espera de resposta." }, 409);
+
+    const { data: feito, error } = await db.from("trabalhos_mais").update({
+        estado: tipo === "aceite" ? "aceite" : "recusado",
+        resposta_em: new Date().toISOString(),
+        resposta_nome: nome || null,
+        resposta_por: "cliente",
+        motivo_recusa: tipo === "recusa" ? (motivo || null) : null,
+        resposta_ip: (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || null,
+        resposta_navegador: (req.headers.get("user-agent") || "").slice(0, 300) || null,
+        visto_em: null,
+    }).eq("id", id).eq("estado", "enviado").select("id");
+    if (error) { console.error(error); return resposta({ erro: "Não foi possível guardar a resposta." }, 500); }
+    // Outra resposta chegou primeiro (dois cliques, dois telemóveis)
+    if (!feito?.length) return resposta({ erro: "Este trabalho já não está à espera de resposta." }, 409);
+    return resposta({ ok: true });
+}
+
+// O cliente confirma que um remate resolvido ficou bem.
+async function confirmarRemate(db: any, clienteId: string, remateId?: string) {
+    const id = String(remateId || "");
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return resposta({ erro: "Remate inválido" }, 400);
+    const { data: rm } = await db.from("obra_remates")
+        .select("id, estado, obras!inner(cliente_id)")
+        .eq("id", id).eq("visivel_cliente", true).eq("obras.cliente_id", clienteId).maybeSingle();
+    if (!rm) return resposta({ erro: "Remate não encontrado" }, 404);
+    if (rm.estado !== "resolvido") return resposta({ erro: "Este remate ainda não está resolvido." }, 409);
+    const { error } = await db.from("obra_remates").update({ cliente_confirmou_em: new Date().toISOString() })
+        .eq("id", id).is("cliente_confirmou_em", null);
+    if (error) { console.error(error); return resposta({ erro: "Não foi possível guardar." }, 500); }
+    return resposta({ ok: true });
+}
 
 // Pedido do cliente sobre uma das obras dele. No máximo 10 por dia, para um
 // link partilhado por engano não encher a caixa do Alcindo.

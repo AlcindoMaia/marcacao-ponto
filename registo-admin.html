@@ -311,6 +311,9 @@ button { font: inherit; color: inherit; }
 .media-nota { font-size: 11px; color: var(--muted); }
 .media-msg { font-size: 12px; margin-top: 6px; min-height: 0; }
 .media-msg.ok { color: var(--green); } .media-msg.warn { color: var(--orange); } .media-msg.err { color: var(--red); }
+.voz-texto { width: 100%; min-height: 110px; padding: 10px; border-radius: var(--radsm); border: 1px solid var(--border); background: var(--bg3); color: var(--text); font-family: var(--fb); font-size: 14px; resize: vertical; margin-bottom: 8px; }
+.btn-acao.a-ouvir { border-color: var(--red); color: var(--red); animation: piscar 1.2s infinite; }
+@keyframes piscar { 50% { opacity: .55; } }
 
 /* Guardar: fica sempre à mão no fundo do ecrã */
 .rodape {
@@ -470,6 +473,25 @@ button { font: inherit; color: inherit; }
     <!-- Lista de funcionários -->
     <div class="func-lista" id="funcLista"></div>
 
+    <!-- Relatório do dia por voz (vai para o diário da obra) -->
+    <div class="media-obra" id="cartaoVoz">
+      <div class="media-titulo">🎤 Relatório do dia</div>
+      <div class="media-linha">
+        <select id="vozObra" aria-label="Obra"></select>
+      </div>
+      <textarea id="vozTexto" class="voz-texto" maxlength="4000" placeholder="Carrega em Ditar e conta o que se fez hoje, o que correu mal e o material que falta. Também podes escrever."></textarea>
+      <div class="media-linha">
+        <button type="button" class="btn-acao destaque" id="btnDitar" style="display:none">🎤 Ditar</button>
+        <button type="button" class="btn-acao" id="btnArrumar" onclick="arrumarVoz()">✨ Arrumar</button>
+      </div>
+      <div class="media-linha">
+        <label class="media-visivel"><input type="checkbox" id="vozVisivel"> O cliente vê</label>
+        <button type="button" class="btn-acao destaque" id="btnGuardarVoz" onclick="guardarRelatorioDia()">✓ Guardar no diário</button>
+      </div>
+      <div class="media-nota">Vai para o diário da obra, no dia escolhido lá em cima. Se já houver nota nesse dia, junta-se a ela.</div>
+      <div class="media-msg" id="vozMsg"></div>
+    </div>
+
     <!-- Fotos e vídeos da obra (vão para Documentos da obra) -->
     <div class="media-obra">
       <div class="media-titulo">📷 Fotos e vídeos da obra</div>
@@ -513,6 +535,7 @@ button { font: inherit; color: inherit; }
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="config.js?v=4"></script>
 <script src="fotos.js?v=2"></script>
-<script src="registo-admin.js?v=9"></script>
+<script src="voz.js?v=1"></script>
+<script src="registo-admin.js?v=10"></script>
 </body>
 </html>

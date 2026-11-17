@@ -122,6 +122,18 @@
     .pac.feito .mini > div { background: var(--ok); }
     .pac .pc { text-align: right; font-variant-numeric: tabular-nums; color: var(--suave); font-size: 13px; }
     .pac .atr { color: var(--aviso); font-size: 12px; }
+    /* Trabalhos a mais e remates */
+    .extra, .remate { border-top: 1px solid var(--linha); padding: 10px 0; }
+    .extra:first-of-type, .remate:first-of-type { border-top: none; }
+    .extra .cab, .remate .cab { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .extra .nm, .remate .nm { font-weight: 600; white-space: pre-wrap; }
+    .extra .dt, .remate .dt { font-size: 12.5px; color: var(--suave); margin-top: 2px; }
+    .extra .resp, .remate .resp { padding: 10px 0 0; }
+    .extra input[type=text] { width: 100%; font: inherit; font-size: 14px; color: var(--texto); background: var(--bg); border: 1px solid var(--linha); border-radius: 10px; padding: 9px 10px; margin-bottom: 10px; }
+    .remate .fotos { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); margin-top: 8px; }
+    .remate .fotos a { aspect-ratio: 4/3; }
+    .remate .leg { position: absolute; left: 6px; bottom: 6px; font-size: 11px; background: rgba(0,0,0,.6); color: #fff; padding: 1px 6px; border-radius: 6px; }
+    .remates-resumo { font-size: 13.5px; color: var(--suave); margin-bottom: 4px; }
     /* Novo esta semana: no topo até "Tomei conhecimento" ou 7 dias */
     .novos { background: rgba(181,136,99,.10); border: 1px solid rgba(208,164,127,.45); border-radius: 14px; padding: 14px 16px; margin: 18px 0 8px; }
     .novos h2 { margin-top: 0; }
@@ -273,7 +285,7 @@ async function enviarResposta(el, tipo) {
 
 document.addEventListener("click", e => {
     const b = e.target.closest(".resp button");
-    if (!b) return;
+    if (!b || b.closest(".extra, .remate")) return;   // têm os seus próprios botões
     const el = b.closest(".resp"), passo = b.dataset.passo;
     if (passo === "enviar-aceite") enviarResposta(el, "aceite");
     else if (passo === "enviar-alteracoes") enviarResposta(el, "alteracoes");
@@ -466,7 +478,126 @@ document.addEventListener("click", async e => {
     }
 });
 
-function htmlObra(o, docs, fases, autos, diario, pacotes, pedidos, novosPorTipo = {}) {
+// ── Trabalhos a mais ─────────────────────────────────────────
+// Os enviados esperam pela resposta do cliente: aceitar (com o nome de quem
+// aceita) ou recusar (com motivo opcional). Aceites e recusados ficam como
+// registo, com a data.
+const BOTOES_EXTRA = `<div class="botoes">
+    <button type="button" class="principal" data-extra="aceitar">Aceito este trabalho</button>
+    <button type="button" data-extra="recusar">Não quero</button></div>`;
+function htmlExtras(extras) {
+    if (!extras.length) return "";
+    const quando = d => d ? new Date(d).toLocaleDateString("pt-PT") : "";
+    const aceites = extras.filter(x => x.estado === "aceite");
+    const somaAceites = aceites.reduce((t, x) => t + Number(x.valor_sem_iva || 0), 0);
+    return `<h2>Trabalhos a mais</h2>${extras.map(x => `<div class="extra" data-extra-id="${esc(x.id)}">
+        <div class="cab"><span class="nm">${esc(x.descricao)}</span><span>${euros(x.total)} com IVA</span></div>
+        <div class="dt">${euros(x.valor_sem_iva)} + IVA ${esc(x.taxa_iva)}%${x.dias_prazo ? ` · acrescenta ${esc(x.dias_prazo)} dia${x.dias_prazo == 1 ? "" : "s"} ao prazo` : ""}</div>
+        ${x.estado === "enviado" ? `<div class="resp">${BOTOES_EXTRA}</div>`
+          : x.estado === "aceite" ? `<div class="dt"><span class="estado ok">Aceite</span> por ${esc(x.resposta_nome || "cliente")} a ${esc(quando(x.resposta_em))}</div>`
+          : `<div class="dt"><span class="estado pend">Recusado</span> a ${esc(quando(x.resposta_em))}${x.motivo_recusa ? ` · ${esc(x.motivo_recusa)}` : ""}</div>`}
+    </div>`).join("")}
+    ${aceites.length ? `<p class="contas-nota">Trabalhos a mais aceites: ${euros(somaAceites)} sem IVA.</p>` : ""}`;
+}
+
+function caixaExtra(el, passo) {
+    if (passo === "aceitar") {
+        el.innerHTML = `<div class="caixa">
+            <p>Para aceitar, escreva o seu nome. Fica registado com a data de hoje e o valor soma ao valor da obra.</p>
+            <input type="text" maxlength="120" placeholder="O seu nome" autocomplete="name">
+            <div class="botoes">
+                <button type="button" class="principal" data-extra="enviar-aceite">Confirmo, aceito</button>
+                <button type="button" data-extra="voltar">Cancelar</button>
+            </div></div>`;
+        el.querySelector("input").focus();
+    } else if (passo === "recusar") {
+        el.innerHTML = `<div class="caixa">
+            <p>Confirma que não quer este trabalho? Se quiser, diga-nos porquê.</p>
+            <textarea maxlength="2000" placeholder="Motivo (opcional)"></textarea>
+            <div class="botoes">
+                <button type="button" class="principal" data-extra="enviar-recusa">Sim, não quero</button>
+                <button type="button" data-extra="voltar">Cancelar</button>
+            </div></div>`;
+        el.querySelector("textarea").focus();
+    }
+}
+
+async function enviarRespostaExtra(el, tipo) {
+    const id = el.closest(".extra").dataset.extraId;
+    const nome = el.querySelector("input")?.value.trim() || "";
+    const comentario = el.querySelector("textarea")?.value.trim() || "";
+    const avisar = msg => {
+        el.querySelector(".erro")?.remove();
+        el.querySelector(".caixa").insertAdjacentHTML("beforeend", `<div class="erro">${esc(msg)}</div>`);
+    };
+    if (tipo === "aceite" && nome.length < 2) return avisar("Escreva o seu nome para aceitar.");
+    el.querySelectorAll("button").forEach(b => b.disabled = true);
+    try {
+        const r = await fetch(FUNCAO, { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: TOKEN, acao: "responder_extra", extra_id: id, resposta: tipo, nome, comentario }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.erro || "Erro " + r.status);
+        await iniciar();
+    } catch (e) {
+        el.querySelectorAll("button").forEach(b => b.disabled = false);
+        avisar(e.message);
+    }
+}
+
+document.addEventListener("click", e => {
+    const b = e.target.closest(".extra .resp button");
+    if (!b) return;
+    const el = b.closest(".resp"), passo = b.dataset.extra;
+    if (passo === "enviar-aceite") enviarRespostaExtra(el, "aceite");
+    else if (passo === "enviar-recusa") enviarRespostaExtra(el, "recusa");
+    else if (passo === "voltar") el.innerHTML = BOTOES_EXTRA;
+    else caixaExtra(el, passo);
+});
+
+// ── Remates (vistoria final) ─────────────────────────────────
+// O que ficou por acertar, divisão a divisão. Os resolvidos pedem ao cliente
+// que confirme que ficou bem; se não ficou, faz um pedido (reclamação).
+function htmlRemates(remates) {
+    if (!remates.length) return "";
+    const quando = d => d ? dataPT(String(d).slice(0, 10)) : "";
+    const abertos = remates.filter(r => r.estado === "aberto").length;
+    const porConfirmar = remates.filter(r => r.estado === "resolvido" && !r.cliente_confirmou_em).length;
+    const foto = (url, leg) => url ? `<a href="${esc(urlSegura(url))}" target="_blank" rel="noopener noreferrer">
+        <img src="${esc(urlSegura(url))}" alt="${leg}" loading="lazy" onerror="this.parentNode.classList.add('falhou')">
+        <span class="sem-pre"><b>📷</b>Abrir</span><span class="leg">${leg}</span></a>` : "";
+    return `<h2>Remates</h2>
+    <div class="remates-resumo">${abertos ? `${abertos} por resolver` : "Todos resolvidos"}${porConfirmar ? ` · ${porConfirmar} à espera da sua confirmação` : ""}</div>
+    ${remates.map(r => `<div class="remate" data-remate-id="${esc(r.id)}">
+        <div class="cab"><span class="nm">${r.divisao ? esc(r.divisao) + " · " : ""}${esc(r.descricao)}</span>
+            ${r.estado === "aberto" ? `<span class="estado pend">Por resolver</span>` : `<span class="estado ok">Resolvido</span>`}</div>
+        <div class="dt">${r.estado === "aberto" ? (r.prazo ? "Prazo: " + esc(quando(r.prazo)) : "")
+            : [r.resolvido_em ? "Resolvido a " + esc(quando(r.resolvido_em)) : "", r.cliente_confirmou_em ? "confirmado por si a " + esc(quando(r.cliente_confirmou_em)) : ""].filter(Boolean).join(" · ")}</div>
+        ${r.foto_antes || r.foto_depois ? `<div class="fotos">${foto(r.foto_antes, "Antes")}${foto(r.foto_depois, "Depois")}</div>` : ""}
+        ${r.estado === "resolvido" && !r.cliente_confirmou_em ? `<div class="resp"><div class="botoes">
+            <button type="button" class="principal" data-remate="confirmar">Confirmo que ficou bem</button></div>
+            <div class="dt">Se não ficou bem, diga-nos em «Pedidos e mensagens», mais abaixo.</div></div>` : ""}
+    </div>`).join("")}`;
+}
+
+document.addEventListener("click", async e => {
+    const b = e.target.closest(".remate .resp button[data-remate]");
+    if (!b) return;
+    const el = b.closest(".resp");
+    b.disabled = true;
+    el.querySelector(".erro")?.remove();
+    try {
+        const r = await fetch(FUNCAO, { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: TOKEN, acao: "confirmar_remate", remate_id: b.closest(".remate").dataset.remateId }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.erro || "Erro " + r.status);
+        await iniciar();
+    } catch (err) {
+        b.disabled = false;
+        el.insertAdjacentHTML("beforeend", `<div class="erro">${esc(err.message)}</div>`);
+    }
+});
+
+function htmlObra(o, docs, fases, autos, diario, pacotes, pedidos, novosPorTipo = {}, extras = [], remates = []) {
     // % pelos pacotes de trabalho (cada um pesado pelo valor, calculada no
     // servidor); sem pacotes, a % escrita na obra; sem ela, as fases
     // (concluídas contam inteiras, as a decorrer metade). Sem nada, não há barra.
@@ -504,6 +635,8 @@ function htmlObra(o, docs, fases, autos, diario, pacotes, pedidos, novosPorTipo 
         ${o.curva ? `<h2>Feito vs previsto</h2>${htmlCurva(o.curva)}` : ""}
         ${htmlFases(fases, pacotes)}
         ${htmlPacotes(pacotes, fases)}
+        ${htmlExtras(extras)}
+        ${htmlRemates(remates)}
         ${htmlDiario(diario)}
         ${seccao("Orçamentos", orcs, vazioSe(["orcamento"], "Ainda não há orçamentos."))}
         ${htmlAutos(autos)}
@@ -541,7 +674,8 @@ async function iniciar() {
                     (j.fases || []).filter(f => f.obra_id === o.id), (j.autos || []).filter(a => a.obra_id === o.id),
                     (j.diario || []).filter(n => n.obra_id === o.id), (j.pacotes || []).filter(p => p.obra_id === o.id),
                     j.pedidos ? j.pedidos.filter(p => p.obra_id === o.id) : null,
-                    Object.fromEntries(docs.filter(d => d.obra_id === o.id && d.novo).map(d => [d.tipo, true])))).join("")
+                    Object.fromEntries(docs.filter(d => d.obra_id === o.id && d.novo).map(d => [d.tipo, true])),
+                    (j.extras || []).filter(x => x.obra_id === o.id), (j.remates || []).filter(x => x.obra_id === o.id))).join("")
                 : `<div class="centro">Ainda não há obras associadas.</div>`}
             <div class="rodape">Os links dos documentos valem 1 hora. Se algum não abrir, atualize a página.<br>Maia Solutions</div>`;
     } catch (e) {
