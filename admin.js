@@ -9821,6 +9821,7 @@ function switchCfgTab(tab) {
 // =======================================================
 let _bibServicos = [];
 let _bibMateriais = {};
+let _bibArtigos = [];   // artigos do Stock com preço, para as composições de custo
 
 async function initBiblioteca() {
     if (!_bibServicos.length) await lerBiblioteca();
@@ -9833,11 +9834,13 @@ async function initBiblioteca() {
 // orçamento só trazia os activos: se corresse primeiro, a biblioteca
 // abria sem os inactivos.
 async function lerBiblioteca() {
-    const [sRes, mRes] = await Promise.all([
+    const [sRes, mRes, aRes] = await Promise.all([
         SB.from("biblioteca_servicos").select("*").order("categoria").order("ordem").order("nome"),
-        SB.from("biblioteca_materiais").select("*").order("ordem")
+        SB.from("biblioteca_materiais").select("*").order("ordem"),
+        SB.from("artigos").select("id, descricao, preco_atual").eq("ativo", true).order("descricao"),
     ]);
     _bibServicos = sRes.data || [];
+    _bibArtigos = aRes.data || [];
     _bibMateriais = {};
     (mRes.data||[]).forEach(m => {
         if (!_bibMateriais[m.servico_id]) _bibMateriais[m.servico_id] = [];
@@ -9860,6 +9863,41 @@ function mostrarBiblioteca() {
             cats.map(c => `<option value="${esc(c)}" ${c===atual?'selected':''}>${esc(c)}</option>`).join("");
     }
     renderBiblioteca();
+}
+
+// ── Composição de custo de um serviço (estrutura DDC, preços nossos) ──
+// Por unidade do serviço:
+//   mão de obra  = custo da equipa por dia ÷ rendimento (unidades por dia)
+//   material     = Σ quantidade × (1 + perdas%) × preço (escrito à mão, ou o
+//                  preço atual do artigo do Stock)
+//   equipamento  = € por unidade
+//   preço        = custo × margem
+// Devolve também o que falta para a conta ficar completa.
+function custoComposicao(s, mats) {
+    const faltam = [];
+    let mo = null;
+    if (Number(s.custo_mo_dia) > 0 && Number(s.rendimento_mo) > 0) mo = Number(s.custo_mo_dia) / Number(s.rendimento_mo);
+    else faltam.push(Number(s.rendimento_mo) > 0 ? "custo da equipa por dia" : "rendimento da mão de obra");
+    let mat = 0;
+    (mats || []).forEach(m => {
+        const art = m.artigo_id ? _bibArtigos.find(a => a.id === m.artigo_id) : null;
+        const preco = m.preco_manual != null && m.preco_manual !== "" ? Number(m.preco_manual) : Number(art?.preco_atual || 0);
+        if (!(preco > 0)) { faltam.push("preço de " + m.descricao); return; }
+        mat += Number(m.quantidade || 0) * (1 + Number(m.perdas_pct || 0) / 100) * preco;
+    });
+    const equip = Number(s.equipamento_unidade || 0);
+    const custo = (mo || 0) + mat + equip;
+    const margem = Number(s.margem) > 0 ? Number(s.margem) : 1.3;
+    const r2 = v => Math.round(v * 100) / 100;
+    return { mo: mo == null ? null : r2(mo), mat: r2(mat), equip: r2(equip), custo: r2(custo), preco: r2(custo * margem), margem, faltam };
+}
+
+function textoCustoComposicao(s, mats) {
+    const c = custoComposicao(s, mats);
+    const eur = v => Number(v || 0).toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+    if (!c.custo) return `<span style="color:#e0b07a">💶 sem preços: falta ${esc(c.faltam.slice(0, 2).join(", "))}${c.faltam.length > 2 ? "…" : ""}</span>`;
+    return `💶 custo <b>${eur(c.custo)}</b>/${esc(s.unidade)} · preço <b>${eur(c.preco)}</b>/${esc(s.unidade)} (×${c.margem})`
+        + (c.faltam.length ? ` <span style="color:#e0b07a">· incompleto: falta ${esc(c.faltam.slice(0, 2).join(", "))}${c.faltam.length > 2 ? "…" : ""}</span>` : "");
 }
 
 function renderBiblioteca() {
@@ -9888,6 +9926,7 @@ function renderBiblioteca() {
                                 ${s.rendimento_mo ? `⚡ ${s.rendimento_mo} ${s.unidade}/dia · ` : ''}
                                 ${mats.length ? mats.slice(0,3).map(m=>`${m.descricao} ${m.quantidade}${m.unidade}`).join(' · ')+(mats.length>3?'…':'') : 'Sem materiais'}
                             </div>
+                            <div style="font-size:11.5px;margin-top:3px">${textoCustoComposicao(s, mats)}</div>
                         </div>
                         <div style="display:flex;gap:4px;flex-shrink:0">
                             <button onclick="abrirModalBibServico('${s.id}')" style="background:rgba(0,0,0,.06);border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px">✏️</button>
@@ -9907,6 +9946,9 @@ function abrirModalBibServico(id) {
     document.getElementById("bibServCategoria").value  = s?.categoria || "";
     document.getElementById("bibServUnidade").value    = s?.unidade || "m²";
     document.getElementById("bibServRendimento").value = s?.rendimento_mo || "";
+    document.getElementById("bibServCustoDia").value   = s?.custo_mo_dia ?? "";
+    document.getElementById("bibServEquip").value      = s?.equipamento_unidade || "";
+    document.getElementById("bibServMargem").value     = s?.margem ?? 1.3;
     document.getElementById("modalBibTitulo").textContent = s ? `✏️ ${s.nome}` : "Novo Serviço";
     const cats = [...new Set(_bibServicos.map(s => s.categoria))].sort();
     const dl = document.getElementById("bibCatList");
@@ -9915,6 +9957,7 @@ function abrirModalBibServico(id) {
     document.getElementById("bibMatLinhas").innerHTML = "";
     if (mats.length) mats.forEach(m => adicionarLinhaBibMat(m));
     else adicionarLinhaBibMat();
+    atualizarResumoCustoBib();
     modal.style.display = "flex";
 }
 
@@ -9926,19 +9969,55 @@ function adicionarLinhaBibMat(mat = null) {
     const cont = document.getElementById("bibMatLinhas");
     const div  = document.createElement("div");
     div.className = "bib-mat-linha";
-    div.style.cssText = "display:grid;grid-template-columns:1fr 80px 70px 28px;gap:6px;align-items:center";
+    div.style.cssText = "display:grid;grid-template-columns:1fr 80px 70px 28px;gap:6px;align-items:center;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.06)";
     if (mat?.id) div.dataset.id = mat.id;
+    const est = "padding:6px 8px;border-radius:6px;font-size:12px;outline:none";
     div.innerHTML = `
-        <input value="${esc(mat?.descricao||'')}" placeholder="Nome do material" data-field="descricao"
-            style="padding:6px 8px;border-radius:6px;font-size:12px;outline:none">
-        <input value="${mat?.quantidade||''}" type="number" step="0.001" min="0" placeholder="Qtd" data-field="quantidade"
-            style="padding:6px 8px;border-radius:6px;font-size:12px;text-align:right;outline:none">
-        <select data-field="unidade"
-            style="padding:6px 4px;border-radius:6px;font-size:12px">
+        <input value="${esc(mat?.descricao||'')}" placeholder="Nome do material" data-field="descricao" style="${est}">
+        <input value="${mat?.quantidade||''}" type="number" step="0.001" min="0" placeholder="Qtd" data-field="quantidade" style="${est};text-align:right">
+        <select data-field="unidade" style="padding:6px 4px;border-radius:6px;font-size:12px">
             ${["kg","L","m²","ml","m³","un","saco","rolo","cx"].map(u=>`<option ${u===(mat?.unidade||'un')?'selected':''}>${u}</option>`).join("")}
         </select>
-        <button onclick="this.closest('.bib-mat-linha').remove()" style="background:rgba(165,72,61,.1);border:none;border-radius:6px;padding:5px;cursor:pointer;font-size:14px;opacity:.7">×</button>`;
+        <button onclick="this.closest('.bib-mat-linha').remove();atualizarResumoCustoBib()" style="background:rgba(165,72,61,.1);border:none;border-radius:6px;padding:5px;cursor:pointer;font-size:14px;opacity:.7">×</button>
+        <select data-field="artigo_id" style="grid-column:1/2;padding:6px 4px;border-radius:6px;font-size:12px" title="Artigo do Stock (usa o preço atual)">
+            <option value="">— Artigo do Stock (opcional) —</option>
+            ${_bibArtigos.map(a => `<option value="${a.id}"${a.id === mat?.artigo_id ? " selected" : ""}>${esc(a.descricao)}${Number(a.preco_atual) > 0 ? " · " + Number(a.preco_atual).toFixed(2) + " €" : " · sem preço"}</option>`).join("")}
+        </select>
+        <input value="${mat?.preco_manual ?? ''}" type="number" step="0.01" min="0" placeholder="€/un" data-field="preco_manual" title="Preço por unidade do material. Vazio = preço atual do artigo" style="${est};text-align:right">
+        <input value="${mat?.perdas_pct || ''}" type="number" step="1" min="0" max="100" placeholder="% perdas" data-field="perdas_pct" title="Perdas e desperdício (%)" style="${est};text-align:right">
+        <span></span>`;
+    div.querySelectorAll("input,select").forEach(e => e.addEventListener("input", atualizarResumoCustoBib));
     cont.appendChild(div);
+}
+
+// Lê o formulário aberto como um serviço + materiais (para a conta ao vivo e para gravar)
+function lerFormBib() {
+    const num = id => { const v = document.getElementById(id)?.value; return v === "" || v == null ? null : parseFloat(v); };
+    const s = { unidade: document.getElementById("bibServUnidade").value, rendimento_mo: num("bibServRendimento"),
+                custo_mo_dia: num("bibServCustoDia"), equipamento_unidade: num("bibServEquip") || 0, margem: num("bibServMargem") || 1.3 };
+    const mats = [];
+    document.querySelectorAll(".bib-mat-linha").forEach(l => {
+        const v = f => l.querySelector(`[data-field="${f}"]`)?.value;
+        const desc = v("descricao")?.trim(), qtd = parseFloat(v("quantidade"));
+        if (!desc || !(qtd > 0)) return;
+        mats.push({ descricao: desc, quantidade: qtd, unidade: v("unidade"), artigo_id: v("artigo_id") || null,
+                    preco_manual: v("preco_manual") === "" ? null : parseFloat(v("preco_manual")),
+                    perdas_pct: parseFloat(v("perdas_pct")) || 0 });
+    });
+    return { s, mats };
+}
+
+function atualizarResumoCustoBib() {
+    const el = document.getElementById("bibResumoCusto");
+    if (!el) return;
+    const { s, mats } = lerFormBib();
+    const c = custoComposicao(s, mats);
+    const eur = v => v == null ? "—" : Number(v).toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+    el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px">
+        <div>Mão de obra<br><b>${eur(c.mo)}</b></div><div>Material<br><b>${eur(c.mat)}</b></div>
+        <div>Equipamento<br><b>${eur(c.equip)}</b></div><div>Custo<br><b>${eur(c.custo)}</b></div>
+        <div style="color:var(--primary,#b58863)">Preço (×${c.margem})<br><b>${eur(c.preco)}</b></div></div>
+        <div style="opacity:.6;margin-top:4px">por ${esc(s.unidade)}${c.faltam.length ? ` · <span style="color:#e0b07a">falta: ${esc(c.faltam.join(", "))}</span>` : ""}</div>`;
 }
 
 async function guardarBibServico() {
@@ -9948,25 +10027,33 @@ async function guardarBibServico() {
     const unidade   = document.getElementById("bibServUnidade").value;
     const rend      = parseFloat(document.getElementById("bibServRendimento").value) || null;
     if (!nome || !categoria) { alert("Nome e categoria são obrigatórios."); return; }
-    const payload = { nome, categoria, unidade, rendimento_mo: rend };
+    const { s: custos, mats: lidos } = lerFormBib();
+    const payload = { nome, categoria, unidade, rendimento_mo: rend,
+                      custo_mo_dia: custos.custo_mo_dia, equipamento_unidade: custos.equipamento_unidade, margem: custos.margem };
+    const avisoSQL = e => /custo_mo_dia|equipamento_unidade|margem|artigo_id|preco_manual|perdas_pct/.test(e?.message || "")
+        ? "Falta correr o ficheiro planear.sql no SQL Editor do Supabase." : "Erro ao guardar: " + (e?.message || e);
     let servId = id;
     if (id) {
-        await SB.from("biblioteca_servicos").update(payload).eq("id", id);
+        const { error } = await SB.from("biblioteca_servicos").update(payload).eq("id", id);
+        if (error) { alert(avisoSQL(error)); return; }
     } else {
-        const { data } = await SB.from("biblioteca_servicos").insert(payload).select("id").single();
+        const { data, error } = await SB.from("biblioteca_servicos").insert(payload).select("id").single();
+        if (error) { alert(avisoSQL(error)); return; }
         servId = data?.id;
     }
     if (!servId) { alert("Erro ao guardar."); return; }
+    const mats = lidos.map((m, i) => ({ servico_id: servId, ...m, ordem: i + 1 }));
+    // Apaga e volta a escrever; se a escrita falhar, repõe os de antes
+    const antes = _bibMateriais[servId] || [];
     await SB.from("biblioteca_materiais").delete().eq("servico_id", servId);
-    const mats = [];
-    let ordem = 1;
-    document.querySelectorAll(".bib-mat-linha").forEach(l => {
-        const desc = l.querySelector('[data-field="descricao"]')?.value?.trim();
-        const qtd  = parseFloat(l.querySelector('[data-field="quantidade"]')?.value);
-        const un   = l.querySelector('[data-field="unidade"]')?.value;
-        if (desc && qtd > 0) mats.push({ servico_id: servId, descricao: desc, quantidade: qtd, unidade: un, ordem: ordem++ });
-    });
-    if (mats.length) await SB.from("biblioteca_materiais").insert(mats);
+    if (mats.length) {
+        const { error } = await SB.from("biblioteca_materiais").insert(mats);
+        if (error) {
+            if (antes.length) await SB.from("biblioteca_materiais").insert(antes.map(({ id: _i, created_at: _c, ...m }) => m));
+            alert(avisoSQL(error));
+            return;
+        }
+    }
     fecharModalBibServico();
     _bibServicos = [];
     await carregarBiblioteca();
@@ -10030,7 +10117,13 @@ async function aplicarServicoBiblioteca(servicoId, inputDescricao, cid) {
     if (!mats.length) return;
     const linhasDiv = document.querySelector(`.orc-linhas[data-cid="${cid}"]`);
     if (!linhasDiv) return;
-    mats.forEach(m => adicionarLinha(cid, "material", { descricao: `${m.descricao}  [${m.quantidade} ${m.unidade}/un]`, unidade: m.unidade, quantidade: 1, preco_unitario: "" }));
+    // Preço do material: o escrito na composição, senão o preço atual do artigo
+    const precoMat = m => {
+        if (m.preco_manual != null) return Number(m.preco_manual);
+        const a = m.artigo_id ? _bibArtigos.find(x => x.id === m.artigo_id) : null;
+        return Number(a?.preco_atual) > 0 ? Number(a.preco_atual) : "";
+    };
+    mats.forEach(m => adicionarLinha(cid, "material", { descricao: `${m.descricao}  [${m.quantidade} ${m.unidade}/un]`, unidade: m.unidade, quantidade: 1, preco_unitario: precoMat(m) }));
     const info = document.createElement("div");
     info.style.cssText = "background:rgba(143,191,160,.1);border:1px solid rgba(143,191,160,.2);border-radius:8px;padding:8px 14px;font-size:12px;color:#8fbfa0;margin:6px 0";
     info.innerHTML = `✓ <strong>${mats.length} material${mats.length>1?'is':''}</strong> adicionado${mats.length>1?'s':''} da biblioteca. Ajusta a quantidade total do serviço.`;

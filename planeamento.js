@@ -136,6 +136,8 @@ async function carregarPlaneamento() {
     }
     desenharGrelha();
     planCarregarTempo(pedido, dias);
+    // A vista das 3 semanas, se estiver aberta, acompanha as mudanças
+    if (typeof _tresSem !== "undefined" && _tresSem.aberto) carregarTresSemanas();
 }
 
 // Previsão do IPMA para os próximos 5 dias. Chega depois do quadro, que se

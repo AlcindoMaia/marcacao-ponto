@@ -164,3 +164,29 @@ test("salário mensal: meio dia sem motivo não desconta; injustificada desconta
     assert.equal(rhValorOrdenado(fixo, 20, { injustificada: 0.5 }).valor, 1300 - dia / 2);
     assert.match(rhValorOrdenado(fixo, 20, { injustificada: 0.5 }).nota, /−0,5 falta/);
 });
+
+// Composição de custo da Biblioteca de serviços (estrutura DDC, preços nossos)
+const comp = vm.createContext({ _bibArtigos: [{ id: "a1", preco_atual: 8 }, { id: "a2", preco_atual: null }] });
+vm.runInContext(funcaoDe("admin.js", "custoComposicao") + "\n;globalThis.__c = custoComposicao;", comp);
+const custoComposicao = comp.__c;
+
+test("composição: MO por dia ÷ rendimento + material com perdas + equipamento, vezes a margem", () => {
+    const s = { rendimento_mo: 20, custo_mo_dia: 240, equipamento_unidade: 1, margem: 1.3 };
+    const mats = [
+        { descricao: "Cola", quantidade: 5, artigo_id: "a1", perdas_pct: 10 },      // 5 × 1,1 × 8 = 44
+        { descricao: "Rede", quantidade: 1.1, preco_manual: 2 },                     // 2,2
+    ];
+    const c = custoComposicao(s, mats);
+    assert.equal(c.mo, 12);
+    assert.equal(c.mat, 46.2);
+    assert.equal(c.custo, 59.2);
+    assert.equal(c.preco, 76.96);
+    assert.equal(JSON.stringify(c.faltam), "[]");
+});
+
+test("composição: diz o que falta (rendimento, preço do artigo) e não inventa", () => {
+    const c = custoComposicao({ rendimento_mo: null }, [{ descricao: "Tinta", quantidade: 0.3, artigo_id: "a2" }]);
+    assert.equal(c.mo, null);
+    assert.equal(c.custo, 0);
+    assert.equal(JSON.stringify(c.faltam), JSON.stringify(["rendimento da mão de obra", "preço de Tinta"]));
+});
