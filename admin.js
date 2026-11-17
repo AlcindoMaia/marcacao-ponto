@@ -4602,6 +4602,8 @@ async function vgCarregarAlertas() {
     catch (e) { console.warn("vgRespostasClientes", e); }
     try { const a = await vgPedidosClientes(); if (a) alertas.push(a); }
     catch (e) { console.warn("vgPedidosClientes", e); }
+    try { const a = await vgExtrasRespondidos(); if (a) alertas.push(a); }
+    catch (e) { console.warn("vgExtrasRespondidos", e); }
     for (const procurar of [vgCortesPorAprovar, vgPedidosPorValidar, vgPrecosSubiram, vgDespesasSemObra,
                             vgFaturasPorPagar, vgStockAbaixoMinimo, vgTarefasAtrasadas, vgPontoParaCorrigir]) {
         try { const a = await procurar(); if (a) alertas.push(a); }
@@ -4632,7 +4634,7 @@ async function vgCarregarAlertas() {
 
 // A acção do botão "Ver" vem como { fn, arg }: só correm funções desta lista
 // e o argumento entra como texto JSON escapado, nunca colado no código.
-const VG_ACCOES = new Set(["abrirPontoParaCorrigir"]);
+const VG_ACCOES = new Set(["abrirPontoParaCorrigir", "abrirExtrasRespondidos"]);
 function vgAccaoOnclick(a) {
     if (!a || !VG_ACCOES.has(a.fn)) return "";
     return `${a.fn}(${esc(JSON.stringify(a.arg ?? null))})`;
@@ -4881,7 +4883,7 @@ const LISTAS_RAPIDAS = {
     // ---- Pedidos dos clientes ----
     async pedidosCliente() {
         const { data, error } = await SB.from("cliente_pedidos")
-            .select("id, tipo, mensagem, created_at, obras(nome), clientes(nome, email, telefone)")
+            .select("id, tipo, mensagem, created_at, obra_id, obras(nome), clientes(nome, email, telefone)")
             .eq("estado", "novo").order("created_at");
         if (error) throw error;
         const lista = data || [];
@@ -4894,6 +4896,7 @@ const LISTAS_RAPIDAS = {
                 <div style="white-space:pre-wrap;margin:6px 0;font-size:13.5px">${esc(p.mensagem)}</div>
                 <textarea id="pedResp-${i}" rows="3" maxlength="4000" placeholder="A tua resposta ao cliente" style="width:100%"></textarea>
                 <div class="lista-accoes" style="justify-content:flex-end;margin-top:6px;flex-wrap:wrap;gap:6px">
+                    ${p.tipo === "extra" && p.obra_id ? `<button type="button" class="btn-secondary" onclick="listaPedidoParaExtra(${i}, this)" title="Faz o preço deste extra para o cliente aceitar">💶 Fazer preço</button>` : ""}
                     <button type="button" class="btn-secondary" onclick="listaPedidoFechar(${i}, this)">Fechar sem resposta</button>
                     <button type="button" class="btn-primary" onclick="listaPedidoResponder(${i}, this)">Responder</button>
                 </div>
@@ -5133,6 +5136,21 @@ async function listaPedidoResponder(i, btn) {
         + (wa ? `<a class="btn-secondary" href="${esc(wa)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none">📲 Avisar</a>` : "")
         + (mail ? `<a class="btn-secondary" href="${esc(mail)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none">✉️ E-mail</a>` : "");
     listaMudou();
+}
+
+// Pedido de extra do cliente → rascunho de trabalho a mais na obra. O pedido
+// fica respondido com uma frase a dizer que o preço vem a caminho.
+async function listaPedidoParaExtra(i, btn) {
+    const p = _vgListas.pedidosCliente?.[i];
+    if (!p?.obra_id) return;
+    btn.disabled = true;
+    const { error } = await SB.from("cliente_pedidos").update({
+        resposta: "Vamos preparar o preço deste trabalho. Vai aparecer em «Trabalhos a mais», nesta página, para aceitar.",
+        estado: "respondido", respondido_em: new Date().toISOString() }).eq("id", p.id);
+    if (error) { console.error(error); alert("Não foi possível gravar."); btn.disabled = false; return; }
+    fecharListaRapida();
+    listaMudou();
+    extraDoPedido(p.id, p.obra_id, p.mensagem);
 }
 
 async function listaPedidoFechar(i, btn) {

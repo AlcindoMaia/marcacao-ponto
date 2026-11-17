@@ -108,6 +108,7 @@ async function iniciarApp() {
     });
 
     preencherObrasMedia();
+    preencherObrasVoz();
     mostrarEcrã("ecrãPrincipal");
     await carregarParaData();
 }
@@ -892,4 +893,77 @@ async function carregarMediaObra() {
         btn.disabled = false;
         som?.close?.();
     }
+}
+
+// =======================================================
+// RELATÓRIO DO DIA POR VOZ (voz.js)
+// O encarregado dita o que se fez; "Arrumar" pede ao assistente para separar
+// em trabalho feito / problemas / material em falta; "Guardar" põe o texto no
+// diário da obra (obra_diario) no dia escolhido em cima. Se já houver nota
+// nesse dia, junta-se por baixo, para não apagar o que lá estava.
+// =======================================================
+function preencherObrasVoz() {
+    const sel = document.getElementById("vozObra");
+    if (!sel) return;
+    const ativas = _obras.filter(o => o.estado !== "concluida");
+    sel.innerHTML = `<option value="">Escolhe a obra…</option>` +
+        ativas.map(o => `<option value="${o.id}">${esc(o.nome || "")}</option>`).join("");
+    if (!sel.dataset.ligado) {
+        sel.dataset.ligado = "1";
+        ligarDitado(document.getElementById("btnDitar"), document.getElementById("vozTexto"));
+    }
+}
+
+function msgVoz(texto, tipo = "ok") {
+    const el = document.getElementById("vozMsg");
+    if (!el) return;
+    el.className = "media-msg " + tipo;
+    el.textContent = texto || "";
+}
+
+async function arrumarVoz() {
+    const caixa = document.getElementById("vozTexto");
+    const texto = caixa.value.trim();
+    if (!texto) return msgVoz("Dita ou escreve primeiro o relatório.", "warn");
+    const sel = document.getElementById("vozObra");
+    const btn = document.getElementById("btnArrumar");
+    btn.disabled = true;
+    msgVoz("A arrumar…", "warn");
+    try {
+        caixa.value = await arrumarRelatorioDia(texto, sel.value ? sel.options[sel.selectedIndex].text : null);
+        msgVoz("Arrumado. Confere e corrige o que for preciso antes de guardar.");
+    } catch (e) {
+        msgVoz("Não deu para arrumar: " + e.message, "err");
+    } finally { btn.disabled = false; }
+}
+
+async function guardarRelatorioDia() {
+    const obraId = document.getElementById("vozObra").value;
+    const texto = document.getElementById("vozTexto").value.trim();
+    const data = document.getElementById("dataRegisto").value;
+    const visivel = document.getElementById("vozVisivel").checked;
+    if (!obraId) return msgVoz("Escolhe a obra.", "warn");
+    if (!texto) return msgVoz("O relatório está vazio.", "warn");
+    if (!data) return msgVoz("Escolhe o dia lá em cima.", "warn");
+    const btn = document.getElementById("btnGuardarVoz");
+    btn.disabled = true;
+    try {
+        const { data: atual, error: e1 } = await SB.from("obra_diario").select("id, notas, visivel_cliente")
+            .eq("obra_id", obraId).eq("data", data).order("created_at").limit(1);
+        if (e1) throw e1;
+        const n = atual?.[0];
+        let error;
+        if (n) {
+            const notas = (n.notas ? n.notas.trim() + "\n\n" : "") + texto;
+            if (notas.length > 4000) throw new Error("a nota desse dia ficava com mais de 4000 letras. Encurta o texto ou escolhe outro dia.");
+            ({ error } = await SB.from("obra_diario").update({ notas, visivel_cliente: n.visivel_cliente && visivel }).eq("id", n.id));
+        } else {
+            ({ error } = await SB.from("obra_diario").insert({ obra_id: obraId, data, notas: texto, visivel_cliente: visivel }));
+        }
+        if (error) throw error;
+        document.getElementById("vozTexto").value = "";
+        msgVoz(n ? "Juntado à nota que já havia nesse dia. ✓" : "Guardado no diário da obra. ✓");
+    } catch (e) {
+        msgVoz("Não foi possível guardar: " + (e.message || e), "err");
+    } finally { btn.disabled = false; }
 }
