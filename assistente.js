@@ -297,6 +297,27 @@ function ligarMicrofone(campo, mic, enviar) {
     });
 }
 
+// Memória da conversa: as últimas 6 trocas vão com cada pergunta, para o
+// assistente perceber "e as horas?" ou "e no mês passado?". Vive só nesta
+// página (some ao fechar) e esquece ao fim de 30 minutos sem perguntas.
+let _conversa = [];
+const CONVERSA_MINUTOS = 30;
+function conversaRecente() {
+    const limite = Date.now() - CONVERSA_MINUTOS * 60000;
+    if (_conversa.length && _conversa[_conversa.length - 1].t < limite) _conversa = [];
+    return _conversa.map(({ p, r }) => ({ p, r }));
+}
+function lembrarConversa(pergunta, j) {
+    const obra = _obrasHoje.find(o => o.id === j.obra_id)?.nome;
+    const feito = {
+        material: "Preparei um rascunho de pedido de material",
+        contexto_obra: "Preparei uma nota de obra",
+        planear_obra: "Vou preparar o plano da obra",
+    }[j.tipo] || "";
+    const r = j.resposta || feito + (obra ? ` (${obra})` : "");
+    _conversa = [..._conversa, { p: pergunta, r: String(r).slice(0, 500), t: Date.now() }].slice(-6);
+}
+
 // O assistente decide o que lhe pediste: material para comprar, uma
 // pergunta sobre os dados, ou coisa que ainda não sabe fazer.
 async function falarComAssistente() {
@@ -318,10 +339,11 @@ async function falarComAssistente() {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${session.access_token}`,
             },
-            body: JSON.stringify({ texto }),
+            body: JSON.stringify({ texto, historico: conversaRecente() }),
         });
         const j = await r.json();
         if (!r.ok) throw new Error(j.erro || `Erro ${r.status}`);
+        lembrarConversa(texto, j);
 
         campo.value = "";
         enviar.style.display = "none";

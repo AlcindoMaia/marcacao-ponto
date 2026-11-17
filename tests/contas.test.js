@@ -190,3 +190,23 @@ test("composição: diz o que falta (rendimento, preço do artigo) e não invent
     assert.equal(c.custo, 0);
     assert.equal(JSON.stringify(c.faltam), JSON.stringify(["rendimento da mão de obra", "preço de Tinta"]));
 });
+
+// Assistente › "faturas por pagar": o que falta pagar de cada fatura.
+// A função está em TypeScript (Edge Function): tiram-se os ": any" para correr aqui.
+const assist = vm.createContext({});
+vm.runInContext(funcaoDe("supabase/functions/assistente/index.ts", "emFaltaFatura").replace(/: any/g, "")
+    + "\n;globalThis.__f = emFaltaFatura;", assist);
+const emFaltaFatura = assist.__f;
+
+test("assistente: fatura por pagar sem recibos fica em falta pelo total", () => {
+    assert.equal(emFaltaFatura("1230.50", undefined), 1230.5);
+});
+
+test("assistente: pagamentos parciais descontam, em cêntimos certos", () => {
+    assert.equal(emFaltaFatura(100.1, 33.4), 66.7);      // 100,1 − 33,4 dava 66,69999…
+    assert.equal(emFaltaFatura(500, 500), 0);
+});
+
+test("assistente: pago a mais nunca dá valor negativo em falta", () => {
+    assert.equal(emFaltaFatura(100, 120), 0);
+});

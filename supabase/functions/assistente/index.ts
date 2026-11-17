@@ -47,7 +47,8 @@ const eur = (n: number) =>
 const num = (n: number) =>
     new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 2 }).format(n || 0);
 
-function instrucoes(artigos: any[], obras: any[], fornecedores: any[], sinonimos: any[]) {
+function instrucoes(artigos: any[], obras: any[], fornecedores: any[], sinonimos: any[], pessoas: any[]) {
+    const listaPessoas = pessoas.map(f => f.nome).join("\n");
     const catalogo = artigos
         .map(a => `${a.id} | ${a.descricao}${a.codigo ? " | cod " + a.codigo : ""}`).join("\n");
     const listaObras = obras
@@ -72,6 +73,9 @@ ${listaObras || "(não há obras activas)"}
 FORNECEDORES CONHECIDOS:
 ${listaForn || "(nenhum)"}
 
+TRABALHADORES (nome):
+${listaPessoas || "(nenhum)"}
+
 Devolves SEMPRE este JSON, sem texto à volta:
 {
   "tipo": "material" | "pergunta" | "contexto_obra" | "planear_obra" | "fora_de_alcance",
@@ -82,9 +86,11 @@ Devolves SEMPRE este JSON, sem texto à volta:
                 "linhas": [ { "descricao": string, "quantidade": number|null,
                               "unidade": string|null, "artigo_id": string|null,
                               "confianca": "alta"|"media"|"baixa" } ] } | null,
-  "pergunta": { "consulta": "custo_obra"|"preco_artigo"|"stock_artigo"|"compras_fornecedor"|"gastos_periodo",
+  "pergunta": { "consulta": "custo_obra"|"preco_artigo"|"stock_artigo"|"compras_fornecedor"|"gastos_periodo"
+                            |"horas_pessoa"|"faturas_por_pagar"|"orcamentos_pendentes"
+                            |"tarefas_semana"|"notas_obra"|"documentos_a_expirar",
                 "obra_id": string|null, "artigo_id": string|null,
-                "fornecedor_nome": string|null,
+                "fornecedor_nome": string|null, "funcionario_nome": string|null,
                 "desde": "AAAA-MM-DD"|null, "ate": "AAAA-MM-DD"|null } | null,
   "resposta": string|null,
   "por_perceber": string|null
@@ -111,11 +117,32 @@ Querem saber alguma coisa que está na base de dados. Escolhe UMA consulta:
 - "compras_fornecedor" — quanto se comprou a um fornecedor. Precisa de
   "fornecedor_nome", copiado da lista.
 - "gastos_periodo" — quanto se gastou num período, com ou sem obra.
+- "horas_pessoa" — horas trabalhadas por pessoa, num dia, semana ou mês.
+  "funcionario_nome" copiado da lista de trabalhadores, ou null para todos.
+  "obra_id" se for dita uma obra. Um só dia: "desde" e "ate" iguais.
+- "faturas_por_pagar" — o que falta pagar a fornecedores. "fornecedor_nome"
+  só se for dito um fornecedor.
+- "orcamentos_pendentes" — orçamentos enviados que o cliente ainda não
+  respondeu. Não precisa de mais nada.
+- "tarefas_semana" — o que está planeado no Planeamento. Sem período dito é
+  esta semana; "para a semana" é a semana seguinte, de segunda a domingo.
+  "obra_id" se for dita uma obra.
+- "notas_obra" — o que está escrito no diário e nas notas de uma obra,
+  incluindo os relatórios do dia ditados por voz. Precisa de "obra_id".
+- "documentos_a_expirar" — documentos de trabalhadores que perdem a validade
+  nos próximos 30 dias. Não precisa de mais nada.
 Datas: hoje é ${new Date().toISOString().slice(0, 10)}. "este mês" é do dia
 1 até hoje; "este ano" é de 1 de Janeiro até hoje; "no ano passado" é o ano
 civil anterior inteiro. Sem período dito, devolve as datas a null.
+A semana começa à segunda-feira.
 Se faltar o essencial — a obra, o artigo, o fornecedor — devolve
 "fora_de_alcance" e diz em "resposta" o que falta saber.
+
+CONVERSA
+A frase pode vir depois de um bloco "CONVERSA ATÉ AGORA". Esse bloco serve só
+para perceberes a que se refere a frase nova ("e as horas?", "e no mês
+passado?", "dessa obra"): reaproveita a obra, a pessoa, o fornecedor ou o
+período de que se estava a falar. Classificas e respondes só à FRASE NOVA.
 
 QUANDO É "contexto_obra"
 Estão a contar-te como está uma obra, ou a dar-te informação para decidires
@@ -155,6 +182,12 @@ async function responderPergunta(admin: any, p: any) {
         case "stock_artigo":      return await stockArtigo(admin, p);
         case "compras_fornecedor":return await comprasFornecedor(admin, p);
         case "gastos_periodo":    return await gastosPeriodo(admin, p);
+        case "horas_pessoa":         return await horasPessoa(admin, p);
+        case "faturas_por_pagar":    return await faturasPorPagar(admin, p);
+        case "orcamentos_pendentes": return await orcamentosPendentes(admin);
+        case "tarefas_semana":       return await tarefasSemana(admin, p);
+        case "notas_obra":           return await notasObra(admin, p);
+        case "documentos_a_expirar": return await documentosAExpirar(admin);
         default: return { texto: "Não percebi o que querias saber.", dados: null };
     }
 }
@@ -305,6 +338,228 @@ async function gastosPeriodo(admin: any, p: any) {
 }
 
 // =======================================================
+// CONSULTAS NOVAS (Novembro 2026). Só leitura, como as de cima.
+// =======================================================
+
+// ---- Datas: "2026-11-17" -> "17/11/2026", e contas de dias em UTC ----
+const dpt = (iso: string) => String(iso || "").slice(0, 10).split("-").reverse().join("/");
+const isoDia = (d: Date) => d.toISOString().slice(0, 10);
+function maisDias(iso: string, n: number) {
+    const d = new Date(iso + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + n);
+    return isoDia(d);
+}
+const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
+const cortar = (t: string, n: number) => (t.length > n ? t.slice(0, n) + "…" : t);
+
+// Quanto falta pagar de uma fatura: o total menos o que já foi pago por
+// recibos (pagamentos parciais). Nunca abaixo de zero. Em cêntimos certos.
+function emFaltaFatura(total: any, pagos: any) {
+    const falta = (Number(total) || 0) - (Number(pagos) || 0);
+    return Math.max(0, Math.round(falta * 100) / 100);
+}
+
+async function horasPessoa(admin: any, p: any) {
+    const hoje = isoDia(new Date());
+    // Sem período dito: o mês em curso, e a resposta diz que foi isso
+    const desde = p.desde || (p.ate ? null : hoje.slice(0, 8) + "01");
+    const ate   = p.ate || hoje;
+
+    let pessoa: any = null;
+    if (p.funcionario_nome) {
+        const { data } = await admin.from("funcionarios").select("id, nome")
+            .ilike("nome", `%${p.funcionario_nome}%`).limit(1).maybeSingle();
+        if (!data) return { texto: `Não encontrei nenhum trabalhador parecido com "${p.funcionario_nome}".`, dados: null };
+        pessoa = data;
+    }
+
+    let q = admin.from("registos_admin")
+        .select("horas, funcionarios(nome), obras(nome)")
+        .eq("tipo", "presenca").lte("data", ate).limit(5000);
+    if (desde)     q = q.gte("data", desde);
+    if (pessoa)    q = q.eq("funcionario_id", pessoa.id);
+    if (p.obra_id) q = q.eq("obra_id", p.obra_id);
+    const { data: regs } = await q;
+
+    const periodo = desde === ate ? `em ${dpt(ate)}` : `de ${desde ? dpt(desde) : "sempre"} a ${dpt(ate)}`;
+    let onde = "";
+    if (p.obra_id) {
+        const { data: obra } = await admin.from("obras").select("nome").eq("id", p.obra_id).maybeSingle();
+        if (obra) onde = ` na obra ${obra.nome}`;
+    }
+    if (!regs?.length) return { texto: `Não há horas registadas${pessoa ? " de " + pessoa.nome : ""}${onde} ${periodo}.`, dados: null };
+
+    // Uma pessoa: separa por obra. Todas: separa por pessoa.
+    const grupos: Record<string, number> = {};
+    let total = 0;
+    for (const r of regs) {
+        const chave = pessoa ? (r.obras?.nome || "sem obra") : (r.funcionarios?.nome || "sem nome");
+        const h = Number(r.horas || 0);
+        grupos[chave] = (grupos[chave] || 0) + h;
+        total += h;
+    }
+    const linhas = Object.entries(grupos).sort((a, b) => b[1] - a[1])
+        .map(([nome, h]) => `${nome}: ${num(h)} h`);
+    return {
+        texto: `${pessoa ? pessoa.nome : "Todos"}${onde}, ${periodo}: ${num(total)} horas. ${linhas.join("; ")}.`,
+        dados: { total, grupos },
+    };
+}
+
+async function faturasPorPagar(admin: any, p: any) {
+    let q = admin.from("movimentos_financeiros")
+        .select("id, referencia, data_documento, valor_total, fornecedores(nome)")
+        .eq("tipo", "saida").eq("estado_pagamento", "por_pagar").eq("ativo", true)
+        .order("data_documento").limit(2000);
+
+    let forn: any = null;
+    if (p.fornecedor_nome) {
+        const { data } = await admin.from("fornecedores")
+            .select("id, nome").ilike("nome", `%${p.fornecedor_nome}%`).limit(1).maybeSingle();
+        if (!data) return { texto: `Não encontrei nenhum fornecedor parecido com "${p.fornecedor_nome}".`, dados: null };
+        forn = data;
+        q = q.eq("fornecedor_id", forn.id);
+    }
+    const { data: movs } = await q;
+    if (!movs?.length) return { texto: `Não há faturas por pagar${forn ? " a " + forn.nome : ""}.`, dados: null };
+
+    // Pagamentos parciais (recibos). Se a tabela não existir, conta-se o total.
+    const pagos: Record<string, number> = {};
+    const { data: parciais } = await admin.from("pagamentos_fatura")
+        .select("movimento_id, valor").in("movimento_id", movs.map((m: any) => m.id));
+    (parciais || []).forEach((x: any) => { pagos[x.movimento_id] = (pagos[x.movimento_id] || 0) + Number(x.valor || 0); });
+
+    const hoje = isoDia(new Date());
+    const lista = movs.map((m: any) => ({
+        fornecedor: m.fornecedores?.nome || "sem fornecedor",
+        referencia: m.referencia || "s/ ref.",
+        data: m.data_documento,
+        falta: emFaltaFatura(m.valor_total, pagos[m.id]),
+    })).filter((f: any) => f.falta > 0);
+    if (!lista.length) return { texto: `Não há faturas por pagar${forn ? " a " + forn.nome : ""}.`, dados: null };
+    const total = lista.reduce((s: number, f: any) => s + f.falta, 0);
+
+    const MOSTRAR = 10;
+    const linhas = lista.slice(0, MOSTRAR).map((f: any) => {
+        const dias = Math.round((Date.parse(hoje) - Date.parse(f.data)) / 86400000);
+        return `${f.fornecedor}, ${f.referencia}: ${eur(f.falta)} (fatura de ${dpt(f.data)}, há ${dias} dias)`;
+    });
+    const resto = lista.length > MOSTRAR ? ` E mais ${lista.length - MOSTRAR}, mais recentes.` : "";
+    return {
+        texto: `Por pagar${forn ? " a " + forn.nome : ""}: ${eur(total)}, em ${lista.length} fatura${lista.length === 1 ? "" : "s"}. ` +
+               `As mais antigas: ${linhas.join("; ")}.${resto} ` +
+               `A data de vencimento não está guardada no programa: mostro a data da fatura.`,
+        dados: { total, faturas: lista.length },
+    };
+}
+
+async function orcamentosPendentes(admin: any) {
+    const { data: orcs } = await admin.from("orcamentos")
+        .select("id, numero, data, validade, cliente_nome, total_com_iva")
+        .eq("estado", "enviado").order("data").limit(200);
+    if (!orcs?.length) return { texto: "Não há orçamentos enviados à espera de resposta.", dados: null };
+
+    // O cliente pode já ter respondido na Área do cliente e a resposta estar por tratar
+    const { data: resps } = await admin.from("orcamento_respostas")
+        .select("orcamento_id").is("tratada_em", null).in("orcamento_id", orcs.map((o: any) => o.id));
+    const respondeu = new Set((resps || []).map((r: any) => r.orcamento_id));
+
+    const hoje = isoDia(new Date());
+    const total = orcs.reduce((s: number, o: any) => s + Number(o.total_com_iva || 0), 0);
+    const MOSTRAR = 10;
+    const linhas = orcs.slice(0, MOSTRAR).map((o: any) =>
+        `${o.numero}, ${o.cliente_nome}: ${eur(Number(o.total_com_iva))}, enviado a ${dpt(o.data)}` +
+        (respondeu.has(o.id) ? " (o cliente já respondeu, falta tratares a resposta)"
+            : o.validade && o.validade < hoje ? ` (validade passou a ${dpt(o.validade)})` : ""));
+    const resto = orcs.length > MOSTRAR ? ` E mais ${orcs.length - MOSTRAR}.` : "";
+    return {
+        texto: `${orcs.length} orçamento${orcs.length === 1 ? "" : "s"} à espera de resposta, ${eur(total)} com IVA. ${linhas.join("; ")}.${resto}`,
+        dados: { total, orcamentos: orcs.length },
+    };
+}
+
+async function tarefasSemana(admin: any, p: any) {
+    // Sem período dito: de segunda a domingo desta semana
+    const hoje = isoDia(new Date());
+    const diaSemana = (new Date(hoje + "T00:00:00Z").getUTCDay() + 6) % 7;   // segunda = 0
+    const desde = p.desde || maisDias(hoje, -diaSemana);
+    const ate   = p.ate   || maisDias(desde, 6);
+
+    let q = admin.from("tarefas")
+        .select("descricao, data_prevista, estado, obras(nome), tarefa_funcionarios(funcionarios(nome))")
+        .gte("data_prevista", desde).lte("data_prevista", ate).neq("estado", "cancelada")
+        .order("data_prevista").order("ordem").limit(200);
+    if (p.obra_id) q = q.eq("obra_id", p.obra_id);
+    const { data: tarefas } = await q;
+    if (!tarefas?.length) return { texto: `Não há tarefas planeadas de ${dpt(desde)} a ${dpt(ate)}.`, dados: null };
+
+    const MOSTRAR = 25;
+    const linhas = tarefas.slice(0, MOSTRAR).map((t: any) => {
+        const quem = (t.tarefa_funcionarios || []).map((x: any) => x.funcionarios?.nome).filter(Boolean).join(", ");
+        return `${dpt(t.data_prevista).slice(0, 5)} ${t.obras?.nome || "sem obra"}: ${cortar(t.descricao, 120)}` +
+            (quem ? ` (${quem})` : "") + (t.estado === "concluida" ? " ✓" : "");
+    });
+    const feitas = tarefas.filter((t: any) => t.estado === "concluida").length;
+    const resto = tarefas.length > MOSTRAR ? ` E mais ${tarefas.length - MOSTRAR}.` : "";
+    return {
+        texto: `${tarefas.length} tarefa${tarefas.length === 1 ? "" : "s"} de ${dpt(desde)} a ${dpt(ate)}, ${feitas} já concluída${feitas === 1 ? "" : "s"}. ${linhas.join("; ")}.${resto}`,
+        dados: { tarefas: tarefas.length, concluidas: feitas },
+    };
+}
+
+async function notasObra(admin: any, p: any) {
+    if (!p.obra_id) return { texto: "Não percebi de que obra falavas.", dados: null };
+
+    let qd = admin.from("obra_diario").select("data, notas").eq("obra_id", p.obra_id)
+        .order("data", { ascending: false }).limit(5);
+    if (p.desde) qd = qd.gte("data", p.desde);
+    if (p.ate)   qd = qd.lte("data", p.ate);
+    const [{ data: obra }, { data: diario }, { data: notas }] = await Promise.all([
+        admin.from("obras").select("nome").eq("id", p.obra_id).maybeSingle(),
+        qd,
+        admin.from("obra_notas").select("tipo, texto, criado_em").eq("obra_id", p.obra_id)
+             .order("criado_em", { ascending: false }).limit(5),
+    ]);
+    if (!obra) return { texto: "Não encontrei essa obra.", dados: null };
+    if (!diario?.length && !notas?.length) return { texto: `${obra.nome}: não há nada escrito no diário nem nas notas.`, dados: null };
+
+    // O texto é de quem o escreveu ou ditou: vai como está, só encurtado
+    const limpo = (t: string) => String(t || "").replace(/\s+/g, " ").trim();
+    const partes = [`${obra.nome}.`];
+    if (diario?.length) {
+        partes.push("Diário da obra: " + diario.map((d: any) => `${dpt(d.data)} — ${cortar(limpo(d.notas), 600)}`).join(" | "));
+    }
+    if (notas?.length) {
+        partes.push("Notas: " + notas.map((n: any) => `${dpt(n.criado_em)} — ${cortar(limpo(n.texto), 300)}`).join(" | "));
+    }
+    return { texto: partes.join(" "), dados: { diario: diario?.length || 0, notas: notas?.length || 0 } };
+}
+
+async function documentosAExpirar(admin: any) {
+    const hoje = isoDia(new Date());
+    const limite = maisDias(hoje, 30);
+    const { data: docs } = await admin.from("rh_documentos")
+        .select("tipo, descricao, validade, funcionarios!inner(nome, ativo)")
+        .not("validade", "is", null).lte("validade", limite)
+        .eq("funcionarios.ativo", true).order("validade").limit(500);
+
+    const aExpirar  = (docs || []).filter((d: any) => d.validade >= hoje);
+    const expirados = (docs || []).filter((d: any) => d.validade < hoje);
+    const jaForam = expirados.length
+        ? ` Além destes, ${expirados.length} documento${expirados.length === 1 ? " já expirou" : "s já expiraram"}: vê em Funcionários › Documentos.`
+        : "";
+    if (!aExpirar.length) return { texto: `Nenhum documento de trabalhadores expira nos próximos 30 dias.${jaForam}`, dados: { a_expirar: 0, expirados: expirados.length } };
+
+    const linhas = aExpirar.slice(0, 20).map((d: any) =>
+        `${d.funcionarios?.nome}: ${d.descricao || d.tipo}, até ${dpt(d.validade)}`);
+    const resto = aExpirar.length > 20 ? ` E mais ${aExpirar.length - 20}.` : "";
+    return {
+        texto: `${aExpirar.length} documento${aExpirar.length === 1 ? " expira" : "s expiram"} nos próximos 30 dias. ${linhas.join("; ")}.${resto}${jaForam}`,
+        dados: { a_expirar: aExpirar.length, expirados: expirados.length },
+    };
+}
+
+// =======================================================
 // RELATÓRIO DO DIA (Registo diário › 🎤 Relatório do dia)
 // O encarregado dita o dia; a IA só separa as frases em quatro listas, com
 // as palavras de quem falou. Não inventa, não resume, não põe números que
@@ -395,7 +650,7 @@ Deno.serve(async (req) => {
     }
 
     // ---- Entrada ----
-    let corpo: { texto?: string; modo?: string; obra?: string | null };
+    let corpo: { texto?: string; modo?: string; obra?: string | null; historico?: unknown };
     try { corpo = await req.json(); } catch { return resposta({ erro: "JSON inválido" }, 400); }
 
     const texto = (corpo.texto || "").trim();
@@ -404,12 +659,25 @@ Deno.serve(async (req) => {
     if (texto.length > 2000) return resposta({ erro: "Pedido demasiado longo." }, 413);
 
     // ---- Contexto: o que existe mesmo ----
-    const [{ data: artigos }, { data: obras }, { data: fornecedores }, { data: sinonimos }] = await Promise.all([
+    const [{ data: artigos }, { data: obras }, { data: fornecedores }, { data: sinonimos }, { data: pessoas }] = await Promise.all([
         admin.from("artigos").select("id, descricao, codigo").eq("ativo", true).order("descricao").limit(MAX_ARTIGOS),
         admin.from("obras").select("id, nome, codigo").eq("estado", "ativa").order("nome"),
         admin.from("fornecedores").select("nome").order("nome").limit(200),
         admin.from("artigo_sinonimos").select("texto, artigo_id").limit(MAX_ARTIGOS),
+        admin.from("funcionarios").select("nome").eq("ativo", true).order("nome").limit(200),
     ]);
+
+    // ---- Memória da conversa: as últimas trocas, mandadas pelo ecrã ----
+    // Servem só para a IA perceber a que se refere a frase nova. Não se
+    // guardam em lado nenhum além do registo habitual.
+    const historico = (Array.isArray(corpo.historico) ? corpo.historico : []).slice(-6)
+        .map((h: any) => ({ p: String(h?.p ?? "").slice(0, 300), r: String(h?.r ?? "").slice(0, 500) }))
+        .filter(h => h.p);
+    const mensagem = historico.length
+        ? "CONVERSA ATÉ AGORA:\n" +
+          historico.map(h => `Gerente: ${h.p}\nAssistente: ${h.r || "(sem resposta)"}`).join("\n") +
+          "\n\nFRASE NOVA:\n" + texto
+        : texto;
 
     const idsArtigos = new Set((artigos || []).map((a: any) => a.id));
     const idsObras   = new Set((obras   || []).map((o: any) => o.id));
@@ -428,8 +696,8 @@ Deno.serve(async (req) => {
             body: JSON.stringify({
                 model: MODELO,
                 max_tokens: 2000,
-                system: instrucoes(artigos || [], obras || [], fornecedores || [], sinonimos || []),
-                messages: [{ role: "user", content: texto }],
+                system: instrucoes(artigos || [], obras || [], fornecedores || [], sinonimos || [], pessoas || []),
+                messages: [{ role: "user", content: mensagem }],
             }),
         });
         const j = await r.json();
@@ -467,6 +735,9 @@ Deno.serve(async (req) => {
         const p = dados.pergunta || {};
         if (p.obra_id   && !idsObras.has(p.obra_id))     p.obra_id   = null;
         if (p.artigo_id && !idsArtigos.has(p.artigo_id)) p.artigo_id = null;
+        // As datas vão para a base de dados: só passam se forem mesmo datas
+        if (p.desde && !DATA_ISO.test(p.desde)) p.desde = null;
+        if (p.ate   && !DATA_ISO.test(p.ate))   p.ate   = null;
         const r = await responderPergunta(admin, p);
         return resposta({ tipo: "pergunta", resposta: r.texto, dados: r.dados, consulta: p.consulta, uso });
     }
