@@ -903,6 +903,14 @@ document.getElementById("btnLogin").addEventListener("click", function () {
             <input id="movObs" placeholder="Opcional">
         </div>
 
+        <!-- Só nas despesas: foto do talão ou da fatura (talao_despesa.sql).
+             Sem "capture": o telemóvel deixa escolher entre câmara e galeria. -->
+        <div class="form-group" id="movTalaoWrap">
+            <label for="movTalao">📎 Foto do talão ou fatura</label>
+            <input type="file" id="movTalao" accept="image/*,.heic,.heif" style="max-width:100%">
+            <div id="movTalaoAtual" style="font-size:12px;margin-top:4px"></div>
+        </div>
+
         <!-- Linhas lidas da fatura: só aparece depois de ler um documento -->
         <div id="faturaLinhasWrap" style="display:none;margin-top:4px;padding:12px;background:rgba(0,0,0,.03);border:1px solid rgba(0,0,0,.1);border-radius:8px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -1951,7 +1959,7 @@ document.getElementById("btnLogin").addEventListener("click", function () {
 <script src="andamento.js?v=10"></script>
 <script src="obra-entrega.js?v=1"></script>
 <script src="rh.js?v=8"></script>
-<script src="admin.js?v=51"></script>
+<script src="admin.js?v=52"></script>
 <script src="push.js?v=1"></script>
 <script src="telemovel.js?v=5"></script>
 
