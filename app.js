@@ -17,9 +17,11 @@ async function getObra(id) {
 
 // A tabela funcionarios não é legível sem login (tem salários, IBAN e NIF).
 // Esta função do servidor devolve só o necessário para o dispositivo actual.
+// Devolve { erro: true } quando não houve resposta do servidor, para o ecrã
+// de bloqueio não dizer "não autorizado" a quem só está sem rede.
 async function getFuncionario(deviceId) {
   const { data, error } = await SB.rpc("funcionario_por_dispositivo", { p_device: deviceId });
-  if (error) { console.error(error); return null; }
+  if (error) { console.error(error); return { erro: true }; }
   return Array.isArray(data) ? (data[0] || null) : data;
 }
 
@@ -448,8 +450,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   mostrarEcrã("ecrãLoading");
 
   funcionario = await getFuncionario(getDeviceId());
-  if (!funcionario || !funcionario.ativo) {
-    mostrarBloqueio("Dispositivo não autorizado", "Este dispositivo não está registado no sistema.<br><br>Contacte o administrador.");
+  if (funcionario?.erro) {
+    mostrarBloqueio("Sem ligação",
+      "Não foi possível falar com o servidor. Isto não quer dizer que o telemóvel deixou de estar autorizado." +
+      `<br><br><button class="btn-bloqueio" onclick="location.reload()">↻ Tentar outra vez</button>`);
+    return;
+  }
+  if (funcionario && !funcionario.ativo) {
+    mostrarBloqueio("Acesso desativado", "A tua ficha está desativada.<br><br>Fala com o administrador.");
+    return;
+  }
+  if (!funcionario) {
+    // Acontece quando se apagam os dados do site, se muda de browser ou de
+    // telemóvel: o telemóvel só é reconhecido por um número guardado nele.
+    const voltar = encodeURIComponent(location.pathname.split("/").pop() + location.search);
+    mostrarBloqueio("Telemóvel não registado",
+      "Este telemóvel (ou este browser) ainda não está registado.<br>" +
+      "Se trocaste de telemóvel ou apagaste os dados do site, pede um código ao administrador." +
+      `<br><br><a class="btn-bloqueio" href="cadastro.html?voltar=${voltar}">🔑 Tenho um código</a>`);
     return;
   }
 

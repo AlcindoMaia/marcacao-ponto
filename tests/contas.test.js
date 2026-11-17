@@ -12,8 +12,8 @@ const ler = f => fs.readFileSync(path.join(raiz, f), "utf8");
 
 // rh.js não toca na página ao carregar: corre inteiro num contexto isolado
 const rh = vm.createContext({});
-vm.runInContext(ler("rh.js") + "\n;globalThis.__rh = { valorDoRegisto, basePagamento, rhValorOrdenado, rhDiasPagos, custoDiaFunc };", rh);
-const { valorDoRegisto, basePagamento, rhValorOrdenado, rhDiasPagos, custoDiaFunc } = rh.__rh;
+vm.runInContext(ler("rh.js") + "\n;globalThis.__rh = { valorDoRegisto, basePagamento, rhValorOrdenado, rhDiasPagos, custoDiaFunc, rhFaltasPorMotivo, rhFracaoFalta, rhPagaDiaInteiro };", rh);
+const { valorDoRegisto, basePagamento, rhValorOrdenado, rhDiasPagos, custoDiaFunc, rhFaltasPorMotivo, rhFracaoFalta, rhPagaDiaInteiro } = rh.__rh;
 
 // admin.js mexe na página ao carregar: tiram-se só as funções que se testam
 function funcaoDe(ficheiro, nome) {
@@ -128,4 +128,39 @@ test("valor do recibo por fatura: o da linha da fatura, senão o total quando s�
     assert.equal(valorDoReciboParaFatura(rc9, "FT2026/12"), 1930);
     assert.equal(valorDoReciboParaFatura({ valor_recebido: 500, faturas_liquidadas: [{ numero: "FT 1", valor: null }] }, "FT 1"), 500);
     assert.equal(valorDoReciboParaFatura({ valor_recebido: 900, faturas_liquidadas: [{ numero: "FT 1" }, { numero: "FT 2" }] }, "FT 1"), null);
+});
+
+// Regra do meio dia (Alcindo, 17/11): a contrato (salário mensal) recebe
+// 100% e o resto do dia é falta; à jornada recebe a parte do dia.
+test("meio dia: só quem tem salário mensal leva falta no resto do dia", () => {
+    assert.equal(rhPagaDiaInteiro({ salario_mensal: 920 }), true);
+    assert.equal(rhPagaDiaInteiro({ valor_dia: 60 }), false);
+});
+
+test("falta de parte do dia vale (8 − horas) ÷ 8; sem presença vale 1", () => {
+    assert.equal(rhFracaoFalta(4), 0.5);
+    assert.equal(rhFracaoFalta(6), 0.25);
+    assert.equal(rhFracaoFalta(0), 1);
+    assert.equal(rhFracaoFalta(9), 0);
+});
+
+test("faltas por motivo somam meios dias; um dia em duas obras conta as horas juntas", () => {
+    const regs = [
+        { data: "2026-11-02", tipo: "falta", horas: 0, motivo: "injustificada" },            // dia inteiro
+        { data: "2026-11-03", tipo: "presenca", horas: 4 },
+        { data: "2026-11-03", tipo: "falta", horas: 0, motivo: "injustificada" },            // meio dia
+        { data: "2026-11-04", tipo: "presenca", horas: 3 }, { data: "2026-11-04", tipo: "presenca", horas: 3 },
+        { data: "2026-11-04", tipo: "falta", horas: 0 },                                     // 2 h sem motivo
+    ];
+    const f = rhFaltasPorMotivo(regs);
+    assert.equal(f.injustificada, 1.5);
+    assert.equal(f.sem_motivo, 0.25);
+});
+
+test("salário mensal: meio dia sem motivo não desconta; injustificada desconta meio dia", () => {
+    const fixo = { salario_mensal: 1300 };
+    const dia = 1300 * 12 / 260;
+    assert.equal(rhValorOrdenado(fixo, 20, { sem_motivo: 0.5 }).valor, 1300);
+    assert.equal(rhValorOrdenado(fixo, 20, { injustificada: 0.5 }).valor, 1300 - dia / 2);
+    assert.match(rhValorOrdenado(fixo, 20, { injustificada: 0.5 }).nota, /−0,5 falta/);
 });

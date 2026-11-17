@@ -505,18 +505,27 @@ async function rhCarregarAusencias(ano = new Date().getFullYear()) {
     const el = document.getElementById("fichaTab-ausencias");
     if (!_rhFunc || !el) return;
     el.innerHTML = `<div style="padding:24px;text-align:center;opacity:.5">A carregar...</div>`;
-    const { data, error } = await SB.from("registos_admin").select("data, motivo")
-        .eq("funcionario_id", _rhFunc.id).eq("tipo", "falta")
+    const { data: todos, error } = await SB.from("registos_admin").select("data, motivo, tipo, horas")
+        .eq("funcionario_id", _rhFunc.id)
         .gte("data", `${ano}-01-01`).lte("data", `${ano}-12-31`).order("data");
+    // Meio dia de quem tem salário: o resto do dia é falta (rhFracaoFalta)
+    const horasDia = {};
+    (todos || []).forEach(r => { if (r.tipo !== "falta") horasDia[r.data] = (horasDia[r.data] || 0) + (Number(r.horas) || 0); });
+    const data = (todos || []).filter(r => r.tipo === "falta")
+        .map(r => ({ ...r, fracao: rhFracaoFalta(horasDia[r.data]) }));
     if (error) {
         el.innerHTML = `<div style="color:#e09486;font-size:13px;padding:12px">Não foi possível ler as faltas: ${esc(error.message)}</div>`;
         return;
     }
     const faltas = data || [];
-    const porMotivo = {};
-    faltas.forEach(r => (porMotivo[r.motivo || "sem_motivo"] ||= []).push(r.data));
+    const porMotivo = {}, diasMotivo = {};
+    faltas.forEach(r => {
+        const m = r.motivo || "sem_motivo";
+        (porMotivo[m] ||= []).push(r.fracao < 1 ? r.data + "|½" : r.data);
+        diasMotivo[m] = (diasMotivo[m] || 0) + r.fracao;
+    });
     const direito = rhDireitoFerias(_rhFunc, ano);
-    const gozados = (porMotivo.ferias || []).length;
+    const gozados = Math.round((diasMotivo.ferias || 0) * 100) / 100;
     const restam  = direito.dias - gozados;
 
     const cartao = (titulo, valor, cor = "") => `<div class="card metric" style="margin:0"><h3>${titulo}</h3><div class="value" ${cor ? `style="color:${cor}"` : ""}>${valor}</div></div>`;
@@ -530,14 +539,14 @@ async function rhCarregarAusencias(ano = new Date().getFullYear()) {
         </div>
         <div class="grid-cards" style="margin-bottom:8px">
             ${cartao("Direito a férias", direito.dias + " dias")}
-            ${cartao("Gozados", gozados + " dias")}
-            ${cartao("Por gozar", restam + " dias", restam < 0 ? "#e09486" : "#8fbfa0")}
+            ${cartao("Gozados", rhNumDias(gozados) + " dias")}
+            ${cartao("Por gozar", rhNumDias(restam) + " dias", restam < 0 ? "#e09486" : "#8fbfa0")}
         </div>
         <div style="font-size:11px;opacity:.55;margin-bottom:12px">Dias úteis, contados a partir das faltas marcadas como 🏖 Férias no registo diário${direito.nota ? " · " + esc(direito.nota) : ""}.</div>
         ${porMotivo.sem_motivo?.length ? `<div style="font-size:12px;color:#fb923c;margin-bottom:10px">⚠ ${porMotivo.sem_motivo.length} falta(s) sem motivo. Marca o motivo no registo diário: decide se desconta no ordenado e se conta como férias.</div>` : ""}
         ${Object.entries(MOTIVOS_FALTA_RH).filter(([k]) => porMotivo[k]?.length).map(([k, nome]) => `
-            <div class="rh-secao">${nome} · ${porMotivo[k].length} dia(s)</div>
-            <div style="font-size:12px;opacity:.8;line-height:1.7">${porMotivo[k].map(rhData).join(" · ")}</div>`).join("")
+            <div class="rh-secao">${nome} · ${rhNumDias(diasMotivo[k])} dia(s)</div>
+            <div style="font-size:12px;opacity:.8;line-height:1.7">${porMotivo[k].map(d => d.endsWith("|½") ? rhData(d.slice(0, 10)) + " (½)" : rhData(d)).join(" · ")}</div>`).join("")
           || `<div style="padding:12px;text-align:center;opacity:.5;font-size:13px">Sem faltas registadas em ${ano}.</div>`}
         <div style="font-size:11px;opacity:.5;margin-top:14px">As férias e faltas marcam-se no Registo diário: botão ✕ Falta e depois o motivo.</div>`;
 }
@@ -605,6 +614,35 @@ function rhDiasPagos(presencas) {
     return Object.values(porDia).reduce((s, h) => s + Math.min(h, 8) / 8, 0);
 }
 
+// Regra do meio dia (Alcindo, 17/11): quem tem salário mensal (a contrato)
+// recebe o salário por inteiro, mas o resto do dia fica como falta; quem
+// trabalha à jornada recebe a parte do dia (rhDiasPagos). A falta de parte
+// do dia é uma linha "falta" (horas 0) no mesmo dia de uma presença: vale
+// (8 − horas trabalhadas) ÷ 8 de um dia. Sem presença, vale um dia.
+function rhPagaDiaInteiro(f) {
+    return Number(f?.salario_mensal) > 0;
+}
+function rhFracaoFalta(horasTrabalhadas) {
+    const h = Number(horasTrabalhadas) || 0;
+    return h > 0 ? Math.max(0, 8 - h) / 8 : 1;
+}
+// Faltas por motivo, em dias (pode dar 0,5). Recebe os registos de UMA
+// pessoa ({ data, tipo, horas, motivo }).
+function rhFaltasPorMotivo(registos) {
+    const horasDia = {};
+    (registos || []).forEach(r => {
+        if (r.tipo !== "falta") horasDia[r.data] = (horasDia[r.data] || 0) + (Number(r.horas) || 0);
+    });
+    const faltas = {};
+    (registos || []).forEach(r => {
+        if (r.tipo !== "falta") return;
+        const m = r.motivo || "sem_motivo";
+        faltas[m] = (faltas[m] || 0) + rhFracaoFalta(horasDia[r.data]);
+    });
+    return faltas;
+}
+const rhNumDias = n => String(Math.round(n * 100) / 100).replace(".", ",");
+
 function rhValorOrdenado(f, dias, faltas = {}, diasPagos = dias) {
     if (!f.salario_mensal) {
         if (!f.valor_dia) return { valor: 0, nota: "sem valor por dia" };
@@ -618,10 +656,11 @@ function rhValorOrdenado(f, dias, faltas = {}, diasPagos = dias) {
     const inj = faltas.injustificada || 0, bx = faltas.baixa || 0, sm = faltas.sem_motivo || 0;
     const valor = Math.max(0, sal - (inj + bx) * dia);
     const notas = ["salário mensal"];
-    if (inj) notas.push(`−${inj} falta(s) injustificada(s)`);
-    if (bx)  notas.push(`−${bx} dia(s) de baixa (paga pela Seg. Social)`);
-    if (faltas.ferias) notas.push(`${faltas.ferias} dia(s) de férias`);
-    if (sm)  notas.push(`⚠ ${sm} falta(s) sem motivo, não descontadas`);
+    if (inj) notas.push(`−${rhNumDias(inj)} falta(s) injustificada(s)`);
+    if (bx)  notas.push(`−${rhNumDias(bx)} dia(s) de baixa (paga pela Seg. Social)`);
+    if (faltas.ferias) notas.push(`${rhNumDias(faltas.ferias)} dia(s) de férias`);
+    if (faltas.justificada) notas.push(`${rhNumDias(faltas.justificada)} falta(s) justificada(s)`);
+    if (sm)  notas.push(`⚠ ${rhNumDias(sm)} falta(s) sem motivo, não descontadas`);
     return { valor, nota: notas.join(" · ") };
 }
 
@@ -706,7 +745,9 @@ async function rhAlertas() {
     // 3. Ausências marcadas para esta semana
     const nomes = Object.fromEntries(funcs.map(f => [f.id, f.nome]));
     const ausentes = {};
-    regs.filter(r => r.tipo === "falta" && r.data >= rhIso(segAtual) && r.data <= rhIso(domAtual) && nomes[r.funcionario_id])
+    // Falta no mesmo dia de uma presença é só o resto de um meio dia: não é ausência
+    const trabalhou = new Set(regs.filter(r => r.tipo !== "falta").map(r => r.funcionario_id + r.data));
+    regs.filter(r => r.tipo === "falta" && !trabalhou.has(r.funcionario_id + r.data) && r.data >= rhIso(segAtual) && r.data <= rhIso(domAtual) && nomes[r.funcionario_id])
         .forEach(r => (ausentes[r.funcionario_id] ||= []).push(r));
     const idsAus = Object.keys(ausentes);
     if (idsAus.length) {

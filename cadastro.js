@@ -19,6 +19,14 @@
 // =======================================================
 
 
+// Quem vem do ecrã "Telemóvel não registado" traz ?voltar=app.html?obra=...
+// Só se aceita voltar para a app.html, nunca para outro site.
+function linkVoltar() {
+    const v = new URLSearchParams(location.search).get("voltar") || "";
+    if (!/^app\.html(\?[\w=&%-]*)?$/.test(v)) return "";
+    return ` <a href="${v}" style="font-weight:600">Marcar ponto →</a>`;
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
     const form = document.getElementById("frmCadastro");
     const msg  = document.getElementById("msg");
@@ -38,6 +46,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const jr = Array.isArray(jaRegistado) ? jaRegistado[0] : jaRegistado;
     if (jr) {
         msg.textContent = "Este dispositivo já está registado como " + jr.nome + ".";
+        msg.insertAdjacentHTML("beforeend", linkVoltar());
         msg.style.color = "#2a8a2a";
         form.querySelector("button[type=submit]").disabled = true;
         return;
@@ -83,6 +92,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         msg.textContent = "✓ Dispositivo registado como " + func.nome + "! Já pode marcar ponto.";
+        msg.insertAdjacentHTML("beforeend", linkVoltar());
         msg.style.color = "#2a8a2a";
         form.querySelector("button[type=submit]").disabled = true;
     });
