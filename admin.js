@@ -7561,9 +7561,9 @@ async function carregarMovimentos() {
 
     const montarPedido = () => {
         let query = SB.from("movimentos_financeiros")
-            .select(`id, referencia, data_documento, tipo,
-                     valor_base, iva, valor_total, estado_pagamento, observacoes,
-                     obra_id, categoria_id, fornecedor_id, cliente_nome,
+            // "*" em vez da lista de colunas: traz o talao_caminho se o
+            // talao_despesa.sql já foi corrido, e não falha se ainda não foi
+            .select(`*,
                      fornecedores(id, nome, nif), categorias_financeiras(id, nome), obras(id, nome)`)
             .eq("ativo", true)   // os inativos são duplicados retirados; o DRE e o painel já os ignoravam
             .order("data_documento", { ascending: false });
@@ -7642,7 +7642,10 @@ function renderMovimentos() {
                 <button class="btn-acao" title="Editar">✏️</button>
                 <button class="btn-acao" title="Apagar">🗑️</button>
                 ${ent ? `<button class="btn-acao btn-declaracao" title="Gerar declaração de valores">📄</button>` : ""}
+                ${m.talao_caminho ? `<button class="btn-acao btn-talao" title="Ver foto do talão" aria-label="Ver foto do talão">📎</button>` : ""}
             </td>`;
+        const btnTalao = tr.querySelector(".btn-talao");
+        if (btnTalao) btnTalao.onclick = () => abrirTalao(m.talao_caminho);
         tr.querySelectorAll(".btn-acao")[0].onclick = () => abrirModalMovimento(m);
         tr.querySelectorAll(".btn-acao")[1].onclick = () => apagarMovimento(m.id, m.referencia);
         const btnDecl = tr.querySelector(".btn-declaracao");
@@ -7861,6 +7864,7 @@ async function abrirModalMovimento(mov = null) {
     const declEl = document.getElementById("movDeclaracao");
     if (declEl) declEl.checked = false;
     atualizarOpcaoDeclaracao();
+    await prepararCampoTalao(mov?.id || null);
 
     // Mostrar modal — igual ao padrão dos outros modais
     // Limpar display inline (pode ter ficado de um fechar anterior)
@@ -8124,6 +8128,12 @@ async function guardarMovimento() {
         }
     }
 
+    // Foto do talão: só nas despesas, e só se foi escolhida uma
+    if (payload.tipo === "saida") {
+        const erroTalao = await guardarTalaoMovimento(movId);
+        if (erroTalao) alert("O movimento foi guardado, mas a foto do talão não: " + erroTalao);
+    }
+
     // Lote em curso: guardar esta não fecha, abre a seguinte já preenchida
     const restantes = _filaFaturas.slice();
     const totalLote = _filaTotal;
@@ -8145,8 +8155,10 @@ async function guardarMovimento() {
 
 async function apagarMovimento(id, ref) {
     if (!confirm(`Apagar movimento "${ref || id}"?`)) return;
+    const talao = movimentos.find(m => m.id === id)?.talao_caminho;
     const { error } = await SB.from("movimentos_financeiros").delete().eq("id", id);
     if (error) { { console.error(error); alert("Não foi possível concluir a operação."); }; return; }
+    if (talao) await SB.storage.from(BUCKET_TALOES).remove([talao]);   // a foto sai com o movimento
     await carregarMovimentos();
 }
 
@@ -10153,8 +10165,66 @@ function dadosEmpresaDeclaracao() {
 }
 
 function atualizarOpcaoDeclaracao() {
+    const entrada = document.getElementById("movTipo")?.value === "entrada";
     const wrap = document.getElementById("movDeclaracaoWrap");
-    if (wrap) wrap.style.display = document.getElementById("movTipo")?.value === "entrada" ? "" : "none";
+    if (wrap) wrap.style.display = entrada ? "" : "none";
+    const talao = document.getElementById("movTalaoWrap");   // a foto do talão é só das despesas
+    if (talao) talao.style.display = entrada ? "none" : "";
+}
+
+// =======================================================
+// FOTO DO TALÃO JUNTO DA DESPESA (coluna talao_caminho, talao_despesa.sql)
+// A foto é reduzida como as fotos de obra (fotos.js) e fica na pasta
+// "taloes/" do armazenamento privado dos documentos de obra, que só os
+// administradores abrem. Na lista do Fluxo aparece um 📎 para a ver.
+// =======================================================
+const BUCKET_TALOES = "obra-documentos";
+let _movTalaoAtual = null;   // caminho da foto que o movimento aberto já tem
+
+async function prepararCampoTalao(movId) {
+    const input = document.getElementById("movTalao");
+    const info  = document.getElementById("movTalaoAtual");
+    if (input) input.value = "";
+    _movTalaoAtual = null;
+    if (movId) {
+        // Lê-se à parte: se o talao_despesa.sql ainda não foi corrido, dá erro e segue sem foto
+        const { data } = await SB.from("movimentos_financeiros").select("talao_caminho").eq("id", movId).maybeSingle();
+        _movTalaoAtual = data?.talao_caminho || null;
+    }
+    if (info) info.innerHTML = _movTalaoAtual
+        ? `Já tem foto: <a href="#" onclick="abrirTalao(_movTalaoAtual);return false">ver</a>. Escolher outra substitui esta.`
+        : "";
+}
+
+// Chamada depois de gravar o movimento. Devolve uma mensagem de erro, ou null.
+async function guardarTalaoMovimento(movId) {
+    const escolhido = document.getElementById("movTalao")?.files?.[0];
+    if (!escolhido || !movId) return null;
+    try {
+        const f = await prepararFoto(escolhido);
+        const caminho = `taloes/${movId}/${Date.now()}_${nomeSeguroFicheiro(f.name)}`;
+        const up = await SB.storage.from(BUCKET_TALOES).upload(caminho, f, { contentType: f.type || "image/jpeg" });
+        if (up.error) throw new Error(up.error.message);
+        const { error } = await SB.from("movimentos_financeiros").update({ talao_caminho: caminho }).eq("id", movId);
+        if (error) {
+            await SB.storage.from(BUCKET_TALOES).remove([caminho]);
+            throw new Error(/talao_caminho/.test(error.message)
+                ? "falta correr o ficheiro talao_despesa.sql no Supabase (SQL Editor)." : error.message);
+        }
+        if (_movTalaoAtual) await SB.storage.from(BUCKET_TALOES).remove([_movTalaoAtual]);
+        return null;
+    } catch (e) {
+        console.error("guardarTalaoMovimento:", e);
+        return e.message || String(e);
+    }
+}
+
+async function abrirTalao(caminho) {
+    if (!caminho) return;
+    const win = janelaParaDepois();
+    const { data, error } = await SB.storage.from(BUCKET_TALOES).createSignedUrl(caminho, 600);
+    if (error) { win?.close(); alert("Não foi possível abrir a foto: " + error.message); return; }
+    irParaNaJanela(win, data.signedUrl);
 }
 
 // "2026-05-19" → "19 de maio de 2026"
