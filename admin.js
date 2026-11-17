@@ -618,16 +618,15 @@ async function carregarFinanceiro() {
     const porFunc = {};
     registos.forEach(r => {
         const fid = r.funcionario_id;
-        if (!porFunc[fid]) porFunc[fid] = { horas: 0, dias: new Set(), faltas: {}, presencas: [] };
-        if (r.tipo === "falta") {
-            const m = r.motivo || "sem_motivo";
-            porFunc[fid].faltas[m] = (porFunc[fid].faltas[m] || 0) + 1;
-            return;
-        }
+        if (!porFunc[fid]) porFunc[fid] = { horas: 0, dias: new Set(), faltas: {}, presencas: [], registos: [] };
+        porFunc[fid].registos.push(r);
+        if (r.tipo === "falta") return;
         porFunc[fid].horas += Number(r.horas) || 0;
         porFunc[fid].dias.add(r.data);
         porFunc[fid].presencas.push(r);
     });
+    // Faltas em dias, com o resto de um meio dia a contar como meia falta
+    Object.values(porFunc).forEach(d => { d.faltas = rhFaltasPorMotivo(d.registos); });
 
     let totalHoras = 0, totalDias = 0, totalPagar = 0;
     const linhasF = [];
@@ -865,21 +864,24 @@ function renderRaMapaFuncionario(ano, mes) {
     const porFunc = {};
     _raCache.forEach(r => {
         const nome = r.funcionarios?.nome || (r.funcionario_id ? "—" : nomeTempRA(r.observacoes));
-        if (!porFunc[nome]) porFunc[nome] = { f: r.funcionarios || null, dias: {}, totalH: 0, diasTrab: new Set(), faltas: {}, presencas: [] };
-        // Um dia em duas obras soma as horas, para o ½ só aparecer em meio dia
+        if (!porFunc[nome]) porFunc[nome] = { f: r.funcionarios || null, dias: {}, totalH: 0, diasTrab: new Set(), faltas: {}, presencas: [], registos: [] };
+        porFunc[nome].registos.push(r);
+        // Um dia em duas obras soma as horas, para o ½ só aparecer em meio dia.
+        // Presença e falta no mesmo dia = meio dia com o resto como falta.
         const ant = porFunc[nome].dias[r.data];
-        porFunc[nome].dias[r.data] = ant && ant.tipo === "presenca" && r.tipo === "presenca"
-            ? { tipo: "presenca", horas: ant.horas + Number(r.horas||0), obra: [ant.obra, r.obras?.nome].filter(Boolean).join(" + ") }
-            : { tipo: r.tipo, horas: Number(r.horas||0), obra: r.obras?.nome||"" };
+        if (ant && ant.tipo === "presenca" && r.tipo === "presenca")
+            porFunc[nome].dias[r.data] = { ...ant, horas: ant.horas + Number(r.horas||0), obra: [ant.obra, r.obras?.nome].filter(Boolean).join(" + ") };
+        else if (ant && ant.tipo === "presenca" && r.tipo === "falta") ant.comFalta = true;
+        else if (ant && ant.tipo === "falta" && r.tipo === "presenca")
+            porFunc[nome].dias[r.data] = { tipo: "presenca", horas: Number(r.horas||0), obra: r.obras?.nome||"", comFalta: true };
+        else porFunc[nome].dias[r.data] = { tipo: r.tipo, horas: Number(r.horas||0), obra: r.obras?.nome||"" };
         if (r.tipo === "presenca") {
             porFunc[nome].totalH += Number(r.horas||0);
             porFunc[nome].diasTrab.add(r.data);
             porFunc[nome].presencas.push(r);
-        } else if (r.tipo === "falta") {
-            const m = r.motivo || "sem_motivo";
-            porFunc[nome].faltas[m] = (porFunc[nome].faltas[m] || 0) + 1;
         }
     });
+    Object.values(porFunc).forEach(d => { d.faltas = rhFaltasPorMotivo(d.registos); });
 
     const funcs = Object.keys(porFunc).sort();
     const raConteudo = document.getElementById("raConteudo");
@@ -918,7 +920,8 @@ function renderRaMapaFuncionario(ano, mes) {
                 else if (reg.tipo === "falta") { bg2="rgba(224,148,134,.15)"; sym="✕"; title=reg.obra||"Falta"; }
                 else if (reg.horas > 0) {
                     bg2="rgba(143,191,160,.15)"; sym=reg.horas<8?"½":"✓";
-                    title = `${reg.obra||""} ${reg.horas}h`;
+                    title = `${reg.obra||""} ${reg.horas}h${reg.comFalta ? " + falta no resto do dia" : ""}`;
+                    if (reg.comFalta) { bg2 = "linear-gradient(90deg,rgba(143,191,160,.18) 50%,rgba(224,148,134,.18) 50%)"; sym = "½✕"; }
                 }
                 return `<td style="text-align:center;padding:3px 2px;background:${bg2};border:1px solid rgba(0,0,0,.05);font-size:11px" title="${esc(title)}">${sym}</td>`;
             }).join("")}
@@ -1867,8 +1870,11 @@ async function carregarFichaMes(anoMes) {
 
     const dias = new Set(presencas.map(r => r.dia)).size;
     const horas = presencas.reduce((s, r) => s + r.horas, 0);
-    const faltasPorMotivo = {};
-    faltas.forEach(f => { faltasPorMotivo[f.motivo] = (faltasPorMotivo[f.motivo] || 0) + 1; });
+    // Meio dia de quem tem salário: o resto do dia conta como meia falta
+    const faltasPorMotivo = rhFaltasPorMotivo((data || []).map(r => ({ ...r, motivo: r.motivo || "sem_motivo" })));
+    const horasDia = {};
+    presencas.forEach(r => { horasDia[r.dia] = (horasDia[r.dia] || 0) + r.horas; });
+    faltas.forEach(f => { if (horasDia[f.dia] > 0) f.parcial = true; });
     const calc = rhValorOrdenado(func, dias, faltasPorMotivo, rhDiasPagos(presencas));
     _histDados = { presencas, faltas, dias, horas, faltasPorMotivo, calc };
 
@@ -1917,7 +1923,7 @@ async function carregarFichaMes(anoMes) {
         <div style="font-family:var(--font-title,sans-serif);font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin:14px 0 6px">Faltas</div>
         ${Object.entries(faltasPorMotivo).map(([m, n]) =>
             `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
-                <span>${MOTIVOS_FALTA_RH[m] || esc(m)}</span><span style="opacity:.6">${n} dia(s)</span>
+                <span>${MOTIVOS_FALTA_RH[m] || esc(m)}</span><span style="opacity:.6">${rhNumDias(n)} dia(s)</span>
             </div>`).join("")}` : ""}`;
 }
 
@@ -1965,7 +1971,7 @@ async function exportarPDFFuncionario() {
     // Tabela dia a dia (presenças e faltas juntas, por data)
     const linhas = [
         ...d.presencas.map(r => ({ dia: r.dia, obra: r.obra, horas: fmtH(r.horas), obs: r.obs })),
-        ...d.faltas.map(f => ({ dia: f.dia, obra: "Falta: " + (MOTIVOS_FALTA_RH[f.motivo] || f.motivo).replace(/^\S+\s/, ""), horas: "—", obs: f.obs })),
+        ...d.faltas.map(f => ({ dia: f.dia, obra: (f.parcial ? "Falta no resto do dia: " : "Falta: ") + (MOTIVOS_FALTA_RH[f.motivo] || f.motivo).replace(/^\S+\s/, ""), horas: "—", obs: f.obs })),
     ].sort((a, b) => a.dia.localeCompare(b.dia));
 
     const cols = [

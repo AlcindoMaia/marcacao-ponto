@@ -86,7 +86,7 @@ async function iniciarApp() {
     // Carregar dados base
     const [obrasRes, funcsRes, servRes] = await Promise.all([
         SB.from("obras").select("id, nome, estado").order("nome"),
-        SB.from("funcionarios").select("id, nome, valor_dia, tipo_contrato").eq("ativo", true).order("nome"),
+        SB.from("funcionarios").select("id, nome, valor_dia, tipo_contrato, salario_mensal").eq("ativo", true).order("nome"),
         SB.from("obra_servicos").select("id, obra_id, nome, extra, concluido").order("ordem").order("created_at")
     ]);
 
@@ -157,17 +157,19 @@ function renderFuncionarios(existentes) {
         card.dataset.funcId = f.id;
         if (registosFunc.length > 0) card.classList.add("guardado");
 
-        // Resumo das horas já registadas
-        const totalH = registosFunc.reduce((s, r) => s + Number(r.horas), 0);
-        const resumo = registosFunc.length > 0
-            ? `${totalH.toFixed(1)}h · ${registosFunc.length} obra(s)`
+        // Resumo das horas já registadas. Uma falta no mesmo dia de uma
+        // presença é o resto de um meio dia (quem tem salário mensal).
+        const presencas = registosFunc.filter(r => r.tipo !== 'falta');
+        const falta  = registosFunc.find(r => r.tipo === 'falta') || null;
+        const totalH = presencas.reduce((s, r) => s + Number(r.horas), 0);
+        const isFalta   = !!falta && presencas.length === 0;
+        const isParcial = !!falta && presencas.length > 0;
+        const resumo = presencas.length > 0
+            ? `${totalH.toFixed(1)}h · ${presencas.length} obra(s)${isParcial ? " · falta no resto do dia" : ""}`
             : "Sem registo";
-
-        const isFalta = registosFunc.some(r => r.tipo === 'falta') && registosFunc.length === 1;
         card.dataset.falta = isFalta ? '1' : '0';
 
         const isTemp = f.tipo_contrato === 'temporario';
-        const falta  = isFalta ? registosFunc[0] : null;
         card.innerHTML = `
             <div class="func-card-header">
                 <div class="func-avatar ${isFalta ? 'avatar-falta' : isTemp ? 'avatar-temp' : ''}">${esc(f.nome.charAt(0).toUpperCase())}</div>
@@ -201,8 +203,8 @@ function renderFuncionarios(existentes) {
         // Adicionar linhas de registo
         const linhasDiv = document.getElementById(`linhas-${f.id}`);
 
-        if (registosFunc.length > 0) {
-            registosFunc.forEach(r => adicionarLinha(linhasDiv, f.id, r));
+        if (presencas.length > 0) {
+            presencas.forEach(r => adicionarLinha(linhasDiv, f.id, r));
         } else {
             adicionarLinha(linhasDiv, f.id, null);
         }
@@ -597,7 +599,9 @@ async function guardarTudo() {
         return;
     }
 
-    feedback(`✓ ${registos.length} linha(s) guardada(s) com sucesso!`, "ok");
+    const nFaltas = await acertarFaltasMeioDia(data, registos);
+    feedback(`✓ ${registos.length} linha(s) guardada(s)` + (nFaltas ? ` · ${nFaltas} meio dia com falta no resto (escolhe o motivo)` : "") + "!", "ok");
+    if (nFaltas) await carregarParaData();
 
     // Actualizar visual dos cards
     document.querySelectorAll(".func-card").forEach(card => {
@@ -612,6 +616,35 @@ async function guardarTudo() {
             .filter(l => parseFloat(l.querySelector("input").value) > 0).length;
         if (temLinhas) card.querySelector(".func-resumo").textContent = `${totalH.toFixed(1)}h · ${nObras} obra(s)`;
     });
+}
+
+// Regra do meio dia (Alcindo, 17/11): quem tem salário mensal recebe o
+// salário por inteiro, mas o resto de um dia com menos de 8 h fica como
+// falta (linha "falta" com horas 0 no mesmo dia; o motivo decide se
+// desconta). Quem trabalha à jornada recebe só a parte do dia e não leva
+// falta. Corre depois de gravar o dia: cria a falta que falta e apaga a que
+// já não faz sentido (dia completo, ou presenças apagadas). As faltas de dia
+// inteiro (cartão com ✕ Falta) não passam por aqui.
+async function acertarFaltasMeioDia(data, registos) {
+    const horas = {};
+    registos.forEach(r => { if (r.funcionario_id) horas[r.funcionario_id] = (horas[r.funcionario_id] || 0) + Number(r.horas || 0); });
+    const { data: faltasDia } = await SB.from('registos_admin').select('id, funcionario_id')
+        .eq('data', data).eq('tipo', 'falta');
+    const temFalta = new Set((faltasDia || []).map(r => r.funcionario_id));
+    let criadas = 0;
+    for (const f of _funcs) {
+        const card = document.querySelector(`.func-card[data-func-id="${f.id}"]`);
+        if (!card || card.dataset.falta === '1') continue;   // falta de dia inteiro
+        const h = horas[f.id] || 0;
+        const deveTer = (typeof rhPagaDiaInteiro === "function" ? rhPagaDiaInteiro(f) : Number(f.salario_mensal) > 0) && h > 0 && h < 8;
+        if (deveTer && !temFalta.has(f.id)) {
+            const { error } = await SB.from('registos_admin').insert({ data, funcionario_id: f.id, horas: 0, tipo: 'falta' });
+            if (!error) criadas++;
+        } else if (!deveTer && temFalta.has(f.id)) {
+            await SB.from('registos_admin').delete().eq('data', data).eq('funcionario_id', f.id).eq('tipo', 'falta');
+        }
+    }
+    return criadas;
 }
 
 // =======================================================
