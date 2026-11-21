@@ -3930,22 +3930,51 @@ async function carregarPorValidar() {
     if (error || !data?.length) { _porValidar = []; cartao.style.display = "none"; return; }
     _porValidar = data;
 
+    // Para a escolha rápida da obra na própria linha, e para saber que
+    // fornecedores ainda não existem (ao aceitar, a app pergunta se cria)
+    if ((document.getElementById("movObra")?.options.length || 0) < 2) await carregarObrasFluxo();
+    const nifs = [...new Set(data.map(r => r.documento?.fornecedor_nif).filter(Boolean))];
+    const { data: conhecidos } = nifs.length
+        ? await SB.from("fornecedores").select("nif").in("nif", nifs)
+        : { data: [] };
+    const nifsConhecidos = new Set((conhecidos || []).map(f => f.nif));
+    const opcoesObra = document.getElementById("movObra")?.innerHTML || "";
+
     document.getElementById("porValidarConta").textContent = `(${data.length})`;
     const eur = v => Number(v || 0).toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
     const dataPt = d => d ? d.split("-").reverse().join("/") : "";
     document.getElementById("listaPorValidar").innerHTML = data.map(r => {
         const d = r.documento || {};
         const pago = d.estado_pagamento === "pago" ? "pago" : "por pagar";
+        const nLinhas = (d.linhas || []).length;
+        const fornNovo = !d.emitida_por_nos && d.fornecedor_nif && !nifsConhecidos.has(d.fornecedor_nif);
+        // Aceitar sem abrir só quando nada pede atenção: avisos do leitor
+        // (totais que não batem, repetida, IBAN diferente), recibos ou faturas
+        // sem data/valor obrigam a abrir. A obra em falta pede-se na linha.
+        const motivoAbrir = d.avisos?.length ? `⚠️ ${d.avisos.length === 1 ? "1 aviso" : d.avisos.length + " avisos"}: abre para ver`
+            : d.e_recibo ? "Recibo: abre para dar as faturas como pagas"
+            : (!d.data || !(Number(d.total_com_iva) > 0)) ? "Falta a data ou o valor: abre para completar"
+            : "";
+        const semObra = !d.obra_id && !motivoAbrir;
         return `
-        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:8px 0;border-top:1px solid rgba(128,128,128,.18)">
+        <div class="linha-por-validar" data-id="${r.id}" style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:8px 0;border-top:1px solid rgba(128,128,128,.18)">
             <div style="flex:1;min-width:200px">
                 <div style="font-weight:600">${esc(d.fornecedor_nome || "Fornecedor?")} · ${esc(d.numero_documento || "")}</div>
                 <div style="font-size:12px;opacity:.75">${dataPt(d.data)} · ${esc(d.obra_nome || "obra por escolher")} · ${pago}` +
-                `${(d.linhas || []).length ? ` · ${(d.linhas || []).length} linhas` : ""}</div>
+                `${nLinhas ? ` · ${nLinhas} ${nLinhas === 1 ? "linha" : "linhas"}` : ""}` +
+                `${fornNovo ? ` · <span style="color:#d9a066">fornecedor novo</span>` : ""}</div>
                 ${r.resumo ? `<div style="font-size:12px;opacity:.75;margin-top:2px">${esc(r.resumo)}</div>` : ""}
+                ${motivoAbrir ? `<div style="font-size:12px;color:#d9a066;margin-top:2px">${esc(motivoAbrir)}</div>` : ""}
             </div>
+            ${semObra ? `
+            <select class="pv-obra" onchange="obraEscolhidaPorValidar('${r.id}')"
+                style="flex-basis:100%;font-size:13px;padding:6px 8px;border-radius:6px">${opcoesObra}</select>` : ""}
             <b style="white-space:nowrap">${eur(d.total_com_iva)}</b>
-            <button type="button" class="btn-primary" style="font-size:12px;padding:4px 12px"
+            ${motivoAbrir ? "" : `
+            <button type="button" class="btn-primary pv-aceitar" style="font-size:12px;padding:4px 12px"
+                ${semObra ? "disabled title=\"Escolhe a obra primeiro\"" : ""}
+                onclick="aceitarPorValidar('${r.id}', this)">✓ Aceitar</button>`}
+            <button type="button" class="${motivoAbrir ? "btn-primary" : "btn-secondary"}" style="font-size:12px;padding:4px 12px"
                 onclick="abrirPorValidar('${r.id}')">Abrir</button>
             <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px"
                 onclick="rejeitarPorValidar('${r.id}')">Rejeitar</button>
@@ -3954,11 +3983,18 @@ async function carregarPorValidar() {
     cartao.style.display = "";
 }
 
-async function abrirPorValidar(id) {
+// A obra escolhida na linha liga o "Aceitar"
+function obraEscolhidaPorValidar(id) {
+    const linha = document.querySelector(`.linha-por-validar[data-id="${id}"]`);
+    const btn = linha?.querySelector(".pv-aceitar");
+    if (btn) btn.disabled = !linha.querySelector(".pv-obra")?.value;
+}
+
+async function abrirPorValidar(id, opcoes = {}) {
     const r = _porValidar.find(x => x.id === id);
     if (!r) return;
     const d = r.documento || {};
-    await abrirModalMovimento();
+    await abrirModalMovimento(null, { escondido: !!opcoes.escondido });
     _validacaoActual = r;          // depois de abrir: o reset não a apaga
     _filaFaturas = [d];
     _filaTotal   = 1;
@@ -3967,11 +4003,63 @@ async function abrirPorValidar(id) {
 
     // O que o assistente propôs e o ler-fatura não traz
     const set = (campo, v) => { const el = document.getElementById(campo); if (el && v != null && v !== "") el.value = v; };
-    set("movObra", d.obra_id);
+    // A obra escolhida na linha da lista vale mais do que a proposta
+    const obraNaLinha = document.querySelector(`.linha-por-validar[data-id="${id}"] .pv-obra`)?.value;
+    set("movObra", obraNaLinha || d.obra_id);
     set("movCategoria", d.categoria_id);
     set("movEstado", d.estado_pagamento);
     if (d.observacoes) set("movObs", d.observacoes);
     actualizarResumoLinhas();
+}
+
+// Aceitar sem abrir: enche o mesmo formulário sem o mostrar e grava como se
+// fosse o botão Guardar (linhas, stock, preços, fornecedor novo, tudo igual).
+// Se a gravação parar por alguma coisa (fornecedor novo recusado, referência
+// repetida...), o formulário abre com a mensagem para se resolver ali.
+async function aceitarPorValidar(id, btn) {
+    const r = _porValidar.find(x => x.id === id);
+    if (!r) return;
+    const linha = btn?.closest(".linha-por-validar");
+    linha?.querySelectorAll("button, select").forEach(b => b.disabled = true);
+    if (btn) btn.textContent = "A gravar…";
+    try {
+        await abrirPorValidar(id, { escondido: true });
+        await guardarMovimento();
+    } catch (e) {
+        console.error("aceitarPorValidar:", e);
+    }
+    // Gravou: guardarMovimento fecha o formulário e limpa _validacaoActual
+    if (_validacaoActual?.id === id) {
+        const modal = document.getElementById("modalMovimento");
+        if (modal) { modal.style.display = ""; modal.classList.remove("hidden"); }
+        activarLeituraBarcode();
+        linha?.querySelectorAll("button, select").forEach(b => b.disabled = false);
+        if (btn) btn.textContent = "✓ Aceitar";
+        obraEscolhidaPorValidar(id);
+        return;
+    }
+    const d = r.documento || {};
+    avisoRapido(`✓ Gravada: ${d.fornecedor_nome || "fatura"} ${d.numero_documento || ""} · ` +
+        `${Number(d.total_com_iva || 0).toFixed(2)} €`);
+}
+
+// Aviso curto no fundo do ecrã, que desaparece sozinho (o do formulário só
+// se vê com o formulário aberto)
+function avisoRapido(msg) {
+    let el = document.getElementById("avisoRapido");
+    if (!el) {
+        el = document.createElement("div");
+        el.id = "avisoRapido";
+        el.style.cssText = "position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:9999;" +
+            "max-width:calc(100vw - 32px);background:#1f3a2c;color:#cfe8d8;border:1px solid rgba(143,191,160,.45);" +
+            "border-radius:10px;padding:10px 16px;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.35);" +
+            "transition:opacity .3s;pointer-events:none";
+        document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.style.opacity = "1";
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.opacity = "0"; }, 3500);
 }
 
 async function rejeitarPorValidar(id) {
@@ -7762,7 +7850,7 @@ function fecharModalMovimento() {
 let _barcodeBuffer = "";
 let _barcodeTimer  = null;
 
-async function abrirModalMovimento(mov = null) {
+async function abrirModalMovimento(mov = null, { escondido = false } = {}) {
     const modal = document.getElementById("modalMovimento");
     if (!modal) return;
 
@@ -7865,6 +7953,9 @@ async function abrirModalMovimento(mov = null) {
     if (declEl) declEl.checked = false;
     atualizarOpcaoDeclaracao();
     await prepararCampoTalao(mov?.id || null);
+
+    // "Aceitar" da lista Por validar: enche-se o formulário sem o mostrar
+    if (escondido) return;
 
     // Mostrar modal — igual ao padrão dos outros modais
     // Limpar display inline (pode ter ficado de um fechar anterior)
