@@ -461,14 +461,14 @@ async function custosDasObras(ids, periodo = null) {
     const nomeMov = m => m?.fornecedores?.nome || m?.referencia || "Sem nome";
     const [fat, regs, ligMov, ligReg, stk] = await Promise.all([
         lerTudo(() => filtrarData(SB.from("movimentos_financeiros")
-            .select("id, obra_id, valor_base, valor_total, referencia, data_documento, fornecedores(nome), categorias_financeiras(nome)")
+            .select("id, obra_id, valor_base, valor_total, referencia, data_documento, fonte, fornecedores(nome), categorias_financeiras(nome)")
             .in("obra_id", ids).eq("tipo", "saida").eq("ativo", true), "data_documento").order("data_documento").order("id")),
         lerTudo(() => filtrarData(SB.from("registos_admin")
             .select("id, obra_id, horas, data, funcionarios(nome, valor_dia, salario_mensal)")
             .in("obra_id", ids).eq("tipo", "presenca"), "data").order("data").order("id")),
         // As ligações são poucas: lêem-se todas e filtra-se aqui
         lerTudo(() => SB.from("movimento_servicos")
-            .select("id, valor, obra_servicos(obra_id, nome, obras(nome)), movimentos_financeiros(tipo, ativo, obra_id, referencia, data_documento, fornecedores(nome), categorias_financeiras(nome), obras(nome))")
+            .select("id, valor, obra_servicos(obra_id, nome, obras(nome)), movimentos_financeiros(tipo, ativo, obra_id, referencia, data_documento, fonte, fornecedores(nome), categorias_financeiras(nome), obras(nome))")
             .order("id")),
         lerTudo(() => SB.from("registo_servicos")
             .select("id, horas, obra_servicos(obra_id, nome, obras(nome)), registos_admin(obra_id, data, tipo, funcionarios(nome, valor_dia, salario_mensal), obras(nome))")
@@ -485,6 +485,9 @@ async function custosDasObras(ids, periodo = null) {
 
     (fat.data || []).forEach(m => {
         const o = r[String(m.obra_id)]; if (!o) return;
+        // Ordenados pagos (recibos, pagamentos dos Ordenados) já contam pelas
+        // horas do Registo diário: somá-los era contar a pessoa duas vezes
+        if (ePagamentoOrdenado(m)) return;
         const v = semIva(m), it = { t: `${dPt(m.data_documento)} ${nomeMov(m)}`, v };
         if (eMOCategoria(m)) { o.moFat += v; o.faturasMO.push(it); }
         else                 { o.matFat += v; o.faturasMat.push(it); }
@@ -498,6 +501,7 @@ async function custosDasObras(ids, periodo = null) {
     (ligMov.data || []).forEach(l => {
         const m = l.movimentos_financeiros, s = l.obra_servicos;
         if (!m || !s || m.tipo !== "saida" || m.ativo === false || !noPeriodo(m.data_documento)) return;
+        if (ePagamentoOrdenado(m)) return;
         const de = String(m.obra_id), para = String(s.obra_id);
         if (de === para) return;
         const v = Number(l.valor || 0), mo = eMOCategoria(m);
@@ -598,14 +602,21 @@ async function carregarFinanceiro() {
 
     // Buscar registos_admin do mês (fonte de verdade para salários)
     const pedido = ++_pedidoOrdenados;
-    const [registosRes, funcsRes] = await Promise.all([
+    const [registosRes, funcsRes, pagosRes] = await Promise.all([
         SB.from("registos_admin")
             .select("funcionario_id, horas, data, tipo, motivo, obra_id, obras(nome)")
             .gte("data", inicio).lte("data", fim),
         SB.from("funcionarios")
-            .select("id, nome, valor_dia, salario_mensal, ativo")
+            .select("id, nome, valor_dia, salario_mensal, ativo"),
+        // O que já saiu no Fluxo de caixa: recibos do e-mail e pagamentos
+        // marcados aqui (são poucas linhas; filtra-se por pessoa e mês depois)
+        SB.from("movimentos_financeiros")
+            .select("id, tipo, fonte, fonte_id, referencia, valor_total, data_documento, ativo")
+            .in("fonte", [FONTE_ORDENADOS, "email_recibos"]).eq("ativo", true).eq("tipo", "saida")
     ]);
     if (pedido !== _pedidoOrdenados) return; // já se pediu outro mês entretanto
+    const pagosMes = pagosRes.data || [];
+    const mesAcabou = fim < dataLocalIso();
 
     const registos = registosRes.data || [];
     // Ativos, e também quem já saiu mas trabalhou nesse mês: sem isto os
@@ -628,7 +639,7 @@ async function carregarFinanceiro() {
     // Faltas em dias, com o resto de um meio dia a contar como meia falta
     Object.values(porFunc).forEach(d => { d.faltas = rhFaltasPorMotivo(d.registos); });
 
-    let totalHoras = 0, totalDias = 0, totalPagar = 0;
+    let totalHoras = 0, totalDias = 0, totalPagar = 0, totalPago = 0, totalFalta = 0;
     const linhasF = [];
     tbody.innerHTML = "";
 
@@ -643,12 +654,17 @@ async function carregarFinanceiro() {
         totalHoras += horas;
         totalDias  += dias;
         totalPagar += calc.valor;
-        linhasF.push({ f, horas, dias, calc });
+        const pags = rhPagamentosDoMes(f, anoMes, pagosMes);
+        const est  = rhEstadoPagamento(f, calc.valor, pags, mesAcabou);
+        totalPago += est.pago;
+        if (est.falta > 0) totalFalta += est.falta;
+        linhasF.push({ f, horas, dias, calc, est, pags });
         tbody.innerHTML += `<tr>
             <td>${esc(f.nome)}${f.ativo ? "" : ' <span style="font-size:11px;opacity:.6">(já saiu)</span>'}${calc.nota ? `<div style="font-size:11px;opacity:.6">${esc(calc.nota)}</div>` : ""}</td>
             <td>${horas.toFixed(2)}h</td>
             <td>${dias}</td>
             <td>${calc.valor.toFixed(2)} €</td>
+            <td>${celulaPagamentoOrdenado(f, est, pags, anoMes)}</td>
         </tr>`;
     });
 
@@ -662,6 +678,14 @@ async function carregarFinanceiro() {
     if (kpiDEl) kpiDEl.textContent = totalDias;
     if (kpiTEl) kpiTEl.textContent = totalPagar.toFixed(2) + " €";
     _ordenadosMes = { anoMes, linhas: linhasF, totalPagar };
+    const subT = document.getElementById("kpiTotalSub");
+    if (subT) subT.textContent = totalFalta > 0.004
+        ? `Pago ${totalPago.toFixed(2)} € · à jornada falta pagar ${totalFalta.toFixed(2)} €`
+        : (totalPago > 0 ? `Pago no Fluxo: ${totalPago.toFixed(2)} €` : "");
+    // TSU da empresa: não está no valor a pagar às pessoas, paga-se à
+    // Segurança Social no mês seguinte. Estimativa sobre os salários mensais.
+    const salBrutos = linhasF.filter(l => Number(l.f.salario_mensal) > 0).reduce((s, l) => s + l.calc.valor, 0);
+    const tsu = salBrutos * TSU_EMPRESA;
 
     const NOTA_ORD = "Sai do Registo diário do mês. Quem tem salário recebe o salário mensal menos as faltas injustificadas e os dias de baixa; os temporários recebem o valor/dia combinado por cada dia de 8 h, e metade por meio dia (horas do dia ÷ 8, no máximo um dia). É o valor bruto, antes de descontos e sem a TSU da empresa.";
     porContas("kpiFuncionariosContas", "Funcionários", linhasF.map(l => ({ t: l.f.nome + (l.f.ativo ? "" : " (já saiu)"), v: l.f.salario_mensal ? "salário" : "à jornada" })),
@@ -670,7 +694,10 @@ async function carregarFinanceiro() {
         "Horas de presença no Registo diário.");
     porContas("kpiDiasContas", "Dias trabalhados", [...linhasF.map(l => ({ t: l.f.nome, v: String(l.dias) })), { t: "Total", v: String(totalDias), total: true }],
         "Dias com presença no Registo diário (um dia em duas obras conta uma vez).");
-    porContas("kpiTotalContas", "Total a pagar", [...linhasF.map(l => ({ t: l.f.nome + (l.calc.nota ? ` (${l.calc.nota})` : ""), v: l.calc.valor })), { t: "Total", v: totalPagar, total: true }], NOTA_ORD);
+    porContas("kpiTotalContas", "Total a pagar", [...linhasF.map(l => ({ t: l.f.nome + (l.calc.nota ? ` (${l.calc.nota})` : ""), v: l.calc.valor })), { t: "Total", v: totalPagar, total: true },
+        { t: "Já lançado no Fluxo de caixa (recibos pelo líquido)", v: totalPago, info: true },
+        ...(salBrutos > 0 ? [{ t: `TSU da empresa, estimativa (${(TSU_EMPRESA * 100).toFixed(2).replace(".", ",")}% dos salários), paga à Seg. Social no mês seguinte e não somada`, v: tsu, info: true }] : [])],
+        NOTA_ORD + " A Segurança Social e o IRS retido só aparecem no Fluxo de caixa quando se lança o pagamento das guias.");
 }
 
 // Excel dos Ordenados do mês que está no ecrã
@@ -685,13 +712,82 @@ async function exportarOrdenadosExcel() {
         subtitulo: "Sai do Registo diário do mês. Valor bruto, antes de descontos e sem a TSU da empresa.",
         colunas: [
             { t: "Funcionário", w: 24 }, { t: "Tipo", w: 12 }, { t: "Horas", w: 9, f: "num1" },
-            { t: "Dias", w: 7, f: "int" }, { t: "Valor a pagar (€)", w: 16, f: "euro" }, { t: "Notas", w: 50, quebrar: true },
+            { t: "Dias", w: 7, f: "int" }, { t: "Valor a pagar (€)", w: 16, f: "euro" }, { t: "Pago no Fluxo (€)", w: 16, f: "euro" }, { t: "Notas", w: 50, quebrar: true },
         ],
         linhas: L.map(l => [{ v: l.f.nome + (l.f.ativo === false ? " (já saiu)" : ""), negrito: true },
-            l.f.salario_mensal ? "Salário" : "À jornada", l.horas, l.dias, l.calc.valor, l.calc.nota || ""]),
-        total: ["Total", "", L.reduce((s, l) => s + l.horas, 0), L.reduce((s, l) => s + l.dias, 0), _ordenadosMes.totalPagar, ""],
+            l.f.salario_mensal ? "Salário" : "À jornada", l.horas, l.dias, l.calc.valor, l.est?.pago || 0,
+            [l.calc.nota, l.f.salario_mensal && l.est?.pago ? "recibo pelo líquido" : ""].filter(Boolean).join(" · ")]),
+        total: ["Total", "", L.reduce((s, l) => s + l.horas, 0), L.reduce((s, l) => s + l.dias, 0), _ordenadosMes.totalPagar, L.reduce((s, l) => s + (l.est?.pago || 0), 0), ""],
         notas: ["Quem tem salário recebe o salário mensal menos as faltas injustificadas e os dias de baixa; quem trabalha à jornada recebe o valor/dia por cada dia de 8 h, e metade por meio dia."],
     }]);
+}
+
+// Coluna "Pagamento" dos Ordenados. Com salário: diz se o recibo do mês já
+// está no Fluxo de caixa. À jornada: botão para lançar o pagamento como saída
+// paga (categoria Ordenados, obra GERAL / EMPRESA), e anular se foi engano.
+function celulaPagamentoOrdenado(f, est, pags, anoMes) {
+    const dPt = d => d ? d.split("-").reverse().slice(0, 2).join("/") : "";
+    const eur = v => Number(v).toFixed(2) + " €";
+    const ultima = [...(pags || [])].sort((a, b) => (b.data_documento || "").localeCompare(a.data_documento || ""))[0];
+    const fid = esc(JSON.stringify(String(f.id))), am = esc(JSON.stringify(anoMes));
+    const btn = (txt, acao, sec) => `<button type="button" class="${sec ? "btn-secondary" : "btn-pequeno"}" style="font-size:12px;padding:3px 10px" onclick='${acao}'>${txt}</button>`;
+    const anular = btn("Anular", `anularPagamentoOrdenado(${fid}, ${am})`, true);
+    const pagar  = v => btn(`💶 Marcar pago ${eur(v)}`, `marcarOrdenadoPago(${fid}, ${am}, ${v})`);
+    const ok = t => `<span style="color:#8fbfa0">✓ ${t}</span>`;
+    const aviso = t => `<span style="color:#e0b070">⚠ ${t}</span>`;
+    switch (est.estado) {
+        case "recibo":          return ok(`Recibo lançado (${eur(est.pago)} líquido)`);
+        case "recibo_em_falta": return aviso("Recibo por lançar");
+        case "recibo_fim_mes":  return `<span style="opacity:.6">Recibo no fim do mês</span>`;
+        case "por_pagar":       return pagar(est.falta);
+        case "parte":           return `${aviso(`Pago ${eur(est.pago)}, falta ${eur(est.falta)}`)}<div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${pagar(est.falta)} ${anular}</div>`;
+        case "a_mais":          return `${aviso(`Pago ${eur(est.pago)}: ${eur(-est.falta)} a mais`)}<div style="margin-top:4px">${anular}</div>`;
+        case "pago":            return `${ok(`Pago ${eur(est.pago)}${ultima ? ` em ${dPt(ultima.data_documento)}` : ""}`)} ${anular}`;
+        default:                return "—";
+    }
+}
+
+async function idObraGeralECategoria() {
+    const [ob, cat] = await Promise.all([
+        SB.from("obras").select("id, nome").ilike("nome", "GERAL%").limit(1),
+        SB.from("categorias_financeiras").select("id, nome").ilike("nome", "Ordenados").limit(1),
+    ]);
+    return { obraId: ob.data?.[0]?.id, categoriaId: cat.data?.[0]?.id };
+}
+
+async function marcarOrdenadoPago(fid, anoMes, valor) {
+    const l = _ordenadosMes?.anoMes === anoMes && _ordenadosMes.linhas.find(x => String(x.f.id) === String(fid));
+    if (!l) return;
+    valor = Math.round(Number(valor) * 100) / 100;
+    if (!(valor > 0)) return;
+    const [ano, mes] = anoMes.split("-");
+    const hoje = dataLocalIso();
+    if (!confirm(`Lançar no Fluxo de caixa o pagamento de ${l.f.nome}?\n\n${valor.toFixed(2)} € · ordenado de ${mes}/${ano}\nSaída paga hoje (${hoje.split("-").reverse().join("/")}), categoria Ordenados, obra GERAL / EMPRESA.\n\nSe pagaste noutro dia, muda a data depois no Fluxo de caixa.`)) return;
+    const { obraId, categoriaId } = await idObraGeralECategoria();
+    if (!obraId) { alert("Não encontrei a obra GERAL / EMPRESA. Nada foi lançado."); return; }
+    const { error } = await SB.from("movimentos_financeiros").insert({
+        tipo: "saida", data_documento: hoje,
+        referencia: `Ordenado ${mes}/${ano} · ${l.f.nome}`,
+        obra_id: obraId, categoria_id: categoriaId || null,
+        valor_base: valor, iva: 0, valor_total: valor, estado_pagamento: "pago",
+        fonte: FONTE_ORDENADOS, fonte_id: `${anoMes}#${fid}#${Date.now()}`,
+        observacoes: `Marcado pago nos Ordenados: ${l.dias} dia(s), ${l.horas.toFixed(2)} h${l.calc.nota ? " · " + l.calc.nota : ""}`,
+        ativo: true,
+    });
+    if (error) { alert("Não foi possível lançar o pagamento: " + error.message); return; }
+    carregarFinanceiro();
+}
+
+async function anularPagamentoOrdenado(fid, anoMes) {
+    const l = _ordenadosMes?.anoMes === anoMes && _ordenadosMes.linhas.find(x => String(x.f.id) === String(fid));
+    const meus = (l?.pags || []).filter(m => m.fonte === FONTE_ORDENADOS);
+    if (!meus.length) return;
+    const tot = meus.reduce((s, m) => s + Number(m.valor_total || 0), 0);
+    if (!confirm(`Anular ${meus.length === 1 ? "o pagamento" : `os ${meus.length} pagamentos`} de ${l.f.nome} deste mês (${tot.toFixed(2)} €)?\nSaem do Fluxo de caixa.`)) return;
+    // Como os duplicados retirados: fica inactivo, não se apaga
+    const { error } = await SB.from("movimentos_financeiros").update({ ativo: false }).in("id", meus.map(m => m.id));
+    if (error) { alert("Não foi possível anular: " + error.message); return; }
+    carregarFinanceiro();
 }
 
 // =======================================================
@@ -9664,9 +9760,10 @@ abrirModalOrcamento = async function(id) {
 // =======================================================
 // DRE — DEMONSTRAÇÃO DE RESULTADOS
 // =======================================================
-// Recibos de vencimento lançados como saídas: o custo desses salários já
-// entra pela mão de obra (horas × custo/dia), por isso não se somam outra vez
-const eReciboVencimento = m => m.fonte === "email_recibos" || /^recibo (de )?vencimento/i.test(m.referencia || "");
+// Recibos de vencimento e pagamentos marcados nos Ordenados: o custo desses
+// salários já entra pela mão de obra (horas × custo/dia), por isso não se
+// somam outra vez (ePagamentoOrdenado, em rh.js)
+const eReciboVencimento = ePagamentoOrdenado;
 
 let _pedidoDRE = 0;
 async function carregarDRE() {
@@ -9741,7 +9838,7 @@ async function carregarDRE() {
             { t: `Faturas e despesas (${custosFat.length})`, v: totalCus, itens: it(custosFat) },
             { t: `Mão de obra: ${horas.toLocaleString("pt-PT")} h do Registo diário × custo/dia ÷ 8`, v: custoMO,
               itens: regs.map(r => ({ t: `${dPt(r.data)} ${r.funcionarios?.nome || ""}: ${Number(r.horas||0)} h × ${custoDiaFunc(r.funcionarios).toFixed(2)} €/dia ÷ 8`, v: Number(r.horas||0) * custoDiaFunc(r.funcionarios) / 8 })) },
-            ...(recibos.length ? [{ t: `Recibos de vencimento (${recibos.length}), não somados: já estão na mão de obra`, v: recibos.reduce((s,m) => s + semIva(m), 0), itens: it(recibos), info: true }] : []),
+            ...(recibos.length ? [{ t: `Ordenados pagos (${recibos.length}): recibos e pagamentos dos Ordenados, não somados: já estão na mão de obra`, v: recibos.reduce((s,m) => s + semIva(m), 0), itens: it(recibos), info: true }] : []),
             { t: "Custos", v: totalCus + custoMO, total: true },
         ];
     }
