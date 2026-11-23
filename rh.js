@@ -664,6 +664,55 @@ function rhValorOrdenado(f, dias, faltas = {}, diasPagos = dias) {
     return { valor, nota: notas.join(" · ") };
 }
 
+// Pagamentos de ordenados no Fluxo de caixa: os recibos de vencimento
+// lançados do e-mail e os pagamentos marcados no ecrã Ordenados. O custo
+// destas pessoas já entra pela mão de obra (horas × custo/dia), por isso o
+// DRE e o custo das obras não os somam outra vez. No Fluxo contam: é dinheiro
+// que saiu do banco.
+const FONTE_ORDENADOS = "ordenados";
+function ePagamentoOrdenado(m) {
+    return m?.fonte === "email_recibos" || m?.fonte === FONTE_ORDENADOS
+        || /^recibo (de )?vencimento/i.test(m?.referencia || "");
+}
+// Primeiro nome em minúsculas e sem acentos: é assim que os recibos do
+// e-mail identificam a pessoa (fonte_id "<mensagem>#<nome>")
+function rhChaveNome(nome) {
+    return String(nome || "").trim().split(/\s+/)[0].normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+// Pagamentos de UMA pessoa num mês ("AAAA-MM"), entre os movimentos activos
+// de ordenados. Recibo do e-mail: pela referência "Recibo vencimento MM/AAAA"
+// e pelo nome; pagamento marcado nos Ordenados: fonte_id "AAAA-MM#<id>#...".
+function rhPagamentosDoMes(f, anoMes, movs) {
+    const [ano, mes] = String(anoMes).split("-");
+    const chave = rhChaveNome(f?.nome);
+    return (movs || []).filter(m => {
+        if (m.ativo === false || m.tipo === "entrada") return false;
+        const fid = String(m.fonte_id || "");
+        if (m.fonte === FONTE_ORDENADOS) return fid.startsWith(`${anoMes}#${f.id}#`);
+        if (m.fonte === "email_recibos")
+            return !!chave && fid.toLowerCase().endsWith("#" + chave) && (m.referencia || "").includes(`${mes}/${ano}`);
+        return false;
+    });
+}
+// Estado do pagamento de uma pessoa no mês. Com salário mensal o recibo traz
+// o líquido (menos que o bruto do ecrã), por isso só se diz se já foi lançado.
+// À jornada compara-se o pago com o valor a pagar.
+function rhEstadoPagamento(f, valor, pagamentos, mesAcabou) {
+    const pago = (pagamentos || []).reduce((s, m) => s + Number(m.valor_total || 0), 0);
+    const arred = v => Math.round(v * 100) / 100;
+    if (Number(f?.salario_mensal) > 0) {
+        if (pagamentos?.length) return { estado: "recibo", pago: arred(pago) };
+        return { estado: mesAcabou ? "recibo_em_falta" : "recibo_fim_mes", pago: 0 };
+    }
+    const v = Number(valor || 0);
+    if (!(v > 0) && !(pago > 0)) return { estado: "nada", pago: 0, falta: 0 };
+    const falta = arred(v - pago);
+    if (pago <= 0.004) return { estado: "por_pagar", pago: 0, falta: arred(v) };
+    if (falta > 0.5)   return { estado: "parte", pago: arred(pago), falta };
+    if (falta < -0.5)  return { estado: "a_mais", pago: arred(pago), falta };
+    return { estado: "pago", pago: arred(pago), falta: 0 };
+}
+
 // Parte do valor de um dia que cabe a um registo (lista e Excel dos
 // Registos). À jornada, como nos Ordenados (rhDiasPagos): o dia vale
 // horas/8 do valor/dia, no máximo um dia, e reparte-se pelas obras desse

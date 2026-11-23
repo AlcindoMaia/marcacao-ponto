@@ -12,8 +12,8 @@ const ler = f => fs.readFileSync(path.join(raiz, f), "utf8");
 
 // rh.js não toca na página ao carregar: corre inteiro num contexto isolado
 const rh = vm.createContext({});
-vm.runInContext(ler("rh.js") + "\n;globalThis.__rh = { valorDoRegisto, basePagamento, rhValorOrdenado, rhDiasPagos, custoDiaFunc, rhFaltasPorMotivo, rhFracaoFalta, rhPagaDiaInteiro };", rh);
-const { valorDoRegisto, basePagamento, rhValorOrdenado, rhDiasPagos, custoDiaFunc, rhFaltasPorMotivo, rhFracaoFalta, rhPagaDiaInteiro } = rh.__rh;
+vm.runInContext(ler("rh.js") + "\n;globalThis.__rh = { valorDoRegisto, basePagamento, rhValorOrdenado, rhDiasPagos, custoDiaFunc, rhFaltasPorMotivo, rhFracaoFalta, rhPagaDiaInteiro, ePagamentoOrdenado, rhPagamentosDoMes, rhEstadoPagamento, rhChaveNome };", rh);
+const { valorDoRegisto, basePagamento, rhValorOrdenado, rhDiasPagos, custoDiaFunc, rhFaltasPorMotivo, rhFracaoFalta, rhPagaDiaInteiro, ePagamentoOrdenado, rhPagamentosDoMes, rhEstadoPagamento, rhChaveNome } = rh.__rh;
 
 // admin.js mexe na página ao carregar: tiram-se só as funções que se testam
 function funcaoDe(ficheiro, nome) {
@@ -209,4 +209,47 @@ test("assistente: pagamentos parciais descontam, em cêntimos certos", () => {
 
 test("assistente: pago a mais nunca dá valor negativo em falta", () => {
     assert.equal(emFaltaFatura(100, 120), 0);
+});
+
+// ---- Pagamentos de ordenados no Fluxo de caixa ----
+test("recibos e pagamentos dos Ordenados não somam no DRE; uma fatura normal soma", () => {
+    assert.equal(ePagamentoOrdenado({ fonte: "email_recibos" }), true);
+    assert.equal(ePagamentoOrdenado({ fonte: "ordenados" }), true);
+    assert.equal(ePagamentoOrdenado({ referencia: "Recibo vencimento 10/2026" }), true);
+    assert.equal(ePagamentoOrdenado({ fonte: null, referencia: "Mão de obra extra" }), false);
+});
+
+test("o nome do recibo do e-mail é o primeiro nome sem acentos", () => {
+    assert.equal(rhChaveNome("Gabriel Cândido"), "gabriel");
+    assert.equal(rhChaveNome("Ângelo Sá"), "angelo");
+});
+
+test("pagamentos do mês: só os da pessoa e do mês certos", () => {
+    const f = { id: "f1", nome: "Jacob Lucas" }, t = { id: "t1", nome: "Pai" };
+    const movs = [
+        { fonte: "email_recibos", fonte_id: "abc#jacob", referencia: "Recibo vencimento 10/2026", valor_total: 876 },
+        { fonte: "email_recibos", fonte_id: "abd#jacob", referencia: "Recibo vencimento 09/2026", valor_total: 870 },
+        { fonte: "ordenados", fonte_id: "2026-10#t1#1", valor_total: 500 },
+        { fonte: "ordenados", fonte_id: "2026-10#t1#2", valor_total: 100, ativo: false },
+        { fonte: "ordenados", fonte_id: "2026-11#t1#3", valor_total: 300 },
+    ];
+    assert.equal(rhPagamentosDoMes(f, "2026-10", movs).length, 1);
+    assert.deepEqual(rhPagamentosDoMes(t, "2026-10", movs).map(m => m.valor_total), [500]);
+});
+
+test("estado do pagamento à jornada: por pagar, parte, pago, a mais", () => {
+    const t = { valor_dia: 100 };
+    assert.equal(rhEstadoPagamento(t, 600, [], true).estado, "por_pagar");
+    const parte = rhEstadoPagamento(t, 600, [{ valor_total: 500 }], true);
+    assert.equal(parte.estado, "parte"); assert.equal(parte.falta, 100);
+    assert.equal(rhEstadoPagamento(t, 600, [{ valor_total: 600 }], true).estado, "pago");
+    assert.equal(rhEstadoPagamento(t, 600, [{ valor_total: 700 }], true).estado, "a_mais");
+    assert.equal(rhEstadoPagamento(t, 0, [], true).estado, "nada");
+});
+
+test("com salário mensal só se diz se o recibo foi lançado (o recibo traz o líquido)", () => {
+    const s = { salario_mensal: 1000 };
+    assert.equal(rhEstadoPagamento(s, 1000, [{ valor_total: 876 }], true).estado, "recibo");
+    assert.equal(rhEstadoPagamento(s, 1000, [], true).estado, "recibo_em_falta");
+    assert.equal(rhEstadoPagamento(s, 1000, [], false).estado, "recibo_fim_mes");
 });
