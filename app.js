@@ -464,17 +464,25 @@ async function pubEscolheuFicheiros(ev) {
   const novos = [...(ev.target.files || [])].filter(f => ehImagem(f));
   ev.target.value = "";
   if (!novos.length) { msg.textContent = "Escolhe fotos (vídeos ainda não)."; return; }
-  const cabem = novos.slice(0, PUB_MAX_FOTOS - pubFotos.length);
-  if (cabem.length < novos.length) msg.textContent = `Só cabem ${PUB_MAX_FOTOS} fotos por publicação.`;
-  for (const f of cabem) {
-    msg.textContent = "A preparar as fotos…";
-    try {
-      const pronta = await prepararFoto(f);
-      // A regra do Storage só aceita JPEG: o que não passou a JPEG fica de fora
-      if (/jpe?g$/i.test(pronta.type) || /\.jpe?g$/i.test(pronta.name)) pubFotos.push(pronta);
-    } catch (e) { console.error(e); msg.textContent = "Uma das fotos não abriu. Tenta outra."; }
+  // Enquanto as fotos se preparam, não se escolhem mais nem se publica
+  const escolher = document.getElementById("pubEscolher"), enviar = document.getElementById("pubEnviar");
+  escolher.disabled = enviar.disabled = true;
+  let foraDoLimite = false;
+  try {
+    for (const f of novos) {
+      if (pubFotos.length >= PUB_MAX_FOTOS) { foraDoLimite = true; break; }
+      msg.textContent = "A preparar as fotos…";
+      try {
+        const pronta = await prepararFoto(f);
+        // A regra do Storage só aceita JPEG: o que não passou a JPEG fica de fora
+        if (pubFotos.length < PUB_MAX_FOTOS && (/jpe?g$/i.test(pronta.type) || /\.jpe?g$/i.test(pronta.name))) pubFotos.push(pronta);
+      } catch (e) { console.error(e); msg.textContent = "Uma das fotos não abriu. Tenta outra."; }
+    }
+  } finally {
+    escolher.disabled = enviar.disabled = false;
   }
   if (msg.textContent === "A preparar as fotos…") msg.textContent = "";
+  if (foraDoLimite) msg.textContent = `Só cabem ${PUB_MAX_FOTOS} fotos por publicação.`;
   pubMostrarFotos();
 }
 
@@ -499,10 +507,11 @@ async function pubEnviar() {
 
   btn.disabled = true;
   const carregadas = [];
+  const fotos = pubFotos.slice(0, PUB_MAX_FOTOS);
   try {
-    for (let i = 0; i < pubFotos.length; i++) {
-      msg.textContent = `A enviar foto ${i + 1} de ${pubFotos.length}…`;
-      const f = pubFotos[i];
+    for (let i = 0; i < fotos.length; i++) {
+      msg.textContent = `A enviar foto ${i + 1} de ${fotos.length}…`;
+      const f = fotos[i];
       const caminho = `equipa/${getDeviceId()}/${obraId}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.jpg`;
       const { error } = await SB.storage.from("obra-documentos").upload(caminho, f, { contentType: "image/jpeg", upsert: false });
       if (error) throw error;
