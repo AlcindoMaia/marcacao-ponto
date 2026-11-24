@@ -373,6 +373,22 @@ html, body {
   border-radius: 10px; padding: 12px; font-weight: 700; font-size: 15px;
 }
 .corte-msg { font-size: 13px; margin-top: 8px; }
+
+/* Publicar da obra: fotos, nota e problemas */
+.pub-fotos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.pub-fotos img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
+.pub-escolher {
+  width: 100%; background: var(--surface2); color: var(--text); border: 1px dashed var(--border);
+  border-radius: 10px; padding: 12px; font-size: 14px;
+}
+.pub-opcao { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; }
+.pub-opcao input { width: 20px; height: 20px; accent-color: var(--primary); }
+.pub-urgente { margin-left: 30px; }
+.pub-minhas { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 8px; }
+.pub-minha { font-size: 12.5px; padding: 6px 0; color: var(--muted); line-height: 1.4; }
+.pub-minha b { color: var(--text); font-weight: 500; }
+.pub-aberto { color: #e09486; }
+.pub-resolvido { color: #8fc49a; }
 </style>
 <link rel="stylesheet" href="carregar.css?v=1">
 </head>
@@ -452,6 +468,25 @@ html, body {
       <div class="corte-painel" id="cortePainel" style="display:none"></div>
     </div>
 
+    <!-- Publicar da obra: fotos, uma nota e, se for o caso, um problema -->
+    <div class="corte-section" id="pubSection" style="display:none">
+      <button type="button" class="corte-abrir" id="pubAbrir">
+        <span>📷 Publicar da obra</span><small id="pubEstado">fotos, nota ou problema</small>
+      </button>
+      <div class="corte-painel" id="pubPainel" style="display:none">
+        <div class="corte-info">Tira fotos do que fizeste ou do que está mal e escreve uma nota curta. O Alcindo vê logo. O cliente só vê as fotos que o Alcindo escolher.</div>
+        <input type="file" id="pubFicheiros" accept="image/*" multiple style="display:none">
+        <button type="button" class="pub-escolher" id="pubEscolher">📷 Tirar ou escolher fotos (até 6)</button>
+        <div class="pub-fotos" id="pubFotos"></div>
+        <textarea id="pubTexto" rows="3" maxlength="2000" placeholder="O que fizeste, o que falta ou o que está mal"></textarea>
+        <label class="pub-opcao"><input type="checkbox" id="pubProblema"> ⚠️ É um problema</label>
+        <label class="pub-opcao pub-urgente" id="pubUrgenteLinha" style="display:none"><input type="checkbox" id="pubUrgente"> 🔴 Urgente (está a parar o trabalho)</label>
+        <button type="button" class="corte-enviar" id="pubEnviar">Publicar</button>
+        <div class="corte-msg" id="pubMsg"></div>
+        <div class="pub-minhas" id="pubMinhas" style="display:none"></div>
+      </div>
+    </div>
+
     <div class="divider"></div>
 
     <!-- Histórico -->
@@ -467,7 +502,8 @@ html, body {
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="config.js?v=4"></script>
-<script src="app.js?v=8"></script>
+<script src="fotos.js?v=2"></script>
+<script src="app.js?v=9"></script>
 
 <!-- Modal parecer saída -->
 <div id="modalParecer" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:3000;align-items:flex-end;justify-content:center;padding:0">
