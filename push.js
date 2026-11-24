@@ -9,6 +9,7 @@
 
 const AVISOS_TIPOS = [
     ["clientes", "Clientes", "Quando um cliente responde a um orçamento ou faz um pedido. Na hora."],
+    ["obra",     "Problemas da obra", "Quando alguém da equipa publica um problema na área do funcionário. Na hora."],
     ["resumo",   "Precisa de ti", "Resumo às 8h do que está à tua espera (só se houver)."],
     ["registo",  "Registo diário", "Às 19h, se ainda não houver Registo diário do dia (seg a sáb)."],
     ["ponto",    "Saída esquecida", "Às 19h, quem marcou entrada e não marcou saída."],

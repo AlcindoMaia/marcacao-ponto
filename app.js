@@ -435,6 +435,132 @@ async function enviarCorte() {
   if (est) est.textContent = "Enviado ✓ À espera de aprovação";
 }
 
+// =======================================================
+// PUBLICAR DA OBRA
+// Fotos + nota curta. "É um problema" fica aberto até o Alcindo o dar como
+// resolvido (e o aviso chega-lhe ao telemóvel). As fotos passam a JPEG
+// pequeno no telemóvel (fotos.js) e vão para a pasta deste telemóvel no
+// Storage; a função publicar_obra confirma que são dele e grava tudo.
+// =======================================================
+const PUB_MAX_FOTOS = 6;
+let pubFotos = [];          // File já preparados (JPEG)
+
+function pubMostrarFotos() {
+  const c = document.getElementById("pubFotos");
+  c.querySelectorAll("img").forEach(i => URL.revokeObjectURL(i.src));
+  c.innerHTML = pubFotos.map((f, i) =>
+    `<img src="${URL.createObjectURL(f)}" alt="Foto ${i + 1}" title="Toca para tirar" data-i="${i}">`).join("");
+  c.querySelectorAll("img").forEach(img => img.addEventListener("click", () => {
+    pubFotos.splice(Number(img.dataset.i), 1);
+    pubMostrarFotos();
+  }));
+  document.getElementById("pubEscolher").textContent = pubFotos.length
+    ? `📷 Mais fotos (${pubFotos.length} de ${PUB_MAX_FOTOS}; toca numa para a tirar)`
+    : `📷 Tirar ou escolher fotos (até ${PUB_MAX_FOTOS})`;
+}
+
+async function pubEscolheuFicheiros(ev) {
+  const msg = document.getElementById("pubMsg");
+  const novos = [...(ev.target.files || [])].filter(f => ehImagem(f));
+  ev.target.value = "";
+  if (!novos.length) { msg.textContent = "Escolhe fotos (vídeos ainda não)."; return; }
+  const cabem = novos.slice(0, PUB_MAX_FOTOS - pubFotos.length);
+  if (cabem.length < novos.length) msg.textContent = `Só cabem ${PUB_MAX_FOTOS} fotos por publicação.`;
+  for (const f of cabem) {
+    msg.textContent = "A preparar as fotos…";
+    try {
+      const pronta = await prepararFoto(f);
+      // A regra do Storage só aceita JPEG: o que não passou a JPEG fica de fora
+      if (/jpe?g$/i.test(pronta.type) || /\.jpe?g$/i.test(pronta.name)) pubFotos.push(pronta);
+    } catch (e) { console.error(e); msg.textContent = "Uma das fotos não abriu. Tenta outra."; }
+  }
+  if (msg.textContent === "A preparar as fotos…") msg.textContent = "";
+  pubMostrarFotos();
+}
+
+function pubLimpar() {
+  pubFotos = [];
+  pubMostrarFotos();
+  document.getElementById("pubTexto").value = "";
+  document.getElementById("pubProblema").checked = false;
+  document.getElementById("pubUrgente").checked = false;
+  document.getElementById("pubUrgenteLinha").style.display = "none";
+}
+
+async function pubEnviar() {
+  const btn = document.getElementById("pubEnviar"), msg = document.getElementById("pubMsg");
+  const obraId = obraDoCorte();
+  const texto = document.getElementById("pubTexto").value.trim();
+  const problema = document.getElementById("pubProblema").checked;
+  const urgente = problema && document.getElementById("pubUrgente").checked;
+  if (!obraId) { msg.textContent = "Escolhe primeiro a obra onde estás."; return; }
+  if (!texto && !pubFotos.length) { msg.textContent = "Tira uma foto ou escreve uma nota."; return; }
+  if (problema && !texto) { msg.textContent = "Diz em poucas palavras qual é o problema."; return; }
+
+  btn.disabled = true;
+  const carregadas = [];
+  try {
+    for (let i = 0; i < pubFotos.length; i++) {
+      msg.textContent = `A enviar foto ${i + 1} de ${pubFotos.length}…`;
+      const f = pubFotos[i];
+      const caminho = `equipa/${getDeviceId()}/${obraId}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.jpg`;
+      const { error } = await SB.storage.from("obra-documentos").upload(caminho, f, { contentType: "image/jpeg", upsert: false });
+      if (error) throw error;
+      carregadas.push({ caminho, nome: nomeSeguroFicheiro(f.name), tamanho: f.size });
+    }
+    msg.textContent = "A publicar…";
+    const { error } = await SB.rpc("publicar_obra", {
+      p_device: getDeviceId(), p_obra_id: obraId, p_texto: texto,
+      p_problema: problema, p_urgente: urgente, p_fotos: carregadas,
+    });
+    if (error) throw error;
+    pubLimpar();
+    msg.textContent = problema
+      ? (urgente ? "✓ Problema urgente enviado. O Alcindo recebe o aviso dentro de minutos." : "✓ Problema enviado. Fica aberto até ser resolvido.")
+      : "✓ Publicado.";
+    carregarMinhasPublicacoes();
+  } catch (e) {
+    console.error(e);
+    const m = e?.message || "";
+    // As fotos que já subiram ficam na pasta deste telemóvel; publicar outra
+    // vez envia-as de novo com outro nome (o telemóvel não pode apagar).
+    msg.textContent = /dispositivo_nao_registado|row-level|security/i.test(m)
+      ? "Este telemóvel não está autorizado a publicar. Fala com o Alcindo."
+      : "Não foi possível publicar. Vê se tens rede e tenta outra vez.";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function carregarMinhasPublicacoes() {
+  const caixa = document.getElementById("pubMinhas");
+  const obraId = obraDoCorte();
+  if (!obraId) { caixa.style.display = "none"; return; }
+  const { data, error } = await SB.rpc("publicacoes_minhas", { p_device: getDeviceId(), p_obra_id: obraId });
+  if (error || !data?.length) { caixa.style.display = "none"; return; }
+  caixa.style.display = "";
+  caixa.innerHTML = `<div class="corte-zona" style="margin-top:4px">As tuas últimas</div>` + data.map(p => {
+    const quando = fmtDia(p.created_at) + " " + fmtHora(p.created_at);
+    const estado = !p.problema ? ""
+      : p.estado === "resolvido" ? ` · <span class="pub-resolvido">resolvido ✓</span>${p.resolucao ? ` (${esc(p.resolucao)})` : ""}`
+      : ` · <span class="pub-aberto">${p.urgente ? "urgente, " : ""}em aberto</span>`;
+    const fotos = p.fotos ? ` · ${p.fotos} foto${p.fotos === 1 ? "" : "s"}` : "";
+    return `<div class="pub-minha">${p.problema ? "⚠️ " : ""}<b>${esc(p.texto || "Fotos")}</b><br>${esc(quando)}${fotos}${estado}</div>`;
+  }).join("");
+}
+
+function pubPreparar() {
+  document.getElementById("pubSection").style.display = obraDoCorte() ? "" : "none";
+  if (document.getElementById("pubPainel").style.display !== "none") carregarMinhasPublicacoes();
+}
+
+function pubAbrir() {
+  const painel = document.getElementById("pubPainel");
+  const abrir = painel.style.display === "none";
+  painel.style.display = abrir ? "" : "none";
+  if (abrir) carregarMinhasPublicacoes();
+}
+
 // Lista das obras ativas (só nomes), com a última obra já escolhida
 async function carregarObrasArea() {
   const { data, error } = await SB.rpc("obras_para_marcar", { p_device: getDeviceId() });
@@ -479,7 +605,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("obraNome").style.display = "none";
     const selObra = document.getElementById("obraEscolha");
     selObra.style.display = "";
-    selObra.addEventListener("change", () => { carregarServicos(selObra.value); carregarCorte(); });
+    selObra.addEventListener("change", () => { carregarServicos(selObra.value); carregarCorte(); pubPreparar(); });
     await carregarServicos(selObra.value);
   } else {
     obra = await getObra(obraID);
@@ -500,6 +626,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("painelSaidaNao").addEventListener("click", esconderPainelSaida);
   document.getElementById("corteAbrir").addEventListener("click", abrirCorte);
   carregarCorte();
+  document.getElementById("pubAbrir").addEventListener("click", pubAbrir);
+  document.getElementById("pubEscolher").addEventListener("click", () => document.getElementById("pubFicheiros").click());
+  document.getElementById("pubFicheiros").addEventListener("change", pubEscolheuFicheiros);
+  document.getElementById("pubProblema").addEventListener("change", e => {
+    document.getElementById("pubUrgenteLinha").style.display = e.target.checked ? "" : "none";
+    if (!e.target.checked) document.getElementById("pubUrgente").checked = false;
+  });
+  document.getElementById("pubEnviar").addEventListener("click", pubEnviar);
+  pubPreparar();
   // Botão de carga — pré-preenche a obra como origem
   const btnCarga = document.getElementById("btnCarga");
   if (btnCarga && obraID) btnCarga.href = "carga.html?origem=" + obraID;

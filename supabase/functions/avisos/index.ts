@@ -10,6 +10,7 @@
 //
 // O que envia (tipo -> quando):
 //   clientes  resposta a um orçamento ou pedido na Área do cliente, na hora
+//   obra      problema publicado pela equipa na área do funcionário, na hora
 //   resumo    "Precisa de ti" às 8h (só se houver alguma coisa)
 //   rh        documentos de RH caducados ou a caducar em 30 dias, segunda às 8h
 //   registo   às 19h (seg-sáb), se ainda não houver Registo diário do dia
@@ -138,13 +139,33 @@ async function avisosClientes(): Promise<Aviso[]> {
     return out;
 }
 
+// ---------- obra (na hora): problemas publicados pela equipa ----------
+async function avisosObra(): Promise<Aviso[]> {
+    const desde = new Date(Date.now() - JANELA_CLIENTES_H * 3600_000).toISOString();
+    const { data, error } = await SB.from("obra_publicacoes")
+        .select("id, texto, urgente, obras(nome), funcionarios(nome)")
+        .eq("estado", "aberto").gte("created_at", desde).order("created_at");
+    if (error) return [];   // sem o SQL novo a tabela não existe
+    const out: Aviso[] = [];
+    for (const p of data || []) {
+        if (!await primeiraVez("prob:" + p.id)) continue;
+        // deno-lint-ignore no-explicit-any
+        const x: any = p;
+        out.push({ titulo: `${p.urgente ? "🔴 Urgente" : "⚠️ Problema"} · ${x.obras?.nome || "obra"}`,
+                   corpo: cortar(`${x.funcionarios?.nome || "Equipa"}: ${p.texto || ""}`),
+                   url: "admin.html", tag: "prob-" + p.id });
+    }
+    return out;
+}
+
 // ---------- 8h: Precisa de ti ----------
 async function contar(q: PromiseLike<{ count: number | null }>) { return (await q).count || 0; }
 async function avisoResumo(hoje: string): Promise<Aviso | null> {
     const h = { count: "exact" as const, head: true };
-    const [resp, peds, cortes, mat, atraso, semObra, tarefas] = await Promise.all([
+    const [resp, peds, probs, cortes, mat, atraso, semObra, tarefas] = await Promise.all([
         contar(SB.from("orcamento_respostas").select("id", h).is("tratada_em", null)),
         contar(SB.from("cliente_pedidos").select("id", h).eq("estado", "novo")),
+        contar(SB.from("obra_publicacoes").select("id", h).eq("estado", "aberto")),
         contar(SB.from("cortes_semanais").select("id", h).eq("estado", "pendente")),
         contar(SB.from("pedidos").select("id", h).eq("estado", "rascunho")),
         contar(SB.from("movimentos_financeiros").select("id", h).eq("estado_pagamento", "por_pagar")
@@ -155,6 +176,7 @@ async function avisoResumo(hoje: string): Promise<Aviso | null> {
     const partes = [
         resp && plural(resp, "resposta de cliente", "respostas de clientes"),
         peds && plural(peds, "pedido de cliente", "pedidos de clientes"),
+        probs && plural(probs, "problema da obra em aberto", "problemas da obra em aberto"),
         cortes && plural(cortes, "corte semanal por aprovar", "cortes semanais por aprovar"),
         mat && plural(mat, "pedido de material por validar", "pedidos de material por validar"),
         atraso && plural(atraso, "fatura por pagar", "faturas por pagar"),
@@ -229,6 +251,7 @@ async function correrCron() {
     };
 
     for (const a of await avisosClientes()) await mandar("clientes", a);
+    for (const a of await avisosObra()) await mandar("obra", a);
 
     if (hora === 8 && await primeiraVez("resumo:" + dia)) {
         await mandar("resumo", await avisoResumo(dia));

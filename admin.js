@@ -4927,6 +4927,8 @@ async function vgCarregarAlertas() {
     catch (e) { console.warn("vgPedidosClientes", e); }
     try { const a = await vgExtrasRespondidos(); if (a) alertas.push(a); }
     catch (e) { console.warn("vgExtrasRespondidos", e); }
+    try { const a = await vgDaEquipa(); if (a) alertas.push(a); }
+    catch (e) { console.warn("vgDaEquipa", e); }
     for (const procurar of [vgCortesPorAprovar, vgPedidosPorValidar, vgPrecosSubiram, vgDespesasSemObra,
                             vgFaturasPorPagar, vgStockAbaixoMinimo, vgTarefasAtrasadas, vgPontoParaCorrigir]) {
         try { const a = await procurar(); if (a) alertas.push(a); }
@@ -5000,6 +5002,25 @@ async function vgPedidosClientes() {
              titulo: (data.length === 1 ? "1 pedido de cliente" : `${data.length} pedidos de clientes`) + (recl ? ` (${recl} reclamaç${recl === 1 ? "ão" : "ões"})` : ""),
              sub: quem.slice(0, 3).join(", ") + (quem.length > 3 ? "…" : "") + " · a resposta aparece na Área do cliente",
              lista: "pedidosCliente" };
+}
+
+// O que a equipa publicou da obra (área do funcionário): problemas em
+// aberto e publicações que ainda não viste
+async function vgDaEquipa() {
+    const { data, error } = await SB.from("obra_publicacoes")
+        .select("id, problema, urgente, estado, obras(nome)")
+        .or("estado.eq.aberto,and(problema.eq.false,visto_em.is.null)");
+    if (error || !data?.length) return null;   // sem o SQL novo a tabela não existe
+    const probs = data.filter(p => p.estado === "aberto"), urg = probs.filter(p => p.urgente).length;
+    const novas = data.length - probs.length;
+    const obras = [...new Set(data.map(p => p.obras?.nome || "obra"))];
+    const partes = [];
+    if (probs.length) partes.push((probs.length === 1 ? "1 problema da obra" : `${probs.length} problemas da obra`) + (urg ? ` (${urg} urgente${urg === 1 ? "" : "s"})` : ""));
+    if (novas) partes.push(novas === 1 ? "1 publicação nova" : `${novas} publicações novas`);
+    return { icone: urg ? "🔴" : probs.length ? "⚠️" : "📷", cor: urg ? "rgba(165,72,61,.18)" : "rgba(181,136,99,.22)",
+             titulo: "Da equipa: " + partes.join(" e "),
+             sub: obras.slice(0, 3).join(", ") + (obras.length > 3 ? "…" : "") + " · fotos e notas de quem está na obra",
+             lista: "equipa" };
 }
 
 // Cortes semanais das obras à espera de aprovação
@@ -5203,6 +5224,42 @@ function listaMudou() {
 
 const TIPO_PEDIDO_CLIENTE = { informacao: "Informação", extra: "Trabalho extra", reclamacao: "Reclamação", sugestao: "Sugestão" };
 const LISTAS_RAPIDAS = {
+    // ---- Da equipa: problemas em aberto e publicações por ver ----
+    async equipa() {
+        const { data, error } = await SB.from("obra_publicacoes")
+            .select("id, texto, problema, urgente, estado, created_at, obra_id, obras(nome), funcionarios(nome), obra_documentos(id, caminho)")
+            .or("estado.eq.aberto,and(problema.eq.false,visto_em.is.null)")
+            .order("urgente", { ascending: false }).order("created_at");
+        if (error) throw error;
+        const lista = (data || []).sort((a, b) => (b.estado === "aberto") - (a.estado === "aberto"));
+        _vgListas.equipa = lista;
+        // Miniaturas: o bucket é privado, por isso pedem-se links de 1 hora
+        const caminhos = lista.flatMap(p => (p.obra_documentos || []).map(d => d.caminho));
+        const urls = {};
+        if (caminhos.length) {
+            const { data: ass } = await SB.storage.from("obra-documentos").createSignedUrls(caminhos, 3600);
+            (ass || []).forEach(a => { if (a.signedUrl) urls[a.path] = a.signedUrl; });
+        }
+        const probs = lista.filter(p => p.estado === "aberto").length;
+        listaPreencher("Da equipa",
+            probs ? "Os problemas ficam aqui até os dares como resolvidos. Quem os publicou vê a tua nota no telemóvel."
+                  : "O que a equipa publicou da obra. As fotos já estão nos documentos da obra, escondidas do cliente.",
+            lista.map((p, i) => `<div class="lista-linha" style="display:block">
+                <div style="font-weight:600">${p.problema ? (p.urgente ? "🔴 Urgente · " : "⚠️ Problema · ") : "📷 "}${esc(p.obras?.nome || "Obra")}</div>
+                <div class="lista-det">${esc(p.funcionarios?.nome || "Equipa")} · ${esc(new Date(p.created_at).toLocaleString("pt-PT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }))}</div>
+                ${p.texto ? `<div style="white-space:pre-wrap;margin:6px 0;font-size:13.5px">${esc(p.texto)}</div>` : ""}
+                ${(p.obra_documentos || []).length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0">${p.obra_documentos.map(d => urls[d.caminho]
+                    ? `<a href="${esc(urls[d.caminho])}" target="_blank" rel="noopener noreferrer"><img src="${esc(urls[d.caminho])}" alt="Foto" style="width:72px;height:72px;object-fit:cover;border-radius:8px"></a>` : "").join("")}</div>` : ""}
+                ${p.estado === "aberto" ? `<textarea id="equipaResol-${i}" rows="2" maxlength="2000" placeholder="O que se fez (opcional, quem publicou vê)" style="width:100%"></textarea>` : ""}
+                <div class="lista-accoes" style="justify-content:flex-end;margin-top:6px;flex-wrap:wrap;gap:6px">
+                    <button type="button" class="btn-secondary" onclick="abrirObraDaEquipa('${esc(p.obra_id)}')">Ver na obra</button>
+                    ${p.estado === "aberto"
+                        ? `<button type="button" class="btn-primary" onclick="listaEquipaResolver(${i}, this)">✓ Resolvido</button>`
+                        : `<button type="button" class="btn-primary" onclick="listaEquipaVisto(${i}, this)">✓ Visto</button>`}
+                </div>
+            </div>`).join(""));
+    },
+
     // ---- Pedidos dos clientes ----
     async pedidosCliente() {
         const { data, error } = await SB.from("cliente_pedidos")
@@ -5437,6 +5494,43 @@ async function listaPorObra(movId, sel) {
     const linha = sel.closest(".lista-linha");
     linha.classList.add("feita");
     linha.querySelector(".lista-accoes").innerHTML = `<span class="lista-feito">${esc(nome)} ✓</span>`;
+    listaMudou();
+}
+
+// "Ver na obra": abre o painel da obra nos Documentos, onde as fotos estão
+// e onde se escolhe se o cliente as vê
+async function abrirObraDaEquipa(obraId) {
+    const { data: obra, error } = await SB.from("obras").select("*").eq("id", obraId).maybeSingle();
+    if (error || !obra) { console.error(error); alert("Não foi possível abrir a obra."); return; }
+    fecharListaRapida();
+    abrirPainelObra(obra, "documentos");
+}
+
+async function listaEquipaResolver(i, btn) {
+    const p = _vgListas.equipa?.[i];
+    if (!p) return;
+    btn.disabled = true;
+    const resolucao = document.getElementById("equipaResol-" + i)?.value.trim() || null;
+    const agora = new Date().toISOString();
+    const { error } = await SB.from("obra_publicacoes")
+        .update({ estado: "resolvido", resolucao, resolvido_em: agora, visto_em: agora }).eq("id", p.id);
+    if (error) { console.error(error); alert("Não foi possível gravar."); btn.disabled = false; return; }
+    const linha = btn.closest(".lista-linha");
+    linha.classList.add("feita");
+    linha.querySelector(".lista-accoes").innerHTML = `<span class="lista-feito">Resolvido ✓</span>`;
+    linha.querySelector("textarea")?.remove();
+    listaMudou();
+}
+
+async function listaEquipaVisto(i, btn) {
+    const p = _vgListas.equipa?.[i];
+    if (!p) return;
+    btn.disabled = true;
+    const { error } = await SB.from("obra_publicacoes").update({ visto_em: new Date().toISOString() }).eq("id", p.id);
+    if (error) { console.error(error); alert("Não foi possível gravar."); btn.disabled = false; return; }
+    const linha = btn.closest(".lista-linha");
+    linha.classList.add("feita");
+    linha.querySelector(".lista-accoes").innerHTML = `<span class="lista-feito">Visto ✓</span>`;
     listaMudou();
 }
 
@@ -9980,7 +10074,13 @@ async function carregarNotificacoes() {
     // Recursos humanos: validades, dias sem registo, ausências (rh.js)
     const rh = await rhAlertas().catch(e => { console.error("rhAlertas:", e); return { total: 0, html: "" }; });
 
-    const total = atrasados.length + stockAlertas.length + respostas.length + rh.total;
+    // Problemas da obra publicados pela equipa, ainda em aberto
+    const { data: probsObra } = await SB.from("obra_publicacoes")
+        .select("id, texto, urgente, obras(nome), funcionarios(nome)").eq("estado", "aberto")
+        .order("urgente", { ascending: false }).order("created_at");
+    const problemas = probsObra || [];   // sem o SQL novo vem vazio
+
+    const total = atrasados.length + stockAlertas.length + respostas.length + rh.total + problemas.length;
     const badge = document.getElementById("notifBadge");
     const painel = document.getElementById("notifPainel");
     if (!badge || !painel) return;
@@ -9995,6 +10095,17 @@ async function carregarNotificacoes() {
     badge.textContent   = total > 9 ? "9+" : total;
 
     let html = rh.html;
+
+    if (problemas.length > 0) {
+        html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:700;letter-spacing:.05em;opacity:.5;text-transform:uppercase">
+            ⚠️ ${problemas.length} Problema(s) da obra em aberto</div>`;
+        problemas.forEach(p => {
+            html += `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer" onclick="abrirListaRapida('equipa')">
+                <div style="font-size:13px;font-weight:500;color:var(--text-dark)">${p.urgente ? "🔴 " : ""}${esc(p.obras?.nome || "Obra")} · ${esc(p.funcionarios?.nome || "Equipa")}</div>
+                <div style="font-size:11px;color:${p.urgente ? "#e05c5c" : "var(--primary)"};margin-top:2px">${esc((p.texto || "").slice(0, 90))}</div>
+            </div>`;
+        });
+    }
 
     if (respostas.length > 0) {
         html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:700;letter-spacing:.05em;opacity:.5;text-transform:uppercase">
