@@ -570,15 +570,38 @@ function pubAbrir() {
   if (abrir) carregarMinhasPublicacoes();
 }
 
-// Lista das obras ativas (só nomes), com a última obra já escolhida
+// Lista das obras ativas (só nomes), sem nenhuma escolhida: a obra só vem
+// sugerida se a localização mostrar que ele está lá (sugerirObraPerto)
 async function carregarObrasArea() {
   const { data, error } = await SB.rpc("obras_para_marcar", { p_device: getDeviceId() });
   if (error) { console.error(error); return false; }
   const sel = document.getElementById("obraEscolha");
   const lista = data || [];
   sel.innerHTML = `<option value="">Em que obra estás?</option>` +
-    lista.map(o => `<option value="${esc(o.id)}"${o.ultima ? " selected" : ""}>${esc(o.nome)}</option>`).join("");
+    lista.map(o => `<option value="${esc(o.id)}">${esc(o.nome)}</option>`).join("");
   return true;
+}
+
+// Ao abrir a área do funcionário, pede a localização e pergunta ao servidor
+// qual é a obra ativa mais próxima dentro do raio da obra + 50 m. As
+// coordenadas das obras ficam no servidor. Sem localização, sem obra perto
+// ou se ele já escolheu à mão, não se mexe na escolha.
+function sugerirObraPerto() {
+  if (!navigator.geolocation) return;
+  const sel = document.getElementById("obraEscolha");
+  let mexeu = false;
+  sel.addEventListener("change", () => { mexeu = true; }, { once: true });
+  navigator.geolocation.getCurrentPosition(async pos => {
+    if (mexeu || sel.value) return;
+    const { data, error } = await SB.rpc("obra_perto", {
+      p_device: getDeviceId(), p_lat: pos.coords.latitude, p_lon: pos.coords.longitude
+    });
+    if (error) { console.error(error); return; }
+    if (!data || mexeu || sel.value) return;
+    if (![...sel.options].some(o => o.value === data)) return;
+    sel.value = data;
+    sel.dispatchEvent(new Event("change"));
+  }, () => {}, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -616,6 +639,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     selObra.style.display = "";
     selObra.addEventListener("change", () => { carregarServicos(selObra.value); carregarCorte(); pubPreparar(); });
     await carregarServicos(selObra.value);
+    sugerirObraPerto();
   } else {
     obra = await getObra(obraID);
     if (!obra) {
