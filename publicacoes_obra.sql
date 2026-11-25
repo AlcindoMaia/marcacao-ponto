@@ -46,6 +46,7 @@ grant select, insert, update, delete on obra_publicacoes to authenticated;
 
 -- ---------- o telemóvel está registado e ativo? ----------
 -- Usada pela regra do Storage (que corre como anon e não lê funcionarios).
+-- Também trava enchimentos: no máximo 60 fotos por telemóvel em 24 horas.
 create or replace function public.dispositivo_ativo(p_device text)
 returns boolean
 language sql
@@ -53,7 +54,11 @@ stable security definer
 set search_path to 'public'
 as $$
     select coalesce(p_device is not null and length(p_device) >= 16
-           and exists (select 1 from funcionarios f where f.device_id = p_device and f.ativo), false);
+           and exists (select 1 from funcionarios f where f.device_id = p_device and f.ativo)
+           and (select count(*) from storage.objects s
+                 where s.bucket_id = 'obra-documentos'
+                   and s.name like 'equipa/' || replace(replace(p_device, '%', ''), '_', '') || '/%'
+                   and s.created_at > now() - interval '24 hours') < 60, false);
 $$;
 revoke execute on function public.dispositivo_ativo(text) from public;
 grant  execute on function public.dispositivo_ativo(text) to anon, authenticated;
@@ -114,7 +119,9 @@ begin
            or left(v_cam, length('equipa/' || p_device || '/' || p_obra_id::text || '/'))
               <> 'equipa/' || p_device || '/' || p_obra_id::text || '/'
            or v_cam like '%..%'
-           or not exists (select 1 from storage.objects s where s.bucket_id = 'obra-documentos' and s.name = v_cam)
+           or not exists (select 1 from storage.objects s
+                           where s.bucket_id = 'obra-documentos' and s.name = v_cam
+                             and lower(coalesce(s.metadata->>'mimetype', '')) = 'image/jpeg')
            or exists (select 1 from obra_documentos d where d.caminho = v_cam) then
             raise exception 'foto_invalida' using errcode = '22023';
         end if;
@@ -129,8 +136,9 @@ begin
     insert into obra_documentos (obra_id, tipo, nome_ficheiro, caminho, mime, tamanho,
                                  visivel_cliente, estado, criado_por, publicacao_id)
     select p_obra_id, 'foto', left(coalesce(nullif(x->>'nome', ''), 'foto.jpg'), 200), x->>'caminho',
-           'image/jpeg', nullif(x->>'tamanho', '')::bigint, false, 'arquivado', v_func.nome, v_id
-      from jsonb_array_elements(v_fotos) x;
+           'image/jpeg', nullif(s.metadata->>'size', '')::bigint, false, 'arquivado', v_func.nome, v_id
+      from jsonb_array_elements(v_fotos) x
+      join storage.objects s on s.bucket_id = 'obra-documentos' and s.name = x->>'caminho';
 
     return v_id;
 end;
@@ -168,7 +176,13 @@ grant  execute on function public.publicacoes_minhas(text, uuid) to anon, authen
 -- ---------- avisos no telemóvel: tipo novo "obra" ----------
 -- Quem já tem os avisos ligados passa a receber também os da obra.
 alter table push_subscricoes alter column tipos set default array['clientes','obra','resumo','registo','ponto','rh'];
-update push_subscricoes set tipos = array_append(tipos, 'obra') where not ('obra' = any(tipos));
+-- Só na primeira vez (marca em push_config): quem desligar este tipo nos
+-- avisos não o volta a ter ligado se o ficheiro for corrido outra vez.
+alter table push_config add column if not exists obra_ligado boolean not null default false;
+update push_subscricoes set tipos = array_append(tipos, 'obra')
+ where not ('obra' = any(tipos))
+   and not (select obra_ligado from push_config where id = 1);
+update push_config set obra_ligado = true where id = 1;
 
 -- Confirmar: deve devolver a tabela e as duas funções
 select (select count(*) from obra_publicacoes) as publicacoes,

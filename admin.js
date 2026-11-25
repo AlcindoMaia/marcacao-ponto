@@ -5222,6 +5222,7 @@ function listaMudou() {
     if (typeof carregarNotificacoes === "function") carregarNotificacoes();
 }
 
+let _equipaBlobs = [];   // fotos da lista "Da equipa" (libertadas ao reabrir)
 const TIPO_PEDIDO_CLIENTE = { informacao: "Informação", extra: "Trabalho extra", reclamacao: "Reclamação", sugestao: "Sugestão" };
 const LISTAS_RAPIDAS = {
     // ---- Da equipa: problemas em aberto e publicações por ver ----
@@ -5233,13 +5234,18 @@ const LISTAS_RAPIDAS = {
         if (error) throw error;
         const lista = (data || []).sort((a, b) => (b.estado === "aberto") - (a.estado === "aberto"));
         _vgListas.equipa = lista;
-        // Miniaturas: o bucket é privado, por isso pedem-se links de 1 hora
+        // Miniaturas: o bucket é privado e a página só mostra imagens locais
+        // (blob:), por isso cada foto é descarregada e mostrada daqui
         const caminhos = lista.flatMap(p => (p.obra_documentos || []).map(d => d.caminho));
+        _equipaBlobs.forEach(u => URL.revokeObjectURL(u));
+        _equipaBlobs = [];
         const urls = {};
-        if (caminhos.length) {
-            const { data: ass } = await SB.storage.from("obra-documentos").createSignedUrls(caminhos, 3600);
-            (ass || []).forEach(a => { if (a.signedUrl) urls[a.path] = a.signedUrl; });
-        }
+        await Promise.all(caminhos.map(async c => {
+            const { data: blob, error: e } = await SB.storage.from("obra-documentos").download(c);
+            if (e || !blob) { console.warn("foto da equipa", c, e); return; }
+            urls[c] = URL.createObjectURL(blob);
+            _equipaBlobs.push(urls[c]);
+        }));
         const probs = lista.filter(p => p.estado === "aberto").length;
         listaPreencher("Da equipa",
             probs ? "Os problemas ficam aqui até os dares como resolvidos. Quem os publicou vê a tua nota no telemóvel."
