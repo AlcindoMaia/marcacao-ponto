@@ -332,7 +332,7 @@ function estadoPagamentoCurto(m, parciais) {
     const txt = pago > 0.004
         ? `${ent ? "recebido" : "pago"} ${pago.toFixed(2)} € · falta ${(Number(m.valor_total) - pago).toFixed(2)} €`
         : (ent ? "por receber" : "por pagar");
-    return `<div style="font-size:10px;color:#fb923c">${txt}</div>`;
+    return `<div style="font-size:11px;color:#fb923c">${txt}</div>`;
 }
 // Grava um pagamento (parcial ou total) de uma fatura. A base de dados põe a
 // fatura como "pago" quando a soma dos pagamentos chega ao total.
@@ -730,7 +730,7 @@ function celulaPagamentoOrdenado(f, est, pags, anoMes) {
     const eur = v => Number(v).toFixed(2) + " €";
     const ultima = [...(pags || [])].sort((a, b) => (b.data_documento || "").localeCompare(a.data_documento || ""))[0];
     const fid = esc(JSON.stringify(String(f.id))), am = esc(JSON.stringify(anoMes));
-    const btn = (txt, acao, sec) => `<button type="button" class="${sec ? "btn-secondary" : "btn-pequeno"}" style="font-size:12px;padding:3px 10px" onclick='${acao}'>${txt}</button>`;
+    const btn = (txt, acao, sec) => `<button type="button" class="${sec ? "btn-secondary" : "btn-pequeno"}" style="font-size:12px;padding:4px 10px" onclick='${acao}'>${txt}</button>`;
     const anular = btn("Anular", `anularPagamentoOrdenado(${fid}, ${am})`, true);
     const pagar  = v => btn(`💶 Marcar pago ${eur(v)}`, `marcarOrdenadoPago(${fid}, ${am}, ${v})`);
     const ok = t => `<span style="color:#8fbfa0">✓ ${t}</span>`;
@@ -949,7 +949,7 @@ function cabecalhoDiasMes(dias) {
         const dow  = dObj.getDay();
         const fer  = feriadoEm(d);
         const isWE = dow===0||dow===6||!!fer;
-        return `<th style="padding:4px 2px;text-align:center;min-width:28px;font-size:10px;font-weight:500;${isWE?"opacity:.3":""}${fer?";color:#a5483d":""}"${fer?` title="Feriado: ${esc(fer)}"`:""}>${String(dObj.getDate()).padStart(2,"0")}</th>`;
+        return `<th style="padding:4px 2px;text-align:center;min-width:28px;font-size:11px;font-weight:500;${isWE?"opacity:.3":""}${fer?";color:#a5483d":""}"${fer?` title="Feriado: ${esc(fer)}"`:""}>${String(dObj.getDate()).padStart(2,"0")}</th>`;
     }).join("");
 }
 
@@ -1022,11 +1022,11 @@ function renderRaMapaFuncionario(ano, mes) {
     let html = `<table style="border-collapse:collapse;font-size:12px;width:100%">
     <thead>
         <tr style="background:var(--primary-lt)">
-            <th style="padding:8px 12px;text-align:left;position:sticky;left:0;background:var(--panel-solid);z-index:2;min-width:140px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Funcionário</th>
+            <th style="padding:8px 12px;text-align:left;position:sticky;left:0;background:var(--panel-solid);z-index:2;min-width:140px;font-size:11px;">Funcionário</th>
             ${cabecalhoDiasMes(dias)}
-            <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Dias</th>
-            <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Horas</th>
-            <th style="padding:8px 10px;text-align:right;min-width:70px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Valor €</th>
+            <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;">Dias</th>
+            <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;">Horas</th>
+            <th style="padding:8px 10px;text-align:right;min-width:70px;font-size:11px;">Valor €</th>
         </tr>
     </thead>
     <tbody>`;
@@ -1037,14 +1037,14 @@ function renderRaMapaFuncionario(ano, mes) {
         const val = fd.calc ? `<span title="${esc(fd.calc.nota || basePagamento(fd.f))}">${fd.calc.valor.toFixed(2)}€</span>` : "—";
 
         html += `<tr style="background:${bg};border-bottom:1px solid rgba(0,0,0,.07)">
-            <td style="padding:7px 12px;position:sticky;left:0;background:var(--panel-solid);z-index:1;font-weight:500;white-space:nowrap;border-right:1px solid rgba(0,0,0,.1)">${esc(func)}</td>
+            <td style="padding:8px 12px;position:sticky;left:0;background:var(--panel-solid);z-index:1;font-weight:500;white-space:nowrap;border-right:1px solid rgba(0,0,0,.1)">${esc(func)}</td>
             ${dias.map(d => {
                 const e = estadoDiaRA(fd, d);
-                return `<td style="text-align:center;padding:3px 2px;background:${FUNDO[e.tipo] || "transparent"};border:1px solid rgba(0,0,0,.05);font-size:11px" title="${esc(e.title)}">${e.sym}</td>`;
+                return `<td style="text-align:center;padding:4px 2px;background:${FUNDO[e.tipo] || "transparent"};border:1px solid rgba(0,0,0,.05);font-size:11px" title="${esc(e.title)}">${e.sym}</td>`;
             }).join("")}
-            <td style="padding:7px 10px;text-align:right;font-weight:600">${fd.totalDias}</td>
-            <td style="padding:7px 10px;text-align:right">${fd.totalH.toFixed(1)}h</td>
-            <td style="padding:7px 10px;text-align:right;color:#4f7a63;font-weight:600">${val}</td>
+            <td style="padding:8px 10px;text-align:right;font-weight:600">${fd.totalDias}</td>
+            <td style="padding:8px 10px;text-align:right">${fd.totalH.toFixed(1)}h</td>
+            <td style="padding:8px 10px;text-align:right;color:#4f7a63;font-weight:600">${val}</td>
         </tr>`;
     });
 
@@ -1075,10 +1075,10 @@ function renderRaMapaObra(ano, mes) {
     let html = `<table style="border-collapse:collapse;font-size:12px;width:100%">
     <thead>
         <tr style="background:var(--primary-lt)">
-            <th style="padding:8px 12px;text-align:left;position:sticky;left:0;background:var(--panel-solid);z-index:2;min-width:160px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Obra</th>
+            <th style="padding:8px 12px;text-align:left;position:sticky;left:0;background:var(--panel-solid);z-index:2;min-width:160px;font-size:11px;">Obra</th>
             ${cabecalhoDiasMes(dias)}
-            <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Horas</th>
-            <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Colabs.</th>
+            <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;">Horas</th>
+            <th style="padding:8px 10px;text-align:right;min-width:60px;font-size:11px;">Colabs.</th>
         </tr>
     </thead>
     <tbody>`;
@@ -1088,7 +1088,7 @@ function renderRaMapaObra(ano, mes) {
         const bg  = oi%2===1 ? "rgba(0,0,0,.03)" : "transparent";
 
         html += `<tr style="background:${bg};border-bottom:1px solid rgba(0,0,0,.07)">
-            <td style="padding:7px 12px;position:sticky;left:0;background:var(--panel-solid);z-index:1;font-weight:500;white-space:nowrap;border-right:1px solid rgba(0,0,0,.1)">${esc(obra)}</td>
+            <td style="padding:8px 12px;position:sticky;left:0;background:var(--panel-solid);z-index:1;font-weight:500;white-space:nowrap;border-right:1px solid rgba(0,0,0,.1)">${esc(obra)}</td>
             ${dias.map(d => {
                 const dObj = new Date(d+"T12:00:00");
                 const dow  = dObj.getDay();
@@ -1105,10 +1105,10 @@ function renderRaMapaObra(ano, mes) {
                     sym = nFunc.toString();
                     title = Object.entries(reg).map(([f,h])=>`${f}: ${h}h`).join(", ");
                 }
-                return `<td style="text-align:center;padding:3px 2px;background:${bg2};border:1px solid rgba(0,0,0,.05);font-size:11px;font-weight:${reg?"600":"400"}" title="${esc(title)}">${sym}</td>`;
+                return `<td style="text-align:center;padding:4px 2px;background:${bg2};border:1px solid rgba(0,0,0,.05);font-size:11px;font-weight:${reg?"600":"400"}" title="${esc(title)}">${sym}</td>`;
             }).join("")}
-            <td style="padding:7px 10px;text-align:right;font-weight:600">${od.totalH.toFixed(1)}h</td>
-            <td style="padding:7px 10px;text-align:right;opacity:.7">${od.funcs.size}</td>
+            <td style="padding:8px 10px;text-align:right;font-weight:600">${od.totalH.toFixed(1)}h</td>
+            <td style="padding:8px 10px;text-align:right;opacity:.7">${od.funcs.size}</td>
         </tr>`;
     });
 
@@ -1161,16 +1161,16 @@ function renderRaDetalhe() {
         const dataFmt = r.data ? r.data.split("-").reverse().join("/") : "—";
 
         html += `<tr style="background:${bg};border-bottom:1px solid rgba(0,0,0,.05)">
-            <td style="padding:7px 12px;font-variant-numeric:tabular-nums">${dataFmt}</td>
-            <td style="padding:7px 12px;font-weight:500">${esc(r.funcionarios?.nome || (r.funcionario_id ? "—" : nomeTempRA(r.observacoes)))}</td>
-            <td style="padding:7px 12px;opacity:.7">${esc(r.obras?.nome||"—")}</td>
-            <td style="padding:7px 12px;text-align:center">
+            <td style="padding:8px 12px;font-variant-numeric:tabular-nums">${dataFmt}</td>
+            <td style="padding:8px 12px;font-weight:500">${esc(r.funcionarios?.nome || (r.funcionario_id ? "—" : nomeTempRA(r.observacoes)))}</td>
+            <td style="padding:8px 12px;opacity:.7">${esc(r.obras?.nome||"—")}</td>
+            <td style="padding:8px 12px;text-align:center">
                 ${r.tipo==="presenca"
                     ? `<span style="background:rgba(143,191,160,.15);color:#4f7a63;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">Presente</span>`
                     : `<span style="background:rgba(224,148,134,.15);color:#a5483d;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">Falta</span>`}
             </td>
-            <td style="padding:7px 12px;text-align:right">${r.tipo==="presenca"?Number(r.horas||0).toFixed(1)+"h":"—"}</td>
-            <td style="padding:7px 12px;text-align:right;color:#4f7a63">${val}</td>
+            <td style="padding:8px 12px;text-align:right">${r.tipo==="presenca"?Number(r.horas||0).toFixed(1)+"h":"—"}</td>
+            <td style="padding:8px 12px;text-align:right;color:#4f7a63">${val}</td>
         </tr>`;
     });
 
@@ -1370,7 +1370,7 @@ async function carregarRegistos() {
         });
 
         document.getElementById("kpiAssiduidade").textContent = assid + "%";
-        document.getElementById("kpiAssiduidade").style.color = assid >= 80 ? "#8fbfa0" : assid >= 60 ? "#f97316" : "#e09486";
+        document.getElementById("kpiAssiduidade").style.color = assid >= 80 ? "#8fbfa0" : assid >= 60 ? "var(--color-warn)" : "#e09486";
         document.getElementById("kpiDiasRegisto").textContent  = diasComRegisto + " / " + diasUteis;
         document.getElementById("kpiHorasExtras").textContent  = totalExtras.toFixed(1) + "h";
         document.getElementById("kpiIncompletos").textContent  = incompletos;
@@ -1404,8 +1404,8 @@ async function carregarRegistos() {
             <td>${r.dia}</td>
             <td>${fmt(r.entrada)}</td>
             <td>${fmt(r.saida)}</td>
-            <td class="col-horas" style="${temExtras ? "color:#f97316;font-weight:700" : ""}">
-                ${horasDisplay}${temExtras ? ` <span style="font-size:10px;background:rgba(249,115,22,.15);padding:1px 5px;border-radius:4px">+EXT</span>` : ""}
+            <td class="col-horas" style="${temExtras ? "color:var(--color-warn);font-weight:600" : ""}">
+                ${horasDisplay}${temExtras ? ` <span style="font-size:11px;background:rgba(249,115,22,.15);padding:1px 4px;border-radius:4px">+EXT</span>` : ""}
             </td>
             <td>${incompleto
                 ? `<span class="estado-incompleto">Incompleto</span>`
@@ -1462,7 +1462,7 @@ function renderMapaPresencas() {
                 const fer = feriadoEm(d);
                 const isWeekend = dow === 0 || dow === 6 || !!fer;
                 const label = String(dObj.getDate()).padStart(2,"0");
-                return `<th style="padding:4px 3px;text-align:center;min-width:24px;${isWeekend?"opacity:.35":""}${fer?";color:#e09486":""}"${fer?` title="Feriado: ${esc(fer)}"`:""}>${label}</th>`;
+                return `<th style="padding:4px 4px;text-align:center;min-width:24px;${isWeekend?"opacity:.35":""}${fer?";color:#e09486":""}"${fer?` title="Feriado: ${esc(fer)}"`:""}>${label}</th>`;
             }).join("")}
         </tr></thead>
         <tbody>
@@ -1860,8 +1860,8 @@ async function carregarFuncionarios() {
         tr.innerHTML = `
             <td style="font-weight:500">
                 ${semaforos[f.id] ? `<span title="${esc(semaforos[f.id].dica)}" style="margin-right:4px">${semaforos[f.id].icone}</span>` : ""}${esc(f.nome || "—")}
-                ${!temDevice ? '<span style="font-size:10px;color:#b58863;margin-left:4px">⚠ sem QR</span>' : ""}
-                ${f.tipo_contrato === 'temporario' ? '<span style="font-size:9px;font-weight:700;background:rgba(181,136,99,.15);color:#c8901e;padding:1px 6px;border-radius:8px;margin-left:4px">TEMP</span>' : ""}
+                ${!temDevice ? '<span style="font-size:11px;color:#b58863;margin-left:4px">⚠ sem QR</span>' : ""}
+                ${f.tipo_contrato === 'temporario' ? '<span style="font-size:11px;font-weight:600;background:rgba(181,136,99,.15);color:#c8901e;padding:1px 6px;border-radius:8px;margin-left:4px">TEMP</span>' : ""}
             </td>
             <td style="font-size:12px;opacity:.7">${f.codigo || "—"}</td>
             <td>
@@ -2049,8 +2049,8 @@ async function abrirHistoricoFuncionario(func) {
     div.innerHTML = `
       <div style="background:var(--bg-dark-panel,#3d4d55);border-radius:16px;padding:22px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.5)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-            <h3 style="font-family:var(--font-title,sans-serif);letter-spacing:.5px;margin:0">${esc(func.nome)}</h3>
-            <button id="fichaFuncFechar" aria-label="Fechar" style="background:none;border:none;font-size:22px;cursor:pointer;opacity:.6;color:inherit">×</button>
+            <h3 style="font-family:var(--font-title,sans-serif);margin:0">${esc(func.nome)}</h3>
+            <button id="fichaFuncFechar" aria-label="Fechar" style="background:none;border:none;font-size:20px;cursor:pointer;opacity:.6;color:inherit">×</button>
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
             <button id="fichaFuncAnt" class="btn-icone" aria-label="Mês anterior" style="min-width:40px">◀</button>
@@ -2123,7 +2123,7 @@ async function carregarFichaMes(anoMes) {
 
     const kpi = (rot, val, cor) => `
         <div style="background:rgba(255,255,255,.05);border-radius:8px;padding:12px 6px;text-align:center">
-            <div style="font-size:11px;opacity:.5;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${rot}</div>
+            <div style="font-size:11px;opacity:.5;margin-bottom:4px">${rot}</div>
             <div style="font-size:20px;font-weight:600${cor ? ";color:" + cor : ""}">${val}</div>
         </div>`;
     const fmtH = h => (Math.round(h * 10) / 10).toLocaleString("pt-PT");
@@ -2132,7 +2132,7 @@ async function carregarFichaMes(anoMes) {
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
             ${kpi("Dias", dias)}
             ${kpi("Horas", fmtH(horas) + "h")}
-            ${kpi("Ganho", calc.valor ? calc.valor.toFixed(0) + "€" : "—", "#f97316")}
+            ${kpi("Ganho", calc.valor ? calc.valor.toFixed(0) + "€" : "—", "var(--color-warn)")}
         </div>
         ${calc.nota ? `<div style="font-size:11px;opacity:.6;margin:-6px 0 12px">${esc(calc.nota)}</div>` : ""}
 
@@ -2146,16 +2146,16 @@ async function carregarFichaMes(anoMes) {
             ${func.iban      ? `<div><span style="opacity:.5">IBAN:</span> <span style="font-family:monospace;font-size:11px">${esc(func.iban)}</span></div>` : ""}
         </div>` : ""}
 
-        <div style="font-family:var(--font-title,sans-serif);font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin-bottom:6px">Obras em ${esc(histNomeMes(anoMes).toLowerCase())}</div>
+        <div style="font-family:var(--font-title,sans-serif);font-size:11px;opacity:.5;margin-bottom:6px">Obras em ${esc(histNomeMes(anoMes).toLowerCase())}</div>
         ${obras.length === 0 ? '<p style="opacity:.4;font-size:13px;margin:4px 0 10px">Sem dias no registo diário neste mês.</p>' :
           obras.map(([obra, o]) =>
-            `<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
+            `<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
                 <span${obra === "Sem obra" ? ' style="color:#fb923c" title="Presenças gravadas sem obra no registo diário"' : ""}>${esc(obra)}</span>
                 <span style="opacity:.6;white-space:nowrap">${o.dias.size} dia(s) · ${fmtH(o.horas)}h</span>
             </div>`).join("")}
 
         ${faltas.length ? `
-        <div style="font-family:var(--font-title,sans-serif);font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin:14px 0 6px">Faltas</div>
+        <div style="font-family:var(--font-title,sans-serif);font-size:11px;opacity:.5;margin:14px 0 6px">Faltas</div>
         ${Object.entries(faltasPorMotivo).map(([m, n]) =>
             `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
                 <span>${MOTIVOS_FALTA_RH[m] || esc(m)}</span><span style="opacity:.6">${rhNumDias(n)} dia(s)</span>
@@ -2401,11 +2401,11 @@ async function carregarObras() {
                 ${o.percentagem_conclusao != null ? `
                 <div style="display:flex;align-items:center;gap:6px">
                     <div style="flex:1;background:rgba(255,255,255,.1);border-radius:4px;height:6px;overflow:hidden">
-                        <div style="width:${Math.min(o.percentagem_conclusao,100)}%;height:100%;background:${o.percentagem_conclusao>=100?"#8fbfa0":o.percentagem_conclusao>=75?"var(--primary)":"#a78bfa"};border-radius:4px"></div>
+                        <div style="width:${Math.min(o.percentagem_conclusao,100)}%;height:100%;background:${o.percentagem_conclusao>=100?"#8fbfa0":o.percentagem_conclusao>=75?"var(--primary)":"#8a9aa6"};border-radius:4px"></div>
                     </div>
                     <span style="font-size:11px;opacity:.7;white-space:nowrap">${o.percentagem_conclusao}%</span>
                 </div>
-                ${o.data_conclusao_prevista ? `<div style="font-size:10px;opacity:.5;margin-top:2px;${new Date(o.data_conclusao_prevista) < new Date() && estado==="ativa" ? "color:#f97316;opacity:1;font-weight:600" : ""}">📅 ${o.data_conclusao_prevista}</div>` : ""}
+                ${o.data_conclusao_prevista ? `<div style="font-size:11px;opacity:.5;margin-top:2px;${new Date(o.data_conclusao_prevista) < new Date() && estado==="ativa" ? "color:var(--color-warn);opacity:1;font-weight:600" : ""}">📅 ${o.data_conclusao_prevista}</div>` : ""}
                 ` : "<span style='opacity:.3;font-size:11px'>—</span>"}
             </td>
             <td class="acoes-td" style="white-space:nowrap">
@@ -2668,9 +2668,9 @@ async function procurarGpsPelaMorada() {
     }
     caixa.innerHTML = `<div style="opacity:.6;margin-bottom:2px">Escolha o sítio certo:</div>` +
         _resultadosMorada.map((r, i) =>
-            `<a href="#" onclick="usarResultadoMorada(${i});return false" style="display:block;padding:3px 0;color:var(--primary)">📍 ${esc(r.nome)}</a>`
+            `<a href="#" onclick="usarResultadoMorada(${i});return false" style="display:block;padding:4px 0;color:var(--primary)">📍 ${esc(r.nome)}</a>`
         ).join("") +
-        `<div style="opacity:.45;font-size:10px;margin-top:2px">Dados © colaboradores do OpenStreetMap</div>`;
+        `<div style="opacity:.45;font-size:11px;margin-top:2px">Dados © colaboradores do OpenStreetMap</div>`;
 }
 
 function usarResultadoMorada(i) {
@@ -2887,20 +2887,20 @@ async function carregarServicosModal() {
             <div style="flex:1;min-width:0">
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">
                     <span style="font-size:13px;font-weight:600">${esc(s.nome)}</span>
-                    ${s.extra?`<span style="font-size:10px;background:rgba(251,146,60,.15);color:#fb923c;padding:1px 6px;border-radius:10px">Extra</span>`:""}
-                    ${s.concluido?`<span style="font-size:10px;background:rgba(143,191,160,.15);color:#8fbfa0;padding:1px 6px;border-radius:10px">✓ Concluído</span>`
-                                 :`<span style="font-size:10px;background:rgba(181,136,99,.15);color:var(--primary,#b58863);padding:1px 6px;border-radius:10px">${pct.toFixed(0)}% feito</span>`}
+                    ${s.extra?`<span style="font-size:11px;background:rgba(251,146,60,.15);color:#fb923c;padding:1px 6px;border-radius:10px">Extra</span>`:""}
+                    ${s.concluido?`<span style="font-size:11px;background:rgba(143,191,160,.15);color:#8fbfa0;padding:1px 6px;border-radius:10px">✓ Concluído</span>`
+                                 :`<span style="font-size:11px;background:rgba(181,136,99,.15);color:var(--primary,#b58863);padding:1px 6px;border-radius:10px">${pct.toFixed(0)}% feito</span>`}
                 </div>
                 <div style="display:flex;gap:4px 14px;font-size:11px;opacity:.6;flex-wrap:wrap">${det.map(d => `<span>${d}</span>`).join("")}</div>
-                ${s.criterio_fim ? `<div style="font-size:11px;opacity:.6;margin-top:3px">Terminado quando: ${esc(s.criterio_fim)}</div>` : ""}
-                ${av.length ? `<div style="font-size:11px;color:#fb923c;margin-top:3px">⚠ ${esc(av.join(" · "))}</div>` : ""}
+                ${s.criterio_fim ? `<div style="font-size:11px;opacity:.6;margin-top:4px">Terminado quando: ${esc(s.criterio_fim)}</div>` : ""}
+                ${av.length ? `<div style="font-size:11px;color:#fb923c;margin-top:4px">⚠ ${esc(av.join(" · "))}</div>` : ""}
                 <div style="margin-top:6px;background:rgba(255,255,255,.1);border-radius:3px;height:3px"><div style="width:${pct}%;height:100%;background:${s.concluido ? "#8fbfa0" : "var(--primary,#b58863)"};border-radius:3px"></div></div>
             </div>
             <div style="display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
-                <button onclick="editarServico('${esc(s.id)}')" style="background:rgba(255,255,255,.07);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px" title="Editar o pacote">✏️</button>
-                ${!s.concluido ? `<button onclick="partirServico('${esc(s.id)}')" style="background:rgba(255,255,255,.07);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:12px" title="Partir em pacotes por zona">✂️</button>` : ""}
-                <button onclick="toggleServicoConcluido('${esc(s.id)}',${s.concluido ? "true" : "false"})" style="background:${s.concluido?"rgba(143,191,160,.15)":"rgba(255,255,255,.07)"};border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px" title="${s.concluido?"Reabrir":"Concluir"}">${s.concluido?"↩":"✓"}</button>
-                <button data-servico-id="${esc(s.id)}" data-servico-nome="${esc(s.nome)}" class="btn-elim-servico" style="background:rgba(224,148,134,.1);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;opacity:.6">🗑</button>
+                <button onclick="editarServico('${esc(s.id)}')" style="background:rgba(255,255,255,.07);border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:13px" title="Editar o pacote">✏️</button>
+                ${!s.concluido ? `<button onclick="partirServico('${esc(s.id)}')" style="background:rgba(255,255,255,.07);border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px" title="Partir em pacotes por zona">✂️</button>` : ""}
+                <button onclick="toggleServicoConcluido('${esc(s.id)}',${s.concluido ? "true" : "false"})" style="background:${s.concluido?"rgba(143,191,160,.15)":"rgba(255,255,255,.07)"};border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:13px" title="${s.concluido?"Reabrir":"Concluir"}">${s.concluido?"↩":"✓"}</button>
+                <button data-servico-id="${esc(s.id)}" data-servico-nome="${esc(s.nome)}" class="btn-elim-servico" style="background:rgba(224,148,134,.1);border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:13px;opacity:.6">🗑</button>
             </div>
         </div>`;
     };
@@ -2920,7 +2920,7 @@ async function carregarServicosModal() {
         + zonas.map(g => {
             const vz = g.itens.reduce((t, s) => t + Number(s.valor_orcamento || 0), 0);
             const titulo = g.zona || (zonas.length > 1 ? "Sem zona" : "");
-            return (titulo ? `<div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.55;margin:8px 0 2px;display:flex;justify-content:space-between;gap:8px">
+            return (titulo ? `<div style="font-size:11px;opacity:.55;margin:8px 0 2px;display:flex;justify-content:space-between;gap:8px">
                     <span>${esc(titulo)}</span><span>${avancoDosPacotes(g.itens)}% · ${vz ? vz.toFixed(0) + " €" : ""}</span></div>` : "")
                 + g.itens.map(linha).join("");
         }).join("");
@@ -2983,8 +2983,8 @@ function editarServico(id) {
             <label style="font-size:11px;opacity:.7;grid-column:1/-1">Terminado quando…<input id="servEdCrit-${id}" value="${esc(s.criterio_fim || "")}" placeholder="Ex.: tomadas e interruptores ligados e testados"></label>
             <label style="font-size:12px;display:flex;gap:6px;align-items:center"><input id="servEdExtra-${id}" type="checkbox" style="width:auto"${s.extra ? " checked" : ""}> Extra</label>
             <div style="display:flex;gap:6px;justify-content:flex-end">
-                <button class="btn-primary" style="padding:5px 12px;font-size:12px" onclick="gravarServico('${esc(id)}')">Gravar</button>
-                <button class="btn-secondary" style="padding:5px 12px;font-size:12px" onclick="carregarServicosModal()">Cancelar</button>
+                <button class="btn-primary" style="padding:4px 12px;font-size:12px" onclick="gravarServico('${esc(id)}')">Gravar</button>
+                <button class="btn-secondary" style="padding:4px 12px;font-size:12px" onclick="carregarServicosModal()">Cancelar</button>
             </div>
         </div>`;
     document.getElementById("servEdZona-" + id).focus();
@@ -3053,8 +3053,8 @@ function partirServico(id) {
             </span>
             <span id="partirSoma-${esc(id)}" style="font-size:12px;opacity:.75"></span>
             <span style="display:flex;gap:6px">
-                <button class="btn-primary" style="padding:5px 12px;font-size:12px" onclick="gravarPartir('${esc(id)}')">Partir</button>
-                <button class="btn-secondary" style="padding:5px 12px;font-size:12px" onclick="carregarServicosModal()">Cancelar</button>
+                <button class="btn-primary" style="padding:4px 12px;font-size:12px" onclick="gravarPartir('${esc(id)}')">Partir</button>
+                <button class="btn-secondary" style="padding:4px 12px;font-size:12px" onclick="carregarServicosModal()">Cancelar</button>
             </span>
         </div>
     </div>`;
@@ -3229,7 +3229,7 @@ async function abrirPainelObra(obra, tabInicial = "resumo") {
         document.getElementById("painelServicosTbody").innerHTML = `
             <div style="padding:48px 24px;text-align:center">
                 <div style="font-size:36px;margin-bottom:12px;opacity:.3">📋</div>
-                <div style="font-family:var(--font-title,'Oswald',sans-serif);font-size:14px;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:8px">Sem serviços definidos</div>
+                <div style="font-family:var(--font-title,'Oswald',sans-serif);font-size:14px;color:rgba(255,255,255,.3);margin-bottom:8px">Sem serviços definidos</div>
                 <div style="font-size:12px;color:rgba(255,255,255,.2)">Adiciona o primeiro serviço aqui em baixo</div>
             </div>`;
         // Sem serviços, os separadores continuam a ter conteúdo útil
@@ -3330,7 +3330,7 @@ async function abrirPainelObra(obra, tabInicial = "resumo") {
             val: totValor > 0 ? eur(margemObra) : "—",
             sub: margemPctObra !== null ? `${margemPctObra.toFixed(1)}% do valor` : "Sem valor nos serviços",
             cor: totValor > 0 ? corMg(margemObra) : "rgba(255,255,255,.6)",
-            accent: "#a78bfa",
+            accent: "#8a9aa6",
             contas: botaoContas("Margem", [
                 { t: "Valor dos serviços", v: totValor },
                 { t: "− Custo real", v: -custoObra },
@@ -3376,11 +3376,11 @@ async function abrirPainelObra(obra, tabInicial = "resumo") {
             <div>
                 <div style="font-weight:500;font-size:13px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">${nome}${badges}${contas}</div>
                 ${pctBar !== null ? `
-                <div style="display:flex;align-items:center;gap:6px;margin-top:5px" title="Custo em % do valor">
+                <div style="display:flex;align-items:center;gap:6px;margin-top:4px" title="Custo em % do valor">
                     <div style="flex:1;max-width:100px;background:rgba(255,255,255,.08);border-radius:3px;height:3px">
                         <div style="width:${Math.min(pctBar,100)}%;height:100%;background:${pctBar>100?"#e09486":pctBar>=80?"#fb923c":"var(--primary,#b58863)"};border-radius:3px"></div>
                     </div>
-                    <span style="font-size:10px;color:rgba(255,255,255,.35)">${pctBar}%</span>
+                    <span style="font-size:11px;color:rgba(255,255,255,.35)">${pctBar}%</span>
                 </div>` : ""}
             </div>
             <div style="color:rgba(255,255,255,.85);font-size:13px">${valor ? eur(valor) : "—"}</div>
@@ -3402,15 +3402,15 @@ async function abrirPainelObra(obra, tabInicial = "resumo") {
     tbody.innerHTML = ordenados.map(s => {
         const z = (s.zona || "").trim();
         const titulo = variasZonas && z !== zonaAnt
-            ? `<div style="padding:8px 14px 4px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.45);background:rgba(255,255,255,.02)">${esc(z || "Sem zona")} · ${avancoDosPacotes(ordenados.filter(x => (x.zona || "").trim() === z))}%</div>` : "";
+            ? `<div style="padding:8px 14px 4px;font-size:11px;color:rgba(255,255,255,.45);background:rgba(255,255,255,.02)">${esc(z || "Sem zona")} · ${avancoDosPacotes(ordenados.filter(x => (x.zona || "").trim() === z))}%</div>` : "";
         zonaAnt = z;
         const valor = Number(s.valor_orcamento || 0);
         const mo = moP[s.id]||0, mat = matP[s.id]||0;
         const estadoBadge = s.concluido
-            ? `<span style="background:rgba(143,191,160,.15);color:#8fbfa0;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap">✓ Feito</span>`
-            : `<span style="background:rgba(255,255,255,.07);color:rgba(255,255,255,.55);padding:2px 9px;border-radius:10px;font-size:10px;white-space:nowrap">${pctPacote(s).toFixed(0)}% feito</span>`;
+            ? `<span style="background:rgba(143,191,160,.15);color:#8fbfa0;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap">✓ Feito</span>`
+            : `<span style="background:rgba(255,255,255,.07);color:rgba(255,255,255,.55);padding:2px 8px;border-radius:10px;font-size:11px;white-space:nowrap">${pctPacote(s).toFixed(0)}% feito</span>`;
         const extraBadge = s.extra
-            ? `<span style="background:rgba(251,146,60,.15);color:#fb923c;padding:1px 6px;border-radius:6px;font-size:9px;font-weight:600;margin-left:4px">Extra</span>`
+            ? `<span style="background:rgba(251,146,60,.15);color:#fb923c;padding:1px 6px;border-radius:6px;font-size:11px;font-weight:600;margin-left:4px">Extra</span>`
             : "";
         const d = detP[s.id] || { mo: [], mat: [], rec: [] };
         const contas = botaoContas(s.nome, [
@@ -3505,7 +3505,7 @@ function desenharGavetaSemServico() {
     const bloco = (tipo, titulo, resumo, linhas) => `
         <div style="margin-top:12px">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
-                <div style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;opacity:.55">${titulo} · ${resumo}</div>
+                <div style="font-size:11px;opacity:.55">${titulo} · ${resumo}</div>
                 <label style="font-family:var(--font-body);letter-spacing:0;text-transform:none;color:inherit;margin:0;display:inline-flex;align-items:center;gap:4px;font-size:11px;opacity:.7;cursor:pointer;white-space:nowrap;flex-shrink:0">
                     <input type="checkbox" checked onchange="marcarTodosGaveta('${tipo}', this.checked)" style="width:14px;height:14px;margin:0"> todas
                 </label>
@@ -3901,7 +3901,7 @@ function modoFaturaNossa(ligar) {
         info.parentNode.insertBefore(aviso, info);
     }
     aviso.innerHTML = `<span style="flex:1">💶 Fatura da Maia Solutions a um cliente: fica como <b>entrada</b> na obra do cliente.</span>` +
-        `<button type="button" class="btn-secondary" style="font-size:12px;padding:3px 10px">Não é nossa</button>`;
+        `<button type="button" class="btn-secondary" style="font-size:12px;padding:4px 10px">Não é nossa</button>`;
     aviso.querySelector("button").onclick = () => {
         modoFaturaNossa(false);
         const tipoEl = document.getElementById("movTipo");
@@ -4102,8 +4102,8 @@ function actualizarBarraFila() {
     barra.innerHTML =
         `<span style="font-weight:600">Fatura ${actual} de ${_filaTotal}</span>` +
         `<span style="opacity:.7;flex:1">${_filaFaturas.length} por lançar neste lote</span>` +
-        `<button type="button" id="btnSaltarFatura" class="btn-secondary" style="font-size:12px;padding:3px 10px">Saltar esta</button>` +
-        `<button type="button" id="btnDescartarFila" class="btn-secondary" style="font-size:12px;padding:3px 10px">Descartar lote</button>`;
+        `<button type="button" id="btnSaltarFatura" class="btn-secondary" style="font-size:12px;padding:4px 10px">Saltar esta</button>` +
+        `<button type="button" id="btnDescartarFila" class="btn-secondary" style="font-size:12px;padding:4px 10px">Descartar lote</button>`;
     barra.style.display = "flex";
 
     document.getElementById("btnSaltarFatura").onclick = async () => {
@@ -4623,31 +4623,31 @@ async function mostrarLinhasFatura(d) {
 
     tbody.innerHTML = _linhasFaturaLidas.map((l, i) => `
         <tr data-i="${i}">
-            <td style="padding:3px 6px"><input value="${esc(l.descricao || "")}" data-campo="descricao"
+            <td style="padding:4px 6px"><input value="${esc(l.descricao || "")}" data-campo="descricao"
                 style="width:100%;padding:4px 6px;border-radius:5px;font-size:12px"></td>
-            <td style="padding:3px 6px">
+            <td style="padding:4px 6px">
                 <select data-campo="artigo" onchange="aoEscolherArtigoLinha(this)"
                     style="width:100%;padding:4px 6px;border-radius:5px;font-size:12px">
                     ${opcoesArtigos(l.artigo_id)}
                 </select>
-                <div class="linha-preco-ant" style="font-size:10px;margin-top:2px;line-height:1.3"></div>
+                <div class="linha-preco-ant" style="font-size:11px;margin-top:2px;line-height:1.3"></div>
             </td>
-            <td style="padding:3px 6px"><input type="number" step="0.001" value="${l.quantidade ?? ""}" data-campo="quantidade"
+            <td style="padding:4px 6px"><input type="number" step="0.001" value="${l.quantidade ?? ""}" data-campo="quantidade"
                 style="width:100%;padding:4px 6px;border-radius:5px;font-size:12px;text-align:right"></td>
-            <td style="padding:3px 6px"><input value="${esc(l.unidade || "")}" data-campo="unidade"
+            <td style="padding:4px 6px"><input value="${esc(l.unidade || "")}" data-campo="unidade"
                 style="width:100%;padding:4px 6px;border-radius:5px;font-size:12px"></td>
-            <td style="padding:3px 6px"><input type="number" step="0.01" value="${l.preco_unitario ?? ""}" data-campo="preco_unitario"
+            <td style="padding:4px 6px"><input type="number" step="0.01" value="${l.preco_unitario ?? ""}" data-campo="preco_unitario"
                 style="width:100%;padding:4px 6px;border-radius:5px;font-size:12px;text-align:right"></td>
-            <td style="padding:3px 6px"><input type="number" step="0.01" value="${l.valor_total ?? ""}" data-campo="valor_total"
+            <td style="padding:4px 6px"><input type="number" step="0.01" value="${l.valor_total ?? ""}" data-campo="valor_total"
                 style="width:100%;padding:4px 6px;border-radius:5px;font-size:12px;text-align:right"></td>
-            <td style="padding:3px 6px;text-align:center">
+            <td style="padding:4px 6px;text-align:center">
                 <input type="checkbox" data-campo="stock" ${l.stock ? "checked" : ""}
                     title="Dar entrada desta quantidade no inventário"
                     style="width:16px;height:16px;cursor:pointer">
             </td>
-            <td style="padding:3px 6px;text-align:center">
+            <td style="padding:4px 6px;text-align:center">
                 <button type="button" onclick="this.closest('tr').remove(); actualizarResumoLinhas()"
-                    style="background:rgba(224,148,134,.1);border:none;border-radius:5px;padding:3px 6px;cursor:pointer;font-size:12px">✕</button>
+                    style="background:rgba(224,148,134,.1);border:none;border-radius:5px;padding:4px 6px;cursor:pointer;font-size:12px">✕</button>
             </td>
         </tr>`).join("");
 
@@ -4885,7 +4885,7 @@ async function vgCarregarPontoHoje() {
     }).filter(Boolean).sort((a, b) => a.ordem - b.ordem);
 
     if (!linhas.length) {
-        cont.innerHTML = '<div style="padding:14px 0;font-size:13.5px;opacity:.7">Ninguém planeado nem a marcar hoje.</div>';
+        cont.innerHTML = '<div style="padding:14px 0;font-size:14px;opacity:.7">Ninguém planeado nem a marcar hoje.</div>';
         return;
     }
     cont.innerHTML = linhas.map((l, i) => {
@@ -4900,11 +4900,11 @@ async function vgCarregarPontoHoje() {
                 ? `<a class="btn-secondary" style="font-size:12px;padding:4px 12px;flex-shrink:0;text-decoration:none" href="${esc(url)}" target="_blank" rel="noopener noreferrer">📲 Lembrar</a>`
                 : `<span style="font-size:11px;opacity:.6;flex-shrink:0">sem telemóvel na ficha</span>`;
         }
-        return `<div style="display:flex;align-items:center;gap:12px;padding:11px 0;${i ? "border-top:1px solid rgba(0,0,0,.07)" : ""}">
+        return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;${i ? "border-top:1px solid rgba(0,0,0,.07)" : ""}">
             <span style="width:9px;height:9px;border-radius:50%;background:${l.cor};flex-shrink:0"></span>
             <div style="flex:1;min-width:0">
                 <div style="font-weight:600;font-size:14px">${esc(l.f.nome)}</div>
-                <div style="font-size:12.5px;opacity:.75">${l.estado}</div>
+                <div style="font-size:13px;opacity:.75">${l.estado}</div>
                 ${aviso}
             </div>
             ${botao}
@@ -4936,17 +4936,17 @@ async function vgCarregarAlertas() {
     }
 
     if (!alertas.length) {
-        cont.innerHTML = '<div style="padding:14px 0;font-size:13.5px;opacity:.7">' +
+        cont.innerHTML = '<div style="padding:14px 0;font-size:14px;opacity:.7">' +
             'Nada à tua espera. Nem preços fora do normal, nem faturas por imputar, nem tarefas atrasadas.</div>';
         return;
     }
 
     cont.innerHTML = alertas.map((a, i) => `
-        <div style="display:flex;align-items:center;gap:14px;padding:13px 0;${i ? "border-top:1px solid rgba(0,0,0,.07)" : ""}">
-            <span style="width:36px;height:36px;border-radius:9px;background:${a.cor};display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0">${a.icone}</span>
+        <div style="display:flex;align-items:center;gap:14px;padding:12px 0;${i ? "border-top:1px solid rgba(0,0,0,.07)" : ""}">
+            <span style="width:36px;height:36px;border-radius:9px;background:${a.cor};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${a.icone}</span>
             <div style="flex:1;min-width:0">
-                <div style="font-weight:600;font-size:14.5px">${esc(a.titulo)}</div>
-                <div style="font-size:12.5px;opacity:.65;margin-top:1px">${esc(a.sub)}</div>
+                <div style="font-weight:600;font-size:14px">${esc(a.titulo)}</div>
+                <div style="font-size:13px;opacity:.65;margin-top:1px">${esc(a.sub)}</div>
             </div>
             ${a.lista || a.fluxo || a.tab || a.ir || a.orc || a.accao ? `<button class="btn-secondary" style="font-size:12px;padding:4px 12px;flex-shrink:0"
                         onclick="${a.lista ? `abrirListaRapida('${a.lista}')`
@@ -5253,7 +5253,7 @@ const LISTAS_RAPIDAS = {
             lista.map((p, i) => `<div class="lista-linha" style="display:block">
                 <div style="font-weight:600">${p.problema ? (p.urgente ? "🔴 Urgente · " : "⚠️ Problema · ") : "📷 "}${esc(p.obras?.nome || "Obra")}</div>
                 <div class="lista-det">${esc(p.funcionarios?.nome || "Equipa")} · ${esc(new Date(p.created_at).toLocaleString("pt-PT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }))}</div>
-                ${p.texto ? `<div style="white-space:pre-wrap;margin:6px 0;font-size:13.5px">${esc(p.texto)}</div>` : ""}
+                ${p.texto ? `<div style="white-space:pre-wrap;margin:6px 0;font-size:14px">${esc(p.texto)}</div>` : ""}
                 ${(p.obra_documentos || []).length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0">${p.obra_documentos.map(d => urls[d.caminho]
                     ? `<a href="${esc(urls[d.caminho])}" target="_blank" rel="noopener noreferrer"><img src="${esc(urls[d.caminho])}" alt="Foto" style="width:72px;height:72px;object-fit:cover;border-radius:8px"></a>` : "").join("")}</div>` : ""}
                 ${p.estado === "aberto" ? `<textarea id="equipaResol-${i}" rows="2" maxlength="2000" placeholder="O que se fez (opcional, quem publicou vê)" style="width:100%"></textarea>` : ""}
@@ -5279,7 +5279,7 @@ const LISTAS_RAPIDAS = {
             lista.map((p, i) => `<div class="lista-linha" style="display:block">
                 <div style="font-weight:600">${esc(p.clientes?.nome || "Cliente")} · ${esc(TIPO_PEDIDO_CLIENTE[p.tipo] || p.tipo)}${p.obras?.nome ? ` · ${esc(p.obras.nome)}` : ""}</div>
                 <div class="lista-det">${esc(new Date(p.created_at).toLocaleString("pt-PT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }))}</div>
-                <div style="white-space:pre-wrap;margin:6px 0;font-size:13.5px">${esc(p.mensagem)}</div>
+                <div style="white-space:pre-wrap;margin:6px 0;font-size:14px">${esc(p.mensagem)}</div>
                 <textarea id="pedResp-${i}" rows="3" maxlength="4000" placeholder="A tua resposta ao cliente" style="width:100%"></textarea>
                 <div class="lista-accoes" style="justify-content:flex-end;margin-top:6px;flex-wrap:wrap;gap:6px">
                     ${p.tipo === "extra" && p.obra_id ? `<button type="button" class="btn-secondary" onclick="listaPedidoParaExtra(${i}, this)" title="Faz o preço deste extra para o cliente aceitar">💶 Fazer preço</button>` : ""}
@@ -5635,10 +5635,10 @@ async function vgCarregarNumeros() {
     if (saidasAnt > 0) {
         const pc = ((saidas - saidasAnt) / saidasAnt) * 100;
         if (Math.abs(pc) < 1) {
-            variacao = `<div style="font-size:11.5px;margin-top:4px;opacity:.6">como no mês passado</div>`;
+            variacao = `<div style="font-size:12px;margin-top:4px;opacity:.6">como no mês passado</div>`;
         } else {
             const sobe = pc > 0;
-            variacao = `<div style="font-size:11.5px;margin-top:4px;color:${sobe ? "#b45309" : "#15803d"}">
+            variacao = `<div style="font-size:12px;margin-top:4px;color:${sobe ? "#b45309" : "#15803d"}">
                 ${sobe ? "▲" : "▼"} ${Math.abs(pc).toFixed(0)}% do que no mês passado</div>`;
         }
     }
@@ -5730,20 +5730,20 @@ async function vgCarregarObras() {
             <div class="vg-obra-linha" role="button" tabindex="0" aria-expanded="false" data-id="${esc(o.id)}">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
                 <div style="min-width:0;flex:1">
-                    <div style="font-weight:600;font-size:14.5px">${esc(o.nome)}</div>
-                    <div style="font-size:12.5px;opacity:.65;margin-top:1px">${esc(sub || "sem fase definida")}</div>
+                    <div style="font-weight:600;font-size:14px">${esc(o.nome)}</div>
+                    <div style="font-size:13px;opacity:.65;margin-top:1px">${esc(sub || "sem fase definida")}</div>
                 </div>
                 <div style="text-align:right;flex-shrink:0">
                     <div style="font-size:13px;font-weight:600">${vgEuros(g)} ${botaoContas("Custo real de " + o.nome, [
                         ...linhasContasCusto(c),
                         ...(orc > 0 ? [{ t: "Valor dos serviços (sem IVA)", v: orc, info: true }, { t: "Custo ÷ valor", v: (g / orc * 100).toFixed(0) + " %", info: true }] : [])],
                         NOTA_CUSTO_REAL)}</div>
-                    ${orc > 0 ? `<div style="font-size:11.5px;opacity:.6">de ${vgEuros(orc)}</div>` : ""}
+                    ${orc > 0 ? `<div style="font-size:12px;opacity:.6">de ${vgEuros(orc)}</div>` : ""}
                 </div>
                 ${vgEtiqueta(o.id, orcamento, gasto, horasOrc, horasReais)}
                 <span class="vg-obra-seta" aria-hidden="true">▾</span>
             </div>
-            <div style="height:5px;border-radius:3px;background:rgba(0,0,0,.08);margin-top:9px;overflow:hidden">
+            <div style="height:5px;border-radius:3px;background:rgba(0,0,0,.08);margin-top:8px;overflow:hidden">
                 <i style="display:block;height:100%;width:${pc}%;background:var(--text-dark);border-radius:3px"></i>
             </div>
             </div>
@@ -5832,7 +5832,7 @@ async function vgIrParaObra(acao, o) {
 
 function vgEtiqueta(id, orcamento, gasto, horasOrc, horasReais) {
     const et = (texto, bg, cor) =>
-        `<span style="font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:20px;white-space:nowrap;background:${bg};color:${cor}">${texto}</span>`;
+        `<span style="font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;white-space:nowrap;background:${bg};color:${cor}">${texto}</span>`;
 
     const orc = orcamento[id] || 0, g = gasto[id] || 0;
     const ho  = horasOrc[id] || 0, hr = horasReais[id] || 0;
@@ -5890,10 +5890,10 @@ async function vgCarregarAtalhos() {
     cont.innerHTML = atalhos.map(a => {
         const accao = a.tab ? `onclick="abrirTab('${a.tab}')"` : `onclick="location.href='${a.ir}'"`;
         return `<button class="card" ${accao}
-            style="text-align:left;border:none;cursor:pointer;padding:14px 16px;display:flex;flex-direction:column;gap:3px;font:inherit">
-            <span style="font-size:19px;line-height:1;margin-bottom:3px">${a.ic}</span>
+            style="text-align:left;border:none;cursor:pointer;padding:14px 16px;display:flex;flex-direction:column;gap:4px;font:inherit">
+            <span style="font-size:20px;line-height:1;margin-bottom:4px">${a.ic}</span>
             <span style="font-weight:600;font-size:14px">${a.nome}</span>
-            <span style="font-size:11.5px;opacity:.6">${esc(a.sub)}</span>
+            <span style="font-size:12px;opacity:.6">${esc(a.sub)}</span>
         </button>`;
     }).join("");
 }
@@ -6017,8 +6017,8 @@ async function carregarArtigos() {
             <td class="largo">${esc(a.descricao || "")}</td>
             <td>${esc(a.tipo_artigo || "")}</td>
             <td>${Number(a.preco_atual || 0).toFixed(2)} €</td>
-            <td style="color:${stockBaixo ? "#f97316" : "inherit"};font-weight:${stockBaixo ? "700" : "400"}">
-                <span>${a.quantidade ?? 0}${stockBaixo ? " ⚠️" : ""}${a.stock_minimo ? `<span style="font-size:10px;opacity:.5;margin-left:4px">(mín: ${a.stock_minimo})</span>` : ""}</span>${contasStock(a)}
+            <td style="color:${stockBaixo ? "var(--color-warn)" : "inherit"};font-weight:${stockBaixo ? "700" : "400"}">
+                <span>${a.quantidade ?? 0}${stockBaixo ? " ⚠️" : ""}${a.stock_minimo ? `<span style="font-size:11px;opacity:.5;margin-left:4px">(mín: ${a.stock_minimo})</span>` : ""}</span>${contasStock(a)}
             </td>
             <td>${esc(a.local_armazenamento || "")}</td>
             <td class="acoes-td">
@@ -6485,7 +6485,7 @@ async function carregarMovimentosStock() {
                 <div style="font-weight:600;font-size:13px">${esc(m.artigos?.descricao || "—")}</div>
                 <div style="font-size:11px;opacity:.5;font-family:monospace">${esc(m.artigos?.codigo || "")}</div>
             </div></td>
-            <td><span style="color:${cor};font-weight:700;font-size:12px">${label}</span></td>
+            <td><span style="color:${cor};font-weight:600;font-size:12px">${label}</span></td>
             <td style="text-align:right;font-weight:600">${m.quantidade ?? "—"}</td>
             <td style="font-size:13px">${esc(m.funcionarios?.nome || "—")}</td>
             <td style="font-size:12px;opacity:.8">${esc(origem)}</td>
@@ -6721,7 +6721,7 @@ async function carregarPainelDocumentos() {
         <div class="card" style="padding:14px;margin:4px 0 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <span style="font-size:20px">👤</span>
             <span style="flex:1;min-width:160px">
-                <span style="display:block;font-size:11px;opacity:.5;text-transform:uppercase;letter-spacing:1px">Cliente da obra</span>
+                <span style="display:block;font-size:11px;opacity:.5;">Cliente da obra</span>
                 ${cliente
                     ? `<span style="font-weight:600">${esc(cliente.nome)}</span>
                        <span style="font-size:12px;opacity:.6">${[cliente.nif && "NIF " + cliente.nif, cliente.email, cliente.telefone].filter(Boolean).map(esc).join(" · ")}</span>
@@ -6756,7 +6756,7 @@ async function carregarPainelDocumentos() {
         </div>
         ${fotosHeic.length ? `
         <div class="card doc-carregar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-            <span style="flex:1;min-width:180px;font-size:12.5px">📷 ${fotosHeic.length === 1 ? "1 foto está" : fotosHeic.length + " fotos estão"} em HEIC e não aparece${fotosHeic.length === 1 ? "" : "m"} no Android nem na Área do cliente.</span>
+            <span style="flex:1;min-width:180px;font-size:13px">📷 ${fotosHeic.length === 1 ? "1 foto está" : fotosHeic.length + " fotos estão"} em HEIC e não aparece${fotosHeic.length === 1 ? "" : "m"} no Android nem na Área do cliente.</span>
             <button class="btn-pequeno" id="btnConverterHeic" onclick="converterFotosHeicObra()">Converter para JPG</button>
         </div>` : ""}
 
@@ -6766,7 +6766,7 @@ async function carregarPainelDocumentos() {
                 : `<div style="padding:20px;text-align:center;opacity:.5;font-size:13px">Ainda não há documentos carregados nesta obra.</div>`}
         </div>
 
-        <div style="font-family:var(--font-title,sans-serif);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:8px">Pastas da empresa no Google Drive (o cliente não vê)</div>
+        <div style="font-family:var(--font-title,sans-serif);font-size:11px;color:rgba(255,255,255,.4);margin-bottom:8px">Pastas da empresa no Google Drive (o cliente não vê)</div>
         ${htmlPastasDrive()}`;
 }
 
@@ -7620,23 +7620,23 @@ async function carregarPainelResumo() {
     el.innerHTML = `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
             <div class="card card-kpi-contas" style="padding:16px;text-align:center">${cRecebido}
-                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">RECEBIDO S/ IVA</div>
-                <div style="font-size:20px;font-weight:800;color:#8fbfa0">${fmt(totalEntradas)}</div>
+                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);">RECEBIDO S/ IVA</div>
+                <div style="font-size:20px;font-weight:600;color:#8fbfa0">${fmt(totalEntradas)}</div>
                 ${porReceber > 0.004 ? `<div style="font-size:11px;color:#fb923c;margin-top:4px">+ ${fmt(porReceber)} por receber</div>` : ""}
             </div>
             <div class="card card-kpi-contas" style="padding:16px;text-align:center">${cGasto}
-                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">GASTO S/ IVA</div>
-                <div style="font-size:20px;font-weight:800;color:#e09486">${fmt(totalSaidas)}</div>
+                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);">GASTO S/ IVA</div>
+                <div style="font-size:20px;font-weight:600;color:#e09486">${fmt(totalSaidas)}</div>
                 <div style="font-size:11px;opacity:.55;margin-top:4px">${fmt(totalFaturas)} material · ${fmt(custoMaoObra)} mão de obra</div>
             </div>
             <div class="card card-kpi-contas" style="padding:16px;text-align:center">${cMargem}
-                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">MARGEM BRUTA</div>
-                <div style="font-size:20px;font-weight:800;color:${corMargem}">${fmt(margem)}</div>
+                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);">Margem bruta</div>
+                <div style="font-size:20px;font-weight:600;color:${corMargem}">${fmt(margem)}</div>
                 ${margemPct ? `<div style="font-size:12px;color:${corMargem};opacity:.8">${margemPct}%</div>` : ""}
             </div>
             <div class="card card-kpi-contas" style="padding:16px;text-align:center">${cHoras}
-                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);letter-spacing:.5px">HORAS OBRA</div>
-                <div style="font-size:20px;font-weight:800;color:var(--primary)">${totalHoras.toFixed(1)}h</div>
+                <div style="font-size:11px;opacity:.5;margin-bottom:6px;font-family:var(--font-title);">Horas da obra</div>
+                <div style="font-size:20px;font-weight:600;color:var(--primary)">${totalHoras.toFixed(1)}h</div>
                 <div style="font-size:11px;opacity:.55;margin-top:4px">${horasRegistos ? `registos · ${horasPonto.toFixed(1)}h no ponto` : "do ponto"}</div>
             </div>
         </div>
@@ -7648,21 +7648,21 @@ async function carregarPainelResumo() {
                 { t: "− Gasto sem IVA (faturas + mão de obra)", v: -totalSaidas },
                 { t: "Desvio (o que ainda sobra do orçamento)", v: desvio, total: true }],
                 "Soma dos orçamentos aceites desta obra, sem IVA, menos o que já se gastou nela. Quando o orçamento já tem serviços no painel, conta o valor dos serviços, que tem os ajustes feitos depois. Positivo: ainda há margem; negativo: já se gastou mais do que o orçado.")}
-            <div style="font-size:11px;opacity:.5;margin-bottom:12px;font-family:var(--font-title);letter-spacing:.5px">ORÇAMENTO VS REAL</div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Orçamento aceite (s/ IVA)</span><span style="font-weight:700">${fmt(totalOrc)}</span></div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Material e faturas (s/ IVA)</span><span style="font-weight:700">${fmt(totalFaturas)}</span></div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Mão de obra (${horasRegistos.toFixed(0)}h)</span><span style="font-weight:700">${fmt(custoMaoObra)}</span></div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Gasto real</span><span style="font-weight:700;color:#e09486">${fmt(totalSaidas)}</span></div>
+            <div style="font-size:11px;opacity:.5;margin-bottom:12px;font-family:var(--font-title);">Orçamento vs real</div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Orçamento aceite (s/ IVA)</span><span style="font-weight:600">${fmt(totalOrc)}</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Material e faturas (s/ IVA)</span><span style="font-weight:600">${fmt(totalFaturas)}</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Mão de obra (${horasRegistos.toFixed(0)}h)</span><span style="font-weight:600">${fmt(custoMaoObra)}</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="opacity:.7">Gasto real</span><span style="font-weight:600;color:#e09486">${fmt(totalSaidas)}</span></div>
             <div style="border-top:1px solid var(--border);margin:8px 0;padding-top:8px;display:flex;justify-content:space-between;font-size:14px">
                 <span style="font-weight:600">Desvio</span>
-                <span style="font-weight:800;color:${desvio >= 0 ? "#8fbfa0" : "#e09486"}">${desvio >= 0 ? "+" : ""}${fmt(desvio)}</span>
+                <span style="font-weight:600;color:${desvio >= 0 ? "#8fbfa0" : "#e09486"}">${desvio >= 0 ? "+" : ""}${fmt(desvio)}</span>
             </div>
             <div style="background:rgba(255,255,255,.08);border-radius:4px;height:8px;margin-top:10px;overflow:hidden">
                 <div style="height:100%;border-radius:4px;background:${totalSaidas <= totalOrc ? "#8fbfa0" : "#e09486"};width:${Math.min((totalSaidas/totalOrc)*100,100).toFixed(0)}%"></div>
             </div>
             <div style="font-size:11px;opacity:.5;margin-top:4px;text-align:right">${((totalSaidas/totalOrc)*100).toFixed(0)}% do orçamento utilizado</div>
         </div>` : `<div class="card" style="padding:14px;opacity:.5;font-size:13px;text-align:center;margin-bottom:12px">Sem orçamento aceite associado.</div>`}
-        ${orcs.length > 0 ? `<div class="card" style="padding:14px"><div style="font-size:11px;opacity:.5;margin-bottom:10px;font-family:var(--font-title);letter-spacing:.5px">ORÇAMENTOS</div>${orcs.map((o, i) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;font-family:monospace">${esc(o.numero || "—")}</span><span class="badge-estado ${o.estado === "aceite" ? "pago" : "por_pagar"}" style="font-size:10px">${esc(o.estado)}</span><span style="font-size:13px;font-weight:700" title="${fmt(o.total_com_iva)} com IVA">${fmt(valorOrc(o))} <span style="font-size:10px;font-weight:400;opacity:.6">s/ IVA</span></span>${o.estado === "aceite" && !(servPorOrc[o.id] > 0) ? `<button class="btn-secondary" style="font-size:11px;padding:3px 9px;white-space:nowrap" onclick="criarServicosDoPainel(_painelOrcs[${i}].id)" title="Este orçamento ainda não tem serviços no painel">＋ Criar serviços</button>` : ""}${o.estado === "aceite" ? `<button class="btn-secondary" style="font-size:11px;padding:3px 9px;white-space:nowrap" onclick="reverterAceiteOrcamento(_painelOrcs[${i}])" title="Cancelar o aceite deste orçamento">↩ Tirar aceite</button>` : ""}</div>`).join("")}</div>` : ""}`;
+        ${orcs.length > 0 ? `<div class="card" style="padding:14px"><div style="font-size:11px;opacity:.5;margin-bottom:10px;font-family:var(--font-title);">ORÇAMENTOS</div>${orcs.map((o, i) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;font-family:monospace">${esc(o.numero || "—")}</span><span class="badge-estado ${o.estado === "aceite" ? "pago" : "por_pagar"}" style="font-size:11px">${esc(o.estado)}</span><span style="font-size:13px;font-weight:600" title="${fmt(o.total_com_iva)} com IVA">${fmt(valorOrc(o))} <span style="font-size:11px;font-weight:400;opacity:.6">s/ IVA</span></span>${o.estado === "aceite" && !(servPorOrc[o.id] > 0) ? `<button class="btn-secondary" style="font-size:11px;padding:4px 8px;white-space:nowrap" onclick="criarServicosDoPainel(_painelOrcs[${i}].id)" title="Este orçamento ainda não tem serviços no painel">＋ Criar serviços</button>` : ""}${o.estado === "aceite" ? `<button class="btn-secondary" style="font-size:11px;padding:4px 8px;white-space:nowrap" onclick="reverterAceiteOrcamento(_painelOrcs[${i}])" title="Cancelar o aceite deste orçamento">↩ Tirar aceite</button>` : ""}</div>`).join("")}</div>` : ""}`;
 }
 
 // Orçamentos aceites antes de haver serviços automáticos: cria-os agora
@@ -7707,8 +7707,8 @@ async function carregarPainelFinanceiro() {
     el.innerHTML = barra + Object.entries(porCat).map(([cat, d]) => `
         <div class="card" style="margin-bottom:10px;padding:0;overflow:hidden">
             <div style="padding:10px 14px;background:rgba(181,136,99,.08);display:flex;justify-content:space-between;align-items:center">
-                <span style="font-family:var(--font-title);font-size:11px;letter-spacing:.5px;text-transform:uppercase">${cat}</span>
-                <span style="font-size:13px;font-weight:700;color:${d.saidas > 0 ? "#e09486" : "#8fbfa0"}">
+                <span style="font-family:var(--font-title);font-size:11px;">${cat}</span>
+                <span style="font-size:13px;font-weight:600;color:${d.saidas > 0 ? "#e09486" : "#8fbfa0"}">
                     ${d.entradas > 0 ? "+" + d.entradas.toFixed(2) + " € " : ""}${d.saidas > 0 ? "−" + d.saidas.toFixed(2) + " €" : ""}
                     ${d.pendente > 0.004 ? `<span style="font-size:11px;font-weight:500;color:#fb923c;margin-left:6px">${d.pendente.toFixed(2)} € ${cat === ENTRADAS ? "por receber" : "por pagar"}</span>` : ""}
                 </span>
@@ -7720,7 +7720,7 @@ async function carregarPainelFinanceiro() {
                         ? (m.referencia || m.observacoes || "—")
                         : (m.fornecedores?.nome || m.observacoes || m.referencia || "—"))}</div></div>
                 <div style="display:flex;align-items:center;gap:8px">
-                    <div style="text-align:right"><div style="font-weight:700;color:${m.tipo === "entrada" ? "#8fbfa0" : "#e09486"}">${m.tipo === "entrada" ? "+" : "−"}${Number(m.valor_total).toFixed(2)} €</div>
+                    <div style="text-align:right"><div style="font-weight:600;color:${m.tipo === "entrada" ? "#8fbfa0" : "#e09486"}">${m.tipo === "entrada" ? "+" : "−"}${Number(m.valor_total).toFixed(2)} €</div>
                         ${estadoPagamentoCurto(m, parciais)}</div>
                     ${m.tipo === "entrada" ? `<button class="btn-icone" title="Gerar declaração de valores" onclick="abrirDeclaracaoValores('${m.id}')">📄</button>` : ""}
                 </div>
@@ -7757,11 +7757,11 @@ async function carregarPainelPonto() {
     const fmt = iso => iso ? iso.substring(11,16) : "—";
     el.innerHTML = `
         <div class="card" style="margin-bottom:12px;padding:0;overflow:hidden">
-            <div style="padding:10px 14px;background:rgba(181,136,99,.08);font-family:var(--font-title);font-size:11px;letter-spacing:.5px;text-transform:uppercase">Por Funcionário</div>
+            <div style="padding:10px 14px;background:rgba(181,136,99,.08);font-family:var(--font-title);font-size:11px;">Por Funcionário</div>
             ${Object.entries(porFunc).sort((a,b) => b[1].horas - a[1].horas).map(([nome, d]) => `
             <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border)">
                 <span style="font-weight:600;font-size:13px">${nome}</span>
-                <div style="text-align:right"><div style="font-weight:700;color:var(--primary)">${d.horas.toFixed(1)}h</div><div style="font-size:11px;opacity:.5">${d.dias} dia${d.dias!==1?"s":""}</div></div>
+                <div style="text-align:right"><div style="font-weight:600;color:var(--primary)">${d.horas.toFixed(1)}h</div><div style="font-size:11px;opacity:.5">${d.dias} dia${d.dias!==1?"s":""}</div></div>
             </div>`).join("")}
         </div>
         <div class="card" style="overflow-x:auto;padding:0">
@@ -7771,8 +7771,8 @@ async function carregarPainelPonto() {
                     <td style="font-size:12px;opacity:.7">${r.dia}</td>
                     <td style="font-weight:500">${r.funcionario}</td>
                     <td>${fmt(r.entrada)}</td><td>${fmt(r.saida)}</td>
-                    <td style="font-weight:700;color:var(--primary)">${r.horas||"—"}</td>
-                    <td><span class="badge-estado ${r.estado==="OK"?"pago":"por_pagar"}" style="font-size:10px">${r.estado}</span></td>
+                    <td style="font-weight:600;color:var(--primary)">${r.horas||"—"}</td>
+                    <td><span class="badge-estado ${r.estado==="OK"?"pago":"por_pagar"}" style="font-size:11px">${r.estado}</span></td>
                 </tr>`).join("")}</tbody>
             </table>
             ${data.length > 100 ? `<div style="padding:8px 14px;font-size:11px;opacity:.55">A mostrar os 100 dias mais recentes de ${data.length}. Os totais por funcionário, em cima, contam todos.</div>` : ""}
@@ -7795,8 +7795,8 @@ async function carregarPainelStock() {
             <tbody>${data.map(m => `<tr>
                 <td style="font-size:12px;opacity:.7">${esc(m.data_movimento)}</td>
                 <td><div style="font-weight:600;font-size:13px">${esc(m.artigos?.descricao||"—")}</div><div style="font-size:11px;opacity:.5;font-family:monospace">${esc(m.artigos?.codigo||"")}</div></td>
-                <td><span style="color:${tipoCor[m.tipo_movimento]||"#888"};font-weight:700;font-size:12px">${esc(tipoLabel[m.tipo_movimento]||m.tipo_movimento)}</span></td>
-                <td style="text-align:right;font-weight:700">${m.quantidade}</td>
+                <td><span style="color:${tipoCor[m.tipo_movimento]||"#888"};font-weight:600;font-size:12px">${esc(tipoLabel[m.tipo_movimento]||m.tipo_movimento)}</span></td>
+                <td style="text-align:right;font-weight:600">${m.quantidade}</td>
                 <td style="font-size:12px">${esc(m.funcionarios?.nome||"—")}</td>
                 <td style="font-size:11px;opacity:.6">${esc(m.observacoes||"—")}</td>
             </tr>`).join("")}</tbody>
@@ -8081,7 +8081,7 @@ function renderMovimentos() {
         tr.innerHTML = `<td colspan="9" style="text-align:center;padding:12px">
             <button onclick="_paginaFluxo++;renderMovimentos()" 
                 style="background:rgba(181,136,99,.15);color:var(--primary,#b8860b);border:1px solid rgba(181,136,99,.3);
-                       border-radius:20px;padding:7px 20px;cursor:pointer;font-size:13px;font-weight:600">
+                       border-radius:20px;padding:8px 20px;cursor:pointer;font-size:13px;font-weight:600">
                 Ver mais (${movimentos.length - fim} restantes)
             </button>
         </td>`;
@@ -8118,13 +8118,13 @@ async function carregarServicosImputacao(obraId, movId = null) {
     wrap.style.display = "block";
     const linhasDiv = document.getElementById("imputacaoLinhas");
     if (linhasDiv) linhasDiv.innerHTML = `
-        <div style="font-size:11px;letter-spacing:.5px;opacity:.5;text-transform:uppercase;margin-bottom:8px">
+        <div style="font-size:11px;opacity:.5;margin-bottom:8px">
             Ligar a serviço(s) desta obra
         </div>
         <div style="font-size:11px;opacity:.5;margin:-4px 0 8px">Com um só serviço e o valor vazio, liga o total sem IVA.</div>
         <div id="imputLinhasInner"></div>
         <button type="button" id="btnAddImput"
-            style="background:rgba(181,136,99,.1);border:1px solid rgba(181,136,99,.2);color:var(--primary,#b58863);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;margin-top:6px">
+            style="background:rgba(181,136,99,.1);border:1px solid rgba(181,136,99,.2);color:var(--primary,#b58863);border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px;margin-top:6px">
             + Adicionar serviço
         </button>`;
 
@@ -8153,7 +8153,7 @@ function adicionarLinhaImput(servs, servicoId = null, valor = null) {
         </select>
         <input class="imput-serv-val" type="number" step="0.01" min="0" placeholder="€ s/ IVA"
             style="width:100px;padding:6px 8px;font-size:13px">
-        <button type="button" onclick="this.parentElement.remove()" style="background:rgba(224,148,134,.1);border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>`;
+        <button type="button" onclick="this.parentElement.remove()" style="background:rgba(224,148,134,.1);border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>`;
     inner.appendChild(div);
 
     if (servicoId) div.querySelector(".imput-serv-sel").value = servicoId;
@@ -8387,7 +8387,7 @@ function mostrarBadgeBarcode() {
 
     const badge = document.createElement("div");
     badge.className = "barcode-badge";
-    badge.style.cssText = "font-size:11px;color:var(--text-muted,#888);margin-top:3px;display:flex;align-items:center;gap:4px";
+    badge.style.cssText = "font-size:11px;color:var(--text-muted,#888);margin-top:4px;display:flex;align-items:center;gap:4px";
     badge.innerHTML = `<span style="font-size:14px">📷</span> Aponta o leitor de barras para preencher automaticamente`;
     wrap.appendChild(badge);
 }
@@ -8987,9 +8987,9 @@ function htmlRespostaCliente(r) {
     return `<div class="resp-cliente" style="margin-top:6px;padding:6px 8px;border-radius:8px;background:rgba(181,136,99,.12);font-size:11px;line-height:1.4">
         <div style="font-weight:600">${aceite ? '👤 Cliente aceitou' : recusa ? '❌ Cliente recusou' : '✏️ Cliente pede alterações'} · ${esc(quando)}</div>
         ${r.comentario ? `<div style="opacity:.8;white-space:pre-wrap;margin-top:2px">${esc(r.comentario)}</div>` : ''}
-        <div style="display:flex;gap:6px;margin-top:5px">
-            <button class="btn-resp-ok btn-primary" style="padding:3px 10px;font-size:11px">${aceite ? 'Confirmar aceite' : recusa ? 'Confirmar recusa' : 'Visto'}</button>
-            ${aceite || recusa ? '<button class="btn-resp-nao btn-secondary" style="padding:3px 10px;font-size:11px">Ignorar</button>' : ''}
+        <div style="display:flex;gap:6px;margin-top:4px">
+            <button class="btn-resp-ok btn-primary" style="padding:4px 10px;font-size:11px">${aceite ? 'Confirmar aceite' : recusa ? 'Confirmar recusa' : 'Visto'}</button>
+            ${aceite || recusa ? '<button class="btn-resp-nao btn-secondary" style="padding:4px 10px;font-size:11px">Ignorar</button>' : ''}
         </div>
     </div>`;
 }
@@ -9075,16 +9075,16 @@ function renderTabelaOrc(lista) {
                 <div style="font-weight:600;font-size:13px;margin-bottom:2px">${esc(o.cliente_nome || '—')}</div>
                 ${nomeObra ? `<div style="font-size:11px;opacity:.45;margin-top:1px">🏗 ${esc(nomeObra)}</div>` : ''}
             </div></td>` +
-            `<td style="text-align:right;font-weight:700;font-size:14px;white-space:nowrap;width:120px;padding:10px 12px">
+            `<td style="text-align:right;font-weight:600;font-size:14px;white-space:nowrap;width:120px;padding:10px 12px">
                 ${total > 0 ? total.toLocaleString('pt-PT', {minimumFractionDigits:2}) + ' €' : '—'}
             </td>` +
             `<td class="largo" style="width:170px;padding:10px 12px">
                 <div class="orc-estado">
-                    <span style="background:${est.bg};color:${est.cor};padding:3px 12px;border-radius:20px;font-size:11px;font-weight:600">${est.label}</span>
+                    <span style="background:${est.bg};color:${est.cor};padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600">${est.label}</span>
                     <button class="btn-estado-rapido sim${o.estado === 'aceite' ? ' ativo' : ''}" title="${o.estado === 'aceite' ? 'Tirar aceite' : 'Marcar como aceite'}">✓</button>
                     <button class="btn-estado-rapido nao${o.estado === 'recusado' ? ' ativo' : ''}" title="${o.estado === 'recusado' ? 'Tirar não aceite' : 'Marcar como não aceite'}">✕</button>
                 </div>
-                ${vencido ? '<div style="font-size:10px;color:#a5483d;margin-top:3px">⚠ Vencido</div>' : ''}
+                ${vencido ? '<div style="font-size:11px;color:#a5483d;margin-top:4px">⚠ Vencido</div>' : ''}
                 ${_respostasOrc[o.id] ? htmlRespostaCliente(_respostasOrc[o.id]) : ''}
             </td>` +
             `<td style="font-size:12px;white-space:nowrap;width:90px;padding:10px 12px;${vencido ? 'color:#a5483d' : 'opacity:.5'}">${dataFmt(o.validade)}</td>` +
@@ -9206,7 +9206,7 @@ function adicionarCategoria(nome = '', linhas = [], catDbId = null) {
     div.innerHTML =
         '<div style="background:rgba(181,136,99,.12);padding:10px 14px;display:flex;align-items:center;gap:10px">' +
             '<input value="' + nomeEsc + '" placeholder="Nome da categoria" data-cid="' + cid + '" ' +
-                'style="flex:1;border:none;background:transparent;font-family:var(--font-title);font-size:13px;font-weight:500;letter-spacing:.5px;text-transform:uppercase;outline:none;color:var(--text-dark)">' +
+                'style="flex:1;border:none;background:transparent;font-family:var(--font-title);font-size:13px;font-weight:500;outline:none;color:var(--text-dark)">' +
             '<span class="cat-subtotal" style="font-family:var(--font-title);font-size:13px;font-weight:600;color:var(--primary-dk,#c8901e);white-space:nowrap;min-width:80px;text-align:right"></span>' +
             '<button onclick="adicionarLinha(' + cid + ',\'mao_obra\')" class="btn-secondary" style="font-size:11px;padding:4px 10px">+ M.O.</button>' +
             '<button onclick="adicionarLinha(' + cid + ',\'material\')" class="btn-secondary" style="font-size:11px;padding:4px 10px">+ Mat.</button>' +
@@ -9253,29 +9253,29 @@ function adicionarLinha(cid, tipo = 'material', dados = null) {
         const vHora    = dados?.preco_unitario || '';
         div.style.cssText = `background:${tipoCor.mao_obra};border-bottom:1px solid rgba(0,0,0,.04)`;
         div.innerHTML = `
-        <div style="display:grid;grid-template-columns:24px 1fr 70px 70px 90px 100px 28px;gap:0;align-items:center;padding:5px 14px">
-            <span style="font-size:10px;opacity:.3">${lid}</span>
+        <div style="display:grid;grid-template-columns:24px 1fr 70px 70px 90px 100px 28px;gap:0;align-items:center;padding:4px 14px">
+            <span style="font-size:11px;opacity:.3">${lid}</span>
             <input value="${esc(dados?.descricao||'')}" placeholder="Descrição do trabalho" data-field="descricao"
-                style="border:none;background:transparent;font-size:13px;padding:3px 6px;outline:none">
+                style="border:none;background:transparent;font-size:13px;padding:4px 6px;outline:none">
             <input value="${nPessoas}" type="number" min="1" step="1" data-field="n_pessoas" placeholder="Pess."
-                style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:3px 5px;text-align:center;outline:none;width:100%"
+                style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:4px 4px;text-align:center;outline:none;width:100%"
                 oninput="calcLinhaMO(this)" title="Nº de pessoas">
             <input value="${horas}" type="number" min="0" step="0.5" data-field="quantidade" placeholder="Horas"
-                style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:3px 5px;text-align:center;outline:none;width:100%"
+                style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:4px 4px;text-align:center;outline:none;width:100%"
                 oninput="calcLinhaMO(this)" title="Nº de horas">
             <input value="${vHora}" type="number" min="0" step="0.01" data-field="preco_unitario" placeholder="€/hora"
-                style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:3px 5px;text-align:right;outline:none;width:100%"
+                style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:4px 4px;text-align:right;outline:none;width:100%"
                 oninput="calcLinhaMO(this)" title="Valor por hora">
             <div data-subtotal class="linha-subtotal"
-                style="font-family:var(--font-title);font-size:13px;font-weight:500;text-align:right;padding:3px 6px;color:var(--primary-dk,#c8901e)">
+                style="font-family:var(--font-title);font-size:13px;font-weight:500;text-align:right;padding:4px 6px;color:var(--primary-dk,#c8901e)">
                 ${nPessoas && horas && vHora ? (nPessoas*horas*vHora).toFixed(2)+' €' : '—'}
             </div>
             <button onclick="this.closest('.orc-linha').remove();actualizarTotaisOrc()"
                 style="background:none;border:none;cursor:pointer;opacity:.25;font-size:16px;padding:0;text-align:center">×</button>
         </div>
         <div style="padding:1px 14px 4px 48px;display:flex;gap:6px;align-items:center">
-            <span style="font-size:10px;background:rgba(143,191,160,.15);color:#8fbfa0;padding:1px 7px;border-radius:6px;font-weight:600;letter-spacing:.3px">MO</span>
-            <span style="font-size:10px;color:rgba(0,0,0,.3)">Pessoas × Horas × €/hora</span>
+            <span style="font-size:11px;background:rgba(143,191,160,.15);color:#8fbfa0;padding:1px 8px;border-radius:6px;font-weight:600;">MO</span>
+            <span style="font-size:11px;color:rgba(0,0,0,.3)">Pessoas × Horas × €/hora</span>
         </div>`;
     } else {
         // Material / Outro: Descrição | Unidade | Qtd | €/un | = Subtotal linha
@@ -9285,27 +9285,27 @@ function adicionarLinha(cid, tipo = 'material', dados = null) {
         const badge = tipoBadge[tipo];
         div.style.cssText = `background:${tipoCor[tipo]||''};border-bottom:1px solid rgba(0,0,0,.04)`;
         div.innerHTML = `
-        <div style="display:grid;grid-template-columns:24px 1fr 60px 80px 90px 100px 28px;gap:0;align-items:center;padding:5px 14px">
-            <span style="font-size:10px;opacity:.3">${lid}</span>
+        <div style="display:grid;grid-template-columns:24px 1fr 60px 80px 90px 100px 28px;gap:0;align-items:center;padding:4px 14px">
+            <span style="font-size:11px;opacity:.3">${lid}</span>
             <input value="${esc(dados?.descricao||'')}" placeholder="Descrição do artigo / trabalho" data-field="descricao"
-                style="border:none;background:transparent;font-size:13px;padding:3px 6px;outline:none">
+                style="border:none;background:transparent;font-size:13px;padding:4px 6px;outline:none">
             <input value="${esc(dados?.unidade||'un')}" data-field="unidade"
-                style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:3px 4px;text-align:center;outline:none;width:100%">
+                style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:4px 4px;text-align:center;outline:none;width:100%">
             <input value="${qtd}" type="number" min="0" step="0.01" data-field="quantidade"
-                style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:3px 6px;text-align:right;outline:none;width:100%"
+                style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:4px 6px;text-align:right;outline:none;width:100%"
                 oninput="calcLinhaMatOuOutro(this)">
             <input value="${pu}" type="number" min="0" step="0.01" placeholder="0.00" data-field="preco_unitario"
-                style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:3px 6px;text-align:right;outline:none;width:100%"
+                style="border:none;background:rgba(0,0,0,.06);border-radius:4px;font-size:12px;padding:4px 6px;text-align:right;outline:none;width:100%"
                 oninput="calcLinhaMatOuOutro(this)">
             <div data-subtotal class="linha-subtotal"
-                style="font-family:var(--font-title);font-size:13px;font-weight:500;text-align:right;padding:3px 6px;color:var(--primary-dk,#c8901e)">
+                style="font-family:var(--font-title);font-size:13px;font-weight:500;text-align:right;padding:4px 6px;color:var(--primary-dk,#c8901e)">
                 ${sub}
             </div>
             <button onclick="this.closest('.orc-linha').remove();actualizarTotaisOrc()"
                 style="background:none;border:none;cursor:pointer;opacity:.25;font-size:16px;padding:0;text-align:center">×</button>
         </div>
         <div style="padding:1px 14px 4px 48px">
-            <span style="font-size:10px;background:rgba(${tipo==='material'?'74,144,226':'244,185,66'},.15);color:${badge.cor};padding:1px 7px;border-radius:6px;font-weight:600;letter-spacing:.3px">${badge.label.toUpperCase()}</span>
+            <span style="font-size:11px;background:rgba(${tipo==='material'?'74,144,226':'244,185,66'},.15);color:${badge.cor};padding:1px 8px;border-radius:6px;font-weight:600;">${badge.label.toUpperCase()}</span>
         </div>`;
     }
 
@@ -9504,7 +9504,7 @@ async function guardarOrcamento(estado = 'rascunho') {
         if (linhasPayload.length) await SB.from('orcamento_linhas').insert(linhasPayload);
     }
 
-    msg.textContent = '✓ Orçamento guardado!'; msg.style.color='var(--color-ok)';
+    msg.textContent = '✓ Orçamento guardado'; msg.style.color='var(--color-ok)';
     await carregarOrcamentos();
     // Não fechar — o utilizador permanece no orçamento para continuar a editar
     // Actualizar número se foi criado agora
@@ -10020,7 +10020,7 @@ function desenharCurvaABC(custos, custoMO) {
         return l.length ? `<span style="color:${cor[c]}"><b>${c}</b>: ${l.length} · ${Math.round(l.reduce((s, x) => s + x.pct, 0))}% do custo</span>` : "";
     }).filter(Boolean).join(" &nbsp; ");
     const linhaHtml = x => `<div style="display:grid;grid-template-columns:22px 1fr auto 46px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
-        <span style="font-weight:700;color:${cor[x.classe]}">${x.classe}</span>
+        <span style="font-weight:600;color:${cor[x.classe]}">${x.classe}</span>
         <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(x.nome)}">${esc(x.nome)}</span>
         <span style="font-weight:600;white-space:nowrap">${x.v.toFixed(2)} €</span>
         <span style="opacity:.55;text-align:right">${x.pct.toFixed(0)}%</span>
@@ -10103,18 +10103,18 @@ async function carregarNotificacoes() {
     let html = rh.html;
 
     if (problemas.length > 0) {
-        html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:700;letter-spacing:.05em;opacity:.5;text-transform:uppercase">
+        html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:600;opacity:.5;">
             ⚠️ ${problemas.length} Problema(s) da obra em aberto</div>`;
         problemas.forEach(p => {
             html += `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer" onclick="abrirListaRapida('equipa')">
                 <div style="font-size:13px;font-weight:500;color:var(--text-dark)">${p.urgente ? "🔴 " : ""}${esc(p.obras?.nome || "Obra")} · ${esc(p.funcionarios?.nome || "Equipa")}</div>
-                <div style="font-size:11px;color:${p.urgente ? "#e05c5c" : "var(--primary)"};margin-top:2px">${esc((p.texto || "").slice(0, 90))}</div>
+                <div style="font-size:11px;color:${p.urgente ? "var(--color-err)" : "var(--primary)"};margin-top:2px">${esc((p.texto || "").slice(0, 90))}</div>
             </div>`;
         });
     }
 
     if (respostas.length > 0) {
-        html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:700;letter-spacing:.05em;opacity:.5;text-transform:uppercase">
+        html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:600;opacity:.5;">
             🧾 ${respostas.length} Resposta(s) de clientes a orçamentos</div>`;
         respostas.forEach(r => {
             html += `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer" onclick="abrirOrcamentoPeloNumero(${esc(JSON.stringify(r.orcamentos?.numero || ""))})">
@@ -10126,7 +10126,7 @@ async function carregarNotificacoes() {
 
     if (atrasados.length > 0) {
         const totalAtr = atrasados.reduce((s,m) => s + Number(m.valor_total), 0);
-        html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:700;letter-spacing:.05em;opacity:.5;text-transform:uppercase">
+        html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:600;opacity:.5;">
             💸 ${atrasados.length} Pagamento(s) em Atraso — ${totalAtr.toFixed(2)} €</div>`;
         atrasados.forEach(m => {
             const desc = m.fornecedores?.nome || m.observacoes || "—";
@@ -10136,21 +10136,21 @@ async function carregarNotificacoes() {
                 onclick="abrirListaRapida('porPagar')">
                 <div>
                     <div style="font-size:13px;font-weight:500;color:var(--text-dark)">${esc(desc)}</div>
-                    <div style="font-size:11px;color:#e05c5c;margin-top:2px">${esc(m.data_documento)} · ${dias} dia(s) atraso</div>
+                    <div style="font-size:11px;color:var(--color-err);margin-top:2px">${esc(m.data_documento)} · ${dias} dia(s) atraso</div>
                 </div>
-                <div style="font-size:13px;font-weight:700;color:#e05c5c;white-space:nowrap;margin-left:12px">–${Number(m.valor_total).toFixed(2)} €</div>
+                <div style="font-size:13px;font-weight:600;color:var(--color-err);white-space:nowrap;margin-left:12px">–${Number(m.valor_total).toFixed(2)} €</div>
             </div>`;
         });
     }
 
     if (stockAlertas.length > 0) {
-        html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:700;letter-spacing:.05em;opacity:.5;text-transform:uppercase">
+        html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:600;opacity:.5;">
             📦 ${stockAlertas.length} Artigo(s) com Stock Baixo</div>`;
         stockAlertas.forEach(a => {
             html += `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;cursor:pointer"
                 onclick="abrirListaRapida('stock')">
                 <div style="font-size:13px;font-weight:500;color:var(--text-dark)">${esc(a.descricao)}</div>
-                <div style="font-size:11px;color:#f97316;white-space:nowrap;margin-left:12px">Abaixo do mínimo (${a.stock_minimo})</div>
+                <div style="font-size:11px;color:var(--color-warn);white-space:nowrap;margin-left:12px">Abaixo do mínimo (${a.stock_minimo})</div>
             </div>`;
         });
     }
@@ -10163,7 +10163,7 @@ async function carregarNotificacoes() {
     const semRegisto = (funcAtivos||[]).filter(f => !comRegisto.has(f.nome));
 
     if (semRegisto.length > 0) {
-        html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:700;letter-spacing:.05em;opacity:.5;text-transform:uppercase">
+        html += `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:600;opacity:.5;">
             👷 ${semRegisto.length} Colaborador(es) Sem Registo Hoje</div>`;
         semRegisto.forEach(f => {
             html += `<div style="padding:8px 16px;border-bottom:1px solid rgba(0,0,0,.06);font-size:13px;color:var(--text-dark);opacity:.7">${esc(f.nome)}</div>`;
@@ -10366,8 +10366,8 @@ function renderBiblioteca() {
     if (!lista.length) { div.innerHTML = `<div style="padding:32px;text-align:center;opacity:.4">Sem serviços.</div>`; return; }
     div.innerHTML = Object.entries(porCat).map(([cat, servs]) => `
         <div style="margin-bottom:20px">
-            <div style="font-family:var(--font-title);font-size:11px;letter-spacing:2px;text-transform:uppercase;opacity:.5;margin-bottom:8px;padding-left:4px">${cat}</div>
-            <div style="display:flex;flex-direction:column;gap:3px">
+            <div style="font-family:var(--font-title);font-size:11px;opacity:.5;margin-bottom:8px;padding-left:4px">${cat}</div>
+            <div style="display:flex;flex-direction:column;gap:4px">
                 ${servs.map(s => {
                     const mats = _bibMateriais[s.id] || [];
                     const op   = !s.ativo ? 'opacity:.4;' : '';
@@ -10375,18 +10375,18 @@ function renderBiblioteca() {
                         <div style="flex:1;min-width:0">
                             <div style="font-weight:600;font-size:13px;margin-bottom:4px;display:flex;align-items:center;gap:8px">
                                 ${s.nome}
-                                <span style="font-size:10px;background:rgba(0,0,0,.06);padding:1px 7px;border-radius:8px;color:var(--text-muted);font-weight:400">${s.unidade}</span>
-                                ${!s.ativo ? '<span style="font-size:10px;color:#a5483d;background:rgba(224,148,134,.1);padding:1px 7px;border-radius:8px">Inactivo</span>' : ''}
+                                <span style="font-size:11px;background:rgba(0,0,0,.06);padding:1px 8px;border-radius:8px;color:var(--text-muted);font-weight:400">${s.unidade}</span>
+                                ${!s.ativo ? '<span style="font-size:11px;color:#a5483d;background:rgba(224,148,134,.1);padding:1px 8px;border-radius:8px">Inactivo</span>' : ''}
                             </div>
                             <div style="font-size:11px;opacity:.5">
                                 ${s.rendimento_mo ? `⚡ ${s.rendimento_mo} ${s.unidade}/dia · ` : ''}
                                 ${mats.length ? mats.slice(0,3).map(m=>`${m.descricao} ${m.quantidade}${m.unidade}`).join(' · ')+(mats.length>3?'…':'') : 'Sem materiais'}
                             </div>
-                            <div style="font-size:11.5px;margin-top:3px">${textoCustoComposicao(s, mats)}</div>
+                            <div style="font-size:12px;margin-top:4px">${textoCustoComposicao(s, mats)}</div>
                         </div>
                         <div style="display:flex;gap:4px;flex-shrink:0">
-                            <button onclick="abrirModalBibServico('${s.id}')" style="background:rgba(0,0,0,.06);border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px">✏️</button>
-                            <button onclick="toggleBibAtivo('${s.id}',${s.ativo})" style="background:rgba(0,0,0,.05);border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;opacity:.6" title="${s.ativo?'Desactivar':'Activar'}">${s.ativo?'🔕':'🔔'}</button>
+                            <button onclick="abrirModalBibServico('${s.id}')" style="background:rgba(0,0,0,.06);border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px">✏️</button>
+                            <button onclick="toggleBibAtivo('${s.id}',${s.ativo})" style="background:rgba(0,0,0,.05);border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;opacity:.6" title="${s.ativo?'Desactivar':'Activar'}">${s.ativo?'🔕':'🔔'}</button>
                         </div>
                     </div>`;
                 }).join("")}
@@ -10434,7 +10434,7 @@ function adicionarLinhaBibMat(mat = null) {
         <select data-field="unidade" style="padding:6px 4px;border-radius:6px;font-size:12px">
             ${["kg","L","m²","ml","m³","un","saco","rolo","cx"].map(u=>`<option ${u===(mat?.unidade||'un')?'selected':''}>${u}</option>`).join("")}
         </select>
-        <button onclick="this.closest('.bib-mat-linha').remove();atualizarResumoCustoBib()" style="background:rgba(165,72,61,.1);border:none;border-radius:6px;padding:5px;cursor:pointer;font-size:14px;opacity:.7">×</button>
+        <button onclick="this.closest('.bib-mat-linha').remove();atualizarResumoCustoBib()" style="background:rgba(165,72,61,.1);border:none;border-radius:6px;padding:4px;cursor:pointer;font-size:14px;opacity:.7">×</button>
         <select data-field="artigo_id" style="grid-column:1/2;padding:6px 4px;border-radius:6px;font-size:12px" title="Artigo do Stock (usa o preço atual)">
             <option value="">— Artigo do Stock (opcional) —</option>
             ${_bibArtigos.map(a => `<option value="${a.id}"${a.id === mat?.artigo_id ? " selected" : ""}>${esc(a.descricao)}${Number(a.preco_atual) > 0 ? " · " + Number(a.preco_atual).toFixed(2) + " €" : " · sem preço"}</option>`).join("")}
@@ -10545,8 +10545,8 @@ function ligarAutocompleteBiblioteca(inputEl, cid) {
         popup.style.top  = (rect.bottom + 4) + "px";
         popup.style.left = rect.left + "px";
         popup.innerHTML =
-            '<div style="padding:6px 12px;font-size:10px;letter-spacing:1px;text-transform:uppercase;opacity:.4;border-bottom:1px solid rgba(255,255,255,.06)">🔧 Biblioteca</div>' +
-            matches.map(s => `<div class="bib-pp" data-id="${s.id}" style="padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.04)" onmouseenter="this.style.background='rgba(181,136,99,.1)'" onmouseleave="this.style.background=''"><div><div style="font-size:13px;font-weight:500">${s.nome}</div><div style="font-size:11px;opacity:.4">${s.categoria}${s.rendimento_mo?' · '+s.rendimento_mo+' '+s.unidade+'/dia':''}</div></div><span style="font-size:10px;background:rgba(255,255,255,.08);padding:2px 8px;border-radius:8px;color:rgba(255,255,255,.5);margin-left:8px;flex-shrink:0">${s.unidade}</span></div>`).join("");
+            '<div style="padding:6px 12px;font-size:11px;opacity:.4;border-bottom:1px solid rgba(255,255,255,.06)">🔧 Biblioteca</div>' +
+            matches.map(s => `<div class="bib-pp" data-id="${s.id}" style="padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.04)" onmouseenter="this.style.background='rgba(181,136,99,.1)'" onmouseleave="this.style.background=''"><div><div style="font-size:13px;font-weight:500">${s.nome}</div><div style="font-size:11px;opacity:.4">${s.categoria}${s.rendimento_mo?' · '+s.rendimento_mo+' '+s.unidade+'/dia':''}</div></div><span style="font-size:11px;background:rgba(255,255,255,.08);padding:2px 8px;border-radius:8px;color:rgba(255,255,255,.5);margin-left:8px;flex-shrink:0">${s.unidade}</span></div>`).join("");
         document.body.appendChild(popup);
         popup.querySelectorAll(".bib-pp").forEach(el => {
             el.addEventListener("mousedown", e => {

@@ -84,7 +84,7 @@ document.getElementById("btnGerar").addEventListener("click", async () => {
     document.getElementById("qrBox").style.display = "block";
     document.getElementById("qrBox").dataset.nomeObra = nome;
 
-    alert(`Obra "${nome}" criada com sucesso!`);
+    alert(`Obra "${nome}" criada`);
 });
 
 // =======================================================

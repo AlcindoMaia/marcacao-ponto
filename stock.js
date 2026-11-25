@@ -128,7 +128,7 @@ async function confirmarMovimentoStock() {
 
   if (error) { console.error(error); mostrarFeedback(msgErro(error), "erro"); return; }
 
-  mostrarFeedback(`✓ ${tipo === "entrada" ? "Entrada" : "Saída"} de ${qtd} registada!`, "ok");
+  mostrarFeedback(`✓ ${tipo === "entrada" ? "Entrada" : "Saída"} de ${qtd} registada`, "ok");
   document.getElementById("quantidade").value = "";
   document.querySelector('input[name="tipoMov"]')?.parentElement?.querySelectorAll('input').forEach(r => r.checked = false);
   // Actualizar stock — voltar a ler para reflectir o movimento registado
