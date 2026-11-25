@@ -471,17 +471,24 @@ async function pubEscolheuFicheiros(ev) {
   try {
     for (const f of novos) {
       if (pubFotos.length >= PUB_MAX_FOTOS) { foraDoLimite = true; break; }
-      msg.textContent = "A preparar as fotos…";
+      msg.textContent = novos.length > 1 ? `A preparar as fotos… (${pubFotos.length + 1})` : "A preparar a foto…";
       try {
-        const pronta = await prepararFoto(f);
+        // Nunca fica preso: se a foto não ficar pronta em 40 s, desiste dela
+        const pronta = await Promise.race([prepararFoto(f),
+          new Promise((_, rej) => setTimeout(() => rej(new Error("tempo_esgotado")), 40000))]);
         // A regra do Storage só aceita JPEG: o que não passou a JPEG fica de fora
         if (pubFotos.length < PUB_MAX_FOTOS && (/jpe?g$/i.test(pronta.type) || /\.jpe?g$/i.test(pronta.name))) pubFotos.push(pronta);
-      } catch (e) { console.error(e); msg.textContent = "Uma das fotos não abriu. Tenta outra."; }
+      } catch (e) {
+        console.error(e);
+        msg.textContent = ehHeic(f)
+          ? "Esta foto está em HEIC e não abriu. Tira a foto com o botão da câmara aqui, ou muda a câmara para JPEG."
+          : "Uma das fotos não abriu. Tenta outra.";
+      }
     }
   } finally {
     escolher.disabled = enviar.disabled = false;
   }
-  if (msg.textContent === "A preparar as fotos…") msg.textContent = "";
+  if (/^A preparar/.test(msg.textContent)) msg.textContent = "";
   if (foraDoLimite) msg.textContent = `Só cabem ${PUB_MAX_FOTOS} fotos por publicação.`;
   pubMostrarFotos();
 }
