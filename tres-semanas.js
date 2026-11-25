@@ -79,8 +79,8 @@ function desenharTresSemanas() {
     const n = { falta: 0, por_ver: 0, pronto: 0 };
     lista.forEach(t => n[tsEstadoTarefa(t)]++);
     const cab = `<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline;margin-bottom:8px">
-        <div style="font-family:var(--font-title,sans-serif);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;opacity:.65">Próximas 3 semanas · está tudo pronto?</div>
-        <div style="font-size:12.5px">${lista.length ? `<b style="color:#8fbfa0">${n.pronto} prontas</b> · <b style="color:#e0b07a">${n.por_ver} por ver</b> · <b style="color:#e09486">${n.falta} com falhas</b>` : ""}</div>
+        <div style="font-family:var(--font-title,sans-serif);font-size:12px;opacity:.65">Próximas 3 semanas · está tudo pronto?</div>
+        <div style="font-size:13px">${lista.length ? `<b style="color:#8fbfa0">${n.pronto} prontas</b> · <b style="color:#e0b07a">${n.por_ver} por ver</b> · <b style="color:#e09486">${n.falta} com falhas</b>` : ""}</div>
     </div>
     <div style="font-size:12px;opacity:.65;margin-bottom:8px">Toca em 📦 material ou 🙋 cliente para mudar (por ver → pronto → falta → não precisa). A 👷 equipa vem das pessoas atribuídas e das faltas registadas.</div>`;
     if (!lista.length) {

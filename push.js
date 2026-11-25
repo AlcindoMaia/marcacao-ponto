@@ -66,7 +66,7 @@ async function avisosDesenhar(msg = "") {
 
     if (avisosIOS() && !avisosInstalada()) {
         c.innerHTML = `<div class="lista-sub" style="opacity:.85">No iPhone, os avisos só funcionam com a app no ecrã principal:</div>
-            <ol style="font-size:13.5px;line-height:1.6;padding-left:20px;margin:6px 0 10px">
+            <ol style="font-size:14px;line-height:1.6;padding-left:20px;margin:6px 0 10px">
                 <li>Nesta página, toca em <b>Partilhar</b> (o quadrado com a seta para cima).</li>
                 <li>Escolhe <b>Adicionar ao ecrã principal</b>.</li>
                 <li>Abre a app pelo novo ícone <b>Maia</b> e volta aqui ao 🔔 › Avisos no telemóvel.</li>
@@ -100,7 +100,7 @@ async function avisosDesenhar(msg = "") {
     const tipos = new Set(linha.tipos || []);
     c.innerHTML = `${nota}<div class="lista-sub" style="opacity:.85">Este aparelho recebe avisos. Desliga os que não quiseres.</div>
         ${AVISOS_TIPOS.map(([k, nome, desc]) => `<label class="lista-linha" style="cursor:pointer;align-items:flex-start">
-            <input type="checkbox" style="margin-top:3px" ${tipos.has(k) ? "checked" : ""} onchange="avisosTipo('${k}', this)">
+            <input type="checkbox" style="margin-top:4px" ${tipos.has(k) ? "checked" : ""} onchange="avisosTipo('${k}', this)">
             <div class="lista-txt" style="flex:1"><b>${esc(nome)}</b><div class="lista-det" style="white-space:normal">${esc(desc)}</div></div>
         </label>`).join("")}
         <div class="lista-rodape" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">

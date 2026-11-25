@@ -750,7 +750,7 @@ async function rhAlertas() {
     if (docsRes.error) return { total: 0, html: "" };   // SQL ainda não corrido
     const funcs = funcsRes.data || [], docs = docsRes.data || [], regs = regsRes.data || [];
 
-    const cab = (t) => `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:700;letter-spacing:.05em;opacity:.5;text-transform:uppercase">${t}</div>`;
+    const cab = (t) => `<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px;font-weight:600;opacity:.5;">${t}</div>`;
     const item = (titulo, sub, cor, onclick) => `<div style="padding:10px 16px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer" onclick="${onclick}">
         <div style="font-size:13px;font-weight:500;color:var(--text-dark)">${titulo}</div>
         <div style="font-size:11px;color:${cor};margin-top:2px;white-space:pre-line">${sub}</div></div>`;
@@ -764,14 +764,14 @@ async function rhAlertas() {
         if (!prob.length) return;
         const vermelhos = prob.filter(p => p.cor === "vermelho").length;
         linhasDocs.push(item(`${vermelhos ? "🔴" : "🟡"} ${esc(f.nome)}`, esc(prob.map(p => p.texto).slice(0, 4).join("\n") + (prob.length > 4 ? `\n… e mais ${prob.length - 4}` : "")),
-            vermelhos ? "#e05c5c" : "#f97316", `abrirDocsFuncionario('${f.id}')`));
+            vermelhos ? "var(--color-err)" : "var(--color-warn)", `abrirDocsFuncionario('${f.id}')`));
     });
     const docsEmp = docs.filter(d => !d.funcionario_id);
     Object.entries(TIPOS_DOC_EMPRESA).forEach(([k, t]) => {
         if (k === "outro") return;
         const e = rhEstadoTipo(docsEmp, k, t);
         if (e.cor === "vermelho" || e.cor === "amarelo")
-            linhasDocs.push(item(`${RH_ICONE[e.cor]} Empresa: ${esc(t.nome)}`, esc(e.texto), e.cor === "vermelho" ? "#e05c5c" : "#f97316", "abrirTab('funcionarios','empresa')"));
+            linhasDocs.push(item(`${RH_ICONE[e.cor]} Empresa: ${esc(t.nome)}`, esc(e.texto), e.cor === "vermelho" ? "var(--color-err)" : "var(--color-warn)", "abrirTab('funcionarios','empresa')"));
     });
     if (linhasDocs.length) { total += linhasDocs.length; html += cab(`🗂 ${linhasDocs.length} Documento(s) de RH por tratar`) + linhasDocs.join(""); }
 
@@ -788,7 +788,7 @@ async function rhAlertas() {
     if (semReg.length && funcs.length) {
         total += 1;
         html += cab("📋 Registo diário da semana passada") +
-            item(`${semReg.length} dia(s) útil(eis) sem registo`, esc(semReg.join(" · ") + "\nÉ a prova das horas (Código do Trabalho, art. 202.º)."), "#f97316", "abrirTab('funcionarios','registos')");
+            item(`${semReg.length} dia(s) útil(eis) sem registo`, esc(semReg.join(" · ") + "\nÉ a prova das horas (Código do Trabalho, art. 202.º)."), "var(--color-warn)", "abrirTab('funcionarios','registos')");
     }
 
     // 3. Ausências marcadas para esta semana
@@ -812,7 +812,7 @@ async function rhAlertas() {
     const semMotivo = regs.filter(r => r.tipo === "falta" && !r.motivo && r.data >= rhIso(ha30) && r.data <= rhIso(hoje));
     if (semMotivo.length) {
         total += 1;
-        html += item(`❔ ${semMotivo.length} falta(s) sem motivo (30 dias)`, "Marca o motivo no registo diário: decide o ordenado e as férias.", "#f97316", "abrirTab('funcionarios','registos')");
+        html += item(`❔ ${semMotivo.length} falta(s) sem motivo (30 dias)`, "Marca o motivo no registo diário: decide o ordenado e as férias.", "var(--color-warn)", "abrirTab('funcionarios','registos')");
     }
 
     return { total, html };

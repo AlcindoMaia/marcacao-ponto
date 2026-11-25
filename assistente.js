@@ -165,15 +165,15 @@ async function abrirObra(obraId, aviso = "") {
     const orcHoras = soma(servicos, "horas_orcamento");
 
     const linha = (rotulo, valor) =>
-        `<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid rgba(0,0,0,.06);font-size:13px">
+        `<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-top:1px solid rgba(0,0,0,.06);font-size:13px">
             <span style="color:var(--text-muted)">${rotulo}</span><span style="font-weight:600">${valor}</span>
         </div>`;
 
     const rotulosNota = { ponto_situacao: "ponto de situação", contexto: "contexto", projeto: "projeto", decisao: "decisão" };
 
     const corpo = `
-        ${aviso ? `<div style="background:rgba(143,191,160,.15);border:1px solid rgba(143,191,160,.5);color:#5e9a74;border-radius:10px;padding:9px 12px;margin-bottom:10px;font-size:13px;font-weight:600">✓ ${esc(aviso)}</div>` : ""}
-        ${obra.local ? `<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px">${esc(obra.local)}</div>` : ""}
+        ${aviso ? `<div style="background:rgba(143,191,160,.15);border:1px solid rgba(143,191,160,.5);color:#5e9a74;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:13px;font-weight:600">✓ ${esc(aviso)}</div>` : ""}
+        ${obra.local ? `<div style="font-size:13px;color:var(--text-muted);margin-bottom:10px">${esc(obra.local)}</div>` : ""}
 
         <div class="hoje-campo">
             <label>Como vai</label>
@@ -197,7 +197,7 @@ async function abrirObra(obraId, aviso = "") {
             <label>O que me contaste</label>
             <div id="obraNotas">
             ${(notas || []).length
-                ? notas.map(n => `<div style="font-size:13px;padding:7px 0;border-top:1px solid rgba(0,0,0,.06);display:flex;gap:8px" data-nota="${n.id}">
+                ? notas.map(n => `<div style="font-size:13px;padding:8px 0;border-top:1px solid rgba(0,0,0,.06);display:flex;gap:8px" data-nota="${n.id}">
                       <div style="flex:1;min-width:0">
                           <div style="font-size:11px;color:var(--text-muted)">${n.criado_em.slice(0,10)} · ${rotulosNota[n.tipo] || n.tipo}</div>
                           <div style="line-height:1.5">${esc(n.texto)}</div>
@@ -387,7 +387,7 @@ async function falarComAssistente() {
 function mostrarResposta(pergunta, resposta) {
     abrirPainel("Assistente", `
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">${esc(pergunta)}</div>
-        <div style="font-size:15px;line-height:1.6">${esc(resposta)}</div>`,
+        <div style="font-size:16px;line-height:1.6">${esc(resposta)}</div>`,
         `<button class="btn-secondary" onclick="fecharPainel()">Fechar</button>`);
 }
 
@@ -434,7 +434,7 @@ function mostrarRascunho() {
             <label>Nota (opcional)</label>
             <input id="pedNota" placeholder="Ex: para segunda de manhã">
         </div>
-        <div style="font-size:11.5px;color:var(--text-muted);margin-top:10px">
+        <div style="font-size:12px;color:var(--text-muted);margin-top:10px">
             Pedido original: "${esc(d.texto)}"
         </div>`;
 
@@ -540,7 +540,7 @@ async function mostrarNotaDeObra(original, j) {
             <label>Nota</label>
             <textarea id="notaTexto" rows="5">${esc(j.texto)}</textarea>
         </div>
-        <div style="font-size:11.5px;color:var(--text-muted)">
+        <div style="font-size:12px;color:var(--text-muted)">
             Fica guardada nesta obra e entra no plano da próxima vez que pedires um.
         </div>`,
         `<button class="btn-secondary" onclick="fecharPainel()">Cancelar</button>
@@ -631,7 +631,7 @@ function mostrarPlano() {
     const listas = (titulo, itens, cor) => (itens || []).length ? `
         <div class="hoje-campo">
             <label>${titulo}</label>
-            <div style="font-size:12.5px;line-height:1.6;color:${cor}">
+            <div style="font-size:13px;line-height:1.6;color:${cor}">
                 ${itens.map(i => "• " + esc(i)).join("<br>")}
             </div>
         </div>` : "";
@@ -649,7 +649,7 @@ function mostrarPlano() {
                 <div style="font-size:12px;color:var(--text-muted)">
                     ${t.data_prevista || "sem data"} · ${t.duracao_horas}h${nomes(t.funcionario_ids) ? " · " + esc(nomes(t.funcionario_ids)) : " · sem ninguém atribuído"}
                 </div>
-                ${t.porque ? `<div style="font-size:11.5px;color:var(--text-muted);margin-top:3px;font-style:italic">${esc(t.porque)}</div>` : ""}
+                ${t.porque ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px;font-style:italic">${esc(t.porque)}</div>` : ""}
             </div>`).join("")}
         </div>
         ${listas("Riscos", p.riscos, "#8a5e06")}
@@ -733,7 +733,7 @@ async function abrirPedidosPorValidar() {
         return `<div class="hoje-linha-pedido" data-pedido="${p.id}">
             <div class="hoje-linha-topo">
                 <span class="hoje-linha-desc">${esc(p.obras?.nome || "sem obra")}</span>
-                <span style="font-size:11.5px;color:var(--text-muted)">${p.criado_em.slice(0, 10)}</span>
+                <span style="font-size:12px;color:var(--text-muted)">${p.criado_em.slice(0, 10)}</span>
             </div>
             <div style="font-size:13px;line-height:1.6">
                 ${linhas.map(l => `• ${l.quantidade ?? "?"} ${esc(l.unidade || "")} ${esc(l.descricao)}`).join("<br>")}

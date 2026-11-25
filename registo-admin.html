@@ -74,7 +74,7 @@ button { font: inherit; color: inherit; }
   gap: 20px;
 }
 .loading-logo { height: 56px; animation: pulse 1.8s ease-in-out infinite; }
-.loading-txt  { font-family: var(--fh); font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--muted); }
+.loading-txt  { font-family: var(--fh); font-size: 11px; color: var(--muted); }
 @keyframes pulse { 0%,100%{opacity:.3} 50%{opacity:.8} }
 
 /* ── Ecrã principal ── */
@@ -101,8 +101,7 @@ button { font: inherit; color: inherit; }
 }
 .logo { height: 34px; border-radius: 4px; }
 .header-titulo {
-  font-family: var(--fh); font-size: 15px; font-weight: 400;
-  letter-spacing: 1.5px; text-transform: uppercase;
+  font-family: var(--fh); font-size: 16px; font-weight: 400;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .header-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
@@ -113,7 +112,7 @@ button { font: inherit; color: inherit; }
   border: 1px solid rgba(255,255,255,.18);
   background: rgba(255,255,255,.08);
   color: #fff;
-  font-size: 15px;
+  font-size: 16px;
   text-decoration: none;
   cursor: pointer;
   transition: background .15s;
@@ -125,7 +124,7 @@ button { font: inherit; color: inherit; }
   border: none;
   background: transparent;
   color: rgba(255,255,255,.65);
-  font-family: var(--fh); font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+  font-family: var(--fh); font-size: 12px;
   cursor: pointer;
 }
 .btn-sair:hover { color: #fff; }
@@ -133,10 +132,10 @@ button { font: inherit; color: inherit; }
 /* Título do dia */
 .hero { padding-top: 18px; }
 .hero-data {
-  font-family: var(--fh); font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+  font-family: var(--fh); font-size: 12px;
   color: var(--gold-txt); margin-bottom: 2px;
 }
-.hero-titulo { font-family: var(--fh); font-size: 22px; font-weight: 500; letter-spacing: .5px; line-height: 1.2; }
+.hero-titulo { font-family: var(--fh); font-size: 20px; font-weight: 500; line-height: 1.2; }
 .hero-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
 
 /* Barra de ferramentas: dia e ações */
@@ -149,7 +148,7 @@ button { font: inherit; color: inherit; }
   border: 1px solid var(--border);
   background: var(--bg2);
   color: var(--text);
-  font-family: var(--fh); font-size: 15px; letter-spacing: .5px; text-align: center;
+  font-family: var(--fh); font-size: 16px; text-align: center;
 }
 .btn-dia {
   width: 42px; height: 42px; flex-shrink: 0;
@@ -168,7 +167,7 @@ button { font: inherit; color: inherit; }
   border: 1px solid var(--border);
   background: var(--bg2);
   color: var(--text);
-  font-family: var(--fh); font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+  font-family: var(--fh); font-size: 12px;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -186,19 +185,19 @@ button { font: inherit; color: inherit; }
   padding: 10px;
   box-shadow: 0 10px 30px rgba(0,0,0,.35);
 }
-.temp-titulo { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; padding: 0 4px; }
+.temp-titulo { font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 6px; padding: 0 4px; }
 .temp-opcao { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
 .temp-opcao:hover { background: var(--gold-lt); }
 .temp-novo {
-  width: 100%; margin-top: 8px; padding: 9px;
+  width: 100%; margin-top: 8px; padding: 8px;
   border-radius: 8px; border: 1px dashed rgba(181,136,99,.5);
   background: transparent; color: var(--gold-txt);
   font-size: 13px; font-weight: 600; cursor: pointer;
 }
 .etq-temp {
-  font-size: 9px; font-weight: 700; letter-spacing: .5px;
+  font-size: 11px; font-weight: 600; letter-spacing: .5px;
   background: var(--gold-lt); color: var(--gold-txt);
-  padding: 1px 6px; border-radius: 8px; margin-left: 5px; vertical-align: middle;
+  padding: 1px 6px; border-radius: 8px; margin-left: 4px; vertical-align: middle;
 }
 
 /* Lista de funcionários */
@@ -220,11 +219,11 @@ button { font: inherit; color: inherit; }
   background: var(--gold-lt);
   color: var(--gold-txt);
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--fh); font-size: 17px; font-weight: 500;
+  font-family: var(--fh); font-size: 18px; font-weight: 500;
 }
 .func-info { flex: 1; min-width: 0; }
 .func-nome {
-  font-family: var(--fh); font-size: 15px; font-weight: 500; letter-spacing: .3px;
+  font-family: var(--fh); font-size: 16px; font-weight: 500;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .func-resumo { font-size: 12px; color: var(--muted); margin-top: 1px; }
@@ -269,11 +268,11 @@ button { font: inherit; color: inherit; }
   display: flex; align-items: center; justify-content: center;
 }
 .btn-add-linha {
-  margin-top: 2px; padding: 9px 14px; width: 100%;
+  margin-top: 2px; padding: 8px 14px; width: 100%;
   border-radius: var(--radsm);
   border: 1px dashed rgba(181,136,99,.45);
   background: transparent; color: var(--gold-txt);
-  font-family: var(--fh); font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+  font-family: var(--fh); font-size: 12px;
   cursor: pointer;
 }
 .input-temp-nome {
@@ -287,7 +286,7 @@ button { font: inherit; color: inherit; }
 .func-card-temp { border: 1px dashed rgba(181,136,99,.5) !important; }
 .btn-falta {
   font-size: 11px; font-weight: 600;
-  padding: 5px 10px; border-radius: 20px;
+  padding: 4px 10px; border-radius: 20px;
   border: 1px solid rgba(224,148,134,.4);
   background: transparent; color: var(--red);
   cursor: pointer; white-space: nowrap; transition: background .2s;
@@ -302,7 +301,7 @@ button { font: inherit; color: inherit; }
 
 /* Fotos e vídeos da obra */
 .media-obra { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin: 14px 0 4px; }
-.media-titulo { font-family: var(--fh); font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
+.media-titulo { font-family: var(--fh); font-size: 13px; color: var(--gold); margin-bottom: 10px; }
 .media-linha { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
 .media-linha select { flex: 1; min-width: 0; padding: 10px; border-radius: var(--radsm); border: 1px solid var(--border); background: var(--bg3); color: var(--text); font-family: var(--fb); font-size: 14px; }
 .media-linha .btn-acao { white-space: nowrap; max-width: 55%; overflow: hidden; text-overflow: ellipsis; }
@@ -323,10 +322,10 @@ button { font: inherit; color: inherit; }
   background: linear-gradient(to top, var(--bg) 70%, transparent);
 }
 .btn-guardar-tudo {
-  width: 100%; padding: 15px;
+  width: 100%; padding: 16px;
   border-radius: var(--radius); border: none;
   background: var(--gold); color: #fff;
-  font-family: var(--fh); font-size: 16px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase;
+  font-family: var(--fh); font-size: 16px; font-weight: 500;
   cursor: pointer;
   box-shadow: 0 6px 20px rgba(0,0,0,.25);
   transition: transform .15s, background .15s;
@@ -335,9 +334,9 @@ button { font: inherit; color: inherit; }
 .btn-guardar-tudo:active { transform: scale(.98); }
 
 .feedback-geral {
-  margin-top: 10px; padding: 11px 14px;
+  margin-top: 10px; padding: 12px 14px;
   border-radius: var(--radsm);
-  font-family: var(--fh); font-size: 13px; letter-spacing: .5px; text-align: center;
+  font-family: var(--fh); font-size: 13px; text-align: center;
 }
 .feedback-geral:empty { display: none; }
 .feedback-geral.ok   { background: rgba(143,191,160,.14); color: var(--green); border: 1px solid rgba(143,191,160,.3); }
@@ -349,8 +348,8 @@ button { font: inherit; color: inherit; }
 .comp-lista { padding-top: 16px; display: flex; flex-direction: column; gap: 8px; }
 .comp-resumo { display: flex; gap: 8px; margin-bottom: 8px; }
 .comp-resumo > div { flex: 1; border-radius: 10px; padding: 10px 12px; text-align: center; background: var(--bg2); border: 1px solid var(--border); }
-.comp-resumo b { display: block; font-family: var(--fh); font-size: 22px; font-weight: 500; }
-.comp-resumo span { font-size: 10px; color: var(--muted); font-family: var(--fh); letter-spacing: 1px; text-transform: uppercase; }
+.comp-resumo b { display: block; font-family: var(--fh); font-size: 20px; font-weight: 500; }
+.comp-resumo span { font-size: 11px; color: var(--muted); font-family: var(--fh); }
 .comp-item {
   background: var(--bg2);
   border: 1px solid var(--border);
@@ -363,33 +362,33 @@ button { font: inherit; color: inherit; }
 .comp-item.obra_diferente    { border-left-color: var(--orange); }
 .comp-item.sem_registo_colab { border-left-color: var(--red); }
 .comp-item.registo_incompleto{ border-left-color: var(--red); }
-.comp-nome { font-family: var(--fh); font-size: 14px; font-weight: 500; letter-spacing: .3px; margin-bottom: 3px; }
+.comp-nome { font-family: var(--fh); font-size: 14px; font-weight: 500; margin-bottom: 4px; }
 .comp-detalhe { font-size: 12px; color: var(--muted); line-height: 1.6; }
 .comp-badge {
-  display: inline-block; margin-top: 5px; padding: 2px 8px; border-radius: 4px;
-  font-size: 10px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase;
+  display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 4px;
+  font-size: 11px; font-weight: 600;
 }
 .badge-ok    { background: rgba(143,191,160,.16); color: var(--green); }
 .badge-aviso { background: rgba(224,176,122,.16); color: var(--orange); }
 .badge-erro  { background: rgba(224,148,134,.14); color: var(--red); }
-.comp-vazio  { padding: 32px; text-align: center; color: var(--muted); font-size: 13px; font-family: var(--fh); letter-spacing: 1px; }
+.comp-vazio  { padding: 32px; text-align: center; color: var(--muted); font-size: 13px; font-family: var(--fh); }
 
 /* ── Login ── */
 #ecrãLogin { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 32px 24px; }
 .login-box { width: 100%; max-width: 340px; text-align: center; }
 .login-logo { height: 64px; margin-bottom: 24px; }
-.login-titulo { font-family: var(--fh); font-size: 18px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 24px; }
+.login-titulo { font-family: var(--fh); font-size: 18px; margin-bottom: 24px; }
 .login-input {
   width: 100%; padding: 12px 16px; margin-bottom: 12px;
   border-radius: var(--radsm); border: 1px solid var(--border);
   background: var(--bg2); color: var(--text);
-  font-family: var(--fb); font-size: 15px;
+  font-family: var(--fb); font-size: 16px;
 }
 .login-btn {
-  width: 100%; padding: 13px;
+  width: 100%; padding: 12px;
   border-radius: var(--radsm); border: none;
   background: var(--gold); color: #fff;
-  font-family: var(--fh); font-size: 15px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase;
+  font-family: var(--fh); font-size: 16px; font-weight: 500;
   cursor: pointer;
 }
 .login-msg { font-size: 13px; color: var(--red); margin-top: 10px; min-height: 18px; font-family: var(--fh); }
@@ -401,7 +400,7 @@ button { font: inherit; color: inherit; }
   .acoes { width: 100%; }
   .acoes > * { flex: 1; }
   .acoes .btn-acao { width: 100%; }
-  .btn-falta { padding: 5px 8px; }
+  .btn-falta { padding: 4px 8px; }
 }
 </style>
 </head>
@@ -536,6 +535,7 @@ button { font: inherit; color: inherit; }
 <script src="config.js?v=4"></script>
 <script src="fotos.js?v=2"></script>
 <script src="voz.js?v=1"></script>
-<script src="registo-admin.js?v=10"></script>
+<script src="registo-admin.js?v=11"></script>
+<script src="icones.js?v=1"></script>
 </body>
 </html>
