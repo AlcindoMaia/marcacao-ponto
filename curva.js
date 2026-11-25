@@ -29,7 +29,7 @@ function htmlCurva(pontos, cores = {}) {
         ${iReal >= 0 ? `<circle cx="${x(iReal)}" cy="${y(pontos[iReal].real)}" r="4.5" fill="${c.real}"/>` : ""}
     </svg>
     <div style="display:flex;gap:16px;font-size:12px;color:${c.texto};margin-top:4px">
-        <span><span style="display:inline-block;width:18px;height:3px;background:${c.real};vertical-align:middle;margin-right:5px"></span>Feito</span>
-        ${pontos.some(p => p.previsto != null) ? `<span><span style="display:inline-block;width:18px;border-top:2px dashed ${c.previsto};vertical-align:middle;margin-right:5px"></span>Previsto</span>` : ""}
+        <span><span style="display:inline-block;width:18px;height:3px;background:${c.real};vertical-align:middle;margin-right:4px"></span>Feito</span>
+        ${pontos.some(p => p.previsto != null) ? `<span><span style="display:inline-block;width:18px;border-top:2px dashed ${c.previsto};vertical-align:middle;margin-right:4px"></span>Previsto</span>` : ""}
     </div>`;
 }

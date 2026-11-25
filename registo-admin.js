@@ -177,7 +177,7 @@ function renderFuncionarios(existentes) {
                 <div class="func-info">
                     <div class="func-nome">
                         ${esc(f.nome)}
-                        ${isTemp ? '<span class="etq-temp">TEMP</span>' : ''}
+                        ${isTemp ? '<span class="etq-temp">Temp</span>' : ''}
                     </div>
                     <div class="func-resumo ${isFalta ? 'resumo-falta' : ''}">${isFalta ? '✕ Falta' : resumo}</div>
                 </div>
@@ -255,7 +255,7 @@ function reconstruirCartaoTemp(nome, regs, syntheticId) {
             <div class="func-info">
                 <div class="func-nome">
                     ${esc(nome)}
-                    <span class="etq-temp">TEMP</span>
+                    <span class="etq-temp">Temp</span>
                 </div>
                 <div class="func-resumo">${totalH.toFixed(1)}h · ${regs.length} obra(s)</div>
             </div>
@@ -350,7 +350,7 @@ function adicionarTempExistente(funcId, nome, valorDia) {
             <div class="func-info">
                 <div class="func-nome">
                     ${esc(nome)}
-                    <span class="etq-temp">TEMP</span>
+                    <span class="etq-temp">Temp</span>
                 </div>
                 <div class="func-resumo">Sem registo</div>
             </div>
@@ -672,11 +672,11 @@ async function mostrarComparacao() {
     const ponto = pontoRes.data || [];
 
     if (admin.length === 0) {
-        lista.innerHTML = `<div class="comp-vazio">SEM REGISTO ADMIN PARA ESTA DATA</div>`;
+        lista.innerHTML = `<div class="comp-vazio">Sem registo do admin nesta data</div>`;
         return;
     }
 
-    let html = `<div style="font-family:var(--fh);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:4px 0">${fmtDataLabel(data)}</div>`;
+    let html = `<div style="font-family:var(--fh);font-size:11px;color:var(--muted);margin:4px 0">${fmtDataLabel(data)}</div>`;
 
     let nOk = 0, nAvisos = 0, nErros = 0;
 

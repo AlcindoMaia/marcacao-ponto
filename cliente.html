@@ -30,29 +30,29 @@
     header { background: var(--topo); border-bottom: 1px solid var(--linha); }
     .topo { display: flex; align-items: center; gap: 12px; padding: 14px 16px; max-width: 860px; margin: 0 auto; }
     .topo img { height: 40px; }
-    .topo .marca { font-family: Oswald, sans-serif; letter-spacing: 1px; text-transform: uppercase; font-size: 13px; color: var(--primary); }
+    .topo .marca { font-family: Oswald, sans-serif; font-size: 13px; color: var(--primary); }
     main { max-width: 860px; margin: 0 auto; padding: 20px 16px 48px; }
-    h1 { font-family: Oswald, sans-serif; font-weight: 500; font-size: 26px; margin: 0 0 4px; }
-    h2 { font-family: Oswald, sans-serif; font-weight: 400; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--suave); margin: 22px 0 10px; }
+    h1 { font-family: Oswald, sans-serif; font-weight: 500; font-size: 24px; margin: 0 0 4px; }
+    h2 { font-family: Oswald, sans-serif; font-weight: 400; font-size: 13px; color: var(--suave); margin: 22px 0 10px; }
     .sub { color: var(--suave); margin: 0 0 18px; }
     .obra { background: var(--card); border: 1px solid var(--linha); border-radius: 16px; padding: 18px; margin-bottom: 20px; }
     .obra-cab { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: flex-start; }
-    .obra-nome { font-family: Oswald, sans-serif; font-size: 21px; font-weight: 500; }
+    .obra-nome { font-family: Oswald, sans-serif; font-size: 20px; font-weight: 500; }
     .obra-local { color: var(--suave); font-size: 13px; }
-    .selo { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+    .selo { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
     .selo.curso { background: rgba(181,136,99,.2); color: var(--primary); }
     .selo.feita { background: rgba(143,191,160,.16); color: var(--ok); }
     .barra { height: 8px; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; margin: 14px 0 6px; }
     .barra > div { height: 100%; background: var(--caramelo); border-radius: 99px; }
     .contas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0 4px; }
     .contas div { background: rgba(127,127,127,.08); border-radius: 10px; padding: 10px; text-align: center; }
-    .contas span { display: block; font-size: 11px; color: var(--suave); text-transform: uppercase; letter-spacing: .5px; }
-    .contas b { display: block; font-size: 15px; margin-top: 2px; }
+    .contas span { display: block; font-size: 11px; color: var(--suave); }
+    .contas b { display: block; font-size: 16px; margin-top: 2px; }
     .contas-nota { font-size: 12px; color: var(--suave); margin: 4px 0 0; }
     .meta { display: flex; justify-content: space-between; font-size: 13px; color: var(--suave); flex-wrap: wrap; gap: 6px; }
     .doc { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--linha); text-decoration: none; color: inherit; }
     .doc:first-child { border-top: none; }
-    .doc .ic { font-size: 22px; width: 28px; text-align: center; }
+    .doc .ic { font-size: 20px; width: 28px; text-align: center; }
     .doc .tx { flex: 1; min-width: 0; }
     .doc .nm { font-weight: 600; word-break: break-word; }
     .doc .dt { font-size: 12px; color: var(--suave); }
@@ -64,7 +64,7 @@
     .fotos img { width: 100%; height: 100%; object-fit: cover; display: block; }
     /* Foto que o telemóvel não consegue mostrar (ex.: HEIC no Android) */
     .fotos .sem-pre { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; text-align: center; color: var(--suave); font-size: 12px; }
-    .fotos .sem-pre b { font-size: 26px; font-weight: 400; }
+    .fotos .sem-pre b { font-size: 24px; font-weight: 400; }
     .fotos a.falhou img { display: none; }
     .fotos a.falhou .sem-pre { display: flex; }
     .fotos .vid { aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: #25363f; }
@@ -89,7 +89,7 @@
     details.auto summary .nm::before { content: "▸ "; color: var(--primary); }
     details.auto[open] summary .nm::before { content: "▾ "; }
     details.auto table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
-    details.auto td { padding: 5px 0; border-top: 1px solid var(--linha); vertical-align: top; }
+    details.auto td { padding: 4px 0; border-top: 1px solid var(--linha); vertical-align: top; }
     details.auto td.n { text-align: right; white-space: nowrap; padding-left: 10px; }
     details.auto tr.tot td { font-weight: 600; }
     details.auto .notas { font-size: 13px; color: var(--suave); margin-top: 8px; white-space: pre-wrap; }
@@ -99,7 +99,7 @@
     .diario .tx { white-space: pre-wrap; }
     .resp { padding: 0 0 12px 40px; }
     .resp .botoes { display: flex; gap: 8px; flex-wrap: wrap; }
-    .resp button { font: inherit; font-size: 14px; font-weight: 600; border-radius: 10px; padding: 9px 14px; cursor: pointer; border: 1px solid var(--caramelo); background: transparent; color: var(--primary); }
+    .resp button { font: inherit; font-size: 14px; font-weight: 600; border-radius: 10px; padding: 8px 14px; cursor: pointer; border: 1px solid var(--caramelo); background: transparent; color: var(--primary); }
     .resp button.principal { background: var(--caramelo); color: #131c25; }
     .resp button:disabled { opacity: .5; cursor: default; }
     .resp .caixa { background: rgba(255,255,255,.04); border: 1px solid var(--linha); border-radius: 12px; padding: 12px; }
@@ -108,14 +108,14 @@
     .resp .erro { color: #e59a8f; font-size: 13px; margin-top: 8px; }
     .rodape { text-align: center; color: var(--suave); font-size: 12px; margin-top: 30px; }
     .doc.sem-link { cursor: default; } .doc.sem-link .abrir { color: var(--suave); }
-    .aviso-links { background: rgba(224,176,122,.12); border: 1px solid rgba(224,176,122,.35); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; margin-bottom: 14px; }
+    .aviso-links { background: rgba(224,176,122,.12); border: 1px solid rgba(224,176,122,.35); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-bottom: 14px; }
     .aviso-links button { font: inherit; font-size: 13px; margin-left: 6px; background: none; border: none; color: var(--primary); text-decoration: underline; cursor: pointer; padding: 0; }
     /* Avanço por pacotes */
-    .pacotes .zona { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--suave); margin: 12px 0 4px; }
+    .pacotes .zona { font-size: 12px; color: var(--suave); margin: 12px 0 4px; }
     .pacotes .zona:first-child { margin-top: 0; }
     .fases .fase-corpo { flex: 1; min-width: 0; }
     .fases .pacotes { margin-top: 4px; }
-    .fases .pac { font-size: 13px; padding: 3px 0; grid-template-columns: 1fr 70px 40px; }
+    .fases .pac { font-size: 13px; padding: 4px 0; grid-template-columns: 1fr 70px 40px; }
     .pac { display: grid; grid-template-columns: 1fr 90px 44px; gap: 10px; align-items: center; padding: 6px 0; font-size: 14px; }
     .pac .mini { height: 6px; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; }
     .pac .mini > div { height: 100%; background: var(--caramelo); }
@@ -127,20 +127,20 @@
     .extra:first-of-type, .remate:first-of-type { border-top: none; }
     .extra .cab, .remate .cab { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
     .extra .nm, .remate .nm { font-weight: 600; white-space: pre-wrap; }
-    .extra .dt, .remate .dt { font-size: 12.5px; color: var(--suave); margin-top: 2px; }
+    .extra .dt, .remate .dt { font-size: 13px; color: var(--suave); margin-top: 2px; }
     .extra .resp, .remate .resp { padding: 10px 0 0; }
-    .extra input[type=text] { width: 100%; font: inherit; font-size: 14px; color: var(--texto); background: var(--bg); border: 1px solid var(--linha); border-radius: 10px; padding: 9px 10px; margin-bottom: 10px; }
+    .extra input[type=text] { width: 100%; font: inherit; font-size: 14px; color: var(--texto); background: var(--bg); border: 1px solid var(--linha); border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; }
     .remate .fotos { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); margin-top: 8px; }
     .remate .fotos a { aspect-ratio: 4/3; }
     .remate .leg { position: absolute; left: 6px; bottom: 6px; font-size: 11px; background: rgba(0,0,0,.6); color: #fff; padding: 1px 6px; border-radius: 6px; }
-    .remates-resumo { font-size: 13.5px; color: var(--suave); margin-bottom: 4px; }
+    .remates-resumo { font-size: 14px; color: var(--suave); margin-bottom: 4px; }
     /* Novo esta semana: no topo até "Tomei conhecimento" ou 7 dias */
     .novos { background: rgba(181,136,99,.10); border: 1px solid rgba(208,164,127,.45); border-radius: 14px; padding: 14px 16px; margin: 18px 0 8px; }
     .novos h2 { margin-top: 0; }
-    .novos .de-obra { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--suave); margin: 12px 0 4px; }
+    .novos .de-obra { font-size: 12px; color: var(--suave); margin: 12px 0 4px; }
     .novos .fotos { margin-top: 8px; }
     .novos .acoes { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
-    .novos .acoes button { font: inherit; font-size: 14px; font-weight: 600; border-radius: 10px; padding: 9px 16px; cursor: pointer; border: none; background: var(--caramelo); color: #131c25; }
+    .novos .acoes button { font: inherit; font-size: 14px; font-weight: 600; border-radius: 10px; padding: 8px 16px; cursor: pointer; border: none; background: var(--caramelo); color: #131c25; }
     .novos .acoes button:disabled { opacity: .5; cursor: default; }
     .novos .acoes span { font-size: 12px; color: var(--suave); }
     .novos .erro { color: #e59a8f; font-size: 13px; }
@@ -152,7 +152,7 @@
     .novo-pedido { margin-top: 10px; }
     .novo-pedido select, .novo-pedido textarea { width: 100%; font: inherit; font-size: 14px; color: var(--texto); background: var(--bg); border: 1px solid var(--linha); border-radius: 10px; padding: 10px; margin-bottom: 8px; }
     .novo-pedido textarea { min-height: 80px; resize: vertical; }
-    .novo-pedido button { font: inherit; font-size: 14px; font-weight: 600; border-radius: 10px; padding: 9px 14px; cursor: pointer; border: none; background: var(--caramelo); color: #131c25; }
+    .novo-pedido button { font: inherit; font-size: 14px; font-weight: 600; border-radius: 10px; padding: 8px 14px; cursor: pointer; border: none; background: var(--caramelo); color: #131c25; }
     .novo-pedido button:disabled { opacity: .5; }
     .novo-pedido .erro { color: #e59a8f; font-size: 13px; }
     .novo-pedido .ok { color: var(--ok); font-size: 13px; }
@@ -176,7 +176,7 @@
     </div>
 </main>
 
-<script src="curva.js?v=2"></script>
+<script src="curva.js?v=3"></script>
 <script>
 const FUNCAO = "https://npyosbigynxmxdakcymg.supabase.co/functions/v1/area-cliente";
 const TOKEN  = new URLSearchParams(location.search).get("t") || "";
@@ -684,5 +684,6 @@ async function iniciar() {
 }
 iniciar();
 </script>
+<script src="icones.js?v=1"></script>
 </body>
 </html>

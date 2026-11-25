@@ -818,8 +818,8 @@ function cotRenderRevisao() {
             <td style="min-width:220px"><select data-ll="destino">${opcoes(l)}</select>
                 ${novo ? `<div style="display:flex;gap:4px;margin-top:4px"><input data-ll="novoNome" value="${cotEsc(l.novoNome)}" placeholder="Nome do artigo"><input data-ll="novaUn" value="${cotEsc(l.novaUn)}" style="width:60px;min-width:60px" placeholder="un"></div>
                 <label class="cot-ed-chk" style="font-size:11px"><input type="checkbox" data-ll="fora" ${l.fora ? "checked" : ""}> fora do cesto (portes, taxas)</label>` : ""}</td>
-            <td><input data-ll="qtd" class="num" style="width:90px;min-width:90px" value="${l.qtd == null ? "" : cotQtd(l.qtd)}"><div style="font-size:10px;color:var(--text-muted)">${cotEsc(un)}</div></td>
-            <td><input data-ll="preco" class="num" style="width:90px;min-width:90px" value="${l.preco == null ? "" : cotNum(l.preco, 4)}"><div style="font-size:10px;color:var(--text-muted)">€/${cotEsc(un)}</div></td>
+            <td><input data-ll="qtd" class="num" style="width:90px;min-width:90px" value="${l.qtd == null ? "" : cotQtd(l.qtd)}"><div style="font-size:11px;color:var(--text-muted)">${cotEsc(un)}</div></td>
+            <td><input data-ll="preco" class="num" style="width:90px;min-width:90px" value="${l.preco == null ? "" : cotNum(l.preco, 4)}"><div style="font-size:11px;color:var(--text-muted)">€/${cotEsc(un)}</div></td>
             <td class="cot-nota" style="min-width:180px">${cotEsc(l.conversao)}</td></tr>`;
     });
     h += `</tbody></table></div>`;

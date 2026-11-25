@@ -128,7 +128,7 @@ function desenharAndamento() {
 // ── Fases ────────────────────────────────────────────────────
 function htmlFases() {
     const titulo = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-        <div style="font-family:var(--font-title,sans-serif);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;opacity:.6">Fases da obra</div>
+        <div style="font-family:var(--font-title,sans-serif);font-size:12px;opacity:.6">Fases da obra</div>
         ${_andamento.fases.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap">
             ${btnSugerirFases()}
             <button class="btn-secondary" style="padding:4px 12px;font-size:12px" onclick="mostrarTrocaFases()" title="Substituir pelas fases de outro tipo de obra">Trocar fases</button>
@@ -158,14 +158,14 @@ function htmlFases() {
 
     const linhas = _andamento.fases.map((f, i) => {
         const e = ESTADOS_FASE[f.estado] || ESTADOS_FASE.por_fazer;
-        return `<div class="fase-linha" style="display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center;padding:9px 0;border-top:${i ? "1px solid rgba(255,255,255,.06)" : "none"}">
+        return `<div class="fase-linha" style="display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center;padding:8px 0;border-top:${i ? "1px solid rgba(255,255,255,.06)" : "none"}">
             <div style="min-width:0">
                 <div style="font-weight:600;font-size:13px">${esc(f.nome)}${f.visivel_cliente ? "" : ` <span title="O cliente não vê esta fase" style="opacity:.5;font-size:11px">🔒</span>`}</div>
                 <div style="font-size:11px;opacity:.55">${f.data_inicio || f.data_fim
                     ? `${dataAnd(f.data_inicio) || "?"} → ${dataAnd(f.data_fim) || "?"}` : "Sem datas"}${resumoPacotesFase(f.id)}</div>
             </div>
             <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
-                <select onchange="mudarEstadoFase('${f.id}', this.value)" style="font-size:12px;padding:3px 6px;color:${e.cor};background:${e.bg};border-radius:8px;width:auto">
+                <select onchange="mudarEstadoFase('${f.id}', this.value)" style="font-size:12px;padding:4px 6px;color:${e.cor};background:${e.bg};border-radius:8px;width:auto">
                     ${Object.entries(ESTADOS_FASE).map(([k, v]) => `<option value="${k}"${k === f.estado ? " selected" : ""}>${v.nome}</option>`).join("")}
                 </select>
                 <button class="btn-acao" title="Subir" onclick="moverFase('${f.id}', -1)"${i ? "" : " disabled style=\"opacity:.25\""}>↑</button>
@@ -254,8 +254,8 @@ function formFase(f) {
         <label style="font-size:11px;opacity:.7">Fim previsto<input type="date" id="faseFim-${id}" value="${f?.data_fim || ""}"></label>
         <label style="grid-column:1/-1;font-size:12px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="faseVis-${id}" style="width:auto"${f?.visivel_cliente === false ? "" : " checked"}> O cliente vê esta fase</label>
         <div style="grid-column:1/-1;display:flex;gap:6px">
-            <button class="btn-primary" style="padding:5px 14px;font-size:12px" onclick="gravarFase('${f?.id || ""}')">Gravar</button>
-            <button class="btn-secondary" style="padding:5px 14px;font-size:12px" onclick="desenharAndamento()">Cancelar</button>
+            <button class="btn-primary" style="padding:4px 14px;font-size:12px" onclick="gravarFase('${f?.id || ""}')">Gravar</button>
+            <button class="btn-secondary" style="padding:4px 14px;font-size:12px" onclick="desenharAndamento()">Cancelar</button>
         </div>
     </div>`;
 }
@@ -369,7 +369,7 @@ function htmlAutos() {
     const pedido = _andamento.autos.reduce((s, a) => s + totaisAuto(a).base, 0);
 
     const titulo = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-        <div style="font-family:var(--font-title,sans-serif);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;opacity:.6">Autos de medição</div>
+        <div style="font-family:var(--font-title,sans-serif);font-size:12px;opacity:.6">Autos de medição</div>
         ${servs.length ? `<button class="btn-secondary" style="padding:4px 12px;font-size:12px" onclick="novoAuto()">+ Novo auto</button>` : ""}
     </div>`;
 
@@ -380,7 +380,7 @@ function htmlAutos() {
     const plano = _painelObraActual.plano_pagamentos ?? "50/30/20";
     const linhaPlano = `<div style="font-size:12px;margin-bottom:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         <span style="opacity:.7">Plano de pagamentos:</span>
-        <input id="planoPag" value="${esc(plano)}" placeholder="ex.: 50/30/20" style="width:120px;padding:3px 8px;font-size:12px"
+        <input id="planoPag" value="${esc(plano)}" placeholder="ex.: 50/30/20" style="width:120px;padding:4px 8px;font-size:12px"
             onchange="gravarPlanoPagamentos(this.value)" title="% de cada prestação, separadas por /. Vazio = sem plano.">
         <span style="opacity:.5">% de cada prestação</span>
     </div>`;
@@ -402,7 +402,7 @@ function htmlAutos() {
     return titulo + resumo + _andamento.autos.slice().reverse().map((a, i) => {
         const t = totaisAuto(a);
         const e = ESTADOS_AUTO[a.estado] || ESTADOS_AUTO.rascunho;
-        return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 0;border-top:${i ? "1px solid rgba(255,255,255,.06)" : "none"}">
+        return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0;border-top:${i ? "1px solid rgba(255,255,255,.06)" : "none"}">
             <div>
                 <div style="font-weight:600;font-size:13px">Auto nº ${a.numero} · ${dataAnd(a.data)}</div>
                 <div style="font-size:11px;opacity:.6" title="${esc(e.dica)}">${e.nome} · ${eurAnd(t.base)} + IVA ${Number(a.taxa_iva)}% = <b>${eurAnd(t.total)}</b></div>
@@ -478,7 +478,7 @@ function htmlEditorAuto() {
         </tr>`).join("");
 
     return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px">
-            <div style="font-family:var(--font-title,sans-serif);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;opacity:.6">Auto de medição nº ${a.numero}</div>
+            <div style="font-family:var(--font-title,sans-serif);font-size:12px;opacity:.6">Auto de medição nº ${a.numero}</div>
             <button class="btn-secondary" style="padding:4px 12px;font-size:12px" onclick="fecharEditorAuto()">Fechar</button>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:10px">
@@ -531,7 +531,7 @@ function recalcularAuto() {
     const taxa = Number(document.getElementById("autoIva")?.value) || 0;
     const iva = arred2(base * taxa / 100);
     const el = document.getElementById("autoTotais");
-    if (el) el.innerHTML = `${eurAnd(base)} + IVA ${taxa}% ${eurAnd(iva)} = <b style="font-size:15px">${eurAnd(base + iva)}</b>`;
+    if (el) el.innerHTML = `${eurAnd(base)} + IVA ${taxa}% ${eurAnd(iva)} = <b style="font-size:16px">${eurAnd(base + iva)}</b>`;
 }
 
 async function gravarAuto() {
@@ -614,7 +614,7 @@ function htmlDiario() {
     const dias = diasDoDiario();
     const hoje = new Date().toISOString().slice(0, 10);
     const titulo = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-        <div style="font-family:var(--font-title,sans-serif);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;opacity:.6">Diário de obra · últimos ${DIAS_DIARIO} dias</div>
+        <div style="font-family:var(--font-title,sans-serif);font-size:12px;opacity:.6">Diário de obra · últimos ${DIAS_DIARIO} dias</div>
         ${dias.some(d => d.data === hoje) ? "" : `<button class="btn-secondary" style="padding:4px 12px;font-size:12px" onclick="editarNotaDia('${hoje}')">+ Nota de hoje</button>`}
     </div>
     <div id="diarioEd-${hoje}-novo"></div>`;
@@ -627,7 +627,7 @@ function htmlDiario() {
         const tar = d.tarefas.map(t => `${t.estado === "concluida" ? "✓" : "•"} ${esc(t.descricao)}`).join("<br>");
         const fotos = d.fotos.map(f => `<a href="#" onclick="abrirDocumentoObra('${f.id}');return false" title="${esc(f.nome_ficheiro)}">${/^video\//i.test(f.mime || "") ? "🎬" : "📷"}</a>`).join(" ");
         const nota = d.nota;
-        return `<div style="padding:9px 0;border-top:${i ? "1px solid rgba(255,255,255,.06)" : "none"};font-size:12px">
+        return `<div style="padding:8px 0;border-top:${i ? "1px solid rgba(255,255,255,.06)" : "none"};font-size:12px">
             <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
                 <b style="font-size:13px;text-transform:capitalize">${sem(d.data)}</b>
                 <button class="btn-acao" title="${nota ? "Editar a nota" : "Escrever nota"}" onclick="editarNotaDia('${d.data}')">✏️</button>
@@ -651,10 +651,10 @@ function editarNotaDia(data) {
         <textarea id="diarioTxt" rows="3" maxlength="4000" placeholder="Ocorrências, atrasos, visitas, o que ficou feito…">${esc(n?.notas || "")}</textarea>
         <label style="font-size:12px;display:flex;gap:6px;align-items:center;margin:6px 0"><input type="checkbox" id="diarioVis" style="width:auto"${n?.visivel_cliente ? " checked" : ""}> O cliente vê esta nota</label>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn-primary" style="padding:5px 14px;font-size:12px" onclick="gravarNotaDia('${data}')">Gravar</button>
-            <button class="btn-secondary" style="padding:5px 14px;font-size:12px" onclick="desenharAndamento()">Cancelar</button>
-            <button type="button" class="btn-secondary" id="diarioMic" style="padding:5px 14px;font-size:12px;display:none">🎤 Ditar</button>
-            <button type="button" class="btn-secondary" style="padding:5px 14px;font-size:12px" onclick="arrumarNotaDia(this)">✨ Arrumar</button>
+            <button class="btn-primary" style="padding:4px 14px;font-size:12px" onclick="gravarNotaDia('${data}')">Gravar</button>
+            <button class="btn-secondary" style="padding:4px 14px;font-size:12px" onclick="desenharAndamento()">Cancelar</button>
+            <button type="button" class="btn-secondary" id="diarioMic" style="padding:4px 14px;font-size:12px;display:none">🎤 Ditar</button>
+            <button type="button" class="btn-secondary" style="padding:4px 14px;font-size:12px" onclick="arrumarNotaDia(this)">✨ Arrumar</button>
         </div></div>`;
     if (typeof ligarDitado === "function") ligarDitado(document.getElementById("diarioMic"), document.getElementById("diarioTxt"));
     document.getElementById("diarioTxt").focus();
@@ -842,7 +842,7 @@ function abrirModalSugestaoFases(html) {
     }
     m.innerHTML = `<div style="background:#25363f;border-radius:14px;width:100%;max-width:760px;padding:20px;border:1px solid rgba(255,255,255,.08);margin:auto 0">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-            <div style="font-family:var(--font-title,sans-serif);font-size:17px">✨ Fases sugeridas pelo assistente</div>
+            <div style="font-family:var(--font-title,sans-serif);font-size:18px">✨ Fases sugeridas pelo assistente</div>
             <button onclick="fecharSugestaoFases()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer">×</button>
         </div>
         <div id="sugFasesCorpo">${html}</div>

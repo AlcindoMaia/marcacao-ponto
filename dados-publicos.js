@@ -94,13 +94,13 @@ async function verificarNif(nif, elInfo, campos = {}) {
         const r = await dadosPublicos({ acao: "nif", nif });
         if (elInfo.dataset.pedido !== pedido) return;
         if (!r.valido) {
-            elInfo.style.color = "#f87171";
+            elInfo.style.color = "var(--color-err)";
             elInfo.textContent = "⚠ Este NIF não é válido. Confirme se não há um dígito trocado.";
             return;
         }
         const v = r.vies || {};
         if (v.registado) {
-            elInfo.style.color = "#4ade80";
+            elInfo.style.color = "var(--color-ok)";
             elInfo.textContent = `✓ NIF válido${v.nome ? ` · ${v.nome}` : ""} (VIES)`;
             const preencher = (id, valor) => {
                 const el = id && document.getElementById(id);

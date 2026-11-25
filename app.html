@@ -65,13 +65,13 @@ html, body {
 
 .loading-logo {
   font-family: var(--font-t);
-  font-size: 26px; letter-spacing: 5px;
+  font-size: 24px; letter-spacing: 5px;
   text-transform: uppercase; color: var(--primary);
   font-weight: 400;
 }
 .loading-sub {
-  font-size: 11px; letter-spacing: 2px;
-  text-transform: uppercase; color: var(--muted);
+  font-size: 11px;
+ color: var(--muted);
 }
 .spinner {
   width: 32px; height: 32px;
@@ -93,8 +93,8 @@ html, body {
 .bloq-icon { font-size: 48px; margin-bottom: 6px; }
 #bloqueioTitulo {
   font-family: var(--font-t);
-  font-size: 20px; letter-spacing: 1.5px;
-  text-transform: uppercase; color: var(--primary);
+  font-size: 20px;
+ color: var(--primary);
   font-weight: 500;
 }
 #bloqueioMsg {
@@ -102,7 +102,7 @@ html, body {
 }
 .btn-bloqueio {
   display: inline-block; padding: 12px 22px; border: none; border-radius: 10px;
-  background: var(--primary); color: #fff; font-size: 15px; font-weight: 600;
+  background: var(--primary); color: #fff; font-size: 16px; font-weight: 600;
   text-decoration: none; cursor: pointer; font-family: inherit;
 }
 
@@ -133,7 +133,7 @@ html, body {
 }
 .topbar-clock {
   font-family: var(--font-t);
-  font-size: 16px; letter-spacing: 1px;
+  font-size: 16px;
   color: var(--text); font-weight: 300;
   font-variant-numeric: tabular-nums;
 }
@@ -158,18 +158,18 @@ html, body {
   width: 42px; height: 42px; border-radius: 50%;
   background: var(--primary); flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-t); font-size: 17px; font-weight: 600;
+  font-family: var(--font-t); font-size: 18px; font-weight: 600;
   color: #fff; letter-spacing: 0;
 }
 .id-info { flex: 1; min-width: 0; }
 .id-nome {
-  font-size: 15px; font-weight: 600;
+  font-size: 16px; font-weight: 600;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   line-height: 1.2;
 }
 .id-obra {
   font-size: 12px; color: var(--muted);
-  margin-top: 3px;
+  margin-top: 4px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 /* Área do funcionário: escolha da obra */
@@ -177,16 +177,16 @@ html, body {
   margin-top: 6px; width: 100%; max-width: 100%;
   font: inherit; font-size: 13px; color: var(--text);
   background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 8px; padding: 7px 8px;
+  border-radius: 8px; padding: 8px 8px;
 }
 .estado-wrap {
   flex-shrink: 0; display: flex; flex-direction: column;
-  align-items: flex-end; gap: 3px;
+  align-items: flex-end; gap: 4px;
 }
 .estado-pill {
   display: flex; align-items: center; gap: 6px;
   background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 20px; padding: 5px 11px;
+  border-radius: 20px; padding: 4px 12px;
 }
 .estado-dot {
   width: 7px; height: 7px; border-radius: 50%;
@@ -199,7 +199,7 @@ html, body {
 }
 .estado-dot.saida { background: var(--orange); }
 .estado-label { font-size: 11px; font-weight: 500; color: var(--text); }
-#estadoHora { font-size: 10px; color: var(--muted); }
+#estadoHora { font-size: 11px; color: var(--muted); }
 
 /* ── BOTÃO CENTRAL ── */
 .btn-zone {
@@ -215,7 +215,7 @@ html, body {
   border-radius: 50%; border: none;
   cursor: pointer;
   display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 5px;
+  align-items: center; justify-content: center; gap: 4px;
   background: conic-gradient(from 200deg at 40% 60%, #c49a76, #9a7150, #c49a76);
   box-shadow:
     0 0 0 8px  rgba(181,136,99,.07),
@@ -240,13 +240,13 @@ html, body {
 
 #btnIcon   { font-size: 36px; line-height: 1; position: relative; z-index: 1; color: #fff; }
 #btnLabel  {
-  font-family: var(--font-t); font-size: 19px;
-  letter-spacing: 3.5px; font-weight: 500;
-  color: #fff; text-transform: uppercase;
+  font-family: var(--font-t); font-size: 20px;
+ font-weight: 500;
+  color: #fff;
   position: relative; z-index: 1;
 }
 #btnSublabel {
-  font-size: 10px; color: rgba(255,255,255,.75);
+  font-size: 11px; color: rgba(255,255,255,.75);
   text-align: center; max-width: 110px; line-height: 1.3;
   position: relative; z-index: 1;
 }
@@ -275,17 +275,17 @@ html, body {
   min-height: 0;
 }
 .hist-label {
-  font-family: var(--font-t);
-  font-size: 10px; letter-spacing: 2.5px;
-  text-transform: uppercase; color: var(--muted);
+  font-family: var(--font-b, inherit);
+  font-size: 12px;
+ color: var(--muted);
   margin-bottom: 10px;
 }
-.hist-lista { display: flex; flex-direction: column; gap: 3px; }
+.hist-lista { display: flex; flex-direction: column; gap: 4px; }
 
 .hist-item {
   display: grid;
   grid-template-columns: 8px 1fr auto;
-  align-items: center; gap: 11px;
+  align-items: center; gap: 12px;
   padding: 10px 14px;
   background: var(--surface);
   border-radius: 10px;
@@ -306,7 +306,7 @@ html, body {
 }
 .hist-total {
   font-family: var(--font-t);
-  font-size: 13px; letter-spacing: .5px;
+  font-size: 13px;
   color: var(--primary);
   min-width: 38px; text-align: right;
 }
@@ -331,7 +331,7 @@ html, body {
 }
 .painel-saida-linha button {
   background: var(--primary); color: #131c25; border: none; border-radius: 8px;
-  padding: 0 18px; font-weight: 600; font-size: 15px;
+  padding: 0 18px; font-weight: 600; font-size: 16px;
 }
 .painel-saida-nao {
   margin-top: 8px; background: none; border: none; color: var(--muted);
@@ -351,15 +351,15 @@ html, body {
   margin-top: 10px; background: var(--surface); border: 1px solid var(--border);
   border-radius: 12px; padding: 14px;
 }
-.corte-info { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin-bottom: 10px; }
+.corte-info { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 10px; }
 .corte-zona {
-  font-family: var(--font-t); font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  font-family: var(--font-t); font-size: 11px;
   color: var(--muted); margin: 12px 0 6px;
 }
 .corte-linha { padding: 8px 0; border-top: 1px solid var(--border); }
 .corte-linha:first-of-type { border-top: none; }
 .corte-nome { font-size: 14px; font-weight: 500; }
-.corte-crit { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.corte-crit { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .corte-medir { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
 .corte-medir input[type=range] { flex: 1; accent-color: var(--primary); }
 .corte-medir output { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -370,7 +370,7 @@ html, body {
 }
 .corte-enviar {
   width: 100%; margin-top: 10px; background: var(--primary); color: #131c25; border: none;
-  border-radius: 10px; padding: 12px; font-weight: 700; font-size: 15px;
+  border-radius: 10px; padding: 12px; font-weight: 600; font-size: 16px;
 }
 .corte-msg { font-size: 13px; margin-top: 8px; }
 
@@ -385,7 +385,7 @@ html, body {
 .pub-opcao input { width: 20px; height: 20px; accent-color: var(--primary); }
 .pub-urgente { margin-left: 30px; }
 .pub-minhas { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 8px; }
-.pub-minha { font-size: 12.5px; padding: 6px 0; color: var(--muted); line-height: 1.4; }
+.pub-minha { font-size: 13px; padding: 6px 0; color: var(--muted); line-height: 1.4; }
 .pub-minha b { color: var(--text); font-weight: 500; }
 .pub-aberto { color: #e09486; }
 .pub-resolvido { color: #8fc49a; }
@@ -445,7 +445,7 @@ html, body {
     <div class="btn-zone">
       <button class="btn-marcacao" id="btnMarcacao">
         <span id="btnIcon">▶</span>
-        <span id="btnLabel">ENTRADA</span>
+        <span id="btnLabel">Entrada</span>
         <span id="btnSublabel">Toca para registar entrada</span>
       </button>
       <div class="feedback" id="feedback"></div>
@@ -503,18 +503,18 @@ html, body {
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="config.js?v=4"></script>
 <script src="fotos.js?v=2"></script>
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 
 <!-- Modal parecer saída -->
 <div id="modalParecer" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:3000;align-items:flex-end;justify-content:center;padding:0">
     <div style="background:#1d2a37;border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:24px 24px calc(env(safe-area-inset-bottom,0px) + 24px)">
-        <div style="font-family:'Oswald',sans-serif;font-size:16px;letter-spacing:1px;margin-bottom:6px;color:#d0a47f">Como correu o dia?</div>
+        <div style="font-family:'Oswald',sans-serif;font-size:16px;margin-bottom:6px;color:#d0a47f">Como correu o dia?</div>
         <div style="font-size:13px;color:rgba(255,255,255,.4);margin-bottom:16px">Opcional — o teu parecer ajuda a acompanhar o progresso da obra.</div>
         <textarea id="parecerTexto" rows="3" placeholder="Ex: Concluímos a primeira camada do capoto…"
             style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:12px;color:#fff;font-size:14px;font-family:'DM Sans',sans-serif;resize:none;outline:none"></textarea>
         <div style="display:flex;gap:10px;margin-top:14px">
             <button onclick="submeterParecer(false)" style="flex:1;background:rgba(255,255,255,.08);border:none;border-radius:10px;padding:12px;color:rgba(255,255,255,.6);font-size:14px;cursor:pointer">Ignorar</button>
-            <button onclick="submeterParecer(true)" style="flex:1;background:#b58863;border:none;border-radius:10px;padding:12px;color:#fff;font-size:14px;font-weight:700;cursor:pointer">Confirmar ✓</button>
+            <button onclick="submeterParecer(true)" style="flex:1;background:#b58863;border:none;border-radius:10px;padding:12px;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Confirmar ✓</button>
         </div>
     </div>
 </div>
@@ -548,5 +548,6 @@ async function submeterParecer(guardar) {
 }
 </script>
 
+<script src="icones.js?v=1"></script>
 </body>
 </html>

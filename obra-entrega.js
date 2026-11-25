@@ -61,7 +61,7 @@ function htmlCartoesEntrega() {
 }
 
 const tituloCartao = (txt, botao = "") => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-    <div style="font-family:var(--font-title,sans-serif);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;opacity:.6">${txt}</div>${botao}</div>`;
+    <div style="font-family:var(--font-title,sans-serif);font-size:12px;opacity:.6">${txt}</div>${botao}</div>`;
 const selo = (txt, cor) => `<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${cor};white-space:nowrap">${esc(txt)}</span>`;
 const dataHoraCurta = d => d ? new Date(d).toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "";
 
@@ -78,7 +78,7 @@ function htmlExtras() {
         return h + `<div style="font-size:13px;opacity:.7">Nenhum. Quando o cliente pedir um extra (ou o pedir pela Área do cliente), faz aqui o preço e envia-lho para aceitar. Ao aceitar, soma ao valor da obra.</div>`;
     }
     if (lista.length) {
-        h += `<div style="font-size:12.5px;opacity:.75;margin-bottom:6px">${aceites.length} aceite${aceites.length === 1 ? "" : "s"}: <b>${eurAnd(soma)}</b> sem IVA${pend ? ` · ${pend} à espera do cliente` : ""}</div>`;
+        h += `<div style="font-size:13px;opacity:.75;margin-bottom:6px">${aceites.length} aceite${aceites.length === 1 ? "" : "s"}: <b>${eurAnd(soma)}</b> sem IVA${pend ? ` · ${pend} à espera do cliente` : ""}</div>`;
     }
     h += lista.map((x, i) => {
         const e = ESTADOS_EXTRA[x.estado] || ESTADOS_EXTRA.rascunho;
@@ -98,7 +98,7 @@ function htmlExtras() {
         } else if (x.estado === "recusado" || x.estado === "cancelado") {
             botoes.push(`<button class="btn-acao" title="Apagar" onclick="apagarExtra('${x.id}')">🗑</button>`);
         }
-        return `<div style="padding:9px 0;border-top:${i || _extraEmEdicao ? "1px solid rgba(255,255,255,.06)" : "none"};font-size:13px">
+        return `<div style="padding:8px 0;border-top:${i || _extraEmEdicao ? "1px solid rgba(255,255,255,.06)" : "none"};font-size:13px">
             <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap">
                 <div style="flex:1;min-width:180px;white-space:pre-wrap">${esc(x.descricao)}</div>
                 <div style="display:flex;gap:6px;align-items:center"><b>${eurAnd(x.valor_sem_iva)}</b>${selo(e.txt, e.cor)}</div>
@@ -120,9 +120,9 @@ function htmlFormExtra(x) {
             <label style="width:120px;font-size:12px">Dias a mais no prazo<input id="extraDias" type="number" step="1" min="0" max="365" value="${x.dias_prazo ?? ""}"></label>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
-            <button class="btn-primary" style="padding:5px 14px;font-size:12px" onclick="gravarExtra(true)">Gravar e enviar ao cliente</button>
-            <button class="btn-secondary" style="padding:5px 14px;font-size:12px" onclick="gravarExtra(false)">Só gravar (rascunho)</button>
-            <button class="btn-secondary" style="padding:5px 14px;font-size:12px" onclick="fecharFormExtra()">Cancelar</button>
+            <button class="btn-primary" style="padding:4px 14px;font-size:12px" onclick="gravarExtra(true)">Gravar e enviar ao cliente</button>
+            <button class="btn-secondary" style="padding:4px 14px;font-size:12px" onclick="gravarExtra(false)">Só gravar (rascunho)</button>
+            <button class="btn-secondary" style="padding:4px 14px;font-size:12px" onclick="fecharFormExtra()">Cancelar</button>
         </div></div>`;
 }
 
@@ -231,18 +231,18 @@ function htmlRemates() {
     if (!lista.length && !_remateEmEdicao) {
         h += `<div style="font-size:13px;opacity:.7;margin-bottom:10px">Na vistoria final, regista aqui cada coisa por acertar, divisão a divisão, com foto. O cliente vê a lista e confirma o que ficou resolvido.</div>`;
     } else if (lista.length) {
-        h += `<div style="font-size:12.5px;opacity:.75;margin-bottom:6px">${abertos.length} por resolver · ${lista.length - abertos.length} resolvido(s) · ${confirmados} confirmado(s) pelo cliente</div>`;
+        h += `<div style="font-size:13px;opacity:.75;margin-bottom:6px">${abertos.length} por resolver · ${lista.length - abertos.length} resolvido(s) · ${confirmados} confirmado(s) pelo cliente</div>`;
     }
     // Agrupados por divisão, os abertos primeiro
     const ord = [...lista].sort((a, b) => String(a.divisao || "").localeCompare(String(b.divisao || ""), "pt")
         || (a.estado === "aberto" ? 0 : 1) - (b.estado === "aberto" ? 0 : 1));
     let divAnt = null;
     h += ord.map(r => {
-        const cab = r.divisao !== divAnt ? `<div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.55;margin:10px 0 2px">${esc(r.divisao || "Sem divisão")}</div>` : "";
+        const cab = r.divisao !== divAnt ? `<div style="font-size:11px;opacity:.55;margin:10px 0 2px">${esc(r.divisao || "Sem divisão")}</div>` : "";
         divAnt = r.divisao;
         const quem = r.responsavel_funcionario_id ? (_entrega.funcs.find(f => f.id === r.responsavel_funcionario_id)?.nome || "funcionário") : (r.responsavel_externo || "");
         const atrasado = r.estado === "aberto" && r.prazo && r.prazo < hoje;
-        return `${cab}<div style="padding:7px 0;border-top:1px solid rgba(255,255,255,.06);font-size:13px">
+        return `${cab}<div style="padding:8px 0;border-top:1px solid rgba(255,255,255,.06);font-size:13px">
             <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap">
                 <div style="flex:1;min-width:160px;white-space:pre-wrap">${r.estado === "resolvido" ? "✓ " : ""}${esc(r.descricao)}</div>
                 ${r.estado === "aberto" ? selo(atrasado ? "Atrasado" : "Por resolver", atrasado ? "rgba(224,148,134,.25)" : "rgba(224,176,122,.22)")
@@ -292,8 +292,8 @@ function htmlFormRemate(r) {
             <label style="font-size:12px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="remVis" style="width:auto"${r.visivel_cliente === false ? "" : " checked"}> O cliente vê</label>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
-            <button class="btn-primary" style="padding:5px 14px;font-size:12px" id="btnGravarRemate" onclick="gravarRemate()">Gravar</button>
-            <button class="btn-secondary" style="padding:5px 14px;font-size:12px" onclick="fecharFormRemate()">Cancelar</button>
+            <button class="btn-primary" style="padding:4px 14px;font-size:12px" id="btnGravarRemate" onclick="gravarRemate()">Gravar</button>
+            <button class="btn-secondary" style="padding:4px 14px;font-size:12px" onclick="fecharFormRemate()">Cancelar</button>
         </div></div>`;
 }
 

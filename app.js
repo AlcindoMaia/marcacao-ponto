@@ -107,10 +107,10 @@ function actualizarBotao(ultimoTipo) {
   const sublabel = document.getElementById("btnSublabel");
   const btn = document.getElementById("btnMarcacao");
   if (ultimoTipo === "entrada") {
-    icon.textContent="⏹"; label.textContent="SAÍDA"; sublabel.textContent="Toca para registar saída";
+    icon.textContent="⏹"; label.textContent="Saída"; sublabel.textContent="Toca para registar saída";
     btn.style.background = "conic-gradient(from 200deg at 40% 60%, #e09486, #a5483d, #e09486)";
   } else {
-    icon.textContent="▶"; label.textContent="ENTRADA"; sublabel.textContent="Toca para registar entrada";
+    icon.textContent="▶"; label.textContent="Entrada"; sublabel.textContent="Toca para registar entrada";
     btn.style.background = "conic-gradient(from 200deg at 40% 60%, #c49a76, #9a7150, #c49a76)";
   }
 }
